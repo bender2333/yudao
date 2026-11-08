@@ -20,7 +20,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 DOCS = {"形态与核验角色设计说明": "docs/design/forms-and-verifier-role.md",
-        "部门内多角色设计说明": "docs/design/department-roles.md",
+        "职能内多角色设计说明": "docs/design/department-roles.md",
+        "部门内多角色设计说明": "docs/design/department-roles.md",  # 11-08 以前的叫法
+        "项目的组织设计说明": "docs/design/project-organization.md",
         "骨架与应用设计说明": "docs/design/skeleton-and-application.md",
         "验证的独立性设计说明": "docs/design/independent-verification.md"}
 FILES = ["batch1-overview.ttl", "batch2-design.ttl", "batch2-eb8429e.ttl"]

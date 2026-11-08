@@ -1,95 +1,102 @@
 {
- "48e2158": [
+ "HEAD": [
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ask-between-functions",
+   "quote": "职能之间的询问也在这里。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-decision-request",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-department",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-event",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-limit",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-outcome-version",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-proposal",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-receipt",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-role",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-rotation-rules",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-round",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-verifier-conclusion",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-workitem",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "c-write-scope",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -332,16 +339,16 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "decl-default-quality",
-   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行",
+   "quote": "质检交付 → 缺陷或放行。它是默认形态里的核验角色：有核验角色时只有它的结论能放行",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "dept-engineering",
-   "quote": "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个部门的内部也可以是一个子组织。",
+   "quote": "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个职能的内部也可以是一个子组织。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -360,23 +367,23 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "dept-quality",
-   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。",
+   "quote": "质检交付 → 缺陷或放行。它是默认形态里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "form-default",
-   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "form-min",
-   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -402,30 +409,30 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "layer-facts",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "layer-loop",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "layer-org",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "layer-routing",
-   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -444,9 +451,9 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "loop-outer",
-   "quote": "外环 · 部门之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止",
+   "quote": "外环 · 职能之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": "拼接"
   },
   {
    "file": "batch1-overview.ttl",
@@ -465,9 +472,9 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "ok-guidance",
-   "quote": "你中途的指导是部门关注的成果",
+   "quote": "你中途的指导是职能关注的成果",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -479,9 +486,9 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "ok-min-completion",
-   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -535,9 +542,9 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "role-min",
-   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -633,93 +640,93 @@
   {
    "file": "batch1-overview.ttl",
    "subject": "src-incident",
-   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "src-onboarding",
-   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "src-subtask",
-   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "src-user-input",
-   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-accepting",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-asking",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-draining",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-rework",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-stopped",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-verifying",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-waiting-user",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-waiting-work",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
    "subject": "st-working",
-   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "quote": "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）",
    "doc": "docs/architecture.html",
-   "found": false
+   "found": true
   },
   {
    "file": "batch1-overview.ttl",
@@ -751,10 +758,17 @@
   },
   {
    "file": "batch2-design.ttl",
+   "subject": "ask-between-functions",
+   "quote": "询问不是成果，不画成成果箭头。",
+   "doc": "docs/design/project-organization.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
    "subject": "basis-eng-architect",
-   "quote": "项目材料、同伴交回的结论、本部门记录",
+   "quote": "项目材料、同伴交回的结论、本职能记录",
    "doc": "docs/design/department-roles.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
@@ -801,23 +815,23 @@
   {
    "file": "batch2-design.ttl",
    "subject": "dept-engineering",
-   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "quote": "职能的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
    "doc": "docs/design/department-roles.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
    "subject": "dept-product",
-   "quote": "接你的输入与建档的部门，是定义里事项的来源写明的那个部门（三部门里是产品）",
+   "quote": "接你的输入与建档的职能，是定义里事项的来源写明的那个职能（「产品 · 工程 · 质检」里是产品）",
    "doc": "docs/design/skeleton-and-application.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
    "subject": "ev-eng-review-reading",
-   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随部门",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随职能",
    "doc": "docs/design/department-roles.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
@@ -843,9 +857,9 @@
   {
    "file": "batch2-design.ttl",
    "subject": "form-default",
-   "quote": "三部门（默认） | 产品、工程、质检 | 成果驱动 | 质检 | 质检放行",
+   "quote": "「产品 · 工程 · 质检」（默认） | 产品、工程、质检 | 按成果 | 质检 | 独立核验放行",
    "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
@@ -857,30 +871,30 @@
   {
    "file": "batch2-design.ttl",
    "subject": "form-eng-center",
-   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "quote": "职能的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
    "doc": "docs/design/department-roles.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
    "subject": "form-min",
    "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
-   "doc": "docs/design/forms-and-verifier-role.md",
+   "doc": "docs/design/forms-and-verifier-role.md、docs/design/project-organization.md",
    "found": true
   },
   {
    "file": "batch2-design.ttl",
-   "subject": "form-outsourced",
-   "quote": "一个外包角色直做 | 一个外包角色 | 直做 | 没有 | 外包交回快照，开环完成并注明外包",
-   "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
+   "subject": "form-min",
+   "quote": "可以询问谁（默认写「其余职能」，改过时列出职能，只有一个职能时这一行不出现）",
+   "doc": "docs/design/forms-and-verifier-role.md、docs/design/project-organization.md",
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
    "subject": "form-several",
-   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "quote": "「产品 · 工程」有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
    "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
@@ -933,17 +947,10 @@
   },
   {
    "file": "batch2-design.ttl",
-   "subject": "ok-out-completion",
-   "quote": "外包交回快照，开环完成并注明外包",
+   "subject": "ok-sev-completion",
+   "quote": "「产品 · 工程」有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
    "doc": "docs/design/forms-and-verifier-role.md",
    "found": true
-  },
-  {
-   "file": "batch2-design.ttl",
-   "subject": "ok-sev-completion",
-   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
-   "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
   },
   {
    "file": "batch2-design.ttl",
@@ -983,30 +990,30 @@
   {
    "file": "batch2-design.ttl",
    "subject": "role-min",
-   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "quote": "「工程」只有一个角色，用工程这个职能的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（由谁做选外部 agent 时注明外包）",
    "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
-  },
-  {
-   "file": "batch2-design.ttl",
-   "subject": "role-outsourced",
-   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
-   "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
    "subject": "role-sev-engineering",
-   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "quote": "「产品 · 工程」有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
    "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-engineering",
+   "quote": "产品、工程两个自有角色；工程交付，要求不清就询问产品，产品在旁边接询问",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
   },
   {
    "file": "batch2-design.ttl",
    "subject": "role-sev-product",
-   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "quote": "「产品 · 工程」有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
    "doc": "docs/design/forms-and-verifier-role.md",
-   "found": false
+   "found": true
   },
   {
    "file": "batch2-design.ttl",

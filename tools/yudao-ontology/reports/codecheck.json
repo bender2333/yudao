@@ -1,14 +1,14 @@
 {
- "37e9d68": [
+ "5c25e1b": [
   {
    "result": "违例",
    "check": "layer-name",
    "focus": "harness/definitions/__init__.py",
    "detail": [
-    "harness/definitions/__init__.py:273 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
-    "harness/definitions/__init__.py:274 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
-    "harness/definitions/__init__.py:274 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
-    "harness/definitions/__init__.py:275 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
+    "harness/definitions/__init__.py:274 顶层集合 LEGACY_VERIFICATION里的「quality」（职能名）",
+    "harness/definitions/__init__.py:275 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:275 顶层集合 LEGACY_VERIFICATION里的「engineering」（职能名）",
+    "harness/definitions/__init__.py:276 顶层集合 LEGACY_VERIFICATION里的「quality」（职能名）"
    ]
   },
   {
@@ -57,12 +57,6 @@
    "result": "不知道",
    "check": "term-unmapped",
    "focus": "轮转的规矩",
-   "detail": []
-  },
-  {
-   "result": "不知道",
-   "check": "term-unmapped",
-   "focus": "部门",
    "detail": []
   }
  ]

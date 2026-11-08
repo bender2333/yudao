@@ -1,11 +1,11 @@
 """第 4 批：代码。把某个提交里的代码事实转写成 Turtle，再用 SHACL 查三件事：
 
-1. 分层：内核模块（kernel-manifest.json 里 kind 为 module 的文件）的判断里出现部门名或成果种类名，记违例。
-   形态与核验角色设计说明验收第 3 条「事实与裁决、循环两层的代码里不出现部门名，也不出现 PRD、交付、质检结论这些成果种类的判断」。
+1. 分层：内核模块（kernel-manifest.json 里 kind 为 module 的文件）的判断里出现职能名（代码里叫 department）或成果种类名，记违例。
+   形态与核验角色设计说明验收第 3 条「事实与裁决、循环两层的代码里不出现职能名，也不出现 PRD、交付、质检结论这些成果种类的判断」。
    只看判断：比较（== != in）的操作数、Literal[...] 的取值（一个 Literal 里有两个以上才算）、模块顶层写死的集合。
    报错文字、文档字符串、注释不算。
 2. name-map 落后于代码：name-map 里状态写「代码里还没有」的词，已经是定义文件里某一项的显示名（label），记违例。
-3. 事项的来源：组织定义没有来源一项时记不知道（还没承诺）；有，就查每一种来源的部门在定义里。
+3. 事项的来源：组织定义没有来源一项时记不知道（还没承诺）；有，就查每一种来源的职能在定义里。
 4. 总图的词有没有对照：第 1 批里的概念（总图的词），name-map 里没有它这一行，记不知道（代码里有没有，这张表没说）。
    对照表少一行只能让结果退到不知道，不能变成确实缺：确实缺只给声明过的闭合范围。
 
@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 SH = rdflib.Namespace("http://www.w3.org/ns/shacl#")
-DEFAULT = "37e9d68"
+DEFAULT = "5c25e1b"
 
 
 def git(*args) -> str:
@@ -46,11 +46,11 @@ def kernel_modules(commit) -> list[str]:
 
 
 def banned_names(commit) -> dict[str, str]:
-    """部门名与成果种类名 → 它是什么。取这个提交的定义；那时还没有成果种类定义的，用 eb8429e 的（报告里写明）。"""
+    """职能名与成果种类名 → 它是什么。取这个提交的定义；那时还没有成果种类定义的，用 eb8429e 的（报告里写明）。"""
     out = {}
     org = json.loads(show(commit, "harness/definitions/organization.json") or "{}")
     for d in org.get("departments", []):
-        out[d["id"]] = "部门名"
+        out[d["id"]] = "职能名"
     kinds = show(commit, "harness/definitions/outcome_kinds.json") or show(DEFAULT, "harness/definitions/outcome_kinds.json")
     for k in json.loads(kinds)["kinds"]:
         out[k["id"]] = "成果种类名"
@@ -79,7 +79,7 @@ class Judgements(ast.NodeVisitor):
         name = node.value.attr if isinstance(node.value, ast.Attribute) else getattr(node.value, "id", "")
         if name == "Literal":
             # 一个 Literal 里只撞上一个名字（例如规则种类 Literal["parameter", "structure"] 的 structure）多半是同名，
-            # 列出两个以上的部门名或成果种类名才算写死了一张表；在 layer_uses 里按 where 收紧
+            # 列出两个以上的职能名或成果种类名才算写死了一张表；在 layer_uses 里按 where 收紧
             self._strings(node.slice, f"Literal@{node.lineno}")
         self.generic_visit(node)
 
@@ -228,7 +228,7 @@ def facts(commit, override: dict[str, str] | None = None, drop_rows: set | None 
 
 P = "PREFIX yd: <https://yudao.dev/onto#>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"
 CHECKS = [
-    ("layer-name", "内核模块的判断里出现部门名或成果种类名（分层，验收第 3 条）", "yd:KernelModule", SH.Violation,
+    ("layer-name", "内核模块的判断里出现职能名（代码里叫 department）或成果种类名（分层，验收第 3 条）", "yd:KernelModule", SH.Violation,
      "$this yd:judgesByName ?u ."),
     ("namemap-stale", "name-map 写「代码里还没有」，定义文件里已经有这一项", "yd:NameMapRow", SH.Violation,
      "$this yd:nmStatus ?s ; yd:labelInDefinitions ?f . FILTER(CONTAINS(STR(?s), \"还没有\"))"),
@@ -236,7 +236,7 @@ CHECKS = [
      "FILTER NOT EXISTS { $this yd:declaresSources true }"),
     ("term-unmapped", "总图的这个词在 name-map 里没有一行，代码里有没有不知道", "yd:TotalTerm", SH.Info,
      "FILTER NOT EXISTS { $this yd:mappedInNameMap true }"),
-    ("source-member", "定义里这种来源没有本定义里的部门接", "yd:DefinitionSource", SH.Warning,
+    ("source-member", "定义里这种来源没有本定义里的职能接", "yd:DefinitionSource", SH.Warning,
      "FILTER NOT EXISTS { $this yd:receivedByMember ?d }"),
 ]
 SEV = {SH.Violation: "违例", SH.Warning: "确实缺", SH.Info: "不知道"}
