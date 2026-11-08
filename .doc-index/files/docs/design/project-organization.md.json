@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/project-organization.md",
-"hash":"04e12852d8df611c",
+"hash":"bbe2bff951c32132",
 "nodes":[
-{"hash":"04e12852d8df611c","id":"docs/design/project-organization.md","kind":"file","title":"docs/design/project-organization.md"},
+{"hash":"bbe2bff951c32132","id":"docs/design/project-organization.md","kind":"file","title":"docs/design/project-organization.md"},
 {"hash":"2463b56e26f9c7a2","id":"docs/design/project-organization.md#项目的组织设计说明","kind":"section","parent":"docs/design/project-organization.md","title":"项目的组织设计说明"},
 {"hash":"19b2e7aa7aec3aa2","id":"docs/design/project-organization.md#项目的组织设计说明 > 1. 功能与依据","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明","title":"1. 功能与依据"},
 {"hash":"7bbe5c7728ecba0c","id":"docs/design/project-organization.md#项目的组织设计说明 > 2. 边界与范围","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明","title":"2. 边界与范围"},
@@ -22,7 +22,7 @@
 {"hash":"3fbb42c2f6e946a0","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.11 外包与分形","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.11 外包与分形"},
 {"hash":"0dc3747f9432bf7b","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.12 形态一键选用","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.12 形态一键选用"},
 {"hash":"173513fb2142efec","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.13 新建的入口","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.13 新建的入口"},
-{"hash":"4e46af55981e7f9c","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.14 项目页是循环图加对话"},
+{"hash":"c9a44d3f3d5c9669","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.14 项目页是循环图加对话"},
 {"hash":"bf1d8b5efa3fbb35","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.15 循环图跟着组织长","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.15 循环图跟着组织长"},
 {"hash":"e5ff596126d6933c","id":"docs/design/project-organization.md#项目的组织设计说明 > 5. 验收","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明","title":"5. 验收"},
 {"hash":"e94e1310357ae146","id":"docs/design/project-organization.md#项目的组织设计说明 > 5. 验收 > 脚本一：「工程」，由外部 agent 做","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 5. 验收","title":"脚本一：「工程」，由外部 agent 做"},

@@ -75,7 +75,18 @@
         { id: 'q4', item: 'w2', round: 1, from: 'engineering', to: 'product', text: '每页 50 条，包含已取消的订单吗？', at: at('t', '09:14'), answered: at('t', '09:16'), answer: '包含，已取消的留在原来的位置。', done: true },
         { id: 'q2b', item: 'w2', round: 2, parent: 'q2', from: 'engineering', to: 'product', text: '没有订单时页面上显示什么？', at: at('t', '14:18'), answered: at('t', '14:21'), answer: '显示「还没有订单」，不显示页码。', done: true },
         { id: 'q2', item: 'w2', round: 2, from: 'quality', to: 'engineering', text: '没有订单时，分页返回什么？（在核验交付 v2）', at: at('t', '14:16'), answered: at('t', '14:24'),
-          work: [{ act: '读了 orders/list.ts 的 pageCount()', used: '5 秒' }, { act: '跑了 npm test -- order-list，第 7 条用例「没有订单」', used: '21 秒' }, { act: '问产品：没有订单时页面上显示什么', used: '3 分' }, { act: '提交回答：事实 3 条，解释 1 段', used: '1 秒', last: true }],
+          work: [
+            { task: '弄清现在的总页数怎么算', steps: [
+              { kind: '读', text: '读取 orders/list.ts', raw: { cmd: 'cat', args: 'orders/list.ts', exit: 0, out: '（96 行）\nexport function pageCount(total) {\n  return Math.ceil(total / 50);\n}', model: '质检问的是没有订单的情况，pageCount(0) 要看一下。' } },
+              { kind: '运行', text: '检查空列表的用例能不能过', raw: { cmd: 'npm', args: 'test -- order-list', exit: 0, out: 'Tests: 9 passed, 9 total\n  ✓ 没有订单（第 7 条）' } }
+            ] },
+            { task: '确认页面上显示什么', steps: [
+              { kind: '询问', text: '问产品没有订单时页面上显示什么', raw: { cmd: 'ask', args: 'to=product', exit: 0, out: '显示「还没有订单」，不显示页码。' } }
+            ] },
+            { task: '回答质检', steps: [
+              { kind: '提交', text: '提交回答：事实 3 条，解释 1 段', last: true, raw: { cmd: 'answer', args: 'facts=3 explanation=1', exit: 0, out: '已送达质检；解释在质检对交付 v2 下结论以后才看到' } }
+            ] }
+          ],
           answer: '返回空列表，总页数为 0。',
           facts: ['接口：GET /orders?page=1 返回 { items: [], pages: 0 }', '怎么运行：npm test -- order-list，第 7 条用例「没有订单」', '文件位置：orders/list.ts 的 pageCount()'],
           why: '总页数写 0 不写 1：前端把 0 当成「没有订单」显示空状态，免得出现「第 1 / 1 页」的空页；这和缺陷记录 v1 说的空页是同一个原因。', after: '交付 v2' },

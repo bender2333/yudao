@@ -303,7 +303,19 @@
         ar('w1', 'product', 'quality', 'PRD', 1, 1, { at: T(-176), text: '导出订单为 CSV：按创建时间倒序，最多 5 万行；orders-日期.csv，UTF-8 带 BOM（质检拿它独立判断）' }),
         ar('w1', 'engineering', 'quality', '交付', 1, 1, { at: T(-150), verdict: { t: 'reject', by: '质检' }, text: '导出第 1 版', files, diff: d('orders/export.ts', 'amount.toFixed(2)', 'Math.round(amount * 100) / 100') }),
         ar('w1', 'quality', 'engineering', '缺陷记录', 1, 1, { at: T(-140), text: '金额列四舍五入错一分：19.995 导出成 19.99' }),
-        ar('w1', 'engineering', 'quality', '交付', 2, 2, { at: T(-100), work: [{ act: '读需求：订单导出的时限与行数', used: '6 秒' }, { act: '读了 orders/export.ts、orders/money.ts', used: '9 秒' }, { act: '改 orders/export.ts：金额改用分计算', used: '2 分 14 秒' }, { act: '跑了 npm test -- export，12 条通过', used: '38 秒' }, { act: '提交交付 v2', used: '1 秒' }], verdict: { t: 'reject', by: '质检' }, text: '导出第 2 版：金额改用分计算', files, diff: d('orders/export.ts', 'rows = await db.all(query)', 'for await (const row of db.stream(query))') }),
+        ar('w1', 'engineering', 'quality', '交付', 2, 2, { at: T(-100), work: [
+          { task: '弄清要改什么', steps: [
+            { kind: '读', text: '读取缺陷记录 v1', raw: { cmd: 'read_outcome', args: 'defect_report r1', exit: 0, out: '金额列四舍五入错一分：19.995 导出成 19.99', model: '缺陷在金额的小数计算上，先看 export.ts 怎么算的。' } },
+            { kind: '读', text: '读取 orders/export.ts 与 orders/money.ts', raw: { cmd: 'cat', args: 'orders/export.ts orders/money.ts', exit: 0, out: '（2 个文件，共 184 行）\nexport function row(o) {\n  return [o.id, Math.round(o.amount * 100) / 100, ...' } }
+          ] },
+          { task: '把金额改成按分计算', steps: [
+            { kind: '写', text: '修改 orders/export.ts 的金额计算', raw: { cmd: 'apply_patch', args: 'orders/export.ts', exit: 0, out: '1 个文件，+6 -3' } },
+            { kind: '运行', text: '检查导出的用例能不能过', raw: { cmd: 'npm', args: 'test -- export', exit: 0, out: 'Tests: 12 passed, 12 total\nTime: 38.2 s' } }
+          ] },
+          { task: '交出这一版', steps: [
+            { kind: '提交', text: '提交交付 v2', raw: { cmd: 'submit_delivery', args: 'revision 2', exit: 0, out: '已接受：交付 r2', model: '金额改用分计算，12 条用例通过。' } }
+          ] }
+        ], verdict: { t: 'reject', by: '质检' }, text: '导出第 2 版：金额改用分计算', files, diff: d('orders/export.ts', 'rows = await db.all(query)', 'for await (const row of db.stream(query))') }),
         ar('w1', 'quality', 'engineering', '缺陷记录', 2, 2, { at: T(-60), text: '5 万行时导出超时（62 秒，上限 30 秒）' }),
         // 质检询问产品，产品在回答里修订 PRD：询问答完以后才有这两条
         ar('w1', 'product', 'engineering', 'PRD', 2, 3, { at: T(-16), q: 'q3', text: 'PRD v2：超过 5 万行时分成几个文件，每个最多 5 万行，打成一个压缩包（回答质检的询问时修订）', diff: ['@@ PRD', '- 一次导出全部订单；最多 5 万行', '+ 一次导出全部订单；超过 5 万行分成几个文件，每个最多 5 万行，打成一个压缩包'] }),
@@ -518,10 +530,15 @@
       sel: !pn ? null : pn.type === 'arrow' ? 'a:' + pn.i : pn.type === 'ask' ? 'q:' + pn.id : pn.type === 'msg' ? 'm:' + pn.i : null
     });
   }
-  function workBlock(work, on) {
-    if (!work) return '';
-    return '<div class="lp-work"><button type="button" class="y20-link" data-act="lp.work" aria-expanded="' + Boolean(on) + '">' + (on ? '收起工作过程' : '看工作过程') + '</button>' +
-      (on ? '<ol class="lp-steps">' + work.map((x) => '<li><span>' + esc(x.act) + '</span><small>' + esc(x.used) + '</small></li>').join('') + '</ol>' : '') + '</div>';
+  // 工作过程：任务一句话，每一步一句话，标记写实际动作的种类；点一步才是原始数据
+  function workBlock(work, pn) {
+    if (!work || !work.length) return '';
+    const raw = (r) => '<dl class="lp-raw">' + [['命令', r.cmd], ['参数', r.args], ['退出状态', r.exit], ['输出', r.out], ['模型文字', r.model]].filter((x) => x[1] !== undefined).map((x) => '<dt>' + x[0] + '</dt><dd>' + esc(x[1]) + '</dd>').join('') + '</dl>';
+    const body = work.map((t, ti) => '<li><b>任务 ' + (ti + 1) + '　' + esc(t.task) + '</b><ul class="lp-steps">' + t.steps.map((st, si) => {
+      const key = ti + '-' + si, on = (pn.steps || {})[key];
+      return '<li><button type="button" class="lp-step" data-act="lp.step" data-k="' + key + '" aria-expanded="' + Boolean(on) + '"><span class="lp-step-kind">' + esc(st.kind) + '</span><span>' + esc(st.text) + '</span></button>' + (on ? raw(st.raw) : '') + '</li>';
+    }).join('') + '</ul></li>').join('');
+    return '<div class="lp-work"><button type="button" class="y20-link" data-act="lp.work" aria-expanded="' + Boolean(pn.work) + '">' + (pn.work ? '收起工作过程' : '看工作过程') + '</button>' + (pn.work ? '<ol class="lp-tasks">' + body + '</ol>' : '') + '</div>';
   }
   function itemPicker(p, it) {
     const s = st(p), seen = s.msgs.filter((m) => m.t === 'sep').map((m) => m.item);
@@ -574,7 +591,7 @@
       const nav = same.length > 1 ? '<span class="lp-nav">' + (at > 0 ? '<button type="button" class="y20-link" data-act="lp.arrow" data-i="' + same[at - 1].i + '">‹ ' + esc(a.name + ' v' + same[at - 1].v) + '</button>' : '') + '<span class="y20-muted">第 ' + (at + 1) + ' / ' + same.length + ' 版</span>' + (at < same.length - 1 ? '<button type="button" class="y20-link" data-act="lp.arrow" data-i="' + same[at + 1].i + '">' + esc(a.name + ' v' + same[at + 1].v) + ' ›</button>' : '') + '</span>' : '';
       const verdict = a.verdict ? '<p class="lp-verdict-line is-' + a.verdict.t + '">' + esc(a.verdict.t === 'reject' ? a.verdict.by + '打回这一版' : a.verdict.t === 'pass' ? a.verdict.by + '审过这一版，交回上一层' : a.verdict.by + '放行这一版') + '</p>' : '';
       return '<section class="lp-panel" aria-label="这一版">' + close + '<h3>' + esc(a.name + (a.v ? ' v' + a.v : '')) + (a.round ? ' · 第 ' + a.round + ' 轮' : '') + '<small> ' + esc(who(a.from) + ' → ' + who(a.to)) + '</small></h3>' + nav + verdict + '<p>' + esc(a.text || '') + '</p>' +
-        (a.files ? '<div class="ln-diff"><b>改了的文件</b><ul>' + a.files.map((f) => '<li>' + esc(f) + '</li>').join('') + '</ul>' + (a.diff ? ui.pre(a.diff.join('\n')) : '') + '</div>' : '') + workBlock(a.work, pn.work) + '</section>';
+        (a.files ? '<div class="ln-diff"><b>改了的文件</b><ul>' + a.files.map((f) => '<li>' + esc(f) + '</li>').join('') + '</ul>' + (a.diff ? ui.pre(a.diff.join('\n')) : '') + '</div>' : '') + workBlock(a.work, pn) + '</section>';
     }
     if (pn.type === 'ask') {
       const q = (p.asks || []).find((x) => x.id === pn.id);
@@ -584,7 +601,7 @@
       return '<section class="lp-panel" aria-label="询问">' + close + '<h3>询问<small> ' + esc(nm(p, q.from) + ' → ' + nm(p, q.to) + ' · ' + ui.time(q.at)) + '</small></h3>' +
         (up ? '<p class="y20-small y20-muted">回答「' + esc(up.text) + '」时又问的</p>' : '') + '<p>' + esc(q.text) + '</p>' +
         (q.done ? '<ul class="ln-fold-body">' + kidHtml(p, reply) + '</ul>' : '<p class="y20-muted y20-small">还没回答</p>') +
-        workBlock(q.work && (q.done ? q.work : q.work.filter((x) => !x.last)), pn.work) + '</section>';
+        workBlock(q.done ? q.work : (q.work || []).map((t) => Object.assign({}, t, { steps: t.steps.filter((x) => !x.last) })).filter((t) => t.steps.length), pn) + '</section>';
     }
     if (pn.type === 'msg') {
       const m = s.msgs[pn.i];
@@ -641,6 +658,7 @@
     refresh(p);
   });
   A('lp.work', () => { const p = H.project(H.pid()), s = st(p); s.panel.work = !s.panel.work; refresh(p); });
+  A('lp.step', (el) => { const p = H.project(H.pid()), s = st(p), k = el.dataset.k; s.panel.steps = s.panel.steps || {}; s.panel.steps[k] = !s.panel.steps[k]; refresh(p); });
   A('lp.close', () => { const p = H.project(H.pid()); st(p).panel = null; refresh(p); });
   A('lp.guide', (el) => { const p = H.project(H.pid()); setTo(p, 'g:' + el.dataset.dept); refresh(p); const i = $('ln-text'); if (i) i.focus(); });
   A('lp.inner', (el) => { const p = H.project(H.pid()), s = st(p); s.inner = el.dataset.dept; s.panel = null; refresh(p); });

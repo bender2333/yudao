@@ -355,3 +355,5 @@
 {"down":"62f7884101cc1896","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","up":"4e46af55981e7f9c"}
 {"down":"62f7884101cc1896","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.15 循环图跟着组织长","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","up":"bf1d8b5efa3fbb35"}
 {"down":"2ffd58c95f352757","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面","up":"4e46af55981e7f9c"}
+{"down":"62f7884101cc1896","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","up":"c9a44d3f3d5c9669"}
+{"down":"2ffd58c95f352757","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面","up":"c9a44d3f3d5c9669"}

@@ -9,6 +9,8 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-08 21:37 / `docs/design/project-organization.md` 4.14 第四层改成一句话说明每一步、按任务分组、点开才是原始数据；`docs/design/app-and-interface.md` 4.4 去掉用时一条；`docs/prototypes/v20/` 工作过程改成任务、步骤、原始数据三级，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户要工作过程像「读取文件」这样的说明，不直接显示一大串实际动作
+
 claude-opus-5-5（子架构师） / 2026-11-08 21:35 / `docs/design/project-organization.md` 4.14 写项目页四层与时序图，交互骨架第 3 条、4.15 与脚本三、四补上；`docs/design/app-and-interface.md` 加 4.4 四层读哪个查询与要补的内容；`docs/prototypes/v20/` 加累计往来、时序图、原文面板的询问内容与工作过程，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户看过示意后定「按这个做」：信息不丢失，也不觉得冗余
 
 claude-opus-5-5（子架构师） / 2026-11-08 21:14 / `docs/design/project-organization.md` 4.14 加「在做」角标的规矩；`docs/prototypes/v20/` 节点上的字、角标与节点详情从同一份职能状态推出，去掉兜底文字「在做」「等别的职能」，新增场景「活动报名小程序：工程在问产品」，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 总架构师复核发现角标按事项的所在职能挂，和节点上的字矛盾；「产品 · 工程」开着询问的画法没有人看过
