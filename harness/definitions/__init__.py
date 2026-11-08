@@ -230,7 +230,8 @@ WriteScopeKind = Literal["workspace", "check_materials"]
 
 class WriteScope(_Definition):
     scope: WriteScopeKind = "workspace"
-    # check_materials 时允许写的目录（相对运行工作区的顶层目录）；workspace 不写路径
+    # check_materials 时允许写的目录（相对运行工作区的顶层目录）；workspace 不写路径。
+    # 检查材料的目录是主机的固定约定，加载时由 verification_issues 核对只写 CHECK_MATERIALS_DIR
     paths: tuple[str, ...] = ()
 
     @model_validator(mode="after")
@@ -1278,7 +1279,8 @@ def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
 
 def verification_issues(organization: Organization, outcomes: Collection[str]) -> list[tuple[str, str, str]]:
     """核验声明的核对（docs/design/forms-and-verifier-role.md「定义的校验」第 2、3 条）：核验角色与被核验的角色都在这份定义里，
-    成果种类在这份定义里，谁能拒绝谁无环（角色核验自己也是环）。
+    成果种类在这份定义里，谁能拒绝谁无环（角色核验自己也是环）；写入范围是检查材料时，目录只写主机固定的那一个
+    （「核验角色」第 1 条）。
 
     旧定义没有这份声明，读的时候按今天写死的三部门解释；那种解释不是定义的一部分，这里不核对。
     """
@@ -1308,6 +1310,17 @@ def verification_issues(organization: Organization, outcomes: Collection[str]) -
                 edges.append((verifier.role, verified.role, f"{field}.role"))
     for role in sorted(set(declaration.write_scopes) - members):
         issues.append((file, f"verification.write_scopes.{role}", f"角色 {role} 不属于任何部门"))
+    # 检查材料的目录是主机的固定约定（「核验角色」第 1 条，工单 #1577）：公开树与交付快照只排除固定的那一个，
+    # 定义声明了别的目录时材料会进公开树，核验角色的树核对把材料算进去，一写材料就放不了行
+    for role in sorted(declaration.write_scopes):
+        scope = declaration.write_scopes[role]
+        if scope.scope != "check_materials":
+            continue
+        elsewhere = [path for path in scope.paths if path != CHECK_MATERIALS_DIR]
+        if elsewhere:
+            issues.append((file, f"verification.write_scopes.{role}.paths",
+                           f"检查材料目录是主机固定的 {CHECK_MATERIALS_DIR}，不能写别的目录："
+                           + "、".join(elsewhere)))
     issues.extend(_rejection_cycles(edges))
     return issues
 
