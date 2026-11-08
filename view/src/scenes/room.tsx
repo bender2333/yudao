@@ -31,6 +31,11 @@ export function RoomScene(props: { shell: Shell; projectId: string; department: 
         clock: options.clock,
         department: props.department,
       });
+      // 端到端测试经这个入口读画面画出的当前状态（声明见 src/test-hooks.d.ts）
+      window.__roomViewForTest = {
+        channels: () => view.inspect().channels(),
+        timeline: () => view.inspect().driver.timeline(),
+      };
       return {
         jump: (state) => view.jump(state as RoomState),
         setState: (state) => view.setState(state as RoomState),
@@ -41,6 +46,8 @@ export function RoomScene(props: { shell: Shell; projectId: string; department: 
     });
     return () => {
       detach();
+      // 场景被卸下（换部门、离开房间）：读取入口一起撤掉，测试不会读到上一个部门的旧画面
+      delete window.__roomViewForTest;
       clock.destroy();
     };
   }, [props.shell, key, props.department, props.projectId]);

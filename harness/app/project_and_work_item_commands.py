@@ -19,7 +19,7 @@ from ..projects import (
     DepartmentSettingConflict, ProjectArchivedError, ProjectNotFoundError,
     SourceDirectoryConflict, WorkItemInProgressError,
 )
-from ..writeback import WritebackTargetUnavailable
+from ..writeback import WritebackOutcomeUnknown, WritebackTargetUnavailable
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
 from .registry import CommandDefinition
@@ -432,11 +432,22 @@ class WritebackExecute(CommandRequest):
 
 
 def _writeback_target_message(missing: WritebackTargetUnavailable) -> str:
-    # 写回的目标不可用：三种都是源目录登记里的配置问题，说明写清是哪一处（工单 #709）
+    # 写回的目标不可用：源目录登记里的配置问题，说明写清是哪一处（工单 #709）。
+    # 远端登记成宿主仓库地址时，凭据引用、远端地址与合并请求接口的拒绝同样在这一条边界上说清（工单 #980）
     if missing.reason == "remote_missing":
         return f"写回的目标仓库不存在：{missing.target}"
     if missing.reason == "not_a_repository":
         return f"写回的目标不是 git 仓库：{missing.target}"
+    if missing.reason == "credential_missing":
+        return f"写回的目标凭据缺失：{missing.target}"
+    if missing.reason == "remote_unreachable":
+        return f"写回的远端仓库读不到：{missing.target}"
+    if missing.reason == "push_failed":
+        return f"写回分支没有推送到远端：{missing.target}"
+    if missing.reason == "branch_exists":
+        return f"写回分支在远端已经存在，与这一次的结果不同：{missing.target}"
+    if missing.reason == "pull_request_rejected":
+        return f"合并请求创建被拒绝：{missing.target}"
     return f"写回的目标分支不存在：{missing.target}"
 
 
@@ -451,6 +462,10 @@ async def _execute_writeback(application: "Application", command: Command,
         raise Rejection("project_archived", "项目已归档，恢复以后才能修改") from archived
     except WritebackTargetUnavailable as unavailable:
         raise Rejection("not_allowed", _writeback_target_message(unavailable)) from unavailable
+    except WritebackOutcomeUnknown as unknown:
+        # 远端动作的结果未知（ADR-0034）：核实以前不重复执行外部动作，写回不记为完成
+        raise Rejection("not_allowed",
+                        f"写回的外部动作结果未知，保持待核实：{unknown.detail}") from unknown
     if result is None:
         # 没有可写回的对象是一种正常情况，按设计不写回（工单 #661）：
         # 以前这里什么都不做，命令没有在写路径上登记，接口层回 500，用户看不到理由。
