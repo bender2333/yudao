@@ -240,7 +240,8 @@ NEXT: 建议的下一轮任务；没有写 none
 
 - 一轮结束时 **Stop hook** 会看账本：还有工人在跑 → 把会话叫回来收账；没有工人但还有待办 → 叫回来派下一批。实现是 `.claude/skills/solo/scripts/hook.mjs`，在 `.claude/settings.json` 的 `hooks` 里注册（`SessionStart`、`SubagentStart`、`PreToolUse`、`SubagentStop`、`Stop`）。
 - 同一个会话最多续 **200** 次，计数器在 `.ralph/<循环>/.stop-guard.json`；续到上限就停下，不会无声死循环。
-- 同时被 hook 挡住的两件事：**写 `.ralph/**`**（账本只由命令改）、**`task_append`**（会复用子会话上下文）。派活超过并发上限、任务书过长时会给提醒。
+- `waitMode=notify` 时所有事件都不参与编排；`waitMode=hook` 且有有效租约时，子代理提示、派活限制、工人记录与自动继续只对租约所有者生效，不接管同项目的其他会话。
+- 同项目的 Claude Code 会话都受账本写保护：**`.ralph/**` 只由命令改**；`task_append`（会复用子会话上下文）只在循环所有者的会话里拒绝。派活超过并发上限、任务书过长时会给提醒。
 - 停下：`solo.mjs pause`（同时关掉无人值守），或者用户直接打断。跑到没有可派的、预算用尽、全部完成时自己停。
 - 没有生效时的查法：新的会话开头应当看到 `[solo] 本工作区有一个…循环` 那段注入；看不到就是宿主没执行项目 hooks，这时退回手动模式——每轮结束时由用户说「继续」。需要 `node` 在 `PATH` 上。
 
