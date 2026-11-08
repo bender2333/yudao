@@ -1,11 +1,12 @@
-# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止、作为任务开始）、激活的准备与收尾、
+# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、作为任务开始）、激活的准备与收尾、
 # 新输入的分派、提案接纳以后的流转、发出决定请求与运行结束时撤销它们、暂停与失败。
+# 薄驱动在 `thin_driver.py`（工单 #1512）：循环、调度、计时与安全节点已经搬过去，这里经它的钩子协议接上；
 # 回答决定请求与建档的流转在应用层（`decision_flow.py`，工单 #827）：薄驱动只转交。
 # 运行工作区与会话的检查工作区在执行环境（`environment.py` 的 `Workspaces`，工单 #863）；
 # 恢复的零件在 `recovery.py` 的 `RunRecovery`（工单 #863）：薄驱动只把继续一个 run 转交过去。
 # 部门与成果的名称不在这个文件里：部门标识、关注的成果与成果种类一律从定义取（docs/design/skeleton-and-application.md「薄驱动」），
 # `harness/tests/test_thin_driver_names.py` 检索这个文件，命中即失败。
-# 一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；同时为步骤驱动实现安全节点接口。
+# 一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；安全节点接口由薄驱动实现并交给它。
 # 流程编排不调用模型。
 # 每一处「读取运行状态、判断、写入」都是写入口的一个事务（WritePath.transact）：判断期间不持有锁，
 # 另一方在读取以后写入了同一个 run，提交被拒绝，按写入以后的状态重新判断。
@@ -30,7 +31,7 @@ from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
 from . import assembly_contract, execution_contract, mcp_session, routing_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, pending_guidance
-from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
+from .bounds import TIME_BOUND, activation_bound, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import artifact_hash
@@ -45,7 +46,7 @@ from .deltas import DeltaChannel
 from .event_store import (Command, EventStore, StreamVersionConflict, project_stream, run_stream)
 from .kernel_events import accepted
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
-from .engine import Judgment, StepLimits
+from .engine import StepLimits
 from .streams import (
     RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )
@@ -76,6 +77,7 @@ from .recovery import RunRecovery
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter, asks_cannot_verify
+from .thin_driver import ThinDriver
 from .tools import in_force
 from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .watched_outputs import waiting_departments
@@ -146,46 +148,6 @@ class _Activation:
     @property
     def department(self) -> str:
         return self.scope.department
-
-
-class _SafeNode:
-    # 流程编排为一次激活实现的安全节点接口（执行契约第三版）。接口由契约定义、步骤驱动在安全节点上调用，
-    # 这里实现并在开始一轮工作时交给它（依赖倒置）：每一步先经这里问薄驱动继续还是停止。
-    # 第三版只剩设计说明写的五样（工单 #1511）：按部门取模型与提示词不在其中，它们随开始一轮工作的请求
-    # 一起交给执行实现
-    def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
-        self._orchestrator = orchestrator
-        self._activation = activation
-
-    def proceed(self) -> Judgment:
-        return self._orchestrator._at_safe_node(self._activation)
-
-    def settle(self, transaction: Transaction) -> RunProjection:
-        return self._orchestrator._assign_new_inputs(transaction)
-
-    async def wait(self, seconds: float) -> Judgment:
-        return await self._orchestrator._wait_at_safe_node(self._activation, seconds)
-
-    def end(self, transaction: Transaction, reason: str, message: str) -> None:
-        self._orchestrator._end(transaction, reason, message)
-
-    async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
-        return await self._orchestrator._execute_ask(self._activation, scope, call)
-
-
-class _SafeNodeV2(_SafeNode):
-    # 第二版的安全节点（工单 #1511）：按第二版写的执行实现还会问按部门取模型与提示词。
-    # 这两个方法已经从安全节点移出，只给声明第二版的实现留一版；值从开始一轮工作时交进来的那份来源读，
-    # 薄驱动不自己查。一版之后连同本类一起去掉
-    def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
-        super().__init__(orchestrator, activation)
-        self._settings = activation.settings
-
-    def department_selection(self, department: str) -> ModelSelection | None:
-        return self._settings.department_selection(department)
-
-    def department_prompt(self, department: str) -> DepartmentPrompt:
-        return self._settings.department_prompt(department)
 
 
 @dataclass(frozen=True)
@@ -408,21 +370,8 @@ class Orchestrator:
         # 会话结束（事务 on_commit）执行后留下的清理错误：Windows 句柄长期占用时会出现，
         # 留给运维或下一次启动扫描处理，不阻塞 run 的正常退出
         self._close_errors: dict[str, list[Exception]] = {}
-        # 运行到停止的循环在等会话时同时等新工作：run_id -> (循环, 事件)。
-        # 没有会话在跑而新输入、指导或取消提交时，由 _wake 打开它，循环醒来重新找可以开始的部门（工单 #561）
-        self._run_wakeups: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
-        # 运行时间的计时（docs/design/skeleton-and-application.md「最小投影」，S1e 工单 #1015）：已经结算的量读最小投影，
-        # 正在跑的那一段只有驱动知道，所以驱动只记这一段从什么时候开始（单调时钟）。
-        # 等待期间段计时暂停，等待的时间不计入（工单 #350）：停表时把这一段折进 _run_segment_ms，
-        # 醒来重新记起点；这一轮结束、累计量写进事件以后，投影给出已结算量，这一段清零。
-        # 段起点与当前时刻都读 _run_clock（工单 #1520）：默认是单调时钟，测试交进受控的时钟时，
-        # 运行时间用完的时点由测试决定；重试退避等多久仍由事件循环的时钟算，与这里的累计无关
-        self._run_clock: Callable[[], float] = time.monotonic if run_clock is None else run_clock
-        self._run_segment_ms: dict[str, int] = {}
-        self._run_segment_start: dict[str, float] = {}
-        # 每个会话这一段的起点（run 的已用毫秒，工单 #475）：键是 (run 编号, 会话编号)。
-        # 会话自己的累计已用时间读最小投影的会话一级用量，这一段用掉多少由这个起点算
-        self._session_base_ms: dict[tuple[str, str], int] = {}
+        # 运行到停止的循环的唤醒登记、运行时间的段计时与每个会话这一段的起点都在薄驱动里（工单 #1512）：
+        # 已经结算的量读最小投影，正在跑的那一段只有驱动知道（docs/design/skeleton-and-application.md「最小投影」）。
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
@@ -431,6 +380,9 @@ class Orchestrator:
         self._test_context_windows: dict[str, int] = {}
         # 项目服务在装配以后回填，用于结算与判断执行槽位（busy）
         self.projects: Any = None
+        # 薄驱动（工单 #1512）：循环、调度、计时与安全节点在 `thin_driver.py`，这里把应用一侧的流程编排
+        # 作为它写在那个模块里的钩子协议交给它；run_clock 是运行时间读的时钟（工单 #1520），原样交过去
+        self._thin_driver = ThinDriver(self.writes, self, run_clock=run_clock)
 
     def _transact(self, stream: str, decide: Callable[[Transaction], Any], **options: Any) -> Any:
         # 薄驱动自己的写入（工单 #1165）：停止原因与部门按这个事项所用的那份定义核对；事项创建时冻结的
@@ -439,6 +391,70 @@ class Orchestrator:
         if "definitions" not in options and stream.startswith("run:"):
             options["definitions"] = self.item_definitions(stream.split(":", 1)[1])
         return self.writes.transact(stream, decide, **options)
+
+    # 薄驱动的钩子协议（`thin_driver.DriverHooks`，工单 #1512）：应用一侧的流程编排做这些事，薄驱动经它们
+    # 读运行视图与路由、开始一轮工作、结算与结束事项。薄驱动不导入这里，构造时把自己交进来的是它
+    def read_run(self, run_id: str) -> Snapshot:
+        # 这个 run 的只读快照：运行视图与还没回答的决定请求；run 不存在时按应用的错误抛出
+        snapshot = self.writes.read(run_stream(run_id))
+        if not snapshot.projection.run_id:
+            raise RunNotFoundError(run_id)
+        return snapshot
+
+    def routing(self, run_id: str) -> Any:
+        # 这个事项冻结的形态所选的路由实现
+        return self._item_routing(run_id)
+
+    def waiting_departments(self, run_id: str) -> set[str]:
+        # 这个进程里在等待工作的部门，由会话状态给出
+        return self._waiting_departments(run_id)
+
+    def aborted(self, run_id: str) -> bool:
+        return self._aborted(run_id)
+
+    def settled(self, run_id: str) -> RunProjection:
+        return self._settled(run_id)
+
+    def activations(self, run_id: str) -> dict[str, _Activation]:
+        return self._active.get(run_id, {})
+
+    def cancel_activation(self, activation: _Activation) -> None:
+        self._cancel_driver(activation)
+
+    async def activate_department(self, run_id: str, department: str,
+                                  connections: Any) -> RunProjection:
+        return await self._activate_department(run_id, department, connections)
+
+    def new_connections(self) -> ProviderConnections:
+        return ProviderConnections()
+
+    def flush_trial_events(self, run_id: str) -> None:
+        self.sessions.flush_trial_events(run_id)
+
+    async def close_mcp_sessions(self, run_id: str) -> None:
+        await self._close_mcp_sessions(run_id)
+
+    def transact_run(self, run_id: str, decide: Callable[[Transaction], Any]) -> Any:
+        return self._transact(run_stream(run_id), decide)
+
+    def assign_new_inputs(self, transaction: Transaction) -> RunProjection:
+        return self._assign_new_inputs(transaction)
+
+    def fail(self, transaction: Transaction, reason: str, message: str) -> None:
+        self._fail(transaction, reason, message)
+
+    def end(self, transaction: Transaction, reason: str, message: str) -> None:
+        self._end(transaction, reason, message)
+
+    async def execute_ask(self, activation: _Activation, scope: ActivationScope,
+                          call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
+        return await self._execute_ask(activation, scope, call)
+
+    def blocks_run(self, decisions: Iterable[DecisionRequest]) -> bool:
+        return blocks_run(decisions)
+
+    def blocked_by_other_session(self, decisions: Iterable[DecisionRequest], department: str) -> bool:
+        return blocked_by_other_session(decisions, department)
 
     def create_run(
         self,
@@ -851,155 +867,46 @@ class Orchestrator:
         ))
         return transaction.projection
 
-    def _at_safe_node(self, activation: _Activation) -> Judgment:
-        # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续与判断时的流版本
-        def judge(transaction: Transaction) -> Judgment:
-            projection = transaction.projection
-            if not (activation.stop_flag.is_set()
-                    or self._aborted(activation.run_id)
-                    or (activation.deadline is not None and time.monotonic() >= activation.deadline)
-                    or time_used_up(transaction.minimal(), self._elapsed_sec(activation.run_id))):
-                projection = self._assign_new_inputs(transaction)
-            decisions = list(transaction.decisions.values())
-            stop = self._stop_requested(activation, projection, transaction.minimal(), decisions)
-            # 别的会话已经写下待恢复的决定请求：这个会话照常停下（事项的状态不变，工单 #856）；
-            # 它自己也被挡住时（这次的模型请求发不出去），它要写下自己的那一条，
-            # 各写明自己的部门、模型与问题（模型管理 docs/design/model-management.md「引用无法使用时」）
-            blocked = blocked_by_other_session(decisions, activation.department)
-            return Judgment(not stop, projection.stream_version, blocked)
-
-        return self._transact(run_stream(activation.run_id), judge)
-
-    def _stop_requested(self, activation: _Activation, projection: RunProjection, minimal: MinimalProjection,
-                        decisions: Iterable[DecisionRequest]) -> bool:
-        # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求；
-        # 只读取，不写入。
-        # 会话自己的开关与事项的开关都看（工单 #856）：停下一个会话只停这个会话，
-        # 用户取消事项时全部会话都停
-        # 有效合同、指导与用户输入变了都不再停止：它们作为通知送达，部门接着工作，一轮工作因此不结束
-        # （工单 #558、工单 #964，循环结构 docs/design/department-loop.md「工作中途要求变化」与 docs/design/department-loop.md「指导」）。
-        # 输入仍然分派给产品部门处理（工单 #556）：产品在自己的那一轮处理它。
-        return (activation.stop_flag.is_set()
-                or self._aborted(activation.run_id)
-                or (activation.deadline is not None and time.monotonic() >= activation.deadline)
-                or time_used_up(minimal, self._elapsed_sec(activation.run_id))
-                or projection.status in TERMINAL_STATUSES or blocks_run(decisions))
-
+    # 计时与安全节点在薄驱动（工单 #1512）：已经结算的用量读最小投影，当前这一段只有驱动知道。
+    # 这里的入口给应用一侧的流程编排用，调用方与方法名不变
     def _elapsed_sec(self, run_id: str) -> float:
-        # 这个 run 已经用的运行时间（秒）：已持久化的累计加上当前运行段。等待（重试退避、
-        # 用户决定阻塞等）期间段计时暂停，不计入（工单 #350）
-        return self._elapsed_ms(run_id) / 1000.0
+        return self._thin_driver.elapsed_sec(run_id)
 
     def _elapsed_ms(self, run_id: str) -> int:
-        # 这个 run 已经用的运行时间（毫秒）：最小投影里已结算的那一部分加上当前这一段
-        total_ms = self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
-        started = self._run_segment_start.get(run_id)
-        if started is not None:
-            total_ms += max(0, int((self._run_clock() - started) * 1000))
-        return total_ms
+        return self._thin_driver.elapsed_ms(run_id)
 
     def _session_used(self, run_id: str, session_id: str) -> SessionState:
-        # 一个会话的已用量（docs/design/skeleton-and-application.md「最小投影」中「应用可以读最小投影，内核不为应用加字段」，S1e 工单 #1015）：驱动与应用都读最小投影，
-        # 不各自从事件数一遍；没有激活过的会话在投影里没有条目，按全零处理
-        return self.writes.minimal(run_stream(run_id)).sessions.get(session_id, SessionState())
+        return self._thin_driver.session_used(run_id, session_id)
 
     def _start_session_segment(self, run_id: str, session_id: str) -> None:
-        # 会话这一段工作的起点：记下 run 此刻的累计已用时间（工单 #475）
-        self._session_base_ms[(run_id, session_id)] = self._elapsed_ms(run_id)
+        self._thin_driver.start_session_segment(run_id, session_id)
 
     def _settle_session_segment(self, run_id: str, session_id: str, run_elapsed_ms: int) -> int:
-        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点，加上投影里已结算的那一部分。
-        # 一个部门会话包含它等待的分支会话的时间（用量计入提问方），因此各会话的用时之和可以大于事项的用时
-        key = (run_id, session_id)
-        settled = self._session_used(run_id, session_id).settled_ms
-        base = self._session_base_ms.pop(key, None)
-        if base is None:
-            return settled
-        return settled + max(0, run_elapsed_ms - base)
+        return self._thin_driver.settle_session_segment(run_id, session_id, run_elapsed_ms)
 
     def _session_elapsed_sec(self, run_id: str, session_id: str) -> float:
-        # 这个会话已经用的运行时间（秒）：投影里已结算的那一部分加上当前这一段（docs/design/skeleton-and-application.md「最小投影」）
-        total = self._session_used(run_id, session_id).settled_ms
-        base = self._session_base_ms.get((run_id, session_id))
-        if base is not None:
-            total += max(0, self._elapsed_ms(run_id) - base)
-        return total / 1000.0
+        return self._thin_driver.session_elapsed_sec(run_id, session_id)
 
     def _pause_run_clock(self, run_id: str, exclude: str | None = None) -> None:
-        # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间。
-        # 同时运行（工单 #557）：还有别的会话在工作时计时继续
-        active = self._active.get(run_id, {})
-        if any(key != exclude for key in active):
-            return
-        started = self._run_segment_start.pop(run_id, None)
-        if started is not None:
-            self._run_segment_ms[run_id] = self._run_segment_ms.get(run_id, 0) + max(
-                0, int((self._run_clock() - started) * 1000))
+        self._thin_driver.pause_run_clock(run_id, exclude=exclude)
 
     def _resume_run_clock(self, run_id: str) -> None:
-        # 等待结束以后重新开始段计时
-        self._run_segment_start.setdefault(run_id, self._run_clock())
+        self._thin_driver.resume_run_clock(run_id)
 
     def _settle_run_segment(self, run_id: str, department: str | None = None) -> int:
-        # 激活结束：把当前运行段也写入累计；还有其他会话工作时，提交以后从新的起点继续计时。
-        # 当前段必须在 _rebase_run_clock 重设起点以前结算，保留同时运行的会话已经用掉的时间。
-        self._pause_run_clock(run_id, exclude=department)
-        return self._elapsed_ms(run_id)
+        return self._thin_driver.settle_run_segment(run_id, department=department)
 
     def _rebase_run_clock(self, run_id: str) -> None:
-        # 一轮工作的累计量写进事件以后：已结算量改由投影给出，停过表的那些段清零；
-        # 别的会话还在工作时这一段的起点从这里重新记，不把已经结算的那一段时间再算一遍
-        self._run_segment_ms[run_id] = 0
-        if run_id in self._run_segment_start:
-            self._run_segment_start[run_id] = self._run_clock()
+        self._thin_driver.rebase_run_clock(run_id)
 
-    def _time_left(self, run_id: str) -> float:
-        # 剩余运行时间读最小投影（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）
-        return time_left_sec(self.writes.minimal(run_stream(run_id)), self._elapsed_sec(run_id))
-
-    async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
-        # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
-        # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
-        # 重试退避不在不计入运行时间的等待清单里（封闭清单只有等待模型服务、等待用户决定、
-        # 等待机器、等待桌面）：这一段照常计入，段计时不停表，否则 min(remaining, time_left) 的等待上限
-        # 永远不会缩短，运行时间用完无法在等待期间结束运行
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + seconds
-        try:
-            while True:
-                changed = asyncio.Event()
-                activation.wakeup = (loop, changed)
-                judgment = self._at_safe_node(activation)
-                if not judgment.proceed:
-                    return judgment
-                time_left = self._time_left(activation.run_id)
-                remaining = deadline - loop.time()
-                if remaining <= 0:
-                    return judgment
-                try:
-                    await asyncio.wait_for(changed.wait(), max(0.0, min(remaining, time_left)))
-                except TimeoutError:
-                    pass
-        finally:
-            activation.wakeup = None
+    @property
+    def _run_segment_ms(self) -> dict[str, int]:
+        # 薄驱动记的「投影还没有结算的那几段」：测试用它把已用的运行时间安排到选定的时点（工单 #1520）
+        return self._thin_driver.segment_ms
 
     def _wake(self, run_id: str, *, restart: bool = False) -> None:
-        # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用。
-        # 同时运行（工单 #557）：这个 run 的每一个会话都醒过来。
-        for activation in list(self._active.get(run_id, {}).values()):
-            wakeup = activation.wakeup
-            if wakeup is not None:
-                loop, changed = wakeup
-                loop.call_soon_threadsafe(changed.set)
-        if not restart:
-            return
-        # 运行到停止的循环也在等（工单 #561）：新输入、指导或取消可能在没有会话运行时带来可以开始的部门，
-        # 由它醒来重新找一遍。部门提交提案时不叫醒它：那时正在工作的部门还没结束这一轮，
-        # 这时重新判断会把别的工作切在半途（harness/tests/test_context.py 的旧交付用例）。
-        waiting = self._run_wakeups.get(run_id)
-        if waiting is not None:
-            loop, changed = waiting
-            loop.call_soon_threadsafe(changed.set)
+        # 唤醒在薄驱动（工单 #1512）：在安全节点等待的一轮与运行到停止的循环都由它叫醒
+        self._thin_driver.wake(run_id, restart=restart)
 
     def _on_close_run(self, run_id: str) -> None:
         # 会话结束（事务提交以后）执行的副作用：关闭会话并清理检查工作区。
@@ -1061,103 +968,13 @@ class Orchestrator:
             self._wake(activation.run_id, restart=True)
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
-        # 运行到终态，或者到 run 被未回答的决定请求阻塞、等待用户回答为止。
-        # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用。
-        # 同时运行（工单 #557）：等待工作的部门各开始一轮工作，各自一个会话，
-        # 这个循环等全部会话结束或事项到终态。
-        # 等会话的同时也等唤醒（工单 #561）：新输入、指导与取消提交以后，即使没有会话结束，
-        # 这个循环也醒过来重新找一遍可以开始的部门；部门的判断本身不变
-        # 停下其余会话只停这些会话，不改变事项的状态（工单 #856）：
-        # 停下以后重新读取再交回，交回的投影里被停下的会话已经收尾
-        # 事项冻结的形态不在发布里时（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：这个 run
-        # 停在原处，不写事件、不换一份定义顶替；换回带那一份形态的发布以后从停住的地方接着跑
-        if not self.item_form_available(run_id):
-            return self.project(run_id)
-        connections = ProviderConnections()
-        tasks: dict[str, asyncio.Task[RunProjection]] = {}
-        loop = asyncio.get_running_loop()
-        changed = asyncio.Event()
-        # 唤醒在寻找部门之前登记：登记之后提交的改变，提交方调用 _wake 时一定看到这次登记
-        self._run_wakeups[run_id] = (loop, changed)
-        try:
-            while True:
-                changed.clear()
-                snapshot = self.writes.read(run_stream(run_id))
-                projection = snapshot.projection
-                if not projection.run_id:
-                    raise RunNotFoundError(run_id)
-                if projection.status in TERMINAL_STATUSES:
-                    await self._stop_sessions(run_id, tasks)
-                    return self.project(run_id)
-                if self._aborted(run_id):
-                    await self._stop_sessions(run_id, tasks)
-                    return await asyncio.to_thread(self._settled, run_id)
-                if blocks_run(snapshot.decisions.values()):
-                    await self._stop_sessions(run_id, tasks)
-                    return self.project(run_id)
-                for department in self._ready_departments(run_id):
-                    task = tasks.get(department)
-                    if task is not None and not task.done():
-                        continue
-                    tasks[department] = loop.create_task(
-                        self._activate_department(run_id, department, connections))
-                pending = [task for task in tasks.values() if not task.done()]
-                if not pending:
-                    # 没有部门在工作，也没有可以开始的部门：没有新的工作
-                    return await self._no_new_work(run_id)
-                waiter = loop.create_task(changed.wait())
-                try:
-                    done, _pending = await asyncio.wait(
-                        [*pending, waiter], return_when=asyncio.FIRST_COMPLETED)
-                finally:
-                    waiter.cancel()
-                    await asyncio.gather(waiter, return_exceptions=True)
-                for task in done:
-                    if task is not waiter:
-                        task.result()
-        finally:
-            self._run_wakeups.pop(run_id, None)
-            await self._stop_sessions(run_id, tasks)
-            # run 进入终态时结束的试用会话在这里补写结束事件（工单 #1183）：结束本身在 cleanup_run 里
-            # 已经做完（那时在终态事件的提交之后的效果里，不能再写事件），这里已经在事务之外，
-            # 写进来的事件位置接在终态事件后面
-            self.sessions.flush_trial_events(run_id)
-            # 这个 run 的 MCP 会话随运行一起关闭（网络与 MCP docs/design/network-and-mcp.md「运行规则」，工单 #1175）：
-            # 到达终态、被决定请求阻塞、中止或没有新工作，运行都从这一条退出；会话表清空，
-            # 继续同一个 run 时按同一台服务器重新建立。持久化生命周期事件归 #1176
-            await self._close_mcp_sessions(run_id)
-            await connections.aclose()
-
-    def _ready_departments(self, run_id: str) -> list[str]:
-        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）。
-        # 判断归路由实现（工单 #825）
-        projection = self.project(run_id)
-        return self._item_routing(run_id).ready_departments(projection, waiting=self._waiting_departments(run_id))
-
-    async def _stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[RunProjection]]) -> None:
-        # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
-        # 只停这些会话，不改变事项的状态（工单 #856）：事项自己的开关只有用户取消才打开。
-        # 取消与暂停作用于事项的全部会话，立即生效（工单 #557）
-        pending = [task for task in tasks.values() if not task.done()]
-        if not pending:
-            return
-        for activation in list(self._active.get(run_id, {}).values()):
-            try:
-                self._cancel_driver(activation)
-            except Exception:
-                pass
-        await asyncio.gather(*pending, return_exceptions=True)
+        # 运行到停止的循环在薄驱动（工单 #1512）：等待工作的部门各开始一轮工作，等全部会话结束或事项到终态。
+        # 外部方法的名称与返回值不变，调用方不用改
+        return await self._thin_driver.run_until_stop(run_id)
 
     async def _no_new_work(self, run_id: str) -> RunProjection:
-        # 没有部门可以开始一轮工作：事项以什么结束由路由判断（工单 #825），薄驱动只把它的判断写成停止
-        def end(transaction: Transaction) -> None:
-            judgment = self._item_routing(run_id).item_end(transaction.projection)
-            if judgment is None:
-                return
-            self._fail(transaction, judgment.stop_reason, judgment.message)
-
-        self._transact(run_stream(run_id), end)
-        return await asyncio.to_thread(self._settled, run_id)
+        # 没有部门可以开始一轮工作时的收尾在薄驱动（工单 #1512）：事项以什么结束由路由判断
+        return await self._thin_driver.no_new_work(run_id)
 
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
         # 在当前事件循环中把这个 run 作为任务运行到停止（run_until_stop）；这个 run 已有任务时，新任务在它结束以后开始。
@@ -1614,12 +1431,10 @@ class Orchestrator:
         return _DepartmentSettings(projection.run_id, projection.project_id, self.projects,
                                    self.artifacts, self.item_definitions(projection.run_id))
 
-    def _safe_node(self, activation: _Activation, declared: int) -> _SafeNode:
-        # 交给执行实现的安全节点按它声明的契约版本给（工单 #1511）：当前版拿到设计说明写的五样；
-        # 声明上一版（第二版）的实现还会问按部门取模型与提示词——那时它们还在安全节点上，留一版
-        if declared == execution_contract.PREVIOUS_VERSION:
-            return _SafeNodeV2(self, activation)
-        return _SafeNode(self, activation)
+    def _safe_node(self, activation: _Activation, declared: int) -> execution_contract.SafeNode:
+        # 安全节点接口由薄驱动实现（工单 #1512）：按执行实现声明的契约版本给，当前版拿到设计说明写的五样；
+        # 声明上一版（第二版）的实现还会问按部门取模型与提示词，那一版留一版
+        return self._thin_driver.safe_node(activation, declared)
 
     def _activation_provider(self, adapter: ModelAdapter) -> str:
         # 激活事件上的提供方名称：确定性测试适配器用它的名称；目录驱动的运行在每次请求解析出连接
