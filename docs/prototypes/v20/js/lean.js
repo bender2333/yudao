@@ -139,11 +139,12 @@
     const outNote = isOut(d) ? '<small class="lp-note">推理档位由它定</small>' : '';
     if (ctx.mini) return '<span class="lp-node is-mini' + (d.verifies ? ' is-ver' : '') + '"><b>' + esc(d.name) + '</b>' + marks + '</span>';
     const st = ctx.state && ctx.state(d) || '';
+    const qs = ctx.qstate ? ctx.qstate(d) : [];
     const asks = ctx.asks ? ctx.asks(d) : 0, others = ctx.others ? ctx.others(d) : 0;
     const flags = (asks ? '<span class="lp-flag is-ask" data-act="lp.jump" data-who="' + esc(d.id) + '" title="跳到对话里要你决定的那条">要你决定 ' + asks + '</span>' : '') +
       (others ? '<span class="lp-flag" title="别的事项正在这个职能">另 ' + others + ' 件</span>' : '');
     return '<div class="lp-node' + (d.verifies ? ' is-ver' : '') + (ctx.working === d.id ? ' is-working' : '') + (ctx.sel === d.id ? ' is-on' : '') + '" role="button" tabindex="0" data-act="lp.node" data-dept="' + esc(d.id) + '" aria-label="' + esc(d.name) + '：看在做什么、给它发指导">' +
-      '<b>' + esc(d.name) + '</b><span class="lp-node-marks">' + marks + '</span>' + outNote + (st ? '<small class="lp-state">' + esc(st) + '</small>' : '') +
+      '<b>' + esc(d.name) + '</b><span class="lp-node-marks">' + marks + '</span>' + outNote + (st ? '<small class="lp-state">' + esc(st) + '</small>' : '') + qs.map((t) => '<small class="lp-qstate">' + esc(t) + '</small>').join('') +
       (isSub(d) && ctx.inner ? '<button type="button" class="y20-link lp-in" data-act="lp.inner" data-dept="' + esc(d.id) + '">看内部 ›</button>' : '') + (flags ? '<span class="lp-flags">' + flags + '</span>' : '') + '</div>';
   }
 
@@ -159,9 +160,12 @@
       const t = a.to === 'end' ? L.chain.length : at(a.to);
       return (f === i - 1 && t === i) || (t === i - 1 && f === i);
     });
+    const qs = (opts.qs || []).filter((q) => !Number.isNaN(at(q.from)) && !Number.isNaN(at(q.to)));
+    const qchip = (q, back) => '<span class="lp-q" title="开着的询问：' + esc(nm(null, q.from) + '在等待' + nm(null, q.to) + '的回答') + '"><span class="lp-dir">' + (back ? '←' : '→') + '</span>询问</span>';
     const edge = (i) => {
       const as = between(i);
-      return '<div class="lp-edge">' + (as.map((a) => chip(a, { mini, back: a.from !== 'src' && a.to !== 'end' && col(c.depts.find((d) => d.id === a.to)) < col(c.depts.find((d) => d.id === a.from)), on: opts.arrow === a.i })).join('') || '<span class="lp-line" aria-hidden="true"></span>') + '</div>';
+      const q = qs.filter((x) => Math.abs(at(x.from) - at(x.to)) === 1 && Math.max(at(x.from), at(x.to)) === i).map((x) => qchip(x, at(x.to) < at(x.from))).join('');
+      return '<div class="lp-edge">' + ((as.map((a) => chip(a, { mini, back: a.from !== 'src' && a.to !== 'end' && col(c.depts.find((d) => d.id === a.to)) < col(c.depts.find((d) => d.id === a.from)), on: opts.arrow === a.i })).join('') + q) || '<span class="lp-line" aria-hidden="true"></span>') + '</div>';
     };
     // 运维发现的故障不算这一圈的来源：它开一件新事项，在图外另画
     const srcs = c.sources.filter((s) => s.to === (L.chain[0] || {}).id && s.id !== 'fault').map((s) => s.name);
@@ -184,6 +188,8 @@
         if (!group) { sideCells.push('<div></div>'); linkCells.push('<div></div>'); continue; }
         sideCells.push('<div class="lp-side">' + group.map((s) => nodeHtml(c, s.d, ctx)).join('') + '</div>');
         linkCells.push('<div class="lp-vlink">' + group.map((s) => {
+          const sq = (opts.qs || []).filter((q) => [q.from, q.to].includes(s.d.id) && [q.from, q.to].includes(s.partner.id));
+          if (s.ask && !mini) return sq.length ? sq.map((q) => qchip(q, false).replace('<span class="lp-dir">→</span>', '<span class="lp-dir">' + (q.to === s.d.id ? '↑' : '↓') + '</span>')).join('') : '<span class="lp-vline" aria-hidden="true"></span>';
           if (s.ask) return '<span class="lp-chip is-ask' + (mini ? ' is-struct' : '') + '"' + (mini ? '' : ' data-act="lp.node" data-dept="' + esc(s.d.id) + '" role="button" tabindex="0"') + '><span class="lp-dir">⇅</span><span class="lp-kind">询问与回答' + (ctx.askCount ? ' ' + ctx.askCount(s.d) + ' 条' : '') + '</span></span>';
           const as = list.filter((a) => (a.from === s.d.id && (a.to === s.partner.id || a.to === 'end')) || (a.to === s.d.id && a.from === s.partner.id));
           return as.map((a) => chip(a, { mini, out: a.to === 'end', down: a.from === s.d.id, up: a.to === s.d.id, on: opts.arrow === a.i })).join('') || '<span class="lp-vline" aria-hidden="true"></span>';
@@ -198,6 +204,9 @@
     const bottom = skips.map((a, j) => {
       const f = at(a.from), t = at(a.to), lo = Math.min(f, t), hi = Math.max(f, t);
       return '<div class="lp-skip" style="grid-column:' + (3 + 2 * lo) + ' / ' + (4 + 2 * hi) + ';grid-row:' + (row + j) + '"><span class="lp-skip-line" aria-hidden="true"></span>' + chip(a, { mini, on: opts.arrow === a.i }) + '<span class="lp-skip-to">给' + esc(nm(null, a.to)) + '</span><span class="lp-skip-line" aria-hidden="true"></span></div>';
+    }).join('') + qs.filter((q) => Math.abs(at(q.from) - at(q.to)) > 1).map((q, j) => {
+      const lo = Math.min(at(q.from), at(q.to)), hi = Math.max(at(q.from), at(q.to));
+      return '<div class="lp-skip is-q" style="grid-column:' + (3 + 2 * lo) + ' / ' + (4 + 2 * hi) + ';grid-row:' + (row + skips.length + j) + '"><span class="lp-skip-line" aria-hidden="true"></span>' + qchip(q, at(q.to) < at(q.from)) + '<span class="lp-skip-to">' + esc(nm(null, q.from) + '问' + nm(null, q.to)) + '</span><span class="lp-skip-line" aria-hidden="true"></span></div>';
     }).join('');
     return '<div class="lp-grid' + (mini ? ' is-mini' : '') + (L.side.length ? ' has-side' : '') + '" style="grid-template-columns:' + tpl + '">' + top + cells.join('') + bottom + '</div>';
   }
@@ -214,17 +223,20 @@
   }
 
   // 窄屏：一行，节点名与当前箭头
-  function lineHtml(c, arrows, it) {
+  function lineHtml(c, arrows, it, qstate) {
     const L = layout(c);
     const cur = arrows.slice().reverse().find((a) => a.from !== 'src') || arrows[arrows.length - 1];
     const toName = (id) => (id === 'end' ? endText(c, it) : (c.depts.find((d) => d.id === id) || {}).name || '');
-    return '<div class="lp-oneline">' + L.chain.map((d) => '<button type="button" class="y20-link" data-act="lp.node" data-dept="' + esc(d.id) + '">' + esc(d.name) + (d.verifies ? '（核验）' : '') + (isOut(d) ? '（' + esc(d.who.agent) + '）' : '') + (isSub(d) ? '（子组织）' : '') + '</button>').join(' → ') +
+    return '<div class="lp-oneline">' + L.chain.map((d) => '<button type="button" class="y20-link" data-act="lp.node" data-dept="' + esc(d.id) + '">' + esc(d.name) + (d.verifies ? '（核验）' : '') + (isOut(d) ? '（' + esc(d.who.agent) + '）' : '') + (isSub(d) ? '（子组织）' : '') + '</button>' + (qstate ? qstate(d).filter((t) => t.startsWith('在等待')).map((t) => '<small class="lp-qstate">' + esc(t) + '</small>').join('') : '')).join(' → ') +
       (cur ? '<span class="lp-oneline-cur">' + (cur.i !== undefined ? '<button type="button" class="y20-link" data-act="lp.arrow" data-i="' + cur.i + '">' : '<span>') + esc(cur.name + (cur.v ? ' v' + cur.v : '') + (cur.round ? ' · 第 ' + cur.round + ' 轮' : '') + ' → ' + toName(cur.to)) + (cur.verdict ? ' · ' + (cur.verdict.t === 'reject' ? cur.verdict.by + '打回' : '放行') : '') + (cur.i !== undefined ? '</button>' : '</span>') + '</span>' : '') + '</div>';
   }
 
   // ---------------------------------------------------------------- 线程的数据
 
   function seed(p) {
+    return syncAsks(p, seedRaw(p));
+  }
+  function seedRaw(p) {
     if (p.demoThread) return Object.assign(base(), clone(p.demoThread));
     const s = base();
     const you = (item, text, tag, m) => ({ t: 'you', item, text, tag, at: T(m) });
@@ -265,8 +277,8 @@
       s.msgs = [{ t: 'sep', item: 'w18' }, you('w18', '活动页上写清楚时间、地点、报名截止日', '开始一个新事项', -330),
         { t: 'done', who: 'engineering', item: 'w18', text: '做完了：活动页文案已改，三处时间保持一致。开环完成：没有人核验', ai: 1, at: T(-300) },
         { t: 'sep', item: 'w17' }, you('w17', '做报名表单：姓名、手机号、参加人数，人数到上限就不能再报', '开始一个新事项', -40),
-        fold('w17', 'pe', '工程与产品往来', ['engineering', 'product'], [['engineering', '报名要不要限人数？'], ['product', '每场 200 人。'], ['engineering', '满了怎么提示？']], -36),
-        ask('w17', 'engineering', '满员后要候补名单吗？', -30)];
+        fold('w17', 'pe', '工程与产品往来', ['engineering', 'product'], [], -36),
+        ask('w17', 'engineering', '候补的人补上以后，要不要发短信通知？短信按条收费。', -30, ['发短信', '只在页面上提示'])];
       return s;
     }
     if (p.id === 'orders') {
@@ -291,7 +303,13 @@
         ar('w1', 'engineering', 'quality', '交付', 1, 1, { verdict: { t: 'reject', by: '质检' }, text: '导出第 1 版', files, diff: d('orders/export.ts', 'amount.toFixed(2)', 'Math.round(amount * 100) / 100') }),
         ar('w1', 'quality', 'engineering', '缺陷记录', 1, 1, { text: '金额列四舍五入错一分：19.995 导出成 19.99' }),
         ar('w1', 'engineering', 'quality', '交付', 2, 2, { verdict: { t: 'reject', by: '质检' }, text: '导出第 2 版：金额改用分计算', files, diff: d('orders/export.ts', 'rows = await db.all(query)', 'for await (const row of db.stream(query))') }),
-        ar('w1', 'quality', 'engineering', '缺陷记录', 2, 2, { text: '5 万行时导出超时（62 秒，上限 30 秒）' })
+        ar('w1', 'quality', 'engineering', '缺陷记录', 2, 2, { text: '5 万行时导出超时（62 秒，上限 30 秒）' }),
+        // 质检询问产品，产品在回答里修订 PRD：询问答完以后才有这两条
+        ar('w1', 'product', 'engineering', 'PRD', 2, 3, { q: 'q3', text: 'PRD v2：超过 5 万行时分成几个文件，每个最多 5 万行，打成一个压缩包（回答质检的询问时修订）', diff: ['@@ PRD', '- 一次导出全部订单；最多 5 万行', '+ 一次导出全部订单；超过 5 万行分成几个文件，每个最多 5 万行，打成一个压缩包'] }),
+        ar('w1', 'product', 'quality', 'PRD', 2, 3, { q: 'q3', text: 'PRD v2：超过 5 万行分文件（质检拿它独立判断）' }),
+        ar('w3', 'src', 'product', '原文', 1, 1, { text: '退款金额要和银行对得上，别再差一分钱' }),
+        ar('w3', 'product', 'engineering', 'PRD', 1, 1, { text: '退款金额取整规则（取整位数待产品回答工程的询问）' }),
+        ar('w3', 'product', 'quality', 'PRD', 1, 1, { text: '退款金额取整规则（质检拿它独立判断）' })
       ];
       s.msgs = [
         { t: 'sep', item: 'w0' }, you('w0', '把订单状态改成明确的状态机，不再用散落的 if', '开始一个新事项', -700),
@@ -303,7 +321,8 @@
         { t: 'sep', item: 'w1' }, you('w1', '把订单导出成 CSV 文件', '开始一个新事项', -180),
         fold('w1', 'pe', '产品与工程往来', ['product', 'engineering'], [['product', 'PRD v1：按创建时间倒序，最多 5 万行。'], ['engineering', '文件名与编码怎么定？'], ['product', 'orders-日期.csv，UTF-8 带 BOM。']], -176),
         fold('w1', 'eq', '工程与质检往来', ['engineering', 'quality'], [['quality', '交付 v1 打回：金额列四舍五入错一分。'], ['engineering', '交付 v2 改用分计算。'], ['quality', '交付 v2 打回：5 万行时导出超时。'], ['engineering', '在写交付 v3：改成流式写出。']], -120),
-        ask('w1', 'product', '金额列要不要带货币符号？', -20, ['不带，只写数字', '带 ¥'])
+        ask('w1', 'product', '金额列要不要带货币符号？', -20, ['不带，只写数字', '带 ¥']),
+        { t: 'sep', item: 'w3' }, you('w3', '退款金额要和银行对得上，别再差一分钱', '开始一个新事项', -40)
       ];
       return s;
     }
@@ -361,6 +380,25 @@
     });
     return s;
   }
+  function syncAsks(p, s) {
+    (p.asks || []).filter((a) => a.done).forEach((a) => {
+      let f = s.msgs.find((m) => m.t === 'fold' && m.item === a.item && m.roles.length === 2 && m.roles.includes(a.from) && m.roles.includes(a.to));
+      if (!f) {
+        f = { t: 'fold', item: a.item, key: 'ask:' + a.from + '-' + a.to, lab: nm(p, a.from) + '与' + nm(p, a.to) + '往来', roles: [a.from, a.to], open: false, kids: [] };
+        const last = s.msgs.reduce((n, m, i) => (m.item === a.item ? i : n), -1);
+        s.msgs.splice(last + 1, 0, f);
+      }
+      f.kids.push({ who: a.from, text: '问' + nm(p, a.to) + '：' + a.text, at: a.at }, { who: a.to, text: '答：' + a.answer, facts: a.facts, why: a.why, after: a.after, verifier: a.from, at: a.at });
+    });
+    return s;
+  }
+  function kidHtml(p, k) {
+    const qa = k.facts ? '<div class="ln-qa"><div class="ln-qa-part"><small>事实</small><ul>' + k.facts.map((f) => '<li>' + esc(f) + '</li>').join('') + '</ul></div>' +
+      (k.why ? '<div class="ln-qa-part is-why"><small>解释 · ' + esc(nm(p, k.verifier) + '对' + k.after + ' 下结论以后才看到') + '</small><p>' + esc(k.why) + '</p></div>' : '') + '</div>' : '';
+    return '<li><b>' + esc(nm(p, k.who)) + '</b> ' + esc(k.text) + qa + '</li>';
+  }
+  const openQs = (p, it) => (p.asks || []).filter((a) => !a.done && it && a.item === it.id && unfinished(it));
+  const qState = (p, it) => (d) => openQs(p, it).map((a) => (a.from === d.id ? '在等待' + nm(p, a.to) + '的回答' : a.to === d.id ? '回答' + nm(p, a.from) + '的询问' : '')).filter(Boolean);
   function base() { return { arrows: [], innerArrows: {}, msgs: [], cur: null, sel: null, queue: [], to: null, manual: false, openItems: {}, panel: null, inner: null }; }
   const st = (p) => p.lean || (p.lean = seed(p));
   Y20.thread = { state: st, templates: cards };
@@ -387,7 +425,7 @@
     return id ? H.item(p, id) : null;
   }
   const orgOf = (p, it) => (it && it.org ? it.org.composed : p.composed);
-  function arrowsOf(p, it) { return it ? st(p).arrows.map((a, i) => Object.assign({ i }, a)).filter((a) => a.item === it.id) : []; }
+  function arrowsOf(p, it) { return it ? st(p).arrows.map((a, i) => Object.assign({ i }, a)).filter((a) => a.item === it.id && (!a.q || (p.asks || []).some((x) => x.id === a.q && x.done))) : []; }
 
   // ---------------------------------------------------------------- 收件人
 
@@ -439,17 +477,18 @@
       state: (d) => nodeState(p, it, d),
       asks: (d) => asks.filter((m) => m.who === d.id).length,
       others: (d) => others.filter((x) => x.dept === d.id).length,
+      qstate: qState(p, it),
       askCount: (d) => st(p).msgs.filter((m) => m.t === 'fold' && it && m.item === it.id && m.roles.includes(d.id)).reduce((n, m) => n + m.kids.length, 0)
     };
     const fault = it && it.source === 'fault';
-    const g = graphBody(c, arrows, { ctx, end: endText(c, it), endCls: it && it.status === 'adopted' ? 'is-ok' : it && it.status === 'open_closed' ? 'is-open' : '', arrow: s.panel && s.panel.type === 'arrow' ? s.panel.i : undefined, src: fault ? '运维发现的故障' : undefined });
+    const g = graphBody(c, arrows, { ctx, qs: openQs(p, it), end: endText(c, it), endCls: it && it.status === 'adopted' ? 'is-ok' : it && it.status === 'open_closed' ? 'is-open' : '', arrow: s.panel && s.panel.type === 'arrow' ? s.panel.i : undefined, src: fault ? '运维发现的故障' : undefined });
     const opsNode = c.depts.find((d) => d.id === 'operations');
     const faultLane = opsNode ? '<div class="lp-fault"><span class="lp-pill is-src">图外</span><span class="lp-chip is-fault"><span class="lp-dir">→</span><span class="lp-kind">故障记录</span></span><span>运维发现的故障从图外进来，' + esc(nm(p, (c.sources.find((x) => x.id === 'fault') || {}).to || 'product')) + '接，开一件新事项；和打回分开，不回到这一件</span>' + (p.faultItems && p.faultItems.length ? '<span class="lp-flag">已开 ' + p.faultItems.length + ' 件</span>' : '') + '</div>' : '';
     const pick = itemPicker(p, it);
     const pool = c.rotation === 'pool' && Y20.pool ? Y20.pool.summary(p) : '';
     // 选中的事项按它冻结的组织画；项目现在的组织不同时（例如刚加了独立核验），下面给出之后新建的事项怎么走
     const next = it && it.org && it.org.core !== O.coreDigest(p.composed) ? '<div class="lp-next"><span class="ln-to-label">之后新建的事项按现在的组织「' + esc(formLabel(p).name) + '」走：</span><div class="lp-mini">' + graphBody(p.composed, [], { mini: true }) + '</div></div>' : '';
-    return pick + '<div class="lp-wrap">' + (p.designPreview ? '<span class="lp-preview">设计预览</span>' : '') + g + '</div>' + lineHtml(c, arrows, it) + next + faultLane + pool + panelHtml(p, it, c, arrows);
+    return pick + '<div class="lp-wrap">' + (p.designPreview ? '<span class="lp-preview">设计预览</span>' : '') + g + '</div>' + lineHtml(c, arrows, it, ctx.qstate) + next + faultLane + pool + panelHtml(p, it, c, arrows);
   }
   function itemPicker(p, it) {
     const s = st(p), seen = s.msgs.filter((m) => m.t === 'sep').map((m) => m.item);
@@ -463,8 +502,9 @@
     const s = st(p);
     if (it.status === 'adopted' || it.status === 'open_closed') return '';
     if (openAsks(p).some((m) => m.item === it.id && m.who === d.id)) return '等你决定';
+    if (qState(p, it)(d).length) return '';
     const ds = p.deptState[d.id];
-    if (ds && ds.items && ds.items.includes(it.id) && ds.state !== 'idle') return ds.text;
+    if (ds && ds.items && ds.items.includes(it.id) && ds.state !== 'idle' && (ds.items.length === 1 || ds.text.includes(it.title))) return ds.text;
     if (it.dept === d.id) return '在做';
     if (!d.produces.length && !d.verifies) return '在旁边接询问';
     if (s.msgs.some((m) => m.t === 'fold' && m.item === it.id && m.roles.includes(d.id))) return '等别的职能';
@@ -501,14 +541,15 @@
     const kids = [];
     s.msgs.forEach((m) => { if (m.t === 'fold' && (!it || m.item === it.id) && m.roles.includes(d.id)) m.kids.forEach((k) => kids.push(k)); });
     const guidance = s.msgs.filter((m) => m.t === 'you' && m.target === d.id).slice(-2);
+    const openHere = openQs(p, it).filter((a) => a.from === d.id || a.to === d.id);
     const ds = p.deptState[d.id];
-    const doing = it && unfinished(it) ? (nodeState(p, it, d) || '这个事项里暂时没有它的事') : it ? '这个事项已结束' : '空闲';
+    const doing = it && unfinished(it) ? (nodeState(p, it, d) || qState(p, it)(d).join('；') || '这个事项里暂时没有它的事') : it ? '这个事项已结束' : '空闲';
     const extra = (d.who.type === 'outsourced' ? '<p class="y20-small">由外部 agent（' + esc(d.who.agent) + '）做：模型经受控入口由本项目定；推理档位由它自己定。</p>' : '') +
       (d.verifies ? '<p class="y20-small">它的角色是核验角色：核验' + esc((c.depts.find((x) => x.id === d.verifies.dept) || {}).name || '') + '交的' + esc(O.kindName(c, d.verifies.kind)) + '，只写检查材料。</p>' : '') +
       (isSub(d) ? '<p class="y20-small">由一个小组做（' + esc(d.sub ? d.sub.formName : '') + '）：这个职能的一轮工作开一个子事项。</p>' : '');
     const ops = d.id === 'operations' ? '<button type="button" class="y20-btn small" data-act="ops.open">运行环境 · 设计预览</button><button type="button" class="y20-btn small" data-act="ops.fault-quick">模拟发现故障</button>' : '';
     return '<section class="lp-panel" aria-label="' + esc(d.name) + '">' + close + '<h3>' + esc(d.name) + '<small> ' + esc(doing) + (ds && ds.role ? ' · ' + esc(ds.role) : '') + '</small></h3>' + extra +
-      '<div class="lp-panel-cols"><div><b class="y20-small">它的往来</b>' + (kids.length ? '<ul class="ln-fold-body">' + kids.slice(-6).map((k) => '<li><b>' + esc(nm(p, k.who)) + '</b> ' + esc(k.text) + '</li>').join('') + '</ul>' : '<p class="y20-muted y20-small">这个事项里还没有往来</p>') +
+      '<div class="lp-panel-cols"><div><b class="y20-small">它的往来</b>' + (kids.length || openHere.length ? '<ul class="ln-fold-body">' + openHere.map((a) => '<li class="is-open"><b>' + esc(nm(p, a.from)) + '</b> 问' + esc(nm(p, a.to)) + '：' + esc(a.text) + ' <span class="y20-muted">（还没回答）</span></li>').join('') + kids.slice(-6).map((k) => kidHtml(p, k)).join('') + '</ul>' : '<p class="y20-muted y20-small">这个事项里还没有往来</p>') +
       (guidance.length ? '<p class="y20-small y20-muted">你给它的指导：' + guidance.map((m) => esc(m.text) + (m.readAt ? '（已读到）' : '（还没读到）')).join('；') + '</p>' : '') + '</div></div>' +
       '<div class="lp-actions"><button type="button" class="y20-btn small primary" data-act="lp.guide" data-dept="' + esc(d.id) + '">给' + esc(d.name) + '发指导</button>' + (isSub(d) ? '<button type="button" class="y20-btn small" data-act="lp.inner" data-dept="' + esc(d.id) + '">看内部的循环图 ›</button>' : '') + ops +
       '<button type="button" class="y20-link" data-go="#/p/' + esc(p.id) + '/org/d/' + esc(d.id) + '">职能详情 ›</button></div></section>';
@@ -563,7 +604,7 @@
         case 'ans': return who('你的回答', 'is-you', esc(m.text));
         case 'queue': return '<div class="ln-notice">' + esc(m.text) + '</div>';
         case 'fold': return '<div class="ln-fold" id="ln-fold-' + i + '"><button type="button" class="ln-fold-head" aria-expanded="' + m.open + '" data-act="ln.fold" data-i="' + i + '">' + esc(m.lab) + ' ' + m.kids.length + ' 条</button>' +
-          (m.open ? '<ul class="ln-fold-body">' + m.kids.map((k) => '<li><b>' + esc(nm(p, k.who)) + '</b> ' + esc(k.text) + '</li>').join('') + '</ul>' : '') + '</div>';
+          (m.open ? '<ul class="ln-fold-body">' + m.kids.map((k) => kidHtml(p, k)).join('') + '</ul>' : '') + '</div>';
         case 'ask': return who((m.by || nm(p, m.who)) + ' · 要你决定', 'is-ask' + (m.answer ? ' is-answered' : ''), '<b>' + esc(m.text) + '</b><div class="ln-opts">' + m.options.map((o) => '<button type="button" class="y20-btn small' + (m.answer === o ? ' primary' : '') + '"' + (m.answer ? ' disabled' : ' data-act="ln.answer" data-i="' + i + '" data-o="' + esc(o) + '"') + '>' + esc(o) + '</button>').join('') + '</div>' + (m.answer ? '<small class="y20-muted">已回答：' + esc(m.answer) + '</small>' : ''), '', ' data-who="' + esc(m.who || '') + '"');
         case 'notice': case 'stop': return '<div class="ln-notice">' + esc(m.text) + '</div>';
         case 'done': return who(nm(p, m.who || 'engineering') + ' · 交完成', 'is-done', esc(m.text) + look(m));

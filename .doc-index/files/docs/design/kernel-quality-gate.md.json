@@ -23,9 +23,9 @@
 ],
 "edges":[
 {"dst":"docs/adr/0046-kernel-trusted-by-checks-not-size.md","kind":"link","raws":["../adr/0046-kernel-trusted-by-checks-not-size.md"],"seen":"6eaa56a8e442ec8a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"501cedc1662adc79","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
-{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「内核」"],"seen":"cb9066af90b3b5a9","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码","kind":"link","raws":["test-pyramid.md"],"seen":"0e0aa94b57082a5d","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"b9b29c85a3d18cc8","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「内核」"],"seen":"bff92efe9855956f","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码","kind":"link","raws":["test-pyramid.md"],"seen":"c44057ff5cf1957f","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"63061389a44211d5","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"0ae7a2dd97132274","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
@@ -33,9 +33,9 @@
 {"dst":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研 > 1. 本仓库的实测","kind":"link","raws":["../research/complexity-and-mutation-testing.md"],"seen":"2fd3296432851eaf","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > 做法与参数速查","kind":"link","raws":["../research/uncle-bob-ub-mode.md"],"seen":"70c8fdbb9502a766","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/design/test-pyramid.md","kind":"link","raws":["test-pyramid.md"],"seen":"34c7d5eba94d3294","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法","kind":"link","raws":["test-pyramid.md"],"seen":"aac785f1a81627e4","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法","kind":"link","raws":["test-pyramid.md"],"seen":"491485060a686211","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["trusted-kernel.md"],"seen":"5ced538e9bf46b7d","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
-{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"4f9d3f25c2196e3e","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"ed10a3c9c33a110a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"}
 ]
 }

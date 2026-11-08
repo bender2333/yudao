@@ -14,7 +14,7 @@
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ea572e94eeb4d291","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.4 用例的变化","kind":"link","raws":["../design/test-pyramid.md"],"seen":"ccd563fa226fa879","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
 {"dst":"harness/tests/kernel/test_manifest.py","kind":"code-path","raws":["harness/tests/kernel/test_manifest.py"],"seen":"7689b767d7fa9e3f","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
-{"dst":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section-ref","raws":["CLAUDE.md"],"seen":"ff66ee419b4ba270","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
+{"dst":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section-ref","raws":["CLAUDE.md"],"seen":"ecabaadccd7b52f9","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
 {"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["acceptance-evidence.md"],"seen":"89e3daa46e774c2b","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"ea7fd54934d91b46","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
 {"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"7b2d40d78ea4b9cd","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"}
