@@ -17,14 +17,22 @@ from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.contracts import AccessMode
 from harness.app.registry import Registry
 from harness.models import DEPARTMENTS
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # uvicorn 自带的日志配置；核对服务日志内容的检查让它自己写日志文件，与命令行启动的方式相同
 LOGGING_CONFIG = uvicorn.config.LOGGING_CONFIG
 
 # 接口测试使用真实运行的服务：uvicorn 在测试进程的一个线程中运行 FastAPI 应用，监听本机的空闲端口，
 # 测试经 HTTP 请求它；控制核心在服务的生命周期中建立，模型回答由调用方交给 LoopSystem 的 FakeAdapter 给出。
-# host 是监听地址，connect 是测试连接的地址（默认回环）
-STARTUP_TIMEOUT_SEC = 30
+# host 是监听地址，connect 是测试连接的地址（默认回环）。
+#
+# 服务就绪的等待上限取按层的表（harness/tests/wait_limits.py）：启动要做约一秒的 CPU 工作（建立路由、
+# 算合同摘要），机器被别的用例占满时这段工作按分到的 CPU 拉长；写死的 30 秒在满负载时会先到上限，
+# 服务其实还在启动（工单 #1566，六条用例同时在就绪之前超时）。上限是本层每条用例上限的一半，
+# 到了上限以一条写明在等什么的失败结束，不等 pytest-timeout 结束整个进程。
+SERVER_READY_TIMEOUT_SEC = WAIT_FOR_HOST_WORK_SEC
+# 停止服务是主机上的收尾，正常在一秒内完成：短上限只用来防止一直等待
+STOP_TIMEOUT_SEC = 30
 
 
 def bearer(token: str) -> dict[str, str]:
@@ -40,7 +48,7 @@ class RunningServer:
     port: int
     thread: threading.Thread
 
-    def wait_stopped(self, timeout: float = STARTUP_TIMEOUT_SEC) -> bool:
+    def wait_stopped(self, timeout: float = STOP_TIMEOUT_SEC) -> bool:
         # 服务宿主线程结束（服务进程退出）时返回真
         self.thread.join(timeout)
         return not self.thread.is_alive()
@@ -68,12 +76,16 @@ def running_server(open_application: Callable[[], Application], *,
         http=http_protocol or "auto"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
-    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+    deadline = time.monotonic() + SERVER_READY_TIMEOUT_SEC
     while not server.started:
         if not thread.is_alive():
             raise RuntimeError("the API server stopped during startup")
         if time.monotonic() > deadline:
-            raise TimeoutError("the API server did not start")
+            # 等不到就绪：让服务线程与它打开的应用退出，不在进程里留下一个还在启动的服务
+            server.should_exit = True
+            thread.join(STOP_TIMEOUT_SEC)
+            raise TimeoutError(
+                f"the API server did not start within {SERVER_READY_TIMEOUT_SEC:g} seconds")
         time.sleep(0.01)
     port = server.servers[0].sockets[0].getsockname()[1]
     # 测试在两次请求之间执行领域检查，耗时由调度决定；每次响应结束后释放空闲连接，
@@ -86,7 +98,7 @@ def running_server(open_application: Callable[[], Application], *,
     finally:
         handle.client.close()
         server.should_exit = True
-        thread.join(STARTUP_TIMEOUT_SEC)
+        thread.join(STOP_TIMEOUT_SEC)
 
 @contextmanager
 def running_api(open_application: Callable[[], Application], *,

@@ -13,7 +13,7 @@ from harness.adapters.fake import FakeTurn
 from harness.event_store import project_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
-from harness.tests.api_helpers import STARTUP_TIMEOUT_SEC, running_api
+from harness.tests.api_helpers import running_api
 from harness.tests.onboarding_project import (
     ONBOARDING_GOAL as GOAL,
     ONBOARDING_REQUIREMENT as REQUIREMENT,
@@ -27,6 +27,10 @@ from harness.tests.onboarding_project import (
 NOTE = "现有 CLI 还没有 --help，初始 PRD 要把这个用法说明写进去"
 SECOND_REQUIREMENT = "the CLI explains its usage when started with --help"
 THIRD_REQUIREMENT = "the CLI reports its version"
+
+# 连接上的事件要在业务时限内发生（空闲计时到达这条连接、请求头发出、连接被关闭）：这些等待的上限是业务断言，
+# 各测试文件自行定义（docs/design/test-pyramid.md「测试的写法」），不用等待主机工作的上限
+CONNECTION_EVENT_TIMEOUT_SEC = 30
 
 
 def _round(requirements: list[str]) -> dict:
@@ -266,7 +270,7 @@ def test_decisions_list_carries_the_initial_prd_materials_and_the_note_mark(data
         def timeout_keep_alive_handler(self):
             if selected.is_set():
                 closing.set()
-                assert sent.wait(STARTUP_TIMEOUT_SEC), "the selected request did not send its headers"
+                assert sent.wait(CONNECTION_EVENT_TIMEOUT_SEC), "the selected request did not send its headers"
             super().timeout_keep_alive_handler()
             closed.set()
 
@@ -278,11 +282,11 @@ def test_decisions_list_carries_the_initial_prd_materials_and_the_note_mark(data
             new_connection = True
         elif name == "http11.send_request_headers.started" and not new_connection:
             selected.set()
-            assert closing.wait(STARTUP_TIMEOUT_SEC), "the server idle timer did not reach the selected connection"
+            assert closing.wait(CONNECTION_EVENT_TIMEOUT_SEC), "the server idle timer did not reach the selected connection"
         elif name == "http11.send_request_headers.complete":
             sent.set()
         elif name == "http11.receive_response_headers.started" and selected.is_set():
-            assert closed.wait(STARTUP_TIMEOUT_SEC), "the server did not close the selected idle connection"
+            assert closed.wait(CONNECTION_EVENT_TIMEOUT_SEC), "the server did not close the selected idle connection"
 
     context, client, opened, refs = _run_onboarding_http(
         data_dir, tmp_path, _round([REQUIREMENT]), http_protocol=ClosingIdleConnection)
