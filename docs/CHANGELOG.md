@@ -9,6 +9,10 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-09 00:27 / `docs/design/project-organization.md`「项目页上的内容在哪里看」与 `docs/design/app-and-interface.md` 4.1、4.3：首页保留离开期间的报告与关键事实，点一条事实跳到那件事项的时序图，按位置读取只给画面；记录原文页面上不留入口 / 用户定了这两条
+
+claude-opus-5-5（子架构师） / 2026-11-09 00:20 / `docs/design/project-organization.md` 4.8、4.9、4.15 的设置页清单一致：成果写回、机器授权、执行位置、MCP 服务器收进「高级」，「模型请求与用量」和「高级」并列在设置页底部，内容去向表最后几行只写理由；`app-and-interface`、`browser-and-computer-use`、`execution-environment`、`existing-project-onboarding`、`model-management`、`network-and-mcp`、`skeleton-and-application`、`visualization` 14.1、`department-loop`、`project-initial-files` 的旧页面名改到内容去向表的位置；`semantic-system` 提到的语义记录与角色详情表里没有位置，未改 / 收成对话与设置两页，已有文档一次改完
+
 claude-opus-5-5（子架构师） / 2026-11-09 00:14 / `docs/design/project-organization.md` 4.14 加「项目页上的内容在哪里看」按内容列的表，并加事项面板与「全部事项」；`docs/design/app-and-interface.md` 4.1 的页面说法、4.3 的分组名与相邻的页面说法改到表里的位置，4.4 加 `run.steps` 每步带调用尝试编号 / 收成对话与设置两页之前要先知道每样内容在哪里看
 
 claude-opus-5-5（子架构师） / 2026-11-08 21:37 / `docs/design/project-organization.md` 4.14 第四层改成一句话说明每一步、按任务分组、点开才是原始数据；`docs/design/app-and-interface.md` 4.4 去掉用时一条；`docs/prototypes/v20/` 工作过程改成任务、步骤、原始数据三级，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户要工作过程像「读取文件」这样的说明，不直接显示一大串实际动作
@@ -514,3 +518,4 @@ claude-opus-5-5（总架构师，用户指定） / 2026-11-08 21:25 / `CONTEXT.m
 claude-opus-5-5（子架构师） / 2026-11-08 22:16 / 新设计说明 `docs/design/work-process-titles.md`：工作过程三层的来源、存放与读者（任务由角色用更新计划写，动作标题由系统按工具和参数算出，运行命令由角色写一句，动作标记只来自工具定义与回执），含任务分组、老事件、外部 agent 的对应与验收；`docs/design/README.md` 加索引；`CONTEXT.md` 加工作过程、动作标题、动作标记、计划条目；`app-and-interface.md` 的 `run.steps` 一行改为供时序图里的工作过程并加标记、标题、来源、任务，4.4 加第 5 条；`project-organization.md` 4.14、`outsourced-roles.md`「ACP 提供的控制手段」、`department-loop.md`「工程的计划」、`local-tools.md` 命令一行各加一句；`semantic-system.md`「五层」的计划条目改为角色与更新计划的工具调用 / 用户要工作过程像常见 agent 那样显示状态缩略式的说明，点开才是原始数据（决定记录同日一条）
 
 claude-sonnet-5-5 / 2026-11-09 00:10 / `.claude/skills/solo/SKILL.md` 与 `scripts/hook.mjs` 无人值守：`notify` 循环退出 Claude Code 的编排钩子，`hook` 循环的子代理提示、派活限制、工人记录与自动继续只认有效租约所有者，账本写保护继续覆盖同项目会话；补 `hook-output.test.mjs` / 共享项目设置使普通 Claude Code 子代理收到 solo 身份与并发提示，甚至写入活动循环的工人记录（这次改动先落在 codex/v19-collaboration-design 的 69bb8a7a，此处带到 main）
+claude-opus-5-5（总架构师，用户指定） / 2026-11-09 00:25 / `docs/program-roadmap.md` 阶段一一行与判据四、`.claude/skills/trial/method/expert.md`、`probes.md`：页面与回放的对账改成页面与按位置读出的事实比对，看回放归画面 / v20 定型，项目页不留回放，这几处的目的不变、手段随之改（决定记录同日一条）
