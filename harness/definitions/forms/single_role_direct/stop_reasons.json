@@ -92,7 +92,7 @@
   "host_commit_error": {
     "label": "主机保存失败",
     "outcome": "failed",
-    "human_action": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。"
+    "human_action": "主机未能保存本次提交所需的工件、材料或事件，或者工作区无法按忽略规则读取。查看失败原因并处理存储或交付文件问题后重新运行。"
   },
   "run_event_version_changed": {
     "label": "因 Yudao 升级停止",
