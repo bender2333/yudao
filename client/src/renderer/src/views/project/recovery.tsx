@@ -192,18 +192,18 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
       <Section id="rc-reason" title="待恢复原因" className="y10-rc-reason-block">
         <div className="y10-rc-unusable">
           <StatusMark kind="unusable" text="待恢复" />
-          <strong>{departmentName(unusable.department)}部门的模型无法使用</strong>
+          <strong>{departmentName(unusable.department)}职能的模型无法使用</strong>
         </div>
         <KeyValue
           items={[
-            ["部门", departmentName(unusable.department)],
+            ["职能", departmentName(unusable.department)],
             ["模型", <code className="y10-code" key="model">{show(unusable.model, "未设置")}</code>],
             ["问题", show(unusable.problem)],
           ]}
         />
         <p className="y10-note note">
-          修复以后控制主机在合适的位置重新判断能否继续；在本项目的部门设置里另选模型只影响本项目，
-          从这个部门下一次模型请求起生效。回答使用下方决定卡片。
+          修复以后控制主机在合适的位置重新判断能否继续；在本项目的职能设置里另选模型只影响本项目，
+          从这个职能下一次模型请求起生效。回答使用下方决定卡片。
         </p>
       </Section>
     );
@@ -251,7 +251,7 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
             // 都取自同一份事项卡片
             ["停止说明", <StopNote key="stop-note" note={item?.stop_note ?? null} kept={item?.kept_delivery}
               detail={item?.stop_detail} empty="没有" />],
-            ["所在部门", item?.department ? departmentName(item.department) : "没有在部门里执行"],
+            ["所在职能", item?.department ? departmentName(item.department) : "没有在职能里执行"],
             ["最后已确认", lastConfirmedText(data)],
           ]}
         />
@@ -320,7 +320,7 @@ function PendingActionCard(props: { entry: UnfinishedAction }) {
       <p className="y10-rc-action-sum">{purposeText(entry.purpose)}</p>
       <KeyValue
         items={[
-          ["部门", departmentName(entry.department) || "没有在部门里执行"],
+          ["职能", departmentName(entry.department) || "没有在职能里执行"],
           ["工具", entry.tool],
           ["输入依据", entry.input_version === null ? "未上报" : `第 ${entry.input_version} 版`],
           ["执行前", artifactRefText(entry.before_snapshot_ref)],
@@ -351,7 +351,7 @@ function HandledActionCard(props: {
       <p className="y10-rc-action-sum">{purposeText(entry.purpose)}</p>
       <KeyValue
         items={[
-          ["部门", departmentName(entry.department) || "没有在部门里执行"],
+          ["职能", departmentName(entry.department) || "没有在职能里执行"],
           ["会话", actionSessionText(props.sessions, entry.session_id)],
           ["工具", entry.tool],
           ["输入依据", entry.input_version === null ? "未上报" : `第 ${entry.input_version} 版`],

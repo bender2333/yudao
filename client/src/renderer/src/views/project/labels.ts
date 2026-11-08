@@ -107,8 +107,8 @@ export const STOP_REASON: Record<string, string> = {
   open_loop: OPEN_LOOP_STATUS_TEXT,
   baseline_verified: "已完成基线核验",
   max_cycles: "循环次数已达上限",
-  model_steps_exhausted: "部门步数已达上限",
-  no_tool_call: "部门连续多次没有调用工具",
+  model_steps_exhausted: "职能步数已达上限",
+  no_tool_call: "职能连续多次没有调用工具",
   workspace_unrepresentable: "工作区有无法表示的条目",
   time_limit: "运行时间已达上限",
   cancelled: "运行已被取消",
@@ -170,7 +170,7 @@ export const ACTION_PURPOSE: Record<string, string> = {
 
 // 会话是部门主线还是询问分支（三部门的循环结构 docs/design/department-loop.md「停止与恢复」，工单 #181）：用量各自累计，页面上分开写
 export const SESSION_KIND: Record<string, string> = {
-  main: "部门主线",
+  main: "职能主线",
   branch: "询问分支",
 };
 
@@ -388,7 +388,7 @@ export function lettersWaitingText(letters: number | null | undefined): string |
   const count = letters === null || letters === undefined || !Number.isFinite(letters)
     ? 0
     : Math.max(0, Math.trunc(letters));
-  return count === 0 ? null : `传信管：${count} 封询问等待本部门回答`;
+  return count === 0 ? null : `传信管：${count} 封询问等待本职能回答`;
 }
 
 // 概览「当前事项」里写部门状态的那一行（工单 #904）：有 departments 时写三个部门各自的状态与原因，
@@ -397,7 +397,7 @@ export function departmentLine(
   departments: Record<string, DepartmentStateView> | null | undefined,
   department: string | null | undefined,
 ): string {
-  return departmentsText(departments) ?? `所在部门：${departmentName(department) || "大厅"}`;
+  return departmentsText(departments) ?? `所在职能：${departmentName(department) || "大厅"}`;
 }
 
 // 看板卡片上写正在工作的部门（三部门的循环结构 docs/design/department-loop.md「各职能在什么时候工作」，工单 #904）：状态是一轮工作中或询问中的部门，
@@ -503,9 +503,9 @@ export function stopDetailText(detail: StopDetailView | null | undefined): strin
   const department = departmentName(detail.department ?? null);
   const model = (detail.requested_model ?? "").trim();
   if (department !== "" && model !== "") {
-    parts.push(`${department}部门请求的模型 ${model}`);
+    parts.push(`${department}职能请求的模型 ${model}`);
   } else if (department !== "") {
-    parts.push(`${department}部门`);
+    parts.push(`${department}职能`);
   } else if (model !== "") {
     parts.push(`请求的模型 ${model}`);
   }
@@ -800,8 +800,8 @@ export function trialCaseResultView(item: {
 }
 
 export const TRIAL_EVIDENCE_TAG = "证据";
-export const TRIAL_NO_SESSION = "这个部门这次运行没有试用会话";
-export const TRIAL_NO_CASE = "这个部门这次运行没有试用用例";
+export const TRIAL_NO_SESSION = "这个职能这次运行没有试用会话";
+export const TRIAL_NO_CASE = "这个职能这次运行没有试用用例";
 export const TRIAL_UNNAMED_CASE = "未命名试用用例";
 export const TRIAL_UNNAMED_LAUNCH = "未命名启动方式";
 export const TRIAL_UNNAMED_CRITERION = "未写编号的验收条件";

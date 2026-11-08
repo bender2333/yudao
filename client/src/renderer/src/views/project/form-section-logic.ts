@@ -30,7 +30,10 @@ export const NOT_IN_RELEASE = "不在这一版发布里";
 
 // 发布带的一份形态在页面上的样子
 export type FormChoiceView = {
+  // 发布带里的标识（提交与 data-testid 用）：不显示给用户
   form: string;
+  // 形态名：查询给的 label（工单 #1601），由这份定义里的职能显示名推出，显示给用户
+  label: string;
   // 一句说明：查询给的那一句，原样显示
   description: string;
   // 没有核验角色时写 OPEN_LOOP_SENTENCE；有核验角色时为空（不写这一行）
@@ -44,6 +47,7 @@ export type FormChoiceView = {
 export function choiceView(choice: FormChoice, currentForm: string): FormChoiceView {
   return {
     form: choice.form,
+    label: choice.label,
     description: choice.description,
     openLoop: choice.verifier_roles.length === 0 ? OPEN_LOOP_SENTENCE : "",
     isCurrent: choice.form === currentForm,
@@ -61,12 +65,15 @@ export function otherChoices(organization: ProjectOrganizationResult): FormChoic
   return organization.forms.filter((choice) => choice.form !== organization.form);
 }
 
-// 现在用哪一份：名字与组织版本；那一份不在发布里时写明，并说清怎么修
+// 现在用哪一份：形态名与组织版本；那一份不在发布里时写明，并说清怎么修。
+// 形态名用查询给的 label（工单 #1601）：页面不显示 single_role_direct 这类发布带里的标识；
+// 这一份不在发布里、取不到 label 时才退回标识，照实写明是哪一份
 export function currentFormText(organization: ProjectOrganizationResult): string {
+  const name = organization.label ?? organization.form;
   if (!organization.form_in_release) {
-    return `现在用 ${organization.form}；这一份${NOT_IN_RELEASE}，选一份发布里的形态以后，之后新建的事项才有可用的组织`;
+    return `现在用 ${name}；这一份${NOT_IN_RELEASE}，选一份发布里的形态以后，之后新建的事项才有可用的组织`;
   }
-  return `现在用 ${organization.form}（组织版本 ${organization.version ?? NOT_IN_RELEASE}）`;
+  return `现在用 ${name}（组织版本 ${organization.version ?? NOT_IN_RELEASE}）`;
 }
 
 // 组织版本：现在这一份不在发布里时没有版本，不写一个假的
@@ -121,8 +128,10 @@ export function reasonText(reason: string): string {
   return reason.trim() === "" ? NO_REASON : reason;
 }
 
-// 一次改动：原值、新值、理由、时间与谁改的；改回一项按现在用的是哪一份决定
-export function historyRow(record: FormChange, currentForm: string): FormHistoryRow {
+// 一次改动：原值、新值、理由、时间与谁改的；改回一项按现在用的是哪一份决定。
+// 原值与新值在页面上写形态名：发布带里有的取它的 label，不在发布带里的那一份照实写标识
+export function historyRow(record: FormChange, currentForm: string,
+                           labels: Record<string, string> = {}): FormHistoryRow {
   return {
     eventId: record.event_id,
     previous: record.previous_form,
@@ -130,14 +139,15 @@ export function historyRow(record: FormChange, currentForm: string): FormHistory
     reason: reasonText(record.reason),
     at: record.at,
     actor: actorText(record.actor),
-    text: `${record.previous_form} → ${record.form}`,
+    text: `${labels[record.previous_form] ?? record.previous_form} → ${labels[record.form] ?? record.form}`,
     canChangeBack: canChangeBack(record.previous_form, currentForm),
   };
 }
 
-// 历史：按查询给的顺序（事件顺序，早的在前）
+// 历史：按查询给的顺序（事件顺序，早的在前）。原值与新值按发布带的形态清单换成形态名
 export function historyRows(organization: ProjectOrganizationResult): FormHistoryRow[] {
-  return organization.history.map((record) => historyRow(record, organization.form));
+  const labels = Object.fromEntries(organization.forms.map((choice) => [choice.form, choice.label]));
+  return organization.history.map((record) => historyRow(record, organization.form, labels));
 }
 
 // 「改回这一份」：原值不是现在用的这一份才有意义（等于没改时不给这一项）
@@ -161,7 +171,7 @@ export function changeBackPayload(props: {
   };
 }
 
-// 谁改的：与事件提出者在页面上的说法一致（你、系统、某部门）；认不出的照实写，不猜
+// 谁改的：与事件提出者在页面上的说法一致（你、系统、某职能）；认不出的照实写，不猜
 export function actorText(actor: string): string {
   const separator = actor.indexOf(":");
   const kind = separator < 0 ? actor : actor.slice(0, separator);
@@ -173,7 +183,7 @@ export function actorText(actor: string): string {
     return "系统";
   }
   if (kind === "department") {
-    return `${departmentName(value)}部门`;
+    return departmentName(value);
   }
   return actor;
 }
