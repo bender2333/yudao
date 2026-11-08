@@ -31,14 +31,18 @@ import { paths } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import type { Route } from "../../shell/routing";
 import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
-import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, StopNote, SubmitButton, Table, TextArea,
-  TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
+import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, StopNote, SubmitButton, Table,
+  TextArea, TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { scopeAtTick, ticksOf } from "../timeline/logic";
 import { INPUT_KIND, STOP_REASON, departmentName, departmentLine, formatTime, label,
   progressLabel, stoppedCardLine, workItemStatusText, workingDepartmentsText } from "./labels";
 import { askIndent, askLine } from "./asks-text";
+import {
+  CANCEL_CONFIRM_CANCEL, CANCEL_CONFIRM_CONFIRM, cancelConfirmLines, cancelConfirmTitle, cancelItemCommand,
+  cancelItemLabel, type CancelRequest,
+} from "./cancel-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
 import { boardGroups } from "./board";
@@ -582,6 +586,8 @@ function CurrentItem(props: {
     work_item: item?.work_item_id ?? "",
   }, item === null);
   const [appendText, setAppendText] = useDraft(`input/${props.projectId}/${item?.work_item_id ?? "none"}/append`);
+  // 取消事项／放弃本次建档不可逆（工单 #737）：点下去先记下这一份，确认以后才提交命令
+  const [pendingCancel, setPendingCancel] = useState<CancelRequest | null>(null);
 
   if (item === null) {
     return (
@@ -655,17 +661,53 @@ function CurrentItem(props: {
         </div>
       ) : null}
       {/* 建档事项等用户确认初始 PRD 时事项本身没有在执行，取消撤销那条决定请求（工单 #136），
-          用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节） */}
+          用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节）。
+          取消事项不可逆（工单 #737）：点下去先确认、写明取消以后不能恢复，确认以后才提交命令；
+          与其他不可逆的操作同一套做法，按钮用 danger 样式 */}
       {(item.status === "in_progress" || item.status === "awaiting_initial_prd")
         && hasCommand(props.app, "work_item.cancel") ? (
         <div className="y10-ov-composer composer">
-          <SubmitButton
-            label={item.status === "awaiting_initial_prd" ? "放弃本次建档" : "取消事项"}
-            busy={props.command.busy}
-            onClick={() => {
-              void props.command.submit("work_item.cancel", { work_item_id: item.work_item_id, base_version: item.version });
-            }}
-          />
+          <button
+            type="button"
+            className="y10-btn danger"
+            data-testid="cancel-item"
+            disabled={props.command.busy}
+            onClick={() => setPendingCancel({
+              work_item_id: item.work_item_id,
+              base_version: item.version,
+              status: item.status,
+            })}
+          >
+            {cancelItemLabel(item.status)}
+          </button>
+          {pendingCancel !== null ? (
+            <Modal title={cancelConfirmTitle(pendingCancel.status)} onClose={() => setPendingCancel(null)}>
+              {cancelConfirmLines(pendingCancel.status).map((line) => (
+                <p key={line} className="y10-note note">{line}</p>
+              ))}
+              <p className="y10-row">
+                <button
+                  type="button"
+                  className="y10-btn danger"
+                  data-testid="cancel-item-confirm"
+                  disabled={props.command.busy}
+                  onClick={() => {
+                    const command = cancelItemCommand(pendingCancel, true);
+                    setPendingCancel(null);
+                    if (command !== null) {
+                      void props.command.submit("work_item.cancel", command);
+                    }
+                  }}
+                >
+                  {CANCEL_CONFIRM_CONFIRM}
+                </button>
+                <button type="button" className="y10-btn" data-testid="cancel-item-dismiss"
+                        onClick={() => setPendingCancel(null)}>
+                  {CANCEL_CONFIRM_CANCEL}
+                </button>
+              </p>
+            </Modal>
+          ) : null}
           <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         </div>
       ) : null}

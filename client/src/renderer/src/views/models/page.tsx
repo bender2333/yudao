@@ -20,8 +20,12 @@ import { ConnectCard, type ConnectStatus, type ConnectTarget } from "./connect-c
 import { DepartmentUsage, type DepartmentStatus } from "./department-usage";
 import { SelectionPanel, type SelectionStatus } from "./selection-panel";
 import { Block, PageHead } from "../../shell/kit";
+import { Modal } from "../project/common";
 import {
   FIRST_PAGE,
+  REMOVE_CONFIRM_CANCEL,
+  REMOVE_CONFIRM_CONFIRM,
+  REMOVE_CONFIRM_TITLE,
   admittedModels,
   candidateKey,
   candidatePageAfter,
@@ -38,12 +42,16 @@ import {
   groupAdmittedModels,
   intFromInput,
   modelInputOf,
+  removalCommand,
   removalRejectionText,
+  removeConfirmLines,
   selectedModelRows,
   type BindingInput,
   type CandidateFilterId,
   type CandidateRow,
   type PendingFetch,
+  type RemovalRequest,
+  type SelectedModelRow,
 } from "./model-logic";
 
 export type ModelManagementPageProps = {
@@ -88,6 +96,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [jsonOpen, setJsonOpen] = useState(false);
   // 页面级提示：只用于整页的事（目录文件的重新读取）
   const [pageNotice, setPageNotice] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  // 取消选用（移除模型访问定义）不可逆（工单 #737）：点下去先记下这一行，确认以后才提交命令
+  const [pendingRemoval, setPendingRemoval] = useState<RemovalRequest | null>(null);
 
   const catalogRef = useRef<Catalog | null>(null);
   const views = props.views;
@@ -444,18 +454,23 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     return removed;
   }, [removeModel]);
 
+  // 确认以后才移除（工单 #737）：两个入口都走到这里，命令的参数由 removalCommand 给出
+  const confirmRemoval = useCallback((pending: RemovalRequest) => {
+    const command = removalCommand(pending, true);
+    setPendingRemoval(null);
+    if (command !== null) {
+      void cancelSelection(command.provider_id, command.model_id, pending.key);
+    }
+  }, [cancelSelection]);
+
   const toggleCandidate = useCallback(async (row: CandidateRow) => {
     const key = candidateKey(row.provider_id, row.candidate.id);
     const model = catalogRef.current?.models.find(
       (item) => item.provider_id === row.provider_id && item.model === row.candidate.id,
     );
     if (model) {
-      // 取消选用：先撤下勾选，服务端拒绝（被引用）时再放回去
-      setPicked((current) => ({ ...current, [key]: false }));
-      const removed = await cancelSelection(row.provider_id, model.id, key);
-      if (!removed) {
-        setPicked((current) => ({ ...current, [key]: true }));
-      }
+      // 取消勾选就是取消选用（移除访问定义），不可逆：先确认，确认以前勾选保持选中（工单 #737）
+      setPendingRemoval(removalOfCandidate(catalogRef.current, row.provider_id, row.candidate.id, model.id));
       return;
     }
     setPicked((current) => ({ ...current, [key]: true }));
@@ -463,7 +478,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     if (!selected) {
       setPicked((current) => ({ ...current, [key]: false }));
     }
-  }, [cancelSelection, selectModel]);
+  }, [selectModel]);
 
   // 容量未知：填完窗口与输出上限以后继续（同一条选用命令带上这两个值）
   const continueWithCapacity = useCallback(async (providerId: string, upstreamModel: string, key: string) => {
@@ -760,7 +775,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             }))}
             onContinue={(row) => void continueWithCapacity(row.provider_id, row.upstream_model, row.key)}
             onRetry={(row) => void selectModel(row.provider_id, row.upstream_model, row.key)}
-            onRemove={(row) => void cancelSelection(row.provider_id, row.model_id, row.key)}
+            onRemove={(row) => setPendingRemoval(removalOfRow(row))}
           />
         </div>
       </Block>
@@ -774,6 +789,28 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         onSaveModel={(providerId, modelId, draft) => void saveModel(providerId, modelId, draft)}
       />
 
+      {/* 取消选用（移除模型访问定义）不可逆（工单 #737）：点下去先说清后果，确认以后才提交命令。
+          与其他不可逆的操作同一套做法：确认按钮 danger，不做的那个普通样式 */}
+      {pendingRemoval !== null ? (
+        <Modal title={REMOVE_CONFIRM_TITLE} onClose={() => setPendingRemoval(null)}>
+          {removeConfirmLines({
+            upstream_model: pendingRemoval.upstream_model,
+            provider_address: pendingRemoval.provider_address,
+            admitted: pendingRemoval.admitted,
+          }).map((line) => <p key={line} className="y10-note note">{line}</p>)}
+          <p className="y10-row">
+            <button type="button" className="y10-btn danger" data-testid="remove-confirm" disabled={busy}
+                    onClick={() => confirmRemoval(pendingRemoval)}>
+              {REMOVE_CONFIRM_CONFIRM}
+            </button>
+            <button type="button" className="y10-btn" data-testid="remove-dismiss"
+                    onClick={() => setPendingRemoval(null)}>
+              {REMOVE_CONFIRM_CANCEL}
+            </button>
+          </p>
+        </Modal>
+      ) : null}
+
       {jsonOpen ? (
         <JsonDialog
           document={document === null ? null : (document as unknown as EditableDocument)}
@@ -784,4 +821,35 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       ) : null}
     </div>
   );
+}
+
+// 已选模型清单里那一行要移除的定义（工单 #737）：准入有效的那一行在确认框里写明准入作废
+function removalOfRow(row: SelectedModelRow): RemovalRequest {
+  return {
+    key: row.key,
+    provider_id: row.provider_id,
+    model_id: row.model_id,
+    upstream_model: row.upstream_model,
+    provider_address: row.provider_address,
+    admitted: row.status === "enabled",
+  };
+}
+
+// 候选的勾选框取消选用时清单里可能还没有这一行（刚勾选、服务端还没写进度）：按候选自己的数据补齐
+function removalOfCandidate(
+  catalog: Catalog | null,
+  providerId: string,
+  upstreamModel: string,
+  modelId: string,
+): RemovalRequest {
+  const provider = catalog?.providers.find((item) => item.id === providerId);
+  const admission = catalog?.admissions.find((item) => item.provider_id === providerId && item.model_id === modelId);
+  return {
+    key: candidateKey(providerId, upstreamModel),
+    provider_id: providerId,
+    model_id: modelId,
+    upstream_model: upstreamModel,
+    provider_address: provider?.base_url ?? providerId,
+    admitted: admission !== undefined && admission.admitted && !admission.stale,
+  };
 }
