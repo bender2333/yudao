@@ -533,8 +533,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       return;
     }
     await saveBindings(departmentBindings(current, department, modelId, departments), department,
-      modelId === "" ? "已取消这个部门的模型，从下一次模型请求起生效。"
-        : "已保存部门默认，从各部门下一次模型请求起生效。");
+      modelId === "" ? "已取消这个职能的模型，从下一次模型请求起生效。"
+        : "已保存职能默认，从各职能下一次模型请求起生效。");
   }, [departments, saveBindings]);
 
   const chooseDepartmentTier = useCallback(async (department: string, tier: string) => {
@@ -688,8 +688,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       </Block>
 
       <Block
-        title="部门使用"
-        subtitle="首个启用的模型自动供三个部门使用；在这里按部门更换"
+        title="职能使用"
+        subtitle="首个启用的模型自动供三个职能使用；在这里按职能更换"
       >
         <DepartmentUsage
           departments={departments}

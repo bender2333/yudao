@@ -154,7 +154,7 @@ export function HomePage(props: {
         onNavigate={props.onNavigate}
       />
 
-      <Section id="home-projects" title="项目" note="每个项目一行：此刻在做什么、事项在哪个部门、有没有事项在等执行槽位、待你回答的决定">
+      <Section id="home-projects" title="项目" note="每个项目一行：此刻在做什么、事项在哪个职能、有没有事项在等执行槽位、待你回答的决定">
         {projectError !== null ? (
           <p className="y10-note note" role="status">{readFailureText(projectError)}</p>
         ) : (replaying ? replayProjects.data : projects.data) === null ? (
@@ -168,7 +168,7 @@ export function HomePage(props: {
                   <th scope="col">长期目标</th>
                   <th scope="col">当前成果</th>
                   <th scope="col">此刻在做什么</th>
-                  <th scope="col">事项在哪个部门</th>
+                  <th scope="col">事项在哪个职能</th>
                   <th scope="col">执行槽位</th>
                   <th scope="col">待回答的决定</th>
                   <th scope="col">最近活动</th>

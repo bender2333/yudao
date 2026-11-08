@@ -35,8 +35,8 @@ export function DepartmentUsage(props: DepartmentUsageProps) {
     <div className="mm-usage" data-testid="department-usage">
       {enabled.length === 0 ? (
         <div className="y10-empty mm-empty" data-testid="department-empty">
-          <strong>选好模型，部门就能开始工作</strong>
-          <p>首个通过验证的模型会自动供三个部门使用。</p>
+          <strong>选好模型，职能就能开始工作</strong>
+          <p>首个通过验证的模型会自动供三个职能使用。</p>
         </div>
       ) : null}
       {props.departments.map((department) => {
@@ -108,7 +108,7 @@ export function DepartmentUsage(props: DepartmentUsageProps) {
         );
       })}
       <p className="y10-small y10-muted mm-meta">
-        从各部门下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项。
+        从各职能下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项。
       </p>
     </div>
   );

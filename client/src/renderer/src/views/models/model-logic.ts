@@ -679,11 +679,11 @@ export const STALE_ADMISSION_LABEL = "无法使用：准入已作废";
 export function referrerLabel(location: string, labels: Record<string, string> = {}): string {
   const binding = /^bindings\.([a-z_]+)$/.exec(location);
   if (binding) {
-    return `部门默认：${labels[binding[1]] ?? departmentName(binding[1])}`;
+    return `职能默认：${labels[binding[1]] ?? departmentName(binding[1])}`;
   }
   const project = /^projects\.([^.]+)\.department_settings\.([a-z_]+)$/.exec(location);
   if (project) {
-    return `项目部门设置：${labels[project[2]] ?? departmentName(project[2])}`;
+    return `项目职能设置：${labels[project[2]] ?? departmentName(project[2])}`;
   }
   return location;
 }
@@ -830,7 +830,7 @@ export function tierOptions(supported: string[], saved: string | null | undefine
 
 // 跟随部门的选项文本：待保存的选择为空时写明当前生效的模型（来源与模型名）
 export function followDepartmentLabel(current: string): string {
-  return current === "" ? "跟随部门默认" : `跟随部门默认（当前：${current}）`;
+  return current === "" ? "跟随职能默认" : `跟随职能默认（当前：${current}）`;
 }
 
 // 当前生效模型的说明：取出生效状态与来源，供跟随选项展示。
@@ -877,7 +877,7 @@ export function modelById(models: CatalogModel[], modelId: string): CatalogModel
 }
 
 // 一次保存以后要提示的生效说明
-export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生效";
+export const DEPARTMENT_SAVE_NOTICE = "从本职能下一次模型请求起生效";
 
 // ---------------------------------------------------------------------------
 // 目录文档（高级部分的编辑 JSON）

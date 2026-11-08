@@ -112,27 +112,50 @@ def _command(client, name, **body):
     return client.post(f"/api/commands/{name}", json={"command_id": str(uuid.uuid4()), **body})
 
 
-def _catalog_events(store):
-    return store.read(0, limit=100_000, types=[value for key, value in vars(CatalogEventType).items()
-                                               if not key.startswith("_")])
+def _catalog_events(store, after=0):
+    return store.read(after, limit=100_000, types=[value for key, value in vars(CatalogEventType).items()
+                                                   if not key.startswith("_")])
 
 
-def _wait_for(store, predicate, *, timeout=WAIT_FOR_HOST_WORK_SEC, description="catalog event"):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        matched = [event for event in _catalog_events(store) if predicate(event)]
-        if matched:
-            return matched
-        time.sleep(0.02)
-    raise AssertionError(f"timed out waiting for {description}")
+def _wait_for(store, predicate, *, after=0, description="catalog event"):
+    # 等一条目录事件（工单 #1320）：订阅写入口的提交通知，由事件到达决定先后，不按轮询的时机赌
+    # （docs/design/test-pyramid.md「测试的写法」第 7 条）。after 是起点：这条用例发出的命令被接受时
+    # 返回的 position（Accepted.position），只有它之后追加的事件才算这次命令的结果。更换 Key 以后
+    # 应用自己会在同一条连接上再取一次候选并重测连接（docs/design/model-management.md「模型访问定义与准入」），
+    # 那次的事件不能算到这次命令头上。返回第一条符合的事件
+    deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
+    found = []
+    signal = threading.Event()
+
+    def receive(events):
+        found.extend(event for event in events if event.position > after and predicate(event))
+        if found:
+            signal.set()
+
+    unsubscribe = store.subscribe(receive)
+    try:
+        while not found:
+            # 结果可能在订阅之前就写完了：先看已经写下的事件，再等下一次提交
+            receive(_catalog_events(store))
+            if found:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AssertionError(f"timed out waiting for {description} after position {after}: "
+                                     f"no event matched this description")
+            signal.wait(remaining)
+            signal.clear()
+        return found[0]
+    finally:
+        unsubscribe()
 
 
 def _set_credential(client, secret):
-    # 换一个凭据：经命令写入，与界面改凭据走同一条路径
+    # 换一个凭据：经命令写入，与界面改凭据走同一条路径。返回这条命令登记的位置
     version = _catalog(client)["providers"][0]["credential"]["version"]
     response = _command(client, "credential.set", base_version=version, ref=REF, secret=secret)
     assert response.status_code == 200, response.text
-    return version + 1
+    return response.json()["position"]
 
 
 def _assert_no_secret(client, opened, secret=SECRET):
@@ -152,8 +175,8 @@ def test_collect_candidates_sends_the_credential_and_reports_source_and_time(tmp
             current = _catalog(client)["revision"]
             collected = _command(client, "catalog.candidates.collect", base_version=current, provider_id="p1")
             assert collected.status_code == 200, collected.text
-            [event] = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                                description="catalog_candidates_collected")
+            event = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
+                              after=collected.json()["position"], description="catalog_candidates_collected")
             assert event.payload["status"] == "ok"
             assert set(event.payload["candidate_ids"]) == {"m1", "m9"}
             assert event.payload["source_url"] == models_url
@@ -171,10 +194,11 @@ def test_collect_candidates_rejects_an_unknown_connection(tmp_path):
         opened = _Opened(tmp_path, _document(models_url=models_url))
         with running_api(opened) as client:
             current = _catalog(client)["revision"]
+            start = opened.store.end_position()
             collected = _command(client, "catalog.candidates.collect", base_version=current, provider_id="missing")
             assert collected.status_code == 409, collected.text
             assert collected.json()["reason"] == "not_found"
-            assert not [event for event in _catalog_events(opened.store)
+            assert not [event for event in _catalog_events(opened.store, start)
                         if event.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED]
             assert not server.requests
 
@@ -190,8 +214,8 @@ def test_connection_test_without_models_uses_saved_address_and_credential(tmp_pa
             assert before["models"] == []
             tested = _command(client, "catalog.connection.test", base_version=before["revision"], provider_id="p1")
             assert tested.status_code == 200, tested.text
-            [event] = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
-                                description="empty connection test")
+            event = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
+                              after=tested.json()["position"], description="empty connection test")
             assert event.payload["ok"] is True
             assert event.payload["source_url"] == models_url
             assert len(server.requests) == 1
@@ -207,18 +231,27 @@ def test_connection_test_fails_when_the_credential_is_wrong(tmp_path):
             current = _catalog(client)["revision"]
             tested = _command(client, "catalog.connection.test", base_version=current, provider_id="p1")
             assert tested.status_code == 200, tested.text
-            [ok] = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
-                             description="catalog_test_finished (connection)")
+            ok = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
+                           after=tested.json()["position"], description="catalog_test_finished (connection)")
             assert ok.payload["ok"] is True
 
-            _set_credential(client, "issue-85-wrong-key")
+            # 更换 Key 以后应用自己会在同一条连接上做一次连接测试，结果写在连接旁
+            # （docs/design/model-management.md「模型访问定义与准入」）：先等这一次落事件，再发这条用例要测的显式连接测试。
+            # 两件事的先后由事件日志决定，不靠时长
+            changed = _set_credential(client, "issue-85-wrong-key")
+            automatic = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection"
+                                  and not item.payload["ok"], after=changed,
+                                  description="the connection test after changing the key")
+            assert automatic.payload["error"]
+
             revision = _catalog(client)["revision"]
             tested = _command(client, "catalog.connection.test", base_version=revision, provider_id="p1")
             assert tested.status_code == 200, tested.text
             failed = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection"
-                               and not item.payload["ok"], description="failed connection test")
-            assert failed[0].payload["error"]
-            assert failed[0].payload["admitted"] is None
+                               and not item.payload["ok"], after=tested.json()["position"],
+                               description="failed connection test")
+            assert failed.payload["error"]
+            assert failed.payload["admitted"] is None
             _assert_no_secret(client, opened)
 
 
@@ -228,9 +261,10 @@ def test_connection_test_rejects_an_unknown_connection(tmp_path):
         opened = _Opened(tmp_path, _document(models_url=models_url))
         with running_api(opened) as client:
             current = _catalog(client)["revision"]
+            start = opened.store.end_position()
             tested = _command(client, "catalog.connection.test", base_version=current, provider_id="missing")
             assert tested.status_code == 409, tested.text
             assert tested.json()["reason"] == "not_found"
-            assert not [event for event in _catalog_events(opened.store)
+            assert not [event for event in _catalog_events(opened.store, start)
                         if event.payload.get("kind") == "connection"]
             assert not server.requests
