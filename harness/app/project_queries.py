@@ -2993,7 +2993,7 @@ class McpServerSettingView(Contract):
 
 
 class McpCredentialStatusView(Contract):
-    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP docs/design/network-and-mcp.md「项目设置的「MCP 服务器」一节」）：
+    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP docs/design/network-and-mcp.md「设置页「高级」的「MCP 服务器」」）：
     # 页面在凭据名称旁写「已设置」或「缺失」与来源，与后端同一份判断，不自己猜；
     # 只有名称、状态与来源，没有凭据值。version 是 credential.set 的基准版本
     ref: str
