@@ -2198,8 +2198,15 @@ class AskView(Contract):
     requester: str
     recipient: str
     question: str
+    # 询问的背景与期望（工单 #1637）：询问开始事件里就有，页面据此显示提问方为什么问、希望得到什么
+    background: str | None = None
+    expected: str | None = None
     status: Literal["进行中", "已回答", "没能回答"]
     answer: str | None = None
+    # 工程回答质检时回答分成的事实与解释两段（工单 #554 写在回答事件里，工单 #1637 读出来给页面）：
+    # 分开的两个字段，不合并；质检的请求里放哪一段由装配决定（验证的独立性设计说明「先判断后看解释」），不由这个查询决定
+    answer_facts: str | None = None
+    answer_explanation: str | None = None
     reason: str | None = None
     # 上一层询问的编号：这次询问是在另一次询问的分支里发出的时候（回问）有值
     parent: str | None = None
@@ -2241,6 +2248,8 @@ def _run_asks(application: Application, request: RunAsks) -> Snapshot[RunAsksRes
         chain = [*(above.chain if above is not None else []), payload.get("requester") or ""]
         answer_event = answers.get(branch_session_id)
         prd_revision = None
+        answer_facts = None
+        answer_explanation = None
         if answer_event is not None:
             ans_payload = answer_event.payload or {}
             if ans_payload.get("status") == "answered":
@@ -2248,6 +2257,9 @@ def _run_asks(application: Application, request: RunAsks) -> Snapshot[RunAsksRes
                 answer = ans_payload.get("answer")
                 reason = None
                 prd_revision = ans_payload.get("revision")
+                # 回答的两段照回答事件里的原文读出（工单 #1637）：老事件没有这两个键，读成空
+                answer_facts = ans_payload.get("facts")
+                answer_explanation = ans_payload.get("explanation")
             else:
                 status = "没能回答"
                 answer = None
@@ -2265,8 +2277,13 @@ def _run_asks(application: Application, request: RunAsks) -> Snapshot[RunAsksRes
             requester=payload.get("requester") or "",
             recipient=payload.get("recipient") or "",
             question=payload.get("question") or "",
+            # 询问的背景与期望照询问开始事件读出（工单 #1637）：老事件没有这两个键，读成空
+            background=payload.get("background"),
+            expected=payload.get("expected"),
             status=status,
             answer=answer,
+            answer_facts=answer_facts,
+            answer_explanation=answer_explanation,
             reason=reason,
             parent=None if above is None else above.id,
             chain=chain,
@@ -2990,7 +3007,7 @@ class McpServerSettingView(Contract):
 
 
 class McpCredentialStatusView(Contract):
-    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP docs/design/network-and-mcp.md「项目设置的「MCP 服务器」一节」）：
+    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP docs/design/network-and-mcp.md「设置页「高级」的「MCP 服务器」」）：
     # 页面在凭据名称旁写「已设置」或「缺失」与来源，与后端同一份判断，不自己猜；
     # 只有名称、状态与来源，没有凭据值。version 是 credential.set 的基准版本
     ref: str

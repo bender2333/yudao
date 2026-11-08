@@ -323,7 +323,7 @@ def test_project_settings_query_returns_the_mcp_section(tmp_path):
 
 
 def test_project_settings_gives_the_state_of_the_credential_names_in_the_settings(tmp_path):
-    # 工单 #237：界面在凭据名称旁写「已设置」或「缺失」，判断来自后端（网络与 MCP docs/design/network-and-mcp.md「项目设置的「MCP 服务器」一节」）。
+    # 工单 #237：界面在凭据名称旁写「已设置」或「缺失」，判断来自后端（网络与 MCP docs/design/network-and-mcp.md「设置页「高级」的「MCP 服务器」」）。
     # 变量与请求头里出现的凭据名称各给一项，状态与凭据命令读的是同一个来源；只给名称与状态，不含凭据值
     system = _system(tmp_path)
     project_id = system.projects.register("凭据状态", GOAL)
