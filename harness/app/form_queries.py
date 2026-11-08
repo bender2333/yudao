@@ -125,9 +125,10 @@ class ProjectOrganization(Contract):
 
 
 class FormChoice(Contract):
-    # 发布带的一份形态：名字（发布带里的标识）、一句说明、这份定义的版本（改动为空时它就是组织版本）、
-    # 核验角色的编号（空表示没有核验角色）与开环与否（没有核验角色核验最后采纳的成果）
+    # 发布带的一份形态：名字（发布带里的标识）、形态名（它有哪几个职能，从这份定义推出）、一句说明、
+    # 这份定义的版本（改动为空时它就是组织版本）、核验角色的编号（空表示没有核验角色）与开环与否
     form: str
+    label: str
     description: str
     version: str
     verifier_roles: list[str]
@@ -167,11 +168,13 @@ class FormChange(Contract):
 
 
 class ProjectOrganizationResult(Contract):
-    # 项目现在的组织：现在用哪一份、合成结果（现在这一份不在发布里、或改动合不到一起时为空，并给出
-    # 拒绝项）、组织版本（合成结果的内容摘要；取不到时为空）、发布带的每一份形态、改动历史，
-    # 以及设置页一次点击的两个改动文档（加 / 去掉核验角色；不适用时为空）
+    # 项目现在的组织：现在用哪一份、它的形态名（它有哪几个职能，从这一份定义推出；这一份不在发布里时
+    # 为空）、合成结果（现在这一份不在发布里、或改动合不到一起时为空，并给出拒绝项）、组织版本
+    # （合成结果的内容摘要；取不到时为空）、发布带的每一份形态、改动历史，以及设置页一次点击的两个
+    # 改动文档（加 / 去掉核验角色；不适用时为空）
     project_id: str
     form: str
+    label: str | None
     version: str | None
     form_in_release: bool
     departments: list[OrganizationDepartment]
@@ -207,10 +210,17 @@ def _describe(definitions: Definitions) -> str:
     return f"{names}；{verifying}。"
 
 
+def _label(definitions: Definitions) -> str:
+    # 形态名：列出这份形态有哪几个职能，从定义推出（术语表「形态」）。按定义里职能的显示名与定义的顺序，
+    # 用「 · 」连起来，不另写一份名字
+    labels = definitions.department_labels
+    return " · ".join(labels[department] for department in definitions.departments)
+
+
 def _choice(name: str, definitions: Definitions) -> FormChoice:
     verifiers = list(definitions.verifier_roles())
-    return FormChoice(form=name, description=_describe(definitions), version=definitions.version,
-                      verifier_roles=verifiers, open_loop=not verifiers)
+    return FormChoice(form=name, label=_label(definitions), description=_describe(definitions),
+                      version=definitions.version, verifier_roles=verifiers, open_loop=not verifiers)
 
 
 def _origin(department: str, changes: dict[str, Any]) -> str:
@@ -264,6 +274,7 @@ def _project_organization(application: Application,
         position=store.end_position(),
         data=ProjectOrganizationResult(
             project_id=state.project_id, form=current,
+            label=None if definitions is None else _label(definitions),
             version=None if definitions is None else definitions.version,
             form_in_release=current in forms,
             departments=[] if definitions is None else [

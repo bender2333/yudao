@@ -1,7 +1,7 @@
 {
   "kinds": {
     "change": {
-      "label": "普通事项（一个角色直做）",
+      "label": "普通事项（「工程」）",
       "stop_reason": "released",
       "departments": {
         "engineering": {
@@ -63,7 +63,7 @@
       }
     },
     "onboarding": {
-      "label": "建档事项（一个角色直做）",
+      "label": "建档事项（「工程」）",
       "stop_reason": "open_loop",
       "departments": {
         "engineering": {
