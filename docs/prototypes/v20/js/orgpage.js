@@ -33,7 +33,7 @@
   function crumbs(r, p) {
     const adv = Y20.state.route.query.advanced === '1';
     const orgLink = adv ? '<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/settings">设置</button><span class="y20-crumb-sep">/</span><button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/org?advanced=1">高级</button>' : '<span class="y20-crumb-note">职能详情</span>';
-    if (r.name === 'item-org') { const it = H.item(p, r.params.item); return [it ? '<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/w/' + it.id + '">' + esc(it.title) + '</button>' : '', '<strong>这个事项用的组织</strong>']; }
+    if (r.name === 'item-org') { const it = H.item(p, r.params.item); return [it ? '<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '?item=' + it.id + '">' + esc(it.title) + '</button>' : '', '<strong>这个事项用的组织</strong>']; }
     const path = pathOf(r);
     if (r.name === 'org') return ['<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/settings">设置</button>', '<strong>高级</strong>'];
     if (r.name === 'org-sub') { const c = pathCrumbs(p, path); c[c.length - 1] = c[c.length - 1].replace('class="y20-crumb"', 'class="y20-crumb is-current"'); return [orgLink].concat(c); }
@@ -343,7 +343,7 @@
   A('og.old', () => {
     const p = pidNow(), old = oldItems(p);
     ui.modal({ title: '在按旧组织跑的事项', wide: true, body: ui.table({ columns: [
-      { label: '事项', render: (i) => H.dot(i) + ' ' + H.link('#/p/' + p.id + '/w/' + i.id, i.title) },
+      { label: '事项', render: (i) => H.dot(i) + ' ' + H.link('#/p/' + p.id + '?item=' + i.id, i.title) },
       { label: '状态', render: (i) => H.status(i) },
       { label: '冻结的组织', render: (i) => esc(i.org.formName) + ' ' + ui.code(i.org.version) + ' · ' + H.link('#/p/' + p.id + '/w/' + i.id + '/org', '看那一份') }
     ], rows: old, empty: '没有' }) + '<p class="y20-small y20-muted">事项走到一半不能换人，所以按建立时那份组织跑完；之后新建的事项用现在的。</p>', actions: [{ label: '关闭', close: true }] });
@@ -721,7 +721,7 @@
       const v = { path: [], node: c, root: c, draft: null, formId: c.form };
       const ck = O.validate(c, O.ctxFor(p));
       return '<div class="y20-page y20-org"><div class="y20-page-head"><div class="y20-page-titles"><h1>这个事项用的组织</h1><p class="y20-muted">' + H.dot(it) + ' ' + esc(it.title) + ' · 事项建立时冻结的那一份，只读</p></div>' +
-        '<div class="y20-page-actions">' + ui.button({ label: '回到事项', icon: 'back', go: '#/p/' + p.id + '/w/' + it.id }) + '</div></div>' +
+        '<div class="y20-page-actions">' + ui.button({ label: '回到事项', icon: 'back', go: '#/p/' + p.id + '?item=' + it.id }) + '</div></div>' +
         ui.block({ title: '形态与版本', body: ui.kv([['形态', '<strong>' + esc(c.formName) + '</strong>'], ['版本', ui.code(it.org.version)], ['事项怎么结束', '<strong>' + esc(ck.ending.text) + '</strong>'],
           ['和项目现在的组织', same ? ui.status('succeeded', '相同') : ui.status('paused', '不同（比较职能、角色、成果、核验与轮转，不含观察者）')]], 'is-rows') +
           (diff.length ? '<h3 class="y20-h3">不同的地方（冻结的 → 现在的）</h3><ul class="y20-org-diff" id="item-org-diff">' + diff.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '') }) +

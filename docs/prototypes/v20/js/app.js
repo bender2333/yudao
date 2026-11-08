@@ -14,7 +14,6 @@
   Y20.W = () => S.world;
   // 项目一直使用同一套导航；高级配置只影响当前页的内容。
   Y20.leanViews = {};
-  Y20.isLean = (p) => Boolean(p);
   Y20.state = S;
 
   // ---------------------------------------------------------------- 取数辅助
@@ -65,7 +64,6 @@
       if (seg.length === 2) r.name = 'overview';
       else if (seg[2] === 'w' && seg[3] && seg[4] === 'recovery') { r.name = 'recovery'; r.params.item = seg[3]; }
       else if (seg[2] === 'w' && seg[3] && seg[4] === 'org') { r.name = 'item-org'; r.params.item = seg[3]; }
-      else if (seg[2] === 'w' && seg[3]) { r.name = 'item'; r.params.item = seg[3]; }
       else if (seg[2] === 'org') {
         // 组织页：/org，/org/d/<职能>，/org/s/<路径>（子组织，路径是职能身份用点连起来），/org/s/<路径>/d/<角色>，/org/new，/org/s/<路径>/new
         r.name = 'org'; r.params.path = '';
@@ -75,8 +73,8 @@
         else if (seg[i] === 'new') r.name = 'org-new';
       }
       else if (seg[2] === 'observe' && seg[3]) { r.name = 'observe-detail'; r.params.attempt = seg[3]; }
-      else if (seg[2] === 'dept' && seg[3]) { r.name = 'dept'; r.params.dept = seg[3]; }
-      else if (['outcomes', 'flow', 'timeline', 'materials', 'observe', 'settings'].includes(seg[2])) r.name = seg[2];    }
+      else if (seg[2] === 'settings') r.name = 'settings';
+    }
     return r;
   }
 
@@ -90,7 +88,6 @@
 
   function handle() {
     const route = parse(location.hash);
-    if (S.adv && S.adv !== route.params.project) S.adv = null;
     if (S.route && S.route.hash === route.hash) { S.route = route; render(true); return; }
     S.route = route;
     if (!/^#\/(sys|connect)/.test(route.hash)) S.back = route.hash;
@@ -99,17 +96,20 @@
 
   function render(keepScroll) {
     const y = window.scrollY;
+    // 整页重画（回答决定、展开判定依据）不清掉输入框里没发出去的话
+    const draftBox = keepScroll ? document.getElementById('ln-text') : null;
+    const draft = draftBox ? draftBox.value : '';
     if (mounted && mounted.unmount) mounted.unmount();
     mounted = null;
     H.ctxOverride = null;
     const rp = S.route.params.project ? H.project(S.route.params.project) : null;
-    if (Y20.isLean(rp) && !Y20.leanHas(rp, S.route.name)) { history.replaceState(null, '', '#/p/' + rp.id); S.route = parse(location.hash); }
+    if (rp && !Y20.leanHas(rp, S.route.name)) { history.replaceState(null, '', '#/p/' + rp.id); S.route = parse(location.hash); }
     renderShell();
     if (S.world.versions.server !== S.world.versions.page) { dom.content.innerHTML = ''; return; }
     const ctx = { route: S.route, world: S.world };
     const p = S.route.params.project ? H.project(S.route.params.project) : null;
     const advanced = S.route.query.advanced === '1' || S.route.query.view === 'doc';
-    const view = (!advanced && Y20.isLean(p) && Y20.leanViews[S.route.name]) || views[S.route.name];
+    const view = (!advanced && p && Y20.leanViews[S.route.name]) || views[S.route.name];
     if (S.route.params.project && !p) dom.content.innerHTML = gate('找不到项目', '当前场景里没有项目「' + esc(S.route.params.project) + '」。');
     else if (S.route.name === 'not-found' || !view) dom.content.innerHTML = gate('找不到这个页面', '路径「' + esc(S.route.hash) + '」不对应任何页面。');
     else {
@@ -119,6 +119,7 @@
       mounted = view;
     }
     if (advanced && p) dom.content.insertAdjacentHTML('afterbegin', '<div class="ws-advanced-return"><span>高级配置</span><button type="button" class="y20-link" data-act="ws.return">返回原页面</button><small>组织改动影响之后新建的事项；模型与 Prompt 影响下一次模型请求。</small></div>');
+    if (draft) { const box = document.getElementById('ln-text'); if (box) box.value = draft; }
     window.scrollTo(0, keepScroll ? y : 0);
     const hit = dom.content.querySelector('.is-target');
     if (hit && hit.scrollIntoView) hit.scrollIntoView({ block: 'center' });
@@ -181,7 +182,7 @@
       '<div class="y20-side-label"><span>项目</span><span class="y20-count">' + S.world.projects.length + '</span></div><ul class="y20-project-list">' + list + '</ul></div>' + sideBottom();
   }
 
-  const TITLES = { home: '首页', overview: '项目', item: '事项', outcomes: '成果库', flow: '流转', timeline: '时间轴', event: '按位置看一条事件', materials: '资料', observe: '观测', 'observe-detail': '请求详情', settings: '设置', recovery: '恢复与动作核实', org: '组织' };
+  const TITLES = { home: '首页', overview: '项目', event: '按位置看一条事件', 'observe-detail': '请求详情', settings: '设置', recovery: '恢复与动作核实', org: '组织' };
   const sysTitle = (r) => (r.name === 'reserved' ? Y20.RESERVED.find((x) => x.id === r.params.which).label : (Y20.SYS.find((x) => 'sys-' + x.id === r.name) || {}).label);
 
   function topbar() {
@@ -191,10 +192,8 @@
     if (sysTitle(r)) { crumbs.length = 0; crumbs.push('<strong>' + sysTitle(r) + '</strong>', '<span class="y20-crumb-note">系统</span>'); }
     else if (p) {
       crumbs.push('<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '">' + esc(p.name) + '</button>');
-      if (r.name === 'item') { const it = H.item(p, r.params.item); if (it) crumbs.push('<strong>' + esc(it.title) + '</strong>'); }
-      else if (r.name === 'recovery') { const it = H.item(p, r.params.item); if (it) crumbs.push('<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/w/' + it.id + '">' + esc(it.title) + '</button>'); crumbs.push('<strong>' + TITLES.recovery + '</strong>'); }
-      else if (r.name === 'observe-detail') crumbs.push('<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/observe">观测</button>', '<strong>' + TITLES['observe-detail'] + '</strong>');
-      else if (r.name === 'dept') crumbs.push('<strong>' + esc(H.dept(r.params.dept)) + '职能</strong>');
+      if (r.name === 'recovery') { const it = H.item(p, r.params.item); if (it) crumbs.push('<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '?item=' + it.id + '">' + esc(it.title) + '</button>'); crumbs.push('<strong>' + TITLES.recovery + '</strong>'); }
+      else if (r.name === 'observe-detail') crumbs.push('<button type="button" class="y20-crumb" data-go="#/p/' + p.id + '/settings?section=requests">模型请求与用量</button>', '<strong>' + TITLES['observe-detail'] + '</strong>');
       else if (/^org/.test(r.name) || r.name === 'item-org') Y20.orgpage.crumbs(r, p).forEach((c) => crumbs.push(c));
       else if (r.name !== 'overview') crumbs.push('<strong>' + TITLES[r.name] + '</strong>');
     } else if (r.name === 'event') {
@@ -203,7 +202,7 @@
       crumbs.push('<strong>按位置看一条事件</strong>');
     } else if (r.name !== 'home' && !sysTitle(r)) crumbs.push('<strong>' + (TITLES[r.name] || '') + '</strong>');
     else if (!sysTitle(r)) crumbs.pop(), crumbs.push('<strong>首页</strong>');
-    const lean = Y20.isLean(p);
+    const lean = Boolean(p);
     const stats = lean ? '' : statusItems().filter((i) => i.lit).map((i) => statItem(i, true)).join('');
     return desktopStrip() + '<button type="button" class="y20-icon-btn y20-drawer-open" data-act="drawer" aria-label="打开左侧栏">' + Y20.ui.icon('menu') + '</button>' +
       '<nav class="y20-crumbs" aria-label="路径">' + crumbs.join('<span class="y20-crumb-sep">/</span>') + '</nav>' +
@@ -215,24 +214,7 @@
     const r = S.route;
     const p = r.params.project ? H.project(r.params.project) : null;
     if (!p) return '';
-    if (Y20.isLean(p)) return Y20.leanTabs(p, r);
-    const sum = Y20.org.summary(p);
-    const many = p.depts.length > 4; // 职能多到标签放不下，收进一个「职能」下拉
-    const deptName = (d) => esc(H.dept(d, p)) + (p.onlyOld.includes(d) ? '（只在旧组织里）' : '');
-    const onDept = r.name === 'dept';
-    const head = [{ go: '#/p/' + p.id, label: '概览', on: r.name === 'overview' || r.name === 'item' || r.name === 'recovery' || r.name === 'item-org' }];
-    const deptTabs = many ? [] : p.depts.map((d) => ({ go: '#/p/' + p.id + '/dept/' + d, label: deptName(d), on: onDept && r.params.dept === d }));
-    const tail = [{ go: '#/p/' + p.id + '/outcomes', label: '成果库', on: r.name === 'outcomes' }]
-      .concat(sum.multi ? [{ go: '#/p/' + p.id + '/flow', label: '流转', on: r.name === 'flow' }] : [])
-      .concat([{ go: '#/p/' + p.id + '/timeline', label: '时间轴', on: r.name === 'timeline' }, { go: '#/p/' + p.id + '/materials', label: '资料', on: r.name === 'materials' },
-        { go: '#/p/' + p.id + '/observe', label: '观测', on: r.name === 'observe' || r.name === 'observe-detail' },
-        { go: '#/p/' + p.id + '/org', label: '组织', on: /^org/.test(r.name), tag: true }, { go: '#/p/' + p.id + '/settings', label: '设置', on: r.name === 'settings' }]);
-    const btn = (x) => '<button type="button" class="y20-ptab' + (x.on ? ' is-active' : '') + '" data-go="' + x.go + '">' + x.label + '</button>';
-    const dropdown = many ? '<select class="y20-ptab-select' + (onDept ? ' is-active' : '') + '" data-act="dept-jump" aria-label="职能"><option value="">职能</option>' +
-      p.depts.map((d) => '<option value="' + esc(d) + '"' + (onDept && r.params.dept === d ? ' selected' : '') + '>' + deptName(d) + '</option>').join('') + '</select>' : '';
-    const tags = Y20.org.tags(p).map((t) => '<span class="y20-ptag">' + esc(t) + '</span>').join('');
-    return '<div class="y20-pheader"><button type="button" class="y20-pname" data-go="#/p/' + p.id + '">' + esc(p.name) + '</button><span class="y20-ptags">' + tags + '</span></div>' +
-      '<div class="y20-ptabs" role="navigation" aria-label="项目页面">' + head.map(btn).join('') + deptTabs.map(btn).join('') + dropdown + tail.map(btn).join('') + '</div>';
+    return Y20.leanTabs(p, r);
   }
 
   // 桌面会话进行期间每一页顶部都有（这一条属于外壳，不属于某个页面）
@@ -303,7 +285,6 @@
     S.search = el.value.trim();
     document.querySelectorAll('.y20-project-list li').forEach((li, i) => { li.hidden = Boolean(S.search) && !S.world.projects[i].name.includes(S.search); });
   });
-  Y20.actions.register('dept-jump', (el) => { if (el.value) Y20.go('#/p/' + S.route.params.project + '/dept/' + el.value); });
   Y20.actions.register('flip-mismatch', () => { S.mismatchDir = S.mismatchDir === 'page_old' ? 'service_old' : 'page_old'; renderShell(); });
   Y20.actions.register('stop-desktop', () => {
     const d = S.world.desktop;
