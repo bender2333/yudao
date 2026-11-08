@@ -47,7 +47,7 @@
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"fe69deff44285b85","src":"README.md#Yudao Loop System > 当前状态 > 现在能试什么"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["docs/design/app-and-interface.md"],"seen":"1e73a165bc6cbd7b","src":"README.md#Yudao Loop System > 快速开始 > 启动服务"},
 {"dst":"uv.lock","kind":"code-path","raws":["uv.lock"],"seen":"8dc93751ce5c2064","src":"README.md#Yudao Loop System > 快速开始 > 安装"},
-{"dst":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录 > 4.3 模型访问定义与准入","kind":"link","raws":["docs/design/model-management.md"],"seen":"1717d79bc1d6e18c","src":"README.md#Yudao Loop System > 快速开始 > 配置 Provider"},
+{"dst":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录 > 4.3 模型访问定义与准入","kind":"link","raws":["docs/design/model-management.md"],"seen":"063640b2a7756eaf","src":"README.md#Yudao Loop System > 快速开始 > 配置 Provider"},
 {"dst":"docs/examples/providers.json","kind":"link","raws":["docs/examples/providers.json"],"seen":"38f2f422a0d1b05a","src":"README.md#Yudao Loop System > 快速开始 > 配置 Provider"},
 {"dst":"docs/architecture.html","kind":"link","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"README.md#Yudao Loop System > 架构"},
 {"dst":"docs/examples/providers.json","kind":"link","raws":["docs/examples/providers.json"],"seen":"38f2f422a0d1b05a","src":"README.md#Yudao Loop System > 模型配置"},

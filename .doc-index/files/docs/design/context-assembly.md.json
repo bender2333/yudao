@@ -37,9 +37,9 @@
 {"hash":"a955941673b1e296","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 8. 未决问题","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","title":"8. 未决问题"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「装配实现」"],"seen":"3c9310ef49956c5b","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「可以整体重写」"],"seen":"501cedc1662adc79","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「上下文逼近上限 → 压缩」"],"seen":"32ac07d30ac47cac","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「装配实现」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「可以整体重写」"],"seen":"b9b29c85a3d18cc8","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「上下文逼近上限 → 压缩」"],"seen":"bd17490d65acfb60","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"052770e8d9e24d0c","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/archive/evaluation/context-assembly-2026-10-29.md","kind":"link","raws":["../archive/evaluation/context-assembly-2026-10-29.md"],"seen":"9e3db839c73835f9","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/archive/evaluation/context-assembly-replay-2026-10-29.md","kind":"link","raws":["../archive/evaluation/context-assembly-replay-2026-10-29.md"],"seen":"419993fac0c95164","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
@@ -53,8 +53,8 @@
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.2 常驻栏目","kind":"link","raws":["semantic-system.md"],"seen":"6efc427144d00b56","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 5. 装入顺序与截断 > 压缩以后保留失败的尝试"},
 {"dst":"docs/evaluation/context-assembly-counterfactual-2026-10-29.json","kind":"link","raws":["../evaluation/context-assembly-counterfactual-2026-10-29.json"],"seen":"63546f541f1f7f4d","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明 > 6.2 反事实回放（做了，但这批模型上没有区分力）"},
 {"dst":"docs/evaluation/context-assembly-replay-2026-10-29.json","kind":"link","raws":["../evaluation/context-assembly-replay-2026-10-29.json"],"seen":"239003151b7bffb5","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明 > 6.2 反事实回放（做了，但这批模型上没有区分力）"},
-{"dst":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"link","raws":["model-management.md"],"seen":"9ff2b4bf956da184","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},
-{"dst":"docs/design/model-management.md#模型管理设计说明 > 11. TODO","kind":"link","raws":["model-management.md"],"seen":"991ac45bfc7e6848","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},
+{"dst":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"link","raws":["model-management.md"],"seen":"2fb1a4b47e6d852c","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},
+{"dst":"docs/design/model-management.md#模型管理设计说明 > 11. TODO","kind":"link","raws":["model-management.md"],"seen":"ac9a9a383a5b49d7","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.5 旧工具结果清理、分界位置与保留","kind":"link","raws":["model-management.md"],"seen":"4f9600f9a917e809","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.2 旧工具结果清理","kind":"link","raws":["semantic-system.md"],"seen":"e85bbbbd9873b2aa","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.3 压缩与轨迹节录","kind":"link","raws":["semantic-system.md"],"seen":"29a19d1b62ed3278","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照"},

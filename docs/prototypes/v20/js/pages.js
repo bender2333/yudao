@@ -216,7 +216,7 @@
         (dn ? ui.block({ id: 'home-decisions', title: '待你决定', body: Y20.cards.list(p.id) }) : '') +
         ui.block({ title: '事项', subtitle: multi ? '点事项名看这个事项在各职能的情况' : '点事项名看这个事项的情况', actions: newItem, body: itemsTable(p) }) +
         ui.block({ title: multi ? '职能' : '角色', subtitle: '状态、原因、在等什么、等了多久；点名字进入职能页。' + (p.onlyOld.length ? '标「只在旧组织里」的职能，现在的组织已经没有，还有事项在按旧组织跑。' : ''), body: deptTable(p) }) +
-        (multi ? ui.block({ title: '进行中的询问', body: asksTable(p, p.asks) }) : '') +
+        (multi ? ui.block({ title: '进行中的询问', body: asksTable(p, p.asks.filter((a) => !a.done)) }) : '') +
         ui.block({ title: '中断与待恢复', subtitle: '整个项目里被打断、等待恢复的工作', body: interruptTable(p, p.interruptions) }) +
         ui.block({ title: '等待模型服务', body: providerBlock(p) }) +
         (multi ? ui.block({ title: '流转汇总', subtitle: '每对职能之间流转了几次，其中多少次是返工；逐条记录在「流转」页', body: pairsTable(p) }) : '') + '</div>';
@@ -259,7 +259,7 @@
         (mine.length ? ui.block({ title: '待你决定', body: '<div class="y20-cards">' + mine.map((d) => Y20.cards.one(d)).join('') + '</div>' }) : '') +
         ui.block({ id: 'item-org', title: '这个事项用的组织', subtitle: '事项建立时整份冻结，之后写入核对、路由、装配、执行、重放都读这一份', body: itemOrg(p, it) }) +
         (multi ? ui.block({ title: '各职能', body: deptsTable }) : '') +
-        (multi ? ui.block({ title: '这个事项的询问', body: asksTable(p, p.asks.filter((a) => a.item === it.id)) }) : '') +
+        (multi ? ui.block({ title: '这个事项的询问', body: asksTable(p, p.asks.filter((a) => !a.done && a.item === it.id)) }) : '') +
         ui.block({ title: '中断', body: interruptTable(p, p.interruptions.filter((r) => r.item === it.id)) }) +
         ui.block({ title: '成果与结论', body: outcomesTable(p.outcomes.filter((o) => o.item === it.id), p) }) + '</div>';
     }
