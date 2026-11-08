@@ -35,7 +35,7 @@ Yudao（枢道）是一个协作执行系统：角色围着同一份事实工作
 - 启动服务：`uv run python -m harness api`（无参 `uv run python -m harness` 相同，默认端口 8765）；无需凭据的演示：`uv run python -m harness demo`
 - 测试：开发中与交付前运行与本次改动相关的测试文件（包括本次改动或新增的集成层文件），以及 CI 报告失败的测试。单元层与模块层全部（包括下面两项固定检查）、客户端的类型检查与单元测试、页面与 wheel 的编译由 CI 在每次推送时运行（`.github/workflows/ci.yml`），本地不反复运行全部。分层定义见 `docs/design/test-pyramid.md`；新增测试文件时在登记表中加一行，放在第一个能到达其结论的层；越界使用子进程、网络或临时目录的测试会被该层的检查判为失败。
   - 测试的写法见 `docs/design/test-pyramid.md`「测试的写法」：提案用 `harness/proposals.py` 的构造函数生成；断言结果，不数模型调用的次数，次数本身是被测的行为时除外；测试不决定产品的文字；两件同时进行的事谁先谁后，由事件或信号决定，不用时长去赌。新增的测试按「测试按三环留」写明它守的是哪一条（R1、R2、R3），写不出来就不加。用例的删除（「用例的变化」）：删要有理由，删了覆盖率不降。理由是工单写明的删除行为，或命中「测试按三环留」的删除口径（重构时下移、合并的写明接替的用例）；交付说明逐条列出用例、理由与接替的用例，附删除前后的覆盖读数。两种理由都没有的只改写不删。内核测试也一样。
-  - 客户端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`。只在本次改动涉及 `client/` 或接口合同时运行，并且只运行相关的测试文件；客户端单元里的逐场景回放测试单独运行。
+  - 客户端测试：`cd client && npm test`（客户端单元）。只在本次改动涉及 `client/` 或接口合同时运行，并且只运行相关的测试文件；客户端单元里的逐场景回放测试单独运行。基础部分的页面没有端到端测试，真实页面由发布以后的走查与试用来看（`docs/design/test-pyramid.md`「各角色运行哪一层」）。
   - 两项固定检查：`uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`，检查整个仓库的模块导入关系与接口合同，CI 每次都运行；改动模块导入或接口合同时本地也运行。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
   - 只用单进程运行，不加 `-n`。集成层全部由 CI 在每次合并以后运行（`docs/design/test-pyramid.md`「集成层在每次合并以后运行」），执行者与审查者不运行全量测试：不运行 `harness/tests` 整个目录，也不把全部测试文件分批逐个运行一遍；单条命令不超过 10 分钟。
   - 先看结尾的计数与失败清单；需要细节时，只对失败的那一项加 `--tb=short` 重新运行，或者用 `--lf` 重新运行上次失败的测试。
