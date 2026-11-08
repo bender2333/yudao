@@ -164,7 +164,10 @@ class LoopSystem:
             execution=execution_implementation,
         )
         self.git_versions = self.orchestrator.git_versions
-        self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
+        # 采纳写回的宿主仓库推送与合并请求按凭据引用取材料：解析边界在 ProviderFacade 上，
+        # 材料只在控制主机上使用（工单 #980）
+        self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator,
+                                       credential_resolver=self.facade.resolve_credential)
         # 流程编排的结算与执行槽位判断经项目服务完成（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」）
         self.orchestrator.projects = self.projects
         # 排空在服务下一次启动时结束（工单 #731）：启动时把还没结束的排空记成已结束，
