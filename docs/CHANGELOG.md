@@ -9,6 +9,10 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-09 00:55 / v20 定型：`docs/prototypes/v20/` 去掉残留的旧页面、路由与旧对话框，修草稿、折叠行、收件人与停止确认；`docs/prototypes/CHANGELOG.md` v20 两节写回设计说明，补原 v15 十三条的去向。`docs/design/project-organization.md` 4.5、4.8、4.13、4.14、4.15 写进试出来的摆法、用词与交互；`docs/design/app-and-interface.md`、`docs/design/visualization.md` 引用改成 v20，查询名改成 `organization.draft`；`docs/design/department-loop.md`、`docs/design/existing-project-onboarding.md` 与 `docs/requirements/web-game-frontend.md`、`request-observability.md`、`game-world-three-spaces.md` 的页面位置按内容去向表改 / 用户要趁 v20 定型把界面的任务清理干净，设计一次改完
+
+claude-opus-5-5（子架构师） / 2026-11-09 00:36 / `docs/prototypes/v20/` 补事项面板、全部事项、设置页「模型请求与用量」、首页关键事实，`walkthrough.md` 与 `docs/prototypes/CHANGELOG.md` 同步；`docs/design/app-and-interface.md` 写明只有一个职能的事项跳到循环图 / 内容去向表定的位置要能看到
+
 claude-opus-5-5（子架构师） / 2026-11-09 00:27 / `docs/design/project-organization.md`「项目页上的内容在哪里看」与 `docs/design/app-and-interface.md` 4.1、4.3：首页保留离开期间的报告与关键事实，点一条事实跳到那件事项的时序图，按位置读取只给画面；记录原文页面上不留入口 / 用户定了这两条
 
 claude-opus-5-5（子架构师） / 2026-11-09 00:20 / `docs/design/project-organization.md` 4.8、4.9、4.15 的设置页清单一致：成果写回、机器授权、执行位置、MCP 服务器收进「高级」，「模型请求与用量」和「高级」并列在设置页底部，内容去向表最后几行只写理由；`app-and-interface`、`browser-and-computer-use`、`execution-environment`、`existing-project-onboarding`、`model-management`、`network-and-mcp`、`skeleton-and-application`、`visualization` 14.1、`department-loop`、`project-initial-files` 的旧页面名改到内容去向表的位置；`semantic-system` 提到的语义记录与角色详情表里没有位置，未改 / 收成对话与设置两页，已有文档一次改完
@@ -519,3 +523,4 @@ claude-opus-5-5（子架构师） / 2026-11-08 22:16 / 新设计说明 `docs/des
 
 claude-sonnet-5-5 / 2026-11-09 00:10 / `.claude/skills/solo/SKILL.md` 与 `scripts/hook.mjs` 无人值守：`notify` 循环退出 Claude Code 的编排钩子，`hook` 循环的子代理提示、派活限制、工人记录与自动继续只认有效租约所有者，账本写保护继续覆盖同项目会话；补 `hook-output.test.mjs` / 共享项目设置使普通 Claude Code 子代理收到 solo 身份与并发提示，甚至写入活动循环的工人记录（这次改动先落在 codex/v19-collaboration-design 的 69bb8a7a，此处带到 main）
 claude-opus-5-5（总架构师，用户指定） / 2026-11-09 00:25 / `docs/program-roadmap.md` 阶段一一行与判据四、`.claude/skills/trial/method/expert.md`、`probes.md`：页面与回放的对账改成页面与按位置读出的事实比对，看回放归画面 / v20 定型，项目页不留回放，这几处的目的不变、手段随之改（决定记录同日一条）
+claude-opus-5-5（总架构师，用户指定） / 2026-11-09 01:11 / `design/semantic-system.md`、`requirements/semantic-system.md`、`requirements/web-game-frontend.md` 里的「职能工作间」改成页面；`design/project-organization.md` 4.14 写明恢复详情页上的决定就地回答 / v20 定型，这几处还写着不存在的页面；恢复详情页是专门处理中断的详情页，算拍板只在气泡的例外

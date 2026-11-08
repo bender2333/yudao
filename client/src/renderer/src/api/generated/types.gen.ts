@@ -470,6 +470,14 @@ export type AskView = {
      */
     question: string;
     /**
+     * Background
+     */
+    background?: string | null;
+    /**
+     * Expected
+     */
+    expected?: string | null;
+    /**
      * Status
      */
     status: '进行中' | '已回答' | '没能回答';
@@ -477,6 +485,14 @@ export type AskView = {
      * Answer
      */
     answer?: string | null;
+    /**
+     * Answer Facts
+     */
+    answer_facts?: string | null;
+    /**
+     * Answer Explanation
+     */
+    answer_explanation?: string | null;
     /**
      * Reason
      */

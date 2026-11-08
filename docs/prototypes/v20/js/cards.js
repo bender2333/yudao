@@ -1,4 +1,4 @@
-// 决定卡片：首页与项目概览共用。「定义版本不同」列出变了哪几份定义，路由改变走同一张卡片
+// 决定卡片：首页与恢复详情页共用。「定义版本不同」列出变了哪几份定义，路由改变走同一张卡片
 (function () {
   'use strict';
   const Y20 = window.Y20;
@@ -27,7 +27,7 @@
     const p = H.project(d.project), it = p && H.item(p, d.item);
     const opts = d.options.map((o) => '<button type="button" class="y20-btn small' + (o.primary ? ' primary' : '') + '" data-act="decide" data-id="' + esc(d.id) + '" data-opt="' + esc(o.id) + '">' + esc(o.label) + '</button>').join('');
     return '<article class="y20-card is-' + d.kind + '" id="decision-' + esc(d.id) + '"><div class="y20-card-title"><strong>' + esc(d.label) + '</strong>' +
-      (p ? ' <span class="y20-muted">·</span> ' + H.link('#/p/' + p.id, p.name) : '') + (it ? ' <span class="y20-muted">·</span> ' + H.link('#/p/' + p.id + '/w/' + it.id, it.title) : '') + '</div>' +
+      (p ? ' <span class="y20-muted">·</span> ' + H.link('#/p/' + p.id, p.name) : '') + (it ? ' <span class="y20-muted">·</span> ' + H.link('#/p/' + p.id + '?item=' + it.id, it.title) : '') + '</div>' +
       '<div class="y20-card-meta"><span>已等待 ' + esc(H.waited(d.at)) + '</span><span>' + esc(d.blocks) + '</span></div>' +
       body(d) + '<div class="y20-row y20-card-answer">' + opts + '</div></article>';
   }
