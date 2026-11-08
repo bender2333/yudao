@@ -155,7 +155,8 @@ export const DRAWN_FACT_ELEMENTS: readonly FactElement[] = ["sign", "parcel", "b
 
 /**
  * 事件种类的中文名：来源卡片写「事件种类」一行，页面不出现英文内部标识。
- * 覆盖 client/tests/fixtures/event-types.json 里的每一种事件，缺一行由单元测试报出（工单 #398）。
+ * 画面画出来或转交实时内容的每一种事件在这里各有一行（单元测试按接口描述里这类事件核对，工单 #1419）；
+ * 还没归类的事件列在缺口清单里，不要求有中文名。登记了而不再画的事件留着不影响。
  */
 export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   action_verified: "动作核实",
@@ -679,9 +680,12 @@ export function floorCards(
 // ---------------------------------------------------------------------------
 // 流式文字（实时内容）
 
+/** 楼层转交实时内容的事件种类（与 translate/coverage.ts 里楼层的 realtime 是同一组，测试核对两边一致）。 */
+export const FLOOR_STREAM_TYPES: readonly string[] = ["model_stream_progress"];
+
 /** 输出片段 → 流式文字；不是输出片段的事件返回 null。 */
 export function streamText(ev: FloorEvent): { room: string | null; role: string | null; text: string } | null {
-  if (ev.type !== "model_stream_progress") return null;
+  if (!FLOOR_STREAM_TYPES.includes(ev.type)) return null;
   const p = pl(ev);
   const body = text(p.text ?? p.delta ?? p.chunk);
   if (!body) return null;
