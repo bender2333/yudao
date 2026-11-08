@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/outsourced-roles.md",
-"hash":"8353b8004fee28ec",
+"hash":"9a84bfa7ae547eeb",
 "nodes":[
-{"hash":"8353b8004fee28ec","id":"docs/design/outsourced-roles.md","kind":"file","title":"docs/design/outsourced-roles.md"},
+{"hash":"9a84bfa7ae547eeb","id":"docs/design/outsourced-roles.md","kind":"file","title":"docs/design/outsourced-roles.md"},
 {"hash":"66c67177e25677b4","id":"docs/design/outsourced-roles.md#外包角色设计说明","kind":"section","parent":"docs/design/outsourced-roles.md","title":"外包角色设计说明"},
 {"hash":"eb24918d42309f7b","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 1. 功能与依据","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明","title":"1. 功能与依据"},
 {"hash":"3cdacd134704dff6","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 2. 边界与范围","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明","title":"2. 边界与范围"},
@@ -12,7 +12,7 @@
 {"hash":"500499feaa2a12de","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.1 同一个角色定义","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.1 同一个角色定义"},
 {"hash":"294394247e8d7378","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.2 一轮外包工作的经过","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.2 一轮外包工作的经过"},
 {"hash":"18c12206a7ab34d7","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.3 接入方式","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.3 接入方式"},
-{"hash":"7bd2c4256f13821f","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.4 ACP 提供的控制手段","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.4 ACP 提供的控制手段"},
+{"hash":"7ea79c882a8e7308","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.4 ACP 提供的控制手段","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.4 ACP 提供的控制手段"},
 {"hash":"d3742000e0db4308","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.5 模型调用","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.5 模型调用"},
 {"hash":"1e36005ea182d068","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.6 会话内部的分工"},
 {"hash":"8d1a316a4e2c5d71","id":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.7 状态主权与可见范围","kind":"section","parent":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案","title":"4.7 状态主权与可见范围"},

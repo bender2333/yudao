@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/department-loop.md",
-"hash":"f2b27f3193c18caf",
+"hash":"63669943843cfecb",
 "nodes":[
-{"hash":"f2b27f3193c18caf","id":"docs/design/department-loop.md","kind":"file","title":"docs/design/department-loop.md"},
+{"hash":"63669943843cfecb","id":"docs/design/department-loop.md","kind":"file","title":"docs/design/department-loop.md"},
 {"hash":"97f4e1292e8941bc","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","kind":"section","parent":"docs/design/department-loop.md","title":"产品 · 工程 · 质检的循环结构"},
 {"hash":"c6af00aff3e96312","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 1. 依据与范围","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"1. 依据与范围"},
 {"hash":"4f8ae39ff38e3ecc","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 2. 职能按关注的成果开始工作","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"2. 职能按关注的成果开始工作"},
@@ -23,7 +23,7 @@
 {"hash":"0aa3a98e7723cdfb","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 5. 工作中途要求变化","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"5. 工作中途要求变化"},
 {"hash":"81f851739dc91ce9","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 6. 指导","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"6. 指导"},
 {"hash":"5ececa70c253dd4e","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 7. 提交与版本","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"7. 提交与版本"},
-{"hash":"3484c61530534e49","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 8. 工程的计划","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"8. 工程的计划"},
+{"hash":"cc6a014cf17be212","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 8. 工程的计划","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"8. 工程的计划"},
 {"hash":"a08e61504ee0f6d5","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 9. 停止与恢复","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"9. 停止与恢复"},
 {"hash":"7169bd5190804422","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 10. 模块交互","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"10. 模块交互"},
 {"hash":"35052f4a8b2b44cc","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 11. 要点汇总","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"11. 要点汇总"}

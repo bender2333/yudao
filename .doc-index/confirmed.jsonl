@@ -357,3 +357,10 @@
 {"down":"2ffd58c95f352757","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面","up":"4e46af55981e7f9c"}
 {"down":"62f7884101cc1896","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","up":"c9a44d3f3d5c9669"}
 {"down":"2ffd58c95f352757","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面","up":"c9a44d3f3d5c9669"}
+{"down":"3cc3640c0cabd0cf","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"2aedbe5320d652b0"}
+{"down":"7284d605a5ee3141","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","src":"docs/design/department-guidance.md#职能指导的处理设计","up":"8df08d7a0f7c1b74"}
+{"down":"a4436dcb9f04b27c","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","up":"2aedbe5320d652b0"}
+{"down":"2340fe00fecf2dd1","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围","up":"2aedbe5320d652b0"}
+{"down":"33ad277b9f03c890","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 7. 模块交互","up":"2aedbe5320d652b0"}
+{"down":"142dd496f4e208c2","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 9. 参照的成熟做法","up":"2aedbe5320d652b0"}
+{"down":"2ffd58c95f352757","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面","up":"406dfa7b2ccf0e2e"}

@@ -59,7 +59,7 @@
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 7. 检验覆盖与开环","kind":"link","raws":["independent-verification.md"],"seen":"aa8cc19970ac07b2","src":"docs/design/visualization.md#画面与播放设计说明 > 12. 开环完成与放行"},
 {"dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","kind":"link","raws":["../program-roadmap.md"],"seen":"f26f6c4978327360","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["app-and-interface.md"],"seen":"78ff3b0bb305cfcb","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面"},
-{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","kind":"link","raws":["project-organization.md"],"seen":"a16c7bcc78d9514a","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面"},
+{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","kind":"link","raws":["project-organization.md"],"seen":"406dfa7b2ccf0e2e","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","kind":"link","raws":["app-and-interface.md"],"seen":"c64461e11d4738bb","src":"docs/design/visualization.md#画面与播放设计说明 > 3. 分层与边界"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流 > 5.4 补齐与实时","kind":"link","raws":["app-and-interface.md"],"seen":"09a764798095b918","src":"docs/design/visualization.md#画面与播放设计说明 > 3. 分层与边界"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","kind":"link","raws":["app-and-interface.md"],"seen":"c64461e11d4738bb","src":"docs/design/visualization.md#画面与播放设计说明 > 5. 画面层 > 5.1 声明表"},

@@ -45,7 +45,7 @@
 {"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程","kind":"link","raws":["local-tools.md"],"seen":"5405f7e186dc5619","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 11. 与其他文档的关系"},
 {"dst":"docs/requirements/existing-project-onboarding.md","kind":"link","raws":["../requirements/existing-project-onboarding.md"],"seen":"a1f62a4433d5dbab","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 11. 与其他文档的关系"},
 {"dst":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 5. 过程检查点与指标","kind":"link","raws":["evaluation-scenarios.md"],"seen":"05be829f436cf8b5","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定"},
-{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"ff4ca7ff14132da6","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定"},
+{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"2aedbe5320d652b0","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定"},
 {"dst":"docs/design/project-initial-files.md","kind":"link","raws":["project-initial-files.md"],"seen":"fcd175a03354c3c7","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c967dae939e2fda6","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 2. 接入的位置：建档事项"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"5560c745cdba1f36","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件"},
@@ -54,7 +54,7 @@
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b7470f5d65460f72","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
 {"dst":"docs/adr/0024-git-in-process-with-pygit2.md","kind":"link","raws":["../adr/0024-git-in-process-with-pygit2.md"],"seen":"123eb22123adb887","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
-{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"ff4ca7ff14132da6","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
+{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"2aedbe5320d652b0","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.3 解析规则","kind":"link","raws":["model-management.md"],"seen":"87ea429fe74f770c","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"08a7ce7e61a441b6","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.2 仓库概况与读取范围"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.4 工程：现有结构说明"},
@@ -66,7 +66,7 @@
 {"dst":"docs/design/project-initial-files.md","kind":"link","raws":["project-initial-files.md"],"seen":"fcd175a03354c3c7","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 5. 确认以后：当前有效要求与第一次采纳"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 6. 失败与中断"},
 {"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 6. 失败与中断"},
-{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"ff4ca7ff14132da6","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 7. 模块交互"},
+{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"2aedbe5320d652b0","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 7. 模块交互"},
 {"dst":"harness/adjudication.py","kind":"code-path","raws":["harness/adjudication.py:66"],"seen":"2813bfbd1c6b8e41","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 8. 与现有代码的关系"},
 {"dst":"harness/app/project_commands.py","kind":"code-path","raws":["harness/app/project_commands.py:27-36"],"seen":"05c973c0ecfe49da","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 8. 与现有代码的关系"},
 {"dst":"harness/context.py","kind":"code-path","raws":["harness/context.py:81-230"],"seen":"fbf8d167a994904e","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 8. 与现有代码的关系"},
@@ -79,6 +79,6 @@
 {"dst":"harness/validation.py","kind":"code-path","raws":["harness/validation.py:321-384"],"seen":"17f96824ba5ebc4b","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 8. 与现有代码的关系"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 9. 参照的成熟做法"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b7470f5d65460f72","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 9. 参照的成熟做法"},
-{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"ff4ca7ff14132da6","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 9. 参照的成熟做法"}
+{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"2aedbe5320d652b0","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 9. 参照的成熟做法"}
 ]
 }

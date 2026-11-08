@@ -58,7 +58,7 @@
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 6. 控制核心内部 > 6.3 两类工具","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"83fd50a0c0dde4bc","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"1ada2d0dec500130","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/execution-environment.md","kind":"link","raws":["execution-environment.md"],"seen":"132fd6c21b9a6e50","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
-{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"ff4ca7ff14132da6","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
+{"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"link","raws":["local-tools.md"],"seen":"2aedbe5320d652b0","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录 > 4.3 模型访问定义与准入","kind":"link","raws":["model-management.md"],"seen":"063640b2a7756eaf","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 4. 动作分类与处置","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"d7551de2f1eb7109","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 5. 本体 > 5.5 要求类条目的编号","kind":"link","raws":["semantic-system.md"],"seen":"dfe7adab630530dc","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
