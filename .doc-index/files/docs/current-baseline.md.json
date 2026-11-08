@@ -16,7 +16,6 @@
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["requirements/system-intent.md"],"seen":"da1c7fffe8ac5ae1","src":"docs/current-baseline.md#当前验收基线"},
 {"dst":"docs/archive/evaluation/2026-10-31-57835530.md","kind":"link","raws":["archive/evaluation/2026-10-31-57835530.md"],"seen":"a2591a74a9254718","src":"docs/current-baseline.md#当前验收基线 > 1. 版本身份（当前）"},
 {"dst":"docs/evaluation/139-prd-confirm-57835530.png","kind":"link","raws":["evaluation/139-prd-confirm-57835530.png"],"seen":"a4acc60010f91b77","src":"docs/current-baseline.md#当前验收基线 > 1. 版本身份（当前）"},
-{"dst":"client/tests/e2e/onboarding.spec.ts","kind":"code-path","raws":["client/tests/e2e/onboarding.spec.ts"],"seen":"39457c6f15cbafd5","src":"docs/current-baseline.md#当前验收基线 > 3. 尚待执行的验收"},
 {"dst":"docs/archive/current-baseline-2026-10-29.md","kind":"link","raws":["archive/current-baseline-2026-10-29.md"],"seen":"9e4a89c32b73cba5","src":"docs/current-baseline.md#当前验收基线 > 4. 历史基线"},
 {"dst":"docs/archive/current-baseline-3.0-contract.md","kind":"link","raws":["archive/current-baseline-3.0-contract.md"],"seen":"018a4291667a7332","src":"docs/current-baseline.md#当前验收基线 > 4. 历史基线"}
 ]

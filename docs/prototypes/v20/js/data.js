@@ -70,13 +70,17 @@
       },
       // 职能之间的询问：开着的在图上画虚线，答完的收进线程的折叠行；done 由场景「询问都答完了」改
       asks: [
-        { id: 'q1', item: 'w3', from: 'engineering', to: 'product', text: '退款金额取整：按分取整还是按元取整？银行侧按分记账。', at: at('t', '14:22'), key: 'o-ask1',
+        { id: 'q1', item: 'w3', from: 'engineering', to: 'product', text: '退款金额取整：按分取整还是按元取整？银行侧按分记账。', at: at('t', '14:22'), answered: at('t', '14:26'), key: 'o-ask1',
           answer: '按分取整，四舍五入到分；页面显示两位小数。PRD v1 的退款规则不用改。' },
-        { id: 'q2', item: 'w2', from: 'quality', to: 'engineering', text: '没有订单时，分页返回什么？（在核验交付 v2）', at: at('t', '14:16'),
+        { id: 'q4', item: 'w2', round: 1, from: 'engineering', to: 'product', text: '每页 50 条，包含已取消的订单吗？', at: at('t', '09:14'), answered: at('t', '09:16'), answer: '包含，已取消的留在原来的位置。', done: true },
+        { id: 'q2b', item: 'w2', round: 2, parent: 'q2', from: 'engineering', to: 'product', text: '没有订单时页面上显示什么？', at: at('t', '14:18'), answered: at('t', '14:21'), answer: '显示「还没有订单」，不显示页码。', done: true },
+        { id: 'q2', item: 'w2', round: 2, from: 'quality', to: 'engineering', text: '没有订单时，分页返回什么？（在核验交付 v2）', at: at('t', '14:16'), answered: at('t', '14:24'),
+          work: [{ act: '读了 orders/list.ts 的 pageCount()', used: '5 秒' }, { act: '跑了 npm test -- order-list，第 7 条用例「没有订单」', used: '21 秒' }, { act: '问产品：没有订单时页面上显示什么', used: '3 分' }, { act: '提交回答：事实 3 条，解释 1 段', used: '1 秒', last: true }],
           answer: '返回空列表，总页数为 0。',
           facts: ['接口：GET /orders?page=1 返回 { items: [], pages: 0 }', '怎么运行：npm test -- order-list，第 7 条用例「没有订单」', '文件位置：orders/list.ts 的 pageCount()'],
           why: '总页数写 0 不写 1：前端把 0 当成「没有订单」显示空状态，免得出现「第 1 / 1 页」的空页；这和缺陷记录 v1 说的空页是同一个原因。', after: '交付 v2' },
-        { id: 'q3', item: 'w1', from: 'quality', to: 'product', text: 'PRD v1 的两条验收标准对不上：「一次导出全部订单」和「最多 5 万行」。订单超过 5 万行时按哪一条？', at: at('t', '14:10'),
+        { id: 'q5', item: 'w1', round: 1, from: 'engineering', to: 'product', text: '文件名与编码怎么定？', at: at('t', '11:36'), answered: at('t', '11:38'), answer: 'orders-日期.csv，UTF-8 带 BOM。', done: true },
+        { id: 'q3', item: 'w1', round: 3, answered: at('t', '14:14'), from: 'quality', to: 'product', text: 'PRD v1 的两条验收标准对不上：「一次导出全部订单」和「最多 5 万行」。订单超过 5 万行时按哪一条？', at: at('t', '14:10'),
           answer: '两条都留：超过 5 万行时分成几个文件，每个最多 5 万行，打成一个压缩包。已修订成 PRD v2。', prd: 2 }
       ],
       interruptions: [],
@@ -223,8 +227,8 @@
         engineering: { text: '写报名表单', state: 'running', reason: '一轮工作进行中，第 2 轮', waits: [], role: '工程师', model: 'qwen3-coder-plus', items: ['w17'] }
       },
       asks: [
-        { id: 'sa1', item: 'w17', from: 'engineering', to: 'product', text: '报名要不要限人数？', at: at('t', '10:40'), answer: '每场 200 人。', done: true },
-        { id: 'sa2', item: 'w17', from: 'engineering', to: 'product', text: '报名人数到了上限以后，候补要不要开放？', at: at('t', '11:40'), key: 'o-s5', answer: '开放候补，最多 20 人，先到先补；活动前一天关闭候补。', done: true }
+        { id: 'sa1', item: 'w17', from: 'engineering', to: 'product', text: '报名要不要限人数？', at: at('t', '13:56'), answered: at('t', '13:57'), answer: '每场 200 人。', done: true },
+        { id: 'sa2', item: 'w17', from: 'engineering', to: 'product', text: '报名人数到了上限以后，候补要不要开放？', at: at('t', '13:58'), answered: at('t', '14:00'), key: 'o-s5', answer: '开放候补，最多 20 人，先到先补；活动前一天关闭候补。', done: true }
       ], interruptions: [],
       elapsed: { used: 4500, limit: 28800, key: 'elapsed-signup' },
       slots: { used: 1, limit: 3, waiting: 0 },

@@ -9,6 +9,8 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-08 21:35 / `docs/design/project-organization.md` 4.14 写项目页四层与时序图，交互骨架第 3 条、4.15 与脚本三、四补上；`docs/design/app-and-interface.md` 加 4.4 四层读哪个查询与要补的内容；`docs/prototypes/v20/` 加累计往来、时序图、原文面板的询问内容与工作过程，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户看过示意后定「按这个做」：信息不丢失，也不觉得冗余
+
 claude-opus-5-5（子架构师） / 2026-11-08 21:14 / `docs/design/project-organization.md` 4.14 加「在做」角标的规矩；`docs/prototypes/v20/` 节点上的字、角标与节点详情从同一份职能状态推出，去掉兜底文字「在做」「等别的职能」，新增场景「活动报名小程序：工程在问产品」，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 总架构师复核发现角标按事项的所在职能挂，和节点上的字矛盾；「产品 · 工程」开着询问的画法没有人看过
 
 solo-deepseek-v4.1-flash / 2026-11-03 23:30 / `docs/design/test-pyramid.md` 第 10 节加第 8 条：检查命令与 bash 命令里要调用解释器时取跑测试的这个解释器（`harness/tests/helpers.py` 的 `python_command`、`python_snippet`），路径写成正斜杠并加引号，不写 PATH 上的 `python`；这一条只管交给执行环境去跑的命令与会被当作检查执行的 `CHECKS` 表，作为工件正文给人看的示例文字（`how_to_run`、`purpose`、PRD 里的 `build_and_test`）不换 / 工单 #1356：开发机上 PATH 的 `python` 可能是 Microsoft Store 的占位程序（执行即结束，bash 里看到退出码 49，即 9009 的低字节），CI 上是 `setup-python` 的真实解释器，同一批用例「本机红、CI 绿」，每个执行者都要重新判定一次是不是自己弄坏的；换成这个写法以后两种环境的结论相同，命令文本与解释器路径都不进事件序列基准与提示快照
