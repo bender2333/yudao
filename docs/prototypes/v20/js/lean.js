@@ -423,7 +423,9 @@
   function readGuidance(p, ids, item) { st(p).msgs.filter((m) => ids.includes(m.target) && !m.readAt && (!m.item || m.item === item)).forEach((m) => { m.readAt = T(++seq); }); }
   function fold(p, it, key, lab, roles, who, text) {
     const ms = st(p).msgs;
-    let f = ms.slice().reverse().find((m) => m.t === 'fold' && m.item === (it ? it.id : '') && m.key === key);
+    // 只合并连续的往来：被你写的、要你决定、交完成或放行打断以后另起一行
+    const last = ms[ms.length - 1];
+    let f = last && last.t === 'fold' && last.item === (it ? it.id : '') && last.key === key ? last : null;
     if (!f) ms.push(f = { t: 'fold', item: it ? it.id : '', key, lab, roles, open: false, kids: [] });
     f.kids.push({ who, text, at: T(++seq) });
   }
@@ -452,7 +454,9 @@
     return o;
   }
   const dflt = (p) => { const it = active(p); return it ? 'g:' + (it.dept && orgOf(p, it).depts.some((d) => d.id === it.dept) ? it.dept : recv(orgOf(p, it)).id) : 'new'; };
-  const cur = (p) => { const s = st(p); return s.manual && options(p).some((o) => o.k === s.to) ? s.to : dflt(p); };
+  const chosen = (p) => { const s = st(p); return s.manual && options(p).some((o) => o.k === s.to) ? s.to : dflt(p); };
+  // 输入框里有字以后收件人不再随状态变，发送后恢复按状态选
+  const cur = (p) => { const s = st(p); return s.hold && options(p).some((o) => o.k === s.hold) ? s.hold : chosen(p); };
   function hintText(p, k) {
     const it = active(p), c = it ? orgOf(p, it) : p.composed, r = recv(c), e = O.ending(p.composed);
     if (k === 'new') return it ? '排在「' + it.title + '」后面，它做完才开始' : recv(p.composed).name + '接，马上开始' + (e.open ? '；没有人核验，以开环完成结束' + (e.outsourced ? '（外包）' : '') : '；' + O.verifiers(p.composed).map((v) => v.name).join('、') + '放行才结束');
@@ -465,7 +469,7 @@
     return '<div class="ln-pills" role="radiogroup" aria-label="收件人"><span class="ln-to-label">收件人</span>' + options(p).map((o) => '<button type="button" role="radio" aria-checked="' + (o.k === k) + '" class="ln-pill' + (o.k === k ? ' is-on' : '') + '" data-act="ln.to" data-k="' + esc(o.k) + '">' + esc(o.label) + '</button>').join('') + '</div>' +
       '<div id="ln-hint" class="ln-hint">' + esc(hintText(p, k)) + '</div>';
   }
-  function setTo(p, k) { const s = st(p); s.to = k; s.manual = true; s.focusDept = k.startsWith('g:') ? k.slice(2) : s.focusDept; }
+  function setTo(p, k) { const s = st(p); s.to = k; s.manual = true; s.hold = null; s.focusDept = k.startsWith('g:') ? k.slice(2) : s.focusDept; }
   A('ln.to', (el) => { const p = H.project(H.pid()); setTo(p, el.dataset.k); refresh(p); });
   document.addEventListener('keydown', (ev) => {
     if (ev.target.matches('[data-act="lp.node"]') && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); ev.target.click(); return; }
@@ -504,7 +508,7 @@
     // 选中的事项按它冻结的组织画；项目现在的组织不同时（例如刚加了独立核验），下面给出之后新建的事项怎么走
     const next = it && it.org && it.org.core !== O.coreDigest(p.composed) ? '<div class="lp-next"><span class="ln-to-label">之后新建的事项按现在的组织「' + esc(formLabel(p).name) + '」走：</span><div class="lp-mini">' + graphBody(p.composed, [], { mini: true }) + '</div></div>' : '';
     const tools = canSeq ? '<span class="lp-tools"><button type="button" class="y20-btn small lp-accum" data-act="lp.accum" aria-pressed="' + Boolean(s.accum) + '">累计往来</button><button type="button" class="y20-btn small" data-act="lp.seq" aria-pressed="' + Boolean(s.seq) + '">看经过</button></span>' : '';
-    return (pick || tools ? '<div class="lp-head">' + pick + tools + '</div>' : '') + '<div class="lp-wrap">' + (p.designPreview ? '<span class="lp-preview">设计预览</span>' : '') + g + '</div>' + lineHtml(c, arrows, it, ctx.qstate) + (canSeq ? seqArea(p, it, c, arrows) : '') + next + faultLane + pool + panelHtml(p, it, c, arrows);
+    return (pick || tools ? '<div class="lp-head">' + pick + tools + '</div>' : '') + (s.all ? allItems(p, it) : '') + '<div class="lp-wrap">' + (p.designPreview ? '<span class="lp-preview">设计预览</span>' : '') + g + '</div>' + lineHtml(c, arrows, it, ctx.qstate) + (canSeq ? seqArea(p, it, c, arrows) : '') + next + faultLane + pool + panelHtml(p, it, c, arrows);
   }
   // 累计往来：这件事项的询问按两个职能合成一条线，次数含开着的
   function askPairs(p, it) {
@@ -540,12 +544,51 @@
     }).join('') + '</ul></li>').join('');
     return '<div class="lp-work"><button type="button" class="y20-link" data-act="lp.work" aria-expanded="' + Boolean(pn.work) + '">' + (pn.work ? '收起工作过程' : '看工作过程') + '</button>' + (pn.work ? '<ol class="lp-tasks">' + body + '</ol>' : '') + '</div>';
   }
+  const WORD = (x) => ({ working: '进行中', open_closed: '开环完成', adopted: '放行', stopped: '已停止' }[x.status] || Y20.ITEM_STATUS[x.status][0]);
   function itemPicker(p, it) {
+    if (!p.items.length) return '';
     const s = st(p), seen = s.msgs.filter((m) => m.t === 'sep').map((m) => m.item);
     const list = p.items.filter((x) => unfinished(x)).concat(seen.map((id) => H.item(p, id)).filter((x) => x && !unfinished(x)).reverse().slice(0, 2));
-    if (list.length < 2) return '';
-    const res = (x) => ({ working: '进行中', open_closed: '开环完成', adopted: '放行', stopped: '已停止' }[x.status] || Y20.ITEM_STATUS[x.status][0]);
-    return '<div class="lp-pick" role="tablist" aria-label="选事项"><span class="ln-to-label">图上画</span>' + list.map((x) => '<button type="button" role="tab" aria-selected="' + (it && x.id === it.id) + '" class="lp-pick-btn' + (it && x.id === it.id ? ' is-on' : '') + '" data-act="lp.pick" data-item="' + esc(x.id) + '">' + esc(x.title) + ' <small>' + esc(res(x)) + '</small></button>').join('') + '</div>';
+    if (it && !list.includes(it)) list.push(it);
+    const open = Boolean(s.panel && s.panel.type === 'item');
+    const chips = list.map((x) => {
+      const on = it && x.id === it.id;
+      return '<button type="button" role="tab" aria-selected="' + Boolean(on) + '"' + (on ? ' aria-expanded="' + open + '" title="点开看这件事项"' : '') + ' class="lp-pick-btn' + (on ? ' is-on' : '') + '" data-act="lp.pick" data-item="' + esc(x.id) + '"' + (on ? ' data-on="1"' : '') + '>' + esc(x.title) + ' <small>' + esc(WORD(x)) + '</small>' + (on ? ' <span class="lp-pick-more" aria-hidden="true">' + (open ? '▴' : '▾') + '</span>' : '') + '</button>';
+    }).join('');
+    return '<div class="lp-pick" role="tablist" aria-label="选事项"><span class="ln-to-label">图上画</span>' + chips + '<button type="button" class="y20-link lp-all-btn" data-act="lp.all" aria-expanded="' + Boolean(s.all) + '">全部事项 ' + p.items.length + '</button></div>';
+  }
+  // 全部事项：点开是分组列表，不在跑的事项从这里选
+  function allItems(p, it) {
+    const card = (x, note) => '<li><button type="button" class="lp-all-card' + (it && x.id === it.id ? ' is-on' : '') + '" data-act="lp.pick-all" data-item="' + esc(x.id) + '"><b>' + esc(x.title) + '</b><small>' + esc(note || Y20.ITEM_STATUS[x.status][0]) + (x.round ? ' · 第 ' + x.round + ' 轮' : '') + '</small>' + (x.status === 'stopped' && x.reason ? '<small>' + esc(x.reason) + '</small>' : '') + '</button></li>';
+    const group = (title, rows, note) => rows.length ? '<section><h4>' + esc(title) + '（' + rows.length + '）</h4><ul>' + rows.map((x) => card(x, note && note(x))).join('') + '</ul></section>' : '';
+    const live = p.items.filter((x) => unfinished(x) && !['queued', 'waiting_slot'].includes(x.status));
+    const by = (st0) => p.items.filter((x) => x.status === st0);
+    const cols = p.composed.depts.map((d) => {
+      const rows = live.filter((x) => x.dept === d.id || (orgOf(p, x).depts.some((y) => y.id === d.id) && deptStatus(p, x, d).working));
+      return group(d.name, rows, (x) => (deptStatus(p, x, d).qs || [])[0] || WORD(x));
+    }).join('');
+    const count = (a) => a.length;
+    return '<div class="lp-all"><p class="y20-small y20-muted">共 ' + p.items.length + ' 件：进行中 ' + count(live) + '，排队中 ' + (count(by('queued')) + count(by('waiting_slot'))) + '，开环完成 ' + count(by('open_closed')) + '，已采纳 ' + count(by('adopted')) + '，已停止 ' + count(by('stopped')) + '。几个职能同时在做的事项，每个职能下都有一条。</p><div class="lp-all-groups">' +
+      group('排队中', p.items.filter((x) => ['queued', 'waiting_slot'].includes(x.status))) + cols + group('开环完成', by('open_closed')) + group('已采纳', by('adopted')) + group('已停止', by('stopped')) + '</div></div>';
+  }
+  // 事项面板：这件事项本身，点选事项一行的标题打开；每条事实旁边有来源
+  function itemPanel(p, it, close) {
+    if (!it) return '';
+    const fact = (k, v, src) => '<tr><th>' + esc(k) + '</th><td>' + v + (src ? ' ' + H.src(src) : '') + '</td></tr>';
+    const waitingYou = openAsks(p).filter((m) => m.item === it.id);
+    const rows = [
+      fact('状态', esc(Y20.ITEM_STATUS[it.status][0]) + (it.reason ? '<small class="y20-muted"> · ' + esc(it.reason) + '</small>' : ''), 'status-' + it.id),
+      it.round ? fact('第几轮', '第 ' + it.round + ' 轮 / 上限 ' + it.round_limit, 'round-' + it.id) : '',
+      it.limit ? fact('已用时间与上限', esc(H.dur(it.used)) + ' / ' + esc(H.dur(it.limit)) + ui.meter(it.used, it.limit)) : '',
+      it.status === 'waiting_slot' ? fact('等执行槽位', '已等 ' + esc(H.waited(it.since)) + '，跨项目的队列在<button type="button" class="y20-link" data-go="#/sys/runtime">运行与执行槽位</button>', 'slot-' + p.id) : '',
+      waitingYou.length ? fact('待决问题', waitingYou.map((m) => esc(m.text)).join('；')) : '',
+      it.status === 'stopped' ? fact('停止原因', esc(it.reason || '你停止了这个事项')) : ''
+    ].join('');
+    const run = it.round > 0;
+    const acts = (run ? '<button type="button" class="y20-btn small" data-go="#/p/' + esc(p.id) + '/w/' + esc(it.id) + '/recovery">恢复与动作核实</button><button type="button" class="y20-btn small" data-act="lp.export" data-item="' + esc(it.id) + '">导出这次运行</button>' : '') +
+      (unfinished(it) ? '<button type="button" class="y20-btn small danger" data-act="lp.cancel" data-item="' + esc(it.id) + '">取消事项</button>' : '');
+    return '<section class="lp-panel" aria-label="这件事项">' + close + '<h3>' + esc(it.title) + '<small> ' + esc(WORD(it)) + '</small></h3><table class="lp-facts"><tbody>' + rows + '</tbody></table>' +
+      '<div><b class="y20-small">循环停在哪一层</b>' + Y20.observe.loops(p, it) + '</div>' + (acts ? '<div class="lp-actions">' + acts + '</div>' : '') + '</section>';
   }
   // 职能在这件事项上的状态，条件与先后按 department-loop.md 2.1；节点上的字、「在做」角标、节点详情都读这一份
   function deptStatus(p, it, d) {
@@ -583,6 +626,7 @@
     const s = st(p), pn = s.panel;
     if (!pn) return '';
     const close = '<button type="button" class="y20-icon-btn lp-close" data-act="lp.close" aria-label="收起">' + ui.icon('close') + '</button>';
+    if (pn.type === 'item') return itemPanel(p, it, close);
     if (pn.type === 'arrow') {
       const a = arrows.find((x) => x.i === pn.i);
       if (!a) return '';
@@ -626,10 +670,29 @@
       '<div class="lp-panel-cols"><div><b class="y20-small">它的往来</b>' + (kids.length || openHere.length ? '<ul class="ln-fold-body">' + openHere.map((a) => '<li class="is-open"><b>' + esc(nm(p, a.from)) + '</b> 问' + esc(nm(p, a.to)) + '：' + esc(a.text) + ' <span class="y20-muted">（还没回答）</span></li>').join('') + kids.slice(-6).map((k) => kidHtml(p, k)).join('') + '</ul>' : '<p class="y20-muted y20-small">这个事项里还没有往来</p>') +
       (guidance.length ? '<p class="y20-small y20-muted">你给它的指导：' + guidance.map((m) => esc(m.text) + (m.readAt ? '（已读到）' : '（还没读到）')).join('；') + '</p>' : '') + '</div></div>' +
       '<div class="lp-actions"><button type="button" class="y20-btn small primary" data-act="lp.guide" data-dept="' + esc(d.id) + '">给' + esc(d.name) + '发指导</button>' + (isSub(d) ? '<button type="button" class="y20-btn small" data-act="lp.inner" data-dept="' + esc(d.id) + '">看内部的循环图 ›</button>' : '') + ops +
-      '<button type="button" class="y20-link" data-go="#/p/' + esc(p.id) + '/org/d/' + esc(d.id) + '">职能详情 ›</button></div></section>';
+      '<button type="button" class="y20-link" data-act="obs.dept" data-dept="' + esc(d.id) + '">本职能的模型请求 ›</button><button type="button" class="y20-link" data-go="#/p/' + esc(p.id) + '/org/d/' + esc(d.id) + '">职能详情 ›</button></div></section>';
   }
 
-  A('lp.pick', (el) => { const p = H.project(H.pid()), s = st(p); s.sel = el.dataset.item; s.panel = null; s.inner = null; if (s.seq) s.seq = { pair: null, rounds: {} }; refresh(p); });
+  A('lp.pick', (el) => {
+    const p = H.project(H.pid()), s = st(p);
+    if (el.dataset.on) { s.panel = s.panel && s.panel.type === 'item' ? null : { type: 'item' }; s.inner = null; refresh(p); return; }
+    s.sel = el.dataset.item; s.panel = null; s.inner = null; if (s.seq) s.seq = { pair: null, rounds: {} }; refresh(p);
+  });
+  A('lp.all', () => { const p = H.project(H.pid()), s = st(p); s.all = !s.all; refresh(p); });
+  A('lp.pick-all', (el) => { const p = H.project(H.pid()), s = st(p); s.sel = el.dataset.item; s.all = false; s.panel = { type: 'item' }; s.inner = null; if (s.seq) s.seq = { pair: null, rounds: {} }; refresh(p); });
+  A('lp.export', (el) => { const it = H.item(H.project(H.pid()), el.dataset.item); ui.toast('已导出「' + it.title + '」这次运行的证据（示例，不生成文件）', 'ok'); });
+  A('lp.cancel', (el) => {
+    const it = H.item(H.project(H.pid()), el.dataset.item), word = el.dataset.word || '取消';
+    ui.modal({ title: word + '这个事项', body: '<p>' + word + '以后「' + esc(it.title) + '」的全部职能与后台命令一起停下，不能接着做。已交出的版本还在，要继续得开一件新事项。</p>', actions: [{ label: '不' + word, close: true }, { label: word + '事项', kind: 'danger', act: 'lp.cancel-do', data: { item: it.id, word } }] });
+  });
+  A('lp.cancel-do', (el) => {
+    const p = H.project(H.pid()), s = st(p), it = H.item(p, el.dataset.item);
+    ui.closeModal();
+    if (active(p) === it) { (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = []; if (it.org.composed.rotation === 'pool') Y20.pool.stop(p); }
+    const word = el.dataset.word || '取消';
+    it.reason = '你' + word + '了这个事项';
+    push(p, { t: 'stop', text: '你' + word + '了「' + it.title + '」' }); finish(p, it, 'stopped'); refresh(p, true);
+  });
   A('lp.node', (el, ev) => {
     if (ev && ev.target.closest('[data-act="lp.jump"],[data-act="lp.inner"]') && ev.target.closest('[data-act="lp.jump"],[data-act="lp.inner"]') !== el) return;
     const p = H.project(H.pid()), s = st(p), id = el.dataset.dept;
@@ -718,7 +781,7 @@
   const barHtml = (p) => {
     const e = p.elapsed;
     return '<div class="ln-time-row"><span>' + (active(p) ? '正在处理 · ' : '') + '已用 ' + esc(ui.duration(e.used)) + ' / 上限 ' + esc(ui.duration(e.limit)) + '</span>' +
-      (active(p) ? '<button type="button" class="y20-btn small danger" data-act="ln.stop">停止</button>' : '') + '</div>' + ui.meter(e.used, e.limit);
+      (active(p) ? '<button type="button" class="y20-btn small danger" data-act="lp.cancel" data-item="' + esc(active(p).id) + '" data-word="停止">停止</button>' : '') + '</div>' + ui.meter(e.used, e.limit);
   };
   function inputLabel(p) {
     const k = cur(p), input = $('ln-text');
@@ -741,11 +804,20 @@
       '<div id="ln-thread" class="ln-thread">' + threadHtml(p) + '</div><div id="ln-strip">' + statusStrip(p) + '</div>' +
       '<form id="ln-form" class="ln-input" autocomplete="off"><div id="ln-to">' + toHtml(p) + '</div><div class="ln-row"><input type="text" class="y20-input" id="ln-text" placeholder="说说你想做什么……"><button type="submit" class="y20-btn primary">发送</button></div></form></div>';
   }
+  let lastGoto = null;
   function convMount(ctx, el, p) {
     inputLabel(p);
+    const box = $('ln-text');
+    if (box) box.addEventListener('input', () => { const s = st(p); s.hold = box.value.trim() ? (s.hold || chosen(p)) : null; });
     setTimeout(() => { const t = $('ln-thread'); if (t) t.scrollTop = 1e9; }, 0);
     const q = Y20.state.route.query;
     if (q.jump) setTimeout(() => jumpAsk(p, q.who || ''), 60);
+    // 从首页点一条关键事实、从请求详情回事项：选中那件事项，有时序图的打开时序图；同一个地址只处理一次
+    if (q.item && lastGoto !== location.hash) {
+      lastGoto = location.hash;
+      const s = st(p), it = H.item(p, q.item);
+      if (it) { s.sel = it.id; s.panel = null; s.inner = null; s.seq = null; if (q.seq && orgOf(p, it).depts.length > 1) openSeq(p, null); else refresh(p); }
+    }
   }
 
   // ---------------------------------------------------------------- 新事项的假进展：按冻结的组织走，约 3.5 秒交付、5 秒放行
@@ -821,6 +893,7 @@
     if (!text) return;
     const k = cur(p), it = active(p), tag = k === 'new' ? '开始一个新事项' : k === 'append' ? '追加输入' : '给' + nm(p, k.slice(2)) + '的指导';
     input.value = '';
+    s.hold = null;
     if (!k.startsWith('g:')) { s.manual = false; s.to = null; s.focusDept = null; }
     if (k === 'new' && !it) { if (!startItem(p, text)) return; }
     else {
@@ -836,12 +909,6 @@
       } else if (it && !it.ran) run(p, it);
     }
     refresh(p, true);
-  });
-  A('ln.stop', () => {
-    const p = H.project(H.pid()), it = active(p);
-    (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = [];
-    if (it.org.composed.rotation === 'pool') Y20.pool.stop(p);
-    push(p, { t: 'stop', text: '你停止了「' + it.title + '」' }); finish(p, it, 'stopped'); refresh(p, true);
   });
   A('ln.answer', (el) => {
     const p = H.project(H.pid()), m = st(p).msgs[Number(el.dataset.i)];
@@ -883,6 +950,7 @@
       field('组织', '<p class="lp-org-line">' + esc(orgLine(p)) + '</p><div class="lp-actions">' + verBtn + '<button type="button" class="y20-btn" data-act="lp.forms">换形态</button></div>',
         '只对之后新建的事项生效' + (running.length ? '；在跑的 ' + running.length + ' 件按原来的组织做完' : '')) +
       field('观察者', obs ? '<div class="lp-obs">' + obs + '</div>' : '<span class="y20-muted">这一份形态没有观察者</span>', '在事项外面读事实，发现问题会变成对话里「要你决定」的气泡；开了就生效，不进草稿，不改事项怎么结束') +
+      '<details class="ln-adv lp-adv lp-req' + (ctx.route.query.section === 'requests' ? ' is-target' : '') + '" id="requests"' + (ctx.route.query.section === 'requests' || Y20.observe.isOpen(p.id) ? ' open' : '') + '><summary>模型请求与用量</summary><div class="lp-adv-body">' + Y20.observe.panel(p) + '</div></details>' +
       '<details class="ln-adv lp-adv"><summary>高级</summary><div class="lp-adv-body">' +
       '<p class="y20-muted y20-small">形态里没有的东西才用这里：改名、加职能、三样说明、编辑定义、草稿与校验、版本与历史、和某项目一样、接来源的职能改给谁。走这里的采用要写理由。</p>' +
       '<div class="lp-adv-links"><button type="button" class="y20-btn" data-go="#/p/' + esc(p.id) + '/org?advanced=1">组织：四问、职能表、加职能、编辑定义、版本与历史</button>' +
@@ -949,7 +1017,7 @@
 
   // ---------------------------------------------------------------- 外壳：项目页只有对话与设置
 
-  Y20.leanHas = (p, name) => Boolean(Y20.leanViews[name]) || /^(org|item|recovery|advanced)/.test(name);
+  Y20.leanHas = (p, name) => Boolean(Y20.leanViews[name]) || /^(org|item-org|recovery|advanced|observe-detail)/.test(name);
   Y20.leanTabs = (p, r) => {
     const b = (on, label, tail) => '<button type="button" class="y20-ptab' + (on ? ' is-active' : '') + '" data-go="#/p/' + p.id + tail + '">' + esc(label) + '</button>';
     const onSet = r.name === 'settings' || /^org/.test(r.name);
@@ -967,7 +1035,7 @@
     const body = '<div class="ln-new" data-np="' + px + '"><input type="text" class="y20-input" id="ln-name" aria-label="项目名字" placeholder="项目名字" data-live data-act="ln.clear">' +
       '<div class="ln-warn" id="ln-warn"></div>' +
       (attach ? '<input type="text" class="y20-input" id="ln-dir" placeholder="源目录：控制主机上已有项目的绝对路径" data-live data-act="ln.clear">' : '') +
-      '<p class="y20-muted y20-small">点一张形态卡，项目就建好了。</p><div class="ln-cards lp-cards">' + cards('ln.create') + '</div>' +
+      '<p class="y20-muted y20-small">点一张形态卡，项目就建好了。建好以后在对话里写要求，长材料也在那里发。</p><div class="ln-cards lp-cards">' + cards('ln.create') + '</div>' +
       '<input type="radio" name="' + px + '-org" id="' + px + '-radio" value="three" checked hidden><input type="checkbox" id="' + px + '-obs" hidden><input type="checkbox" id="' + px + '-sub" hidden>' +
       '<div class="ln-more">' + (attach ? '' : '<button type="button" class="y20-link" data-act="ln.toggle" data-t="ln-dirbox">选起始文件夹</button> ') + '<button type="button" class="y20-link" data-act="ln.toggle" data-t="ln-advbox">高级</button></div>' +
       '<div id="ln-dirbox" hidden><input type="text" class="y20-input" id="pn-dir" placeholder="控制主机上的路径，可以不填"></div>' +

@@ -208,3 +208,27 @@ button.sq-row:hover, button.sq-row.is-on { background: var(--tint); }
   .sq-wide { display: none; }
   .sq-list { display: grid; }
 }
+
+/* 选事项一行：全部事项、事项面板 */
+.lp-pick-more { color: var(--muted); font-size: 10px; }
+.lp-all-btn { font-size: 12px; margin-left: 2px; }
+.lp-all { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; display: grid; gap: 6px; background: var(--surface); }
+.lp-all p { margin: 0; }
+.lp-all-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.lp-all-groups h4 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.lp-all-groups ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lp-all-card { width: 100%; display: grid; gap: 1px; text-align: left; border: 1px solid var(--line); border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 13px; padding: 4px 8px; cursor: pointer; }
+.lp-all-card small { color: var(--muted); font-size: 11px; }
+.lp-all-card.is-on, .lp-all-card:hover { border-color: var(--green); background: var(--tint); }
+.lp-facts { border-collapse: collapse; font-size: 13px; width: 100%; }
+.lp-facts th { text-align: left; font-weight: 400; color: var(--muted); white-space: nowrap; padding: 2px 12px 2px 0; vertical-align: top; width: 1%; }
+.lp-facts td { padding: 2px 0; }
+.lp-panel .y20-table-wrap { margin-top: 4px; }
+.lp-req > .lp-adv-body { display: grid; gap: 8px; }
+
+/* 首页的关键事实 */
+.y20-report-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.y20-report-fact { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit; font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 4px; cursor: pointer; }
+.y20-report-fact:hover { background: var(--tint); }
+.y20-report-fact.is-plain { cursor: default; }
+.y20-report-fact.is-plain:hover { background: none; }

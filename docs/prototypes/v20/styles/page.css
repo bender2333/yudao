@@ -20,27 +20,11 @@ button.y20-source-kind:hover { filter: brightness(.95); text-decoration: underli
 .y20-desktop .y20-btn { margin-left: auto; }
 
 /* 成果种类与结论 */
-.y20-okind { display: inline-block; padding: 0 7px; border-radius: 5px; font-size: 12px; font-weight: 600; background: var(--soft); color: var(--text); }
-.y20-okind.is-release { background: var(--tint); color: var(--green); }
-.y20-okind.is-defect { background: var(--red-bg); color: var(--red); }
-.y20-okind.is-open_close { background: var(--amber-bg); color: var(--amber); }
-.y20-okind.is-adopt { background: var(--teal-bg); color: var(--teal); }
-.y20-okind.is-ask, .y20-okind.is-answer { background: var(--blue-bg); color: var(--blue); }
-.y20-concl-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
-.y20-concl { display: grid; gap: 4px; justify-items: start; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
-.y20-concl b { font-size: 22px; line-height: 1.1; }
-.y20-concl small { color: var(--muted); font-size: 12px; }
 
 /* 决定卡片里的定义列表 */
 .y20-def-table td:nth-child(3), .y20-def-table td:nth-child(4) { white-space: nowrap; }
 
 /* 时间轴 */
-.y20-tl { list-style: none; margin: 0; padding: 0; display: grid; }
-.y20-tl-row { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; padding: 7px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
-.y20-tl-row.is-target { background: var(--violet-bg); outline: 2px solid var(--violet); border-radius: 6px; }
-.y20-tl-pos { font-family: var(--mono); color: var(--muted); font-size: 12px; min-width: 52px; }
-.y20-tl-time { color: var(--muted); min-width: 90px; font-size: 12px; }
-.y20-tl-main { flex: 1 1 300px; min-width: 0; }
 
 /* 职能页 */
 .y20-live { min-height: 130px; max-height: 260px; overflow: auto; line-height: 1.7; }
