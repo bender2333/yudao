@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from dataclasses import asdict, dataclass
 from copy import deepcopy
 from typing import Any
@@ -33,6 +34,7 @@ from .models import (
     hash_bytes,
     json_dumps,
 )
+from .tools import tool_action
 from .validation import Tightening
 
 # 调用目标没有给出窗口时按这个值处理（工单 #669）：窗口是调用目标的属性，run 不再冻结它
@@ -344,6 +346,56 @@ class ContextAssembler:
         self.rules = rules or Rules()
 
 
+    def _verified_outcomes(self, run_id: str, department: str, events: list[Any],
+                           definitions: Definitions) -> list[dict[str, Any]]:
+        # 这个核验角色面对的交付以外的被核验成果（工单 #1579）：每一对（被核验角色、成果种类）取最近一版。
+        # 交付走上面那条既有的通道。哪一对按核验声明取，不按成果种类名
+        pairs = {(verified, kind) for verifier, verified, kind in definitions.rejection_edges()
+                 if verifier == department and kind != "delivery_spec"}
+        latest: dict[tuple[str, str], int] = {}
+        for index, event in enumerate(events):
+            payload = event.payload or {}
+            key = (payload.get("artifact_issuer"), payload.get("artifact_kind"))
+            if event.type == EventType.ARTIFACT_ACCEPTED and key in pairs:
+                latest[key] = index
+        return [self._verified_outcome(run_id, department, events, index, definitions)
+                for index in sorted(latest.values())]
+
+    def _verified_outcome(self, run_id: str, department: str, events: list[Any], index: int,
+                          definitions: Definitions) -> dict[str, Any]:
+        # 被核验那一版的两份：事实（封存的树与作者交这一版之前在这棵树上的主机检查回执）总在；
+        # 解释（提案合同里不属于事实的字段，例如说明与拿不准的地方）在核验角色对这一版下了结论以后才给
+        # （docs/design/independent-verification.md「先判断后看解释」）
+        version = events[index].payload or {}
+        issuer, kind, digest = version["artifact_issuer"], version["artifact_kind"], version.get("artifact_tree_digest")
+        contract = definitions.proposal_contracts.roles[issuer].kinds.get(kind) or {}
+        parts = contract.get("parts") or {}
+        declared = [str(name).split("=", 1)[0] for name in (*contract.get("required", ()), *contract.get("optional", ()))]
+        # 合同没有分事实与解释时，作者写的字段都算解释：事实只认主机记下的树与回执
+        explanation_fields = tuple(parts.get("explanation") or (name for name in declared if name != "kind"))
+        fact_fields = tuple(name for name in parts.get("facts") or () if name != "kind")
+        receipts = []
+        for event in events[:index]:
+            payload = event.payload or {}
+            ref = payload.get("output_ref")
+            if (event.type != EventType.TOOL_CALLED or event.department != issuer or not isinstance(ref, dict)
+                    or self.artifacts is None
+                    or tool_action(str(payload.get("name") or ""), definitions=definitions) != "check"):
+                continue
+            output = json.loads(self.artifacts.get_for_run(run_id, ArtifactRef(**ref)))
+            if isinstance(output, dict) and output.get("snapshot_hash") == digest:
+                receipts.append({key: output.get(key) for key in ("name", "exit_code", "summary", "snapshot_hash")})
+        concluded = any(event.type == EventType.ARTIFACT_ACCEPTED
+                        and (event.payload or {}).get("artifact_issuer") == department
+                        and version["content_hash"] in (event.payload or {}).values()
+                        for event in events[index + 1:])
+        outcome = {"kind": kind, "issuer": issuer, "version": version.get("artifact_version"),
+                   "content_hash": version["content_hash"], "tree_digest": digest, "checks": receipts,
+                   **{name: version[name] for name in fact_fields if name in version}}
+        if concluded:
+            outcome["explanation"] = {name: version[name] for name in explanation_fields if name in version}
+        return outcome
+
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
                  step_id: int = 1, history: list[dict[str, Any]] | None = None,
                  compaction_event_id: str | None = None, prompt: DepartmentPrompt | None = None,
@@ -506,6 +558,9 @@ class ContextAssembler:
             # 核验角色对当前交付下结论以后，被核验方在问答里的解释部分进入它之后的请求（工单 #554）
             parts.append(ContextPart("engineering_explanation", None,
                                      json_dumps(verified_content["explanations"])))
+        for outcome in self._verified_outcomes(projection.run_id, department, events or [], definitions):
+            # 交付以外的被核验成果（直做的交完成，工单 #1579）：先事实后解释
+            parts.append(ContextPart("verified_outcome", outcome["content_hash"], json_dumps(outcome)))
         if projection.product_spec and projection.product_spec.status == "active":
             spec = projection.product_spec
             parts.append(
