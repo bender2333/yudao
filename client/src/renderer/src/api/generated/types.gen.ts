@@ -3200,6 +3200,10 @@ export type FormChoice = {
      */
     form: string;
     /**
+     * Label
+     */
+    label: string;
+    /**
      * Description
      */
     description: string;
@@ -4861,6 +4865,10 @@ export type ProjectOrganizationResult = {
      * Form
      */
     form: string;
+    /**
+     * Label
+     */
+    label: string | null;
     /**
      * Version
      */
