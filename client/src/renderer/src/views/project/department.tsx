@@ -204,7 +204,7 @@ function selectionSourceLabel(value: string | null): string {
   return show(value, "未上报");
 }
 
-// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #905）：
+// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #905）：
 // 标题区另起一行列出这个事项的组织里的部门，本部门加粗；没有部门状态（事项没有进行中）时这一行不出现。
 // 部门清单与显示名取自事实（工单 #1457）：事项冻结的组织里的部门，不写死三个。
 export function DepartmentsLine(props: {

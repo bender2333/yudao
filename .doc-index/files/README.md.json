@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"README.md",
-"hash":"94b6f015a0db9618",
+"hash":"f82ec69fc4f0a370",
 "nodes":[
-{"hash":"94b6f015a0db9618","id":"README.md","kind":"file","title":"README.md"},
-{"hash":"6959306fb8594057","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
+{"hash":"f82ec69fc4f0a370","id":"README.md","kind":"file","title":"README.md"},
+{"hash":"25ab9b9653cb9fa1","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
 {"hash":"f3eea1e60864c734","id":"README.md#Yudao Loop System > 当前状态","kind":"section","parent":"README.md#Yudao Loop System","title":"当前状态"},
 {"hash":"eb93a109884ad267","id":"README.md#Yudao Loop System > 当前状态 > 现在能试什么","kind":"section","parent":"README.md#Yudao Loop System > 当前状态","title":"现在能试什么"},
 {"hash":"45bf8e193824bc7c","id":"README.md#Yudao Loop System > 参与开发","kind":"section","parent":"README.md#Yudao Loop System","title":"参与开发"},
@@ -20,7 +20,7 @@
 {"hash":"9dcc2e2c37c393fb","id":"README.md#Yudao Loop System > 安装与启动 > 控制主机上的 Yudao 服务","kind":"section","parent":"README.md#Yudao Loop System > 安装与启动","title":"控制主机上的 Yudao 服务"},
 {"hash":"4711bc23f8259b13","id":"README.md#Yudao Loop System > 安装与启动 > 网页界面","kind":"section","parent":"README.md#Yudao Loop System > 安装与启动","title":"网页界面"},
 {"hash":"bba55ebaffb55372","id":"README.md#Yudao Loop System > 安装与启动 > 升级","kind":"section","parent":"README.md#Yudao Loop System > 安装与启动","title":"升级"},
-{"hash":"698c81a0687ea398","id":"README.md#Yudao Loop System > 测试","kind":"section","parent":"README.md#Yudao Loop System","title":"测试"},
+{"hash":"b6657b242d92f4f0","id":"README.md#Yudao Loop System > 测试","kind":"section","parent":"README.md#Yudao Loop System","title":"测试"},
 {"hash":"8077bdc1810dc9f7","id":"README.md#Yudao Loop System > 如何使用","kind":"section","parent":"README.md#Yudao Loop System","title":"如何使用"},
 {"hash":"e0a8554ee676db9f","id":"README.md#Yudao Loop System > 如何使用 > 1. 创建项目与任务","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"1. 创建项目与任务"},
 {"hash":"9968d1e6b71c6e6b","id":"README.md#Yudao Loop System > 如何使用 > 2. 观察三部门协作","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"2. 观察三部门协作"},
@@ -35,7 +35,7 @@
 {"hash":"6f08bbe6a44c87b1","id":"README.md#Yudao Loop System > 停止与后续范围","kind":"section","parent":"README.md#Yudao Loop System","title":"停止与后续范围"}
 ],
 "edges":[
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["docs/design/test-pyramid.md"],"seen":"b528b2647bc3d93f","src":"README.md#Yudao Loop System"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["docs/design/test-pyramid.md"],"seen":"6cd634905d5ab090","src":"README.md#Yudao Loop System"},
 {"dst":"docs/requirements/git-change-management.md","kind":"link","raws":["docs/requirements/git-change-management.md"],"seen":"5e603d6c027cc0f6","src":"README.md#Yudao Loop System > 任务内 Git 版本"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"c828dcee198a6ad8","src":"README.md#Yudao Loop System > 停止与后续范围"},
 {"dst":".claude/skills/README.md","kind":"link","raws":[".claude/skills/README.md"],"seen":"6ed1d66350b92c02","src":"README.md#Yudao Loop System > 参与开发"},
@@ -54,7 +54,7 @@
 {"dst":"docs/requirements/department-providers.md","kind":"link","raws":["docs/requirements/department-providers.md"],"seen":"35140a184bdfd8e0","src":"README.md#Yudao Loop System > 模型配置"},
 {"dst":"docs/requirements/provider-layer.md","kind":"link","raws":["docs/requirements/provider-layer.md"],"seen":"6bdd92e4b4c7820f","src":"README.md#Yudao Loop System > 模型配置"},
 {"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["docs/requirements/provider-retries.md"],"seen":"190ddcb53255d852","src":"README.md#Yudao Loop System > 模型配置"},
-{"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"6ed7870024cc25f6","src":"README.md#Yudao Loop System > 测试"},
-{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"266c758f0cf38a07","src":"README.md#Yudao Loop System > 测试"}
+{"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"fa1e1ab66f669cbb","src":"README.md#Yudao Loop System > 测试"},
+{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"8fe9e97075209a6d","src":"README.md#Yudao Loop System > 测试"}
 ]
 }

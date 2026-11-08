@@ -647,7 +647,7 @@ export function departmentTierBindings(
 }
 
 // 部门默认涉及的部门：这一版加载的定义里的部门（catalog 查询的 departments，工单 #1457），
-// 目录里已有绑定的部门也算（模型管理 docs/design/model-management.md「部门默认与角色默认」：部门默认按定义里的每个部门各设一项）
+// 目录里已有绑定的部门也算（模型管理 docs/design/model-management.md「职能默认与角色默认」：部门默认按定义里的每个部门各设一项）
 export function departmentsOf(bindings: Record<string, CatalogBinding> | undefined,
                              departments: readonly string[] = []): string[] {
   const merged: string[] = [...departments];

@@ -357,7 +357,7 @@ class WatchedOutputsTightening:
         return Tightened(content=content)
 
     def _review(self, request: TightenRequest) -> Tightened:
-        # 核验角色的结论是对当前交付的核验（循环结构 docs/design/department-loop.md「各部门在什么时候工作」）：这一轮开始时没有交付就没有可以核验的对象；
+        # 核验角色的结论是对当前交付的核验（循环结构 docs/design/department-loop.md「各职能在什么时候工作」）：这一轮开始时没有交付就没有可以核验的对象；
         # 放行要用它当前的测试材料；提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达）。
         # 部门名取自定义：这一轮正是提交结论的那个部门在做核验（工单 #1391）
         minimal, facts = request.minimal, request.facts

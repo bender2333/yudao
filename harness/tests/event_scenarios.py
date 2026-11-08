@@ -82,7 +82,7 @@ def _judgement(checks: dict[str, int | dict[str, Any]] | None = None) -> Callabl
 
 
 def _explore(name: str = "test_echo.py") -> FakeTurn:
-    # 质检的预测性探索（循环结构 docs/design/department-loop.md「各部门在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检的预测性探索（循环结构 docs/design/department-loop.md「各职能在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
     # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
     # 提交的结论被拒绝，这一轮到这里结束；交付到达以后质检开始新一轮工作。
     return FakeTurn(

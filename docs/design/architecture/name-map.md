@@ -28,7 +28,7 @@
 | 事项的执行权编号 | 第四节写入口「交换」 | `WritePath.claim_execution_right`、`StaleExecutionRight`；编号本身叫 `epoch`（`Event.epoch`、`event_store.py` 的表列） | 写入口 | 不一致：方法与异常叫执行权，编号字段叫 `epoch` |
 | 派发编号 | 第四节写入口「交换」；第三节「重派与迟到的结果」 | 无。一轮工作只有身份 `activation_id`（`new_id("act")`，记在事件内容、`ContextManifest` 与 `CheckReceipt` 里），不递增，写入口不核对 | 写入口 | 代码里还没有 |
 | 消息身份、按消息身份去重 | 第四节写入口 | `event_store.py` 的 `Command`、`CommandRecord`、`DuplicateCommand`、`CommandIdReused`；`Event.command_id` | 写入口 | 不一致：叫命令身份，只覆盖经接口发来的命令 |
-| 来源（部门、角色、工作单元） | 第四节写入口「交换」 | `Event.department`、`Event.role`、`Event.actor`、`Event.session_id`；工作单元没有字段 | 写入口 | 不一致：分在四个字段里，没有「来源」这一组；工作单元代码里还没有 |
+| 来源（职能、角色、工作单元） | 第四节写入口「交换」 | `Event.department`、`Event.role`、`Event.actor`、`Event.session_id`；工作单元没有字段 | 写入口 | 不一致：分在四个字段里，没有「来源」这一组；工作单元代码里还没有 |
 | 证据引用 | 第四节写入口「交换」 | `Event.artifact_hashes`、`models.py` 的 `ArtifactRef`、`artifacts.py` | 写入口 | 一致（方框的技术名词是工件） |
 | 提案、完成提案 | 第一节方程「U ≠ f」；第四节执行「出」 | `proposals.py`、`submissions.py`；事件 `proposal_submitted`、`proposal_rejected`；定义 `proposal_contracts.json` | 写入口、执行 | 一致 |
 | 裁决（U） | 第一节「裁决与边界」；方程里的 U | `adjudication.py`（`tool_permission`、`ToolPermission`、`proposal_decision`、`commit_decision`、`WorkBasis`）、`validation.py`（`evaluate_proposal`、`ProposalDecision`）；路由的收紧检查（总图没有这个词）：接口 `tightening_contract.py`，实现 `tightening.py` 的 `WatchedOutputsTightening` | 写入口内侧（内核，不是缝） | 一致 |
@@ -43,7 +43,7 @@
 | 插件加载 | 第二节「只由你批准」 | `routing_contract.py` 的 `register`、`select`：路由实现登记名称，启动时按组织定义的 `routing` 接上（`routings.json` 登记可用的名称）；装配与执行没有按名字加载，由 `LoopSystem` 的构造参数 `assembly`、`execution` 交给 `Orchestrator`（默认 `ContextAssembly`、`StepDriver`），构造时核对四份契约的版本 | 路由、装配、执行 | 不一致：只有路由按定义里的名字接上（`register`、`select`），装配与执行经构造参数接上，没有叫插件加载的模块 |
 | 路由契约 | 第四节路由 | `routing_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`、`Routing` 协议）；实现 `watched_outputs.py` 的 `WatchedOutputs` 声明 `CONTRACT_VERSION` | 路由 | 一致 |
 | 槽位：路由、路由实现 | 第一节「槽位：路由」 | `watched_outputs.py` 的 `WatchedOutputs`（成果驱动，登记名称 `watched_outputs`；`ready_departments`、`next_department`、`round_end`、`item_end`）；`tightening.py` 的 `WatchedOutputsTightening`（含 `allowed_proposal_kinds`）；`routings.json` | 路由；道 03 | 一致 |
-| 按成果（关注的成果） | 第一节「轮转方式」 | `definitions/__init__.py` 的 `Definitions.watched_outputs`、组织定义里部门的 `watched`；`watched_outputs.py` 的 `watched_new_work`、`has_new_work` | 路由；道 03 | 一致 |
+| 按成果（关注的成果） | 第一节「轮转方式」 | `definitions/__init__.py` 的 `Definitions.watched_outputs`、组织定义里职能的 `watched`；`watched_outputs.py` 的 `watched_new_work`、`has_new_work` | 路由；道 03 | 一致 |
 | 任务池、工作单元、认领 | 第一节「轮转方式」；第三节外环「待认领」 | 无（`claim_execution_right` 的 claim 是领取事项的执行权，不是认领工作单元） | 路由；道 03 | 代码里还没有 |
 | 事项 | 第一、三节 | 项目流里叫 work_item（`work_item_created`、命令 `work_item.create`、`work_item.cancel`、`work_item.append_input`，查询 `work_item.*`）；事项的一次执行叫 run（`run_stream`、`run_created` 至 `run_continued`、`RunProjection`，查询 `run.*`） | 路由、接口 | 不一致：总图只有事项，代码与接口资源名里 `work_item` 与 `run` 两个名字并存 |
 | 放行或开环完成，事项完成 | 第三节外环 | 放行：质检结论 `models.py` 的 `QAReview`（`verdict` 字段）、事件 `qa_submitted`；事项结束 `run_done`；开环完成：事项创建时按 `Definitions.is_open_loop`（事项最后采纳的成果没有核验角色核验时为开环）判断，标记记在事项创建事件的 `open_loop` 上；事项完成时路由读这条记录，结束原因 `stop_reasons.json` 的 `open_loop`（结果是 done），与放行的 `released` 分开 | 路由 | 不一致：放行没有自己的名字，是质检结论的一个取值；开环完成有自己的结束原因与记录 |
@@ -68,9 +68,9 @@
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
 | 槽位：执行、执行实现 | 第一节「槽位：执行」；第四节执行 | `engine.py` 的 `StepDriver`（`start`、`cancel`）；`execution_contract.py` 的 `StepLimits`、`ActivationScope`；`recording.py` 的 `StepRecorder` | 执行 | 一致（方框的技术名词是步骤驱动） |
-| 执行契约、每一步先问边界 | 第四节执行 | `execution_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`；`StepDriver` 协议的 `start`、`cancel`、`result`；`SafeNode` 协议的 `proceed`、`settle`、`wait`、`end`、`department_selection`、`department_prompt`、`ask`）；`orchestrator.py` 的 `_SafeNode` 实现安全节点；实现 `engine.py` 的 `StepDriver` 声明 `CONTRACT_VERSION` | 执行 | 不一致：协议里带着 `department_selection`、`department_prompt` 两个按部门的方法，路由的问题混在执行契约里 |
+| 执行契约、每一步先问边界 | 第四节执行 | `execution_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`；`StepDriver` 协议的 `start`、`cancel`、`result`；`SafeNode` 协议的 `proceed`、`settle`、`wait`、`end`、`department_selection`、`department_prompt`、`ask`）；`orchestrator.py` 的 `_SafeNode` 实现安全节点；实现 `engine.py` 的 `StepDriver` 声明 `CONTRACT_VERSION` | 执行 | 不一致：协议里带着 `department_selection`、`department_prompt` 两个按职能的方法，路由的问题混在执行契约里 |
 | 一轮工作 | 第三节外环「一轮工作中」；第一节方程 | 叫 activation：`orchestrator.py` 的 `_Activation`、事件 `department_activated`、`activation_finished`、`bounds.activation_bound`、身份 `activation_id` | 执行、路由 | 不一致：叫激活，术语表把「激活」列为避免的说法 |
-| 部门成员（一个会话） | 第六节「可以多份」 | `sessions.py` 的 `DepartmentSession`、`SessionFactory`；`models.py` 的 `SessionRecord` | 执行 | 一致 |
+| 职能成员（一个会话） | 第六节「可以多份」 | `sessions.py` 的 `DepartmentSession`、`SessionFactory`；`models.py` 的 `SessionRecord` | 执行 | 一致 |
 | 询问 | 第三节外环「询问中」；第四节执行「出」 | 事件 `ask_started`、`ask_answered`；`adjudication.ask_chain_decision`；`watched_outputs.py` 的 `pending_ask_department`、`ask_branch`、`ask_outcome`；`SafeNode.ask`；查询 `run.asks` | 执行、路由 | 一致 |
 | 外包角色 | 第一节「工程」；第四节执行 | 无 | 执行；道 02 | 代码里还没有 |
 | 开子事项的请求 | 第四节执行「出」；第三节「子组织」 | 无（执行契约的结果只有这一轮写下的事件范围、停止原因与三样观察） | 执行；道 02 | 代码里还没有 |
@@ -128,12 +128,18 @@
 | --- | --- | --- | --- | --- |
 | 定义、加载与校验 | 第二节「定义」；第四节定义 | `definitions/__init__.py` 的 `Definitions`、`load_definitions`、`DefinitionError`；文件 `organization.json`、`roles.json`、`tools.json`、`proposal_contracts.json`、`rules.json`、`stop_reasons.json`、`work_items.json`、`service_presets.json`、`model_capabilities.json`、`routings.json` | 定义；道 10 | 一致 |
 | 版本 | 第四节定义「交换」 | `Definitions` 的版本取全部文件的内容摘要 | 定义 | 一致 |
-| 部门与角色 | 第一节「下一个部门」；第四节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality`；对外合同里部门是字符串（`app/payloads.py` 的 `Department = str`），命令收到定义里没有的部门时拒绝并写明可用的 | 定义；道 01、02 | 不一致：`models.py` 的 `DEPARTMENTS` 与 `providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 都取自模块加载时的默认定义（`DEFINITIONS.departments`），`app/project_queries.py`、`app/catalog_*.py`、`department_prompts.py` 按它列部门；总图要的是随事项冻结的定义给出 |
+| 职能与角色 | 第一节「下一个职能」；第四节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality`；对外合同里职能是字符串（`app/payloads.py` 的 `Department = str`），命令收到定义里没有的职能时拒绝并写明可用的 | 定义；道 01、02 | 不一致：代码里职能叫 department（部门），见下一行；`models.py` 的 `DEPARTMENTS` 与 `providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 都取自模块加载时的默认定义（`DEFINITIONS.departments`），`app/project_queries.py`、`app/catalog_*.py`、`department_prompts.py` 按它列职能；总图要的是随事项冻结的定义给出 |
 | 上限 | 第四节定义「交换」 | `rules.json` 与 `Rule`；`parameters.py`（`check_bounds`、`ParameterChange`、`fold_parameters`）；命令 `parameter.set`、事件 `parameter_set`、`project_parameter_set` | 定义 | 一致（方框的技术名词是上限与规则、参数） |
 | 停止原因清单 | 第三节外环「停止」；第四节定义「交换」 | `stop_reasons.json`、`StopReason`、`UnknownStopReason`、`models.stop_reason_name`、`Event.stop_reason` | 定义 | 一致 |
-| 谁能拒绝谁 | 第四节定义「交换」 | 由核验声明推出，不另写一份：`definitions/__init__.py` 的 `Definitions.rejection_edges`；加载时 `verification_issues`、`_rejection_cycles` 核对无环；各部门能提交什么另写在 `proposal_contracts.json` | 定义 | 一致 |
-| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第四节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方还写死：`app/project_queries.py` 的 `VERIFIER_OF`（`{"engineering": "quality"}`）、检查材料目录 `path_rules.py` 的 `QA_TESTS_DIR`、部门 id `quality` | 定义、路由；道 01 | 不一致：声明已有，读声明的只有定义模块自己，使用方仍写死在部门名上 |
-| 写入范围 | 第四节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 的写路径检查读 `Definitions.write_scope(部门)`，范围是检查材料时把写入限在声明的目录下，不按部门名 | 定义、写入口 | 一致 |
+| 职能 | 第一节「下一个职能」；术语表「职能」 | 叫 department：`Department`、`Event.department`、`app/payloads.py` 的 `Department = str`、`DepartmentSession`、`DEPARTMENTS`、`DEPARTMENT_STATES`，事件与命令名里的 `department_*`（`department_activated`、`department_guidance_*`），查询名 `department.workspace` 等，界面里的 `DepartmentPage`、`DepartmentView` | 定义、执行、接口；道 01 | 不一致：代码与接口叫 department（部门），立缝时随各道缝改名，旧名留别名一版 |
+| 形态「产品 · 工程 · 质检」（默认） | 术语表「形态」 | `definitions/__init__.py` 的 `DEFAULT_FORM = "three_departments"`，定义在 `harness/definitions/` 根下 | 定义；道 01 | 不一致：标识按部门数起名 |
+| 形态「工程」 | 术语表「形态」 | `single_role_direct`（`runtime.py` 的 `SINGLE_ROLE_DIRECT`，定义 `definitions/forms/single_role_direct/`） | 定义；道 01、03 | 不一致：标识按角色数与轮转起名 |
+| 形态「产品 · 工程」 | 术语表「形态」 | `several_roles_direct`（`runtime.py` 的 `SEVERAL_ROLES_DIRECT`，定义 `definitions/forms/several_roles_direct/`） | 定义；道 01、03 | 不一致：标识按角色数与轮转起名 |
+| 形态「产品 · 工程 · 质检 · 运维」 | 术语表「形态」 | 无 | 定义；道 08 | 代码里还没有 |
+| 加独立核验、去掉独立核验 | 术语表「核验角色」「形态」 | 查询 `project.organization` 给出的改动 `add_verifier`、`remove_verifier`；采用命令的方式 `mode: "verifier"`（`app/form_commands.py` 的 `AdoptionMode`，另两种是 `template`、`advanced`）；合成 `organization_compose.py` 的 `verifier_changes` | 定义、接口 | 一致（核验角色的直译）；采用方式里的 `template` 指换形态，术语表把「模板」列为避免的说法 |
+| 谁能拒绝谁 | 第四节定义「交换」 | 由核验声明推出，不另写一份：`definitions/__init__.py` 的 `Definitions.rejection_edges`；加载时 `verification_issues`、`_rejection_cycles` 核对无环；各职能能提交什么另写在 `proposal_contracts.json` | 定义 | 一致 |
+| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第四节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方还写死：`app/project_queries.py` 的 `VERIFIER_OF`（`{"engineering": "quality"}`）、检查材料目录 `path_rules.py` 的 `QA_TESTS_DIR`、职能 id `quality` | 定义、路由；道 01 | 不一致：声明已有，读声明的只有定义模块自己，使用方仍写死在职能名上 |
+| 写入范围 | 第四节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 的写路径检查读 `Definitions.write_scope(职能)`，范围是检查材料时把写入限在声明的目录下，不按职能名 | 定义、写入口 | 一致 |
 | 成果种类与提案合同 | 第四节定义「交换」 | `outcome_kinds.json`（`OutcomeKinds`：成果种类与分组，单独的一项），路由按组名引用（`routings.json` 的 `outcomes`）；`proposal_contracts.json` | 定义；道 03 | 一致 |
 | 路由实现与它的定义、工作单元的大小 | 第四节定义「交换」 | 路由实现与它的定义：组织定义的 `routing`、`routings.json`（每种路由一条）、`Definitions.routing_definition`；工作单元的大小：无 | 定义、路由；道 03 | 一致（路由实现与它的定义）；代码里还没有（工作单元的大小） |
 | 登记的机器 | 第四节定义「交换」；第六节 | 无 | 定义；道 10 | 代码里还没有 |
@@ -154,7 +160,7 @@
 
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
-| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | 还在 `client/src/renderer/src/` 里，与页面同一个目录、同一份依赖与构建：`pixel/`、`translate/`，挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx`，图鉴 `views/pixel/gallery.tsx`，开发挂载 `pixel/floor/dev-mount`（`main.tsx` 引入） | 画面；画面的阶段步 0 | 不一致：没有单独的目录、依赖与构建；页面取画面的文字与颜色（`views/project/labels.ts`、`materials.tsx`），翻译层反过来取页面的部门名与卡片文字（`translate/floor.ts`） |
+| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | 还在 `client/src/renderer/src/` 里，与页面同一个目录、同一份依赖与构建：`pixel/`、`translate/`，挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx`，图鉴 `views/pixel/gallery.tsx`，开发挂载 `pixel/floor/dev-mount`（`main.tsx` 引入） | 画面；画面的阶段步 0 | 不一致：没有单独的目录、依赖与构建；页面取画面的文字与颜色（`views/project/labels.ts`、`materials.tsx`），翻译层反过来取页面的职能名与卡片文字（`translate/floor.ts`） |
 | 壳 | 画面总图第一节「壳」、第四节「回调」 | 没有单独的壳：三个挂载兼做连接，回调直接调页面的函数 | 画面 | 不一致：回调不经命令发现，点开回链在画布上画卡片 |
 | 画面的同步层 | 画面总图第四节「读事实」 | 与页面共用 `contract/view-sync.ts` | 画面 | 不一致：画面没有自己的一份 |
 | 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类取自客户端夹具 `client/tests/fixtures/event-types.json`，由服务端的 `harness/tests/test_event_type_fixture.py` 与 `EVENT_TYPES` 核对；`translate/coverage.ts` 缺一种事件就测试失败；缺口清单：无 | 画面 | 不一致：服务端为画面维护夹具；不认识的事件让测试失败，不进缺口清单 |
@@ -163,22 +169,22 @@
 | 元件断言、回链 | 第四节画面的规矩（回链）；画面总图第四节「映射」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
 | 播放参数 | 画面总图第二节「调节参数」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
 | 七种元件的对照表 | 画面总图第四节「映射」 | `translate/coverage.ts`：事件在三个场景的归属 `COVERAGE`、覆盖层的中文名 `OVERLAY_LABELS`；概念到元件的行：无 | 画面；道 09 | 不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对 |
-| 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个部门字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按部门名分支 |
-| 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按部门 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按部门名取，不按核验角色 |
+| 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个职能字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按职能名分支 |
+| 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按职能 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按职能名取，不按核验角色 |
 | 章（放行、开环完成） | 画面总图第五节 | 合同 `pixel/contract.ts` 的 `Stamp`（楼层状态的 `stamp`）；动作 `stamp_release`、`stamp_defect`、`stamp_valid`（`translate/floor.ts`）；开环完成章：无 | 画面 | 不一致：开环完成章代码里还没有 |
 | 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布上的来源卡片 `pixel/floor/card.ts` 的 `createSourceCard`，卡片内容 `SourceCardFace`（`pixel/contract.ts`）画原始事件与差异 | 画面（页面一侧） | 不一致：细内容画在画布上，没有交给页面 |
 
 ## 3. 外环的九个状态
 
-外环的状态对一个部门成立；代码里 run 自己的状态只有 `kernel_events.py` 的 `RUN_STATUSES`（`running`、`done`、`paused`、`failed`，`models.py` 转出）。部门的状态里五个由查询算出来：`app/project_queries.py` 的 `DEPARTMENT_STATES` 与 `DepartmentState`（`waiting_user`、`working`、`asking`、`verifying`、`waiting`），在 `project.loop`、`department.workspace` 等查询的结果里；其余四个（接纳、返工、排空中、停止）不在这个类型里，没有一个列出九个状态的类型。
+外环的状态对一个职能成立；代码里 run 自己的状态只有 `kernel_events.py` 的 `RUN_STATUSES`（`running`、`done`、`paused`、`failed`，`models.py` 转出）。职能的状态里五个由查询算出来：`app/project_queries.py` 的 `DEPARTMENT_STATES` 与 `DepartmentState`（`waiting_user`、`working`、`asking`、`verifying`、`waiting`），在 `project.loop`、`department.workspace` 等查询的结果里；其余四个（接纳、返工、排空中、停止）不在这个类型里，没有一个列出九个状态的类型。
 
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
-| 等待工作 | 第三节外环 | `watched_outputs.is_waiting`；部门状态 `waiting`（`app/project_queries.py` 的 `DepartmentState`） | 路由 | 一致 |
-| 一轮工作中 | 第三节外环 | `watched_outputs.is_working`；部门状态 `working`；run 状态 `running` | 路由、执行 | 一致 |
-| 询问中 | 第三节外环 | `watched_outputs.pending_ask_department`；部门状态 `asking`；事件 `ask_started` | 路由、执行 | 一致 |
-| 等用户 | 第三节外环 | `decisions.blocks_run`、`DecisionRequest`（见接口一节）；部门状态 `waiting_user` | 接口 | 一致 |
-| 核验中 | 第三节外环 | 部门状态 `verifying`（`app/project_queries.py` 的 `DepartmentState`；`_awaiting_verification`：最新的交付还没有质检的缺陷记录或放行）；检查工作区 `environment.inspection_root` | 路由、动作 | 不一致：`_awaiting_verification` 按质检与交付写死，不按核验角色 |
+| 等待工作 | 第三节外环 | `watched_outputs.is_waiting`；职能状态 `waiting`（`app/project_queries.py` 的 `DepartmentState`） | 路由 | 一致 |
+| 一轮工作中 | 第三节外环 | `watched_outputs.is_working`；职能状态 `working`；run 状态 `running` | 路由、执行 | 一致 |
+| 询问中 | 第三节外环 | `watched_outputs.pending_ask_department`；职能状态 `asking`；事件 `ask_started` | 路由、执行 | 一致 |
+| 等用户 | 第三节外环 | `decisions.blocks_run`、`DecisionRequest`（见接口一节）；职能状态 `waiting_user` | 接口 | 一致 |
+| 核验中 | 第三节外环 | 职能状态 `verifying`（`app/project_queries.py` 的 `DepartmentState`；`_awaiting_verification`：最新的交付还没有质检的缺陷记录或放行）；检查工作区 `environment.inspection_root` | 路由、动作 | 不一致：`_awaiting_verification` 按质检与交付写死，不按核验角色 |
 | 接纳 | 第三节外环 | 通用接纳事件 `artifact_accepted`（`kernel_events.py`）；成果驱动的老事件 `spec_accepted`、`contract_accepted`、`delivery_accepted`、`structure_accepted`、`baseline_review_accepted`、`product_decision_accepted` | 写入口、路由 | 一致 |
 | 返工 | 第三节外环 | 质检结论的取值 `rework_engineering`（`kernel_events.py` 的 `QA_VERDICTS`）；取值 `rework`（`views/timeline/logic.ts`）；缺陷在 `QAReview.defects`，页面显示「缺陷记录」 | 路由 | 一致 |
 | 排空中 | 第三节外环 | `streams.py` 的 `DrainState`（见看门狗一行） | 看门狗 | 一致 |
@@ -191,17 +197,17 @@
 | 缝 | 两侧在代码里 | 守卫 | 守的规矩 |
 | --- | --- | --- | --- |
 | 写入口 | 写入方：`orchestrator.py`、`projects.py`、`app/` 的命令 ↔ `write_path.py`、`event_store.py` | `kernel/test_single_write_path.py`（单元）、`test_write_path.py`（模块）、`test_concurrent_commands.py`（集成）、`kernel/test_tool_needs_permission.py`（单元）、`kernel/test_tightening_only_rejects_or_waits.py`（模块） | 事实只经写入口写入；先过裁决；同一事务核对执行权编号与流版本；按命令身份去重；工具开始之前有许可记录 |
-| 路由 | 薄驱动 `orchestrator.py` ↔ 契约 `routing_contract.py`，实现 `watched_outputs.py`、`tightening.py` | `test_routing_contract.py`（单元）、`test_second_routing.py`（模块）、`test_thin_driver_names.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_contract_surface.py`（单元） | 契约的公开名称与版本；第二种路由（测试里的任务池）接上同一副骨架跑完一个事项；薄驱动的源码里没有部门与成果的名字；每种路由带自己的定义与结束原因 |
+| 路由 | 薄驱动 `orchestrator.py` ↔ 契约 `routing_contract.py`，实现 `watched_outputs.py`、`tightening.py` | `test_routing_contract.py`（单元）、`test_second_routing.py`（模块）、`test_thin_driver_names.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_contract_surface.py`（单元） | 契约的公开名称与版本；第二种路由（测试里的任务池）接上同一副骨架跑完一个事项；薄驱动的源码里没有职能与成果的名字；每种路由带自己的定义与结束原因 |
 | 装配 | 执行 `engine.py` ↔ 契约 `assembly_contract.py`，实现 `assembly.py`、`context.py`、`compaction.py` | `test_slot_contracts.py`（模块）、`test_contract_seams.py`（模块）、`test_second_slot_implementations.py`（模块）、`test_contract_modules.py`（单元）、`test_assembly_replay.py`（模块） | 输入输出的形状；交给模型的那份与上下文清单记进事实；装配不写事实事件；第二种装配接上以后薄驱动不改；同样的事件与定义重放出同样的请求字节与上下文清单（真实装配与第二种装配各一条） |
 | 执行 | 薄驱动 `orchestrator.py`（安全节点 `_SafeNode`）↔ 契约 `execution_contract.py`，实现 `engine.py`、`recording.py` | `test_slot_contracts.py`（模块）、`test_second_slot_implementations.py`（模块）、`test_contract_seams.py`（模块）、`kernel/test_every_stop_has_reason.py`（单元）、`kernel/test_limits_survive_restart.py`（集成） | 每一步先问安全节点；取消与上限时停下，停止原因取自封闭清单；重启以后用量连续累计；第二种执行接上以后薄驱动不改 |
 | 模型 | 执行 `engine.py` ↔ `providers/`、`adapters/` | `test_providers_module.py`（集成）、`test_call_target_per_request.py`（集成）、`test_resolve_call_target.py`（单元）、`test_redact.py`（模块）、`test_saved_projections.py`（集成） | 每次请求解析一次调用目标；凭据不进事实与导出；重放不调模型 |
 | 动作 | 工具 `tools.py`、`engine.py` ↔ `environment.py`、`actions.py`、`workspace.py`、`snapshot.py` | `test_action_contract.py`（模块）、`test_tool_contracts.py`（单元）、`kernel/test_only_grows.py`（单元）、`test_workspace_boundary.py`（单元） | 两种环境（本机与测试里的第二种）接受同一份动作合同、给出同样的回执；回执带前后公开树摘要与终点快照的引用，旧回执照常读；动作类别与回执字段只增；控制核心不直接读写工作区 |
 | 投影 | `event_store.py` → `projection.py`、`project_projection.py`、`app/read_models.py`；内核的 `minimal_projection.py` | `test_replay.py`（模块）、`test_saved_projections.py`（集成）、`kernel/test_minimal_projection.py`（模块）、`kernel/test_minimal_projection_baselines.py`（集成）、`kernel/test_skeleton_events.py`（单元）、`test_event_classification.py`（单元） | 从头重算得到同一状态；最小投影与应用投影逐项一致；骨架事件有登记表；每种事件声明所属的流 |
-| 接口 | 页面 `client/`、命令行、`evals/`、画面 ↔ 应用层 `app/`，经接口层 `api/` | `test_layers.py`（单元，导入方向合同，定义在 `pyproject.toml` 的 `[tool.importlinter]`）、`test_openapi_snapshot.py`（模块）、`test_event_stream.py`（模块）、`test_capabilities.py`（模块）、`test_department_names.py`（模块） | 接口层只导入应用层、应用层只导入控制核心的公开接口；合同快照不偷偷改；事件流按位置续；能力清单列出改变每条查询的事件；对外合同里的部门是字符串、取值由定义给出，换一份改了名的定义载荷照样通过，定义里没有的部门命令拒绝 |
+| 接口 | 页面 `client/`、命令行、`evals/`、画面 ↔ 应用层 `app/`，经接口层 `api/` | `test_layers.py`（单元，导入方向合同，定义在 `pyproject.toml` 的 `[tool.importlinter]`）、`test_openapi_snapshot.py`（模块）、`test_event_stream.py`（模块）、`test_capabilities.py`（模块）、`test_department_names.py`（模块） | 接口层只导入应用层、应用层只导入控制核心的公开接口；合同快照不偷偷改；事件流按位置续；能力清单列出改变每条查询的事件；对外合同里的职能是字符串、取值由定义给出，换一份改了名的定义载荷照样通过，定义里没有的职能命令拒绝 |
 | 画面 | 接口 `harness/api/` ↔ 画面（现在还在 `client/src/renderer/src/` 的 `translate/`、`pixel/` 与三个挂载里）；里面一道是翻译层 ↔ 画面层，合同 `pixel/contract.ts` | 客户端 `client/tests/unit/pixel-imports.test.ts`、`pixel-contract.test.ts`、`translate-coverage.test.ts`（都在合并门里）；逐场景回放 `pixel-floor-replay.test.ts`、`pixel-room-replay.test.ts`、`pixel-building-replay.test.ts`（不在 CI 里，手动跑） | 画面层只导入画面合同与自己的声明表；合同取值逐项校验；每种事件在三个场景里都有归属（缺一种就失败）；回放的每个检查点与原型逐像素相同。画面与基础部分互不导入、画面的测试不进合并门、认不出的事件进缺口清单：没有守卫 |
-| 定义 | 文件 `harness/definitions/*.json` ↔ `definitions/__init__.py` | `test_definitions.py`（集成）、`test_definition_rules.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_definitions_decide.py`（单元）、`test_frozen_parameters.py`（集成） | 加载与校验；版本是内容摘要；裁决读事项所用的那份定义；参数建 run 时冻结；核验声明的校验（核验角色与被核验角色在定义里、成果种类有定义、谁能拒绝谁无环、写入范围的角色在定义里）与开环的判断；没有声明的旧定义读成三部门 |
+| 定义 | 文件 `harness/definitions/*.json` ↔ `definitions/__init__.py` | `test_definitions.py`（集成）、`test_definition_rules.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_definitions_decide.py`（单元）、`test_frozen_parameters.py`（集成） | 加载与校验；版本是内容摘要；裁决读事项所用的那份定义；参数建 run 时冻结；核验声明的校验（核验角色与被核验角色在定义里、成果种类有定义、谁能拒绝谁无环、写入范围的角色在定义里）与开环的判断；没有声明的旧定义读成「产品 · 工程 · 质检」 |
 | 评价 | `evals/`、`release_check.py` → 系统（经接口） | `evals/tests/test_no_harness_import.py`、`evals/tests/test_no_harness_paths.py`；内核清单的 `material` 条目由 `path_guard.py` 在采纳前比较（`test_projects.py` 的内核守卫用例，集成）；`test_release_check.py`（模块） | 评测工具不导入 `harness`、不引用它的内部路径；改动评价材料的交付不自动采纳；发布检查的清单与检查取自运行中的实例，改待发布提交里的清单与检查不改变结果 |
 | 观察者 | 无 | 无 | 无 |
 | 看门狗 | 无；排空在 `streams.py` 的 `DrainState` | `test_runtime_drain.py`、`test_drain_upgrade.py`（集成，只守排空） | 排空期间新事项排队、在跑的照常结束 |
-| 四层 | 上面两层（事实与裁决、循环）的文件：内核清单里 `kind` 为 `module` 的文件，五个契约模块，`orchestrator.py`、`runtime.py`、`engine.py`、`assembly.py`、`context.py`；路由实现 `watched_outputs.py`、`tightening.py` | `test_thin_driver_names.py`（单元，只查 `orchestrator.py`）；其余文件靠差异报告里的部门名检索 | 薄驱动不写部门与成果的名字 |
+| 四层 | 上面两层（事实与裁决、循环）的文件：内核清单里 `kind` 为 `module` 的文件，五个契约模块，`orchestrator.py`、`runtime.py`、`engine.py`、`assembly.py`、`context.py`；路由实现 `watched_outputs.py`、`tightening.py` | `test_thin_driver_names.py`（单元，只查 `orchestrator.py`）；其余文件靠差异报告里的职能名检索 | 薄驱动不写职能与成果的名字 |
 | 三环 | 只由你批准那一环：内核清单 `harness/definitions/kernel-manifest.json`；只能向后兼容那一环：五个契约模块、骨架事件、接口合同、定义格式；可以整体重写那一环：各道缝的实现 | 只由你批准那一环 `kernel/test_manifest.py`（单元，导入方向）、`path_guard.py`；只能向后兼容那一环 `kernel/test_contract_surface.py`、`kernel/test_only_grows.py`、`test_contract_modules.py`、`test_openapi_snapshot.py`；可以整体重写那一环 `test_second_routing.py`、`test_second_slot_implementations.py`、`test_action_contract.py` 的第二种实现 | 内核只导入内核与标准库；契约名称与版本、骨架事件与停止原因只增；路由、装配、执行、执行环境能换第二种实现 |

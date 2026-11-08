@@ -290,7 +290,7 @@ def _outcome_label(definitions: Definitions, kind: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 采用与历史（工单 #1516，项目的组织设计说明「采用与历史」「模板一键选用」「拒绝与提醒」）：
+# 采用与历史（工单 #1516，项目的组织设计说明「采用与历史」「形态一键选用」「拒绝与提醒」）：
 # 采用前要过的同一套校验、项目现在的组织、加或去掉核验角色的改动文档，以及历史里两条采用之间的差异。
 # 命令与查询都从这里取，看到的是同一批拒绝项；差异按两条采用事件的形态名与改动比较，不另存状态。
 
@@ -480,7 +480,7 @@ def _verifier_removal(definitions: Definitions, changes: Any) -> dict[str, Any] 
 def verifier_changes(forms: Mapping[str, Definitions], form_name: str, changes: Any,
                      definitions: Definitions | None, *, store: Any = None) -> tuple[dict[str, Any] | None,
                                                                                        dict[str, Any] | None]:
-    """设置页一次点击的两个改动文档：加一个核验角色、去掉本项目加的那个（设计说明「模板一键选用」：
+    """设置页一次点击的两个改动文档：加一个核验角色、去掉本项目加的那个（设计说明「形态一键选用」：
     改动由查询给出，页面只把它原样交给采用命令）。
 
     只交出合成与校验通过的那一份：已经有核验角色时没有「加」，核验角色不是本项目加进来的时候没有「去掉」。
@@ -518,7 +518,7 @@ def change_diff(previous_form: str, previous_changes: Any, form: str, changes: A
 
 
 def dropped_changes(current: Any, requested: Any) -> list[str]:
-    """换一份时本项目现有改动里会丢掉的那些项（设计说明「模板一键选用」：查询给出，由页面确认）。
+    """换一份时本项目现有改动里会丢掉的那些项（设计说明「形态一键选用」：查询给出，由页面确认）。
 
     按改动文档逐项比较：请求的改动里没有的、或者写法不同的那些项各写一句话；命令本身不拦。
     """
