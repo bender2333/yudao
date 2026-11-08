@@ -77,11 +77,13 @@ NAVIGATION_TOOLS = frozenset({"browser_navigate"})
 # （浏览器那一层只按字面来源挡，别名挡不住；工单 #1184 的审查 6625033513 第 1 条）
 TAB_TOOL = "browser_tabs"
 # 一次调用最多等这么久（规则登记 browser.call_timeout_sec）：Playwright MCP 自己的动作时限 5 秒、
-# 导航时限 60 秒，这里是它们之外的上限
+# 导航时限 60 秒，这里是它们之外的上限。运行中的会话按本 run 建 run 时冻结的取值传入（工单 #1582）；
+# 这里的初值只是没有冻结值时的回退（直接构造 BrowserSessions 的测试与旧 run）
 CALL_TIMEOUT_SEC = int(DEFINITIONS.rule_value("browser.call_timeout_sec"))
 # 启动最多等这么久：node 冷启动、Chromium 第一次启动都在这一段里
 STARTUP_TIMEOUT_SEC = 120.0
-# 页面结构的摘录上限（字符）：与工具输出的上限同一做法
+# 页面结构的摘录上限（字符）：与工具输出的上限同一做法。调用方（harness/environment.py 的 _browser）
+# 每次动作都传入本 run 冻结的 tool_output_limit；这里的初值只是没有冻结值时的回退（工单 #1582）
 STRUCTURE_LIMIT = int(DEFINITIONS.rule_value("tool_output_limit"))
 # MCP 结果里指向会话目录的页面结构文件（`- [Snapshot](<path>)`）
 _SNAPSHOT_LINK = re.compile(r"\[Snapshot\]\(([^)]+)\)")
@@ -391,8 +393,10 @@ class BrowserSessions:
         return None if session is None else session.record()
 
     async def start(self, *, run_id: str | None, department: str, copy_root: str | Path,
-                    tree_digest: str, ready_url: str, output_dir: str | Path | None = None) -> dict[str, Any]:
-        # 结束本部门原来的会话，再按启动参数起 Playwright MCP，打开就绪地址并截一张图（docs/design/browser-and-computer-use.md「试用工具」）
+                    tree_digest: str, ready_url: str, output_dir: str | Path | None = None,
+                    call_timeout_sec: float = CALL_TIMEOUT_SEC) -> dict[str, Any]:
+        # 结束本部门原来的会话，再按启动参数起 Playwright MCP，打开就绪地址并截一张图（docs/design/browser-and-computer-use.md「试用工具」）。
+        # call_timeout_sec 是本 run 冻结的浏览器调用时限（工单 #1582）：环境按 run_created 的冻结字典传入
         await self.stop(run_id, department, reason="replaced by a new browser session")
         if self._artifacts is None or run_id is None:
             raise BrowserSessionFailed(
@@ -407,7 +411,7 @@ class BrowserSessions:
                               args=(program.cli, *launch_arguments(directory)),
                               cwd=str(root)),
             startup_timeout_sec=STARTUP_TIMEOUT_SEC,
-            call_timeout_sec=CALL_TIMEOUT_SEC,
+            call_timeout_sec=call_timeout_sec,
             stderr_log_path=str(directory / "mcp-stderr.log"),
         )
         try:
