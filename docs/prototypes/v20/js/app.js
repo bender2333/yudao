@@ -151,7 +151,7 @@
     const waiting = p.items.some((i) => i.status === 'waiting_user' || i.status === 'waiting_resume');
     if (waiting) return Y20.ui.status('pending', '等你决定');
     if (p.items.some((i) => i.status === 'waiting_model')) return Y20.ui.status('waiting_provider', '等待模型服务');
-    if (p.items.some((i) => i.status === 'working')) return Y20.ui.status('running', '进行中');
+    if (p.items.some((i) => ['working', 'asking'].includes(i.status))) return Y20.ui.status('running', '进行中');
     return Y20.ui.status('idle', '空闲');
   }
   Y20.marker = marker;

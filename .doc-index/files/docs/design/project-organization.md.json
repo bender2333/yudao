@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/project-organization.md",
-"hash":"d6b7c16775c8a338",
+"hash":"51e797a3031067e8",
 "nodes":[
-{"hash":"d6b7c16775c8a338","id":"docs/design/project-organization.md","kind":"file","title":"docs/design/project-organization.md"},
+{"hash":"51e797a3031067e8","id":"docs/design/project-organization.md","kind":"file","title":"docs/design/project-organization.md"},
 {"hash":"2463b56e26f9c7a2","id":"docs/design/project-organization.md#项目的组织设计说明","kind":"section","parent":"docs/design/project-organization.md","title":"项目的组织设计说明"},
 {"hash":"19b2e7aa7aec3aa2","id":"docs/design/project-organization.md#项目的组织设计说明 > 1. 功能与依据","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明","title":"1. 功能与依据"},
 {"hash":"7bbe5c7728ecba0c","id":"docs/design/project-organization.md#项目的组织设计说明 > 2. 边界与范围","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明","title":"2. 边界与范围"},
@@ -22,7 +22,7 @@
 {"hash":"3fbb42c2f6e946a0","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.11 外包与分形","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.11 外包与分形"},
 {"hash":"0dc3747f9432bf7b","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.12 形态一键选用","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.12 形态一键选用"},
 {"hash":"173513fb2142efec","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.13 新建的入口","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.13 新建的入口"},
-{"hash":"877867952036d42f","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.14 项目页是循环图加对话"},
+{"hash":"22f4027257fb848a","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.14 项目页是循环图加对话"},
 {"hash":"3d30ebeb1849abef","id":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.15 循环图跟着组织长","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案","title":"4.15 循环图跟着组织长"},
 {"hash":"e5ff596126d6933c","id":"docs/design/project-organization.md#项目的组织设计说明 > 5. 验收","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明","title":"5. 验收"},
 {"hash":"e94e1310357ae146","id":"docs/design/project-organization.md#项目的组织设计说明 > 5. 验收 > 脚本一：「工程」，由外部 agent 做","kind":"section","parent":"docs/design/project-organization.md#项目的组织设计说明 > 5. 验收","title":"脚本一：「工程」，由外部 agent 做"},
@@ -65,6 +65,7 @@
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"d6f13fa7d91f364e","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.11 外包与分形"},
 {"dst":"docs/design/outsourced-roles.md","kind":"link","raws":["outsourced-roles.md"],"seen":"8353b8004fee28ec","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.11 外包与分形"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"97b93618619c8d9b","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.13 新建的入口"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 2. 职能按关注的成果开始工作 > 2.1 职能的状态","kind":"link","raws":["department-loop.md"],"seen":"86273fd98d83d114","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.6 工程与质检之间的问答：事实与解释","kind":"link","raws":["department-loop.md"],"seen":"35c87ed9638c87aa","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","kind":"link","raws":["independent-verification.md"],"seen":"5cfba2bfd2f70c7c","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话"},
