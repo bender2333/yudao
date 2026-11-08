@@ -9,7 +9,7 @@ export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   quality: { name: "质检", role: "按验收条件核验并给出放行或缺陷记录" },
 };
 
-// 部门状态的中文名（三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #904）：总图第三节外环的五个词，页面上只写这一处。
+// 部门状态的中文名（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #904）：总图第三节外环的五个词，页面上只写这一处。
 // 外环另外四个词（接纳、返工、排空中、停止）在成果驱动下不作为部门的持续状态显示，这里不列。
 export const DEPARTMENT_STATE: Record<string, string> = {
   waiting_user: "等用户",
@@ -248,7 +248,7 @@ const CONCLUSION_LABELS: Record<string, string> = {
   release: "放行",
 };
 
-// 进度行（三部门的循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」，工单 #904 按原型 v12 第 3.2 节改写）：
+// 进度行（三部门的循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」，工单 #904 按原型 v12 第 3.2 节改写）：
 // 「PRD r2 · 交付 r1（依据 PRD r2）· 结论：放行」；还没有交付时写「PRD r2 · 还没有交付」；没有结论不写。
 // 什么都不写时不写这一行（还没有成果）。
 export function progressLabel(progress: WorkItemProgressView | null | undefined): string | null {
@@ -287,13 +287,13 @@ export const DEPARTMENT_STATE_KIND: Record<string, string> = {
 };
 
 // 一个部门的状态与原因（原型 v12 第 3.1 节）：状态词，有原因时写在括号里，例如
-// 「询问中（在等待产品的回答）」。原因只有四种，见三部门的循环结构 docs/design/department-loop.md「部门的状态」。
+// 「询问中（在等待产品的回答）」。原因只有四种，见三部门的循环结构 docs/design/department-loop.md「职能的状态」。
 export function departmentStateText(state: DepartmentStateView): string {
   const name = DEPARTMENT_STATE[state.state] ?? state.state;
   return state.note ? `${name}（${state.note}）` : name;
 }
 
-// 部门页标题区的部门状态（原型 v12 第 3.1 节、三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #905）：
+// 部门页标题区的部门状态（原型 v12 第 3.1 节、三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #905）：
 // 事项进行中时用 departments[本部门]，写状态与原因；没有部门状态（事项还没有开始、已经结束，
 // 或者进程中断以后还没有继续）时按事项的结束方式写，不再写「正在工作」与「这次运行不在本部门」。
 // text 是状态词，note 是原因（没有时为空串），kind 是页面上那个状态标记的样式。
@@ -349,7 +349,7 @@ export function departmentStatusView(data: {
   };
 }
 
-// 三个部门各自的状态与原因拆成一段段（三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #904）：
+// 三个部门各自的状态与原因拆成一段段（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #904）：
 // 「产品 一轮工作中（回答工程的询问） · 工程 询问中（在等待产品的回答） · 质检 等待工作」。
 // 顺序取查询给出的那个（事项所用的定义里的部门顺序，工单 #1372）；current 标出本部门那一段，
 // 部门工作间把它加粗（工单 #905）。没有 departments（事项没有进行中的 run）时返回 null。
@@ -400,7 +400,7 @@ export function departmentLine(
   return departmentsText(departments) ?? `所在部门：${departmentName(department) || "大厅"}`;
 }
 
-// 看板卡片上写正在工作的部门（三部门的循环结构 docs/design/department-loop.md「各部门在什么时候工作」，工单 #904）：状态是一轮工作中或询问中的部门，
+// 看板卡片上写正在工作的部门（三部门的循环结构 docs/design/department-loop.md「各职能在什么时候工作」，工单 #904）：状态是一轮工作中或询问中的部门，
 // 按查询给出的部门顺序写成「工程、质检在工作」（工单 #1372）。有这样的部门时写它；没有时不写这句话
 // （返回空串，调用处这一格不出现）；查询结果里没有 departments（旧数据、没有进行中的 run）时
 // 退回事项所在的部门（工单 #842 的行为：没有部门的事项，这一格不写）。

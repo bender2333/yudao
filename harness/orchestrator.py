@@ -1517,7 +1517,7 @@ class Orchestrator:
             else:
                 self._pause(transaction, bound)
             return None
-        # 开始一轮工作的部门由它关注的成果决定（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）：
+        # 开始一轮工作的部门由它关注的成果决定（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）：
         # 关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
         # 同时运行（工单 #557）：这个部门在准备激活之前可能已经别人的工作做完了，
         # 这时不再开始一轮工作。

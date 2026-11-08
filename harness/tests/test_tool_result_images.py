@@ -1,6 +1,6 @@
 # 工具结果带图像：装配里的减法与三个协议各自的图像输入写法。
 # 依据：浏览器与 computer use docs/design/browser-and-computer-use.md「请求中的图像」、docs/design/browser-and-computer-use.md「保存与绑定」；
-# 模型管理 docs/design/model-management.md「部门的建议能力」「按模型输入方式提供工具」与。
+# 模型管理 docs/design/model-management.md「职能的建议能力」「按模型输入方式提供工具」与。
 # 守 R2（第二环的合同：装配缝交给模型的工具结果、三个协议各自的交换形状）与
 # R3（阶段二：模型看到最近 3 张截图，更早的带证据编号，只有文本的模型不收到图像）。
 
@@ -232,7 +232,7 @@ def test_each_protocol_carries_tool_images_from_the_unified_input():
 
 
 def test_the_tool_result_images_follow_the_call_target_modalities(tmp_path):
-    # 工具结果里的截图是否随结果进入历史，按这次请求的调用目标的输入方式决定（模型管理 docs/design/model-management.md「部门的建议能力」）
+    # 工具结果里的截图是否随结果进入历史，按这次请求的调用目标的输入方式决定（模型管理 docs/design/model-management.md「职能的建议能力」）
     class _Request:
         call_target = {"input_modalities": ["text", "image"]}
 

@@ -1,4 +1,4 @@
-"""工单 #1402：项目设置里「形态」的命令与查询（项目的组织设计说明「采用与历史」「模板一键选用」；
+"""工单 #1402：项目设置里「形态」的命令与查询（项目的组织设计说明「采用与历史」「形态一键选用」；
 形态与核验角色设计说明「形态随事项冻结」；总图第四节「接口」缝与「定义」缝）。
 
 organization.adopt 把项目现在用的形态换成发布带的某一份，带用户看到的组织版本，理由可以不写；改回就是再采用
@@ -113,7 +113,7 @@ def test_changing_the_form_and_changing_back_writes_two_events_and_the_history_l
     changed = _organization(application, project_id)
     assert (changed.form, changed.version) == (second_routing.ROUTING_NAME, second_routing.DEFINITIONS.version)
 
-    # 改回就是再采用一次原值：理由可以不写（docs/design/project-organization.md「模板一键选用」）
+    # 改回就是再采用一次原值：理由可以不写（docs/design/project-organization.md「形态一键选用」）
     back = _adopt(application, project_id, DEFAULT_FORM, base_version=changed.version)
     assert isinstance(back, Accepted), back
 
