@@ -541,8 +541,8 @@ export function openCriteriaText(count: number, criteria: readonly string[]): st
 export const OPEN_CRITERIA_READING = "正在读取开环明细";
 export const OPEN_CRITERIA_UNREADABLE = "开环明细读不出来";
 
-// 事项标题取不到时的写法：与离开期间的报告原来的说法一致，不写事项标识（工单 #401）
-export const WORK_ITEM_UNNAMED = "未记事项";
+// 事项标题取不到时的写法：离开期间的报告按标题写明细，不写事项标识（工单 #1583）
+export const WORK_ITEM_UNNAMED = "未命名事项";
 
 // 「跳到逐条结论表」的链接（工单 #401）：逐条结论表在资料页（工单 #154）。软依赖，不等 #154——
 // 那张表还没有的时候链接不出现（点不到一张不存在的表）。#154 合并以后这一行是 true，

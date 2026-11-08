@@ -54,7 +54,7 @@ stateDiagram-v2
    - B 模块走向、C 总图边界、帖子里的建议：不建工单，攒进导游卡后面的「要你定的」。
    - 标了后面阶段的观察：评论到那个阶段的阶段工单下。
    写 `TRIAL: 缺陷` 与建了哪几张。
-5. **发布**：发布前检查按[测试分层设计说明](../../../docs/design/test-pyramid.md)「各角色运行哪一层」：`integration` 在要发布的提交上通过、真实模型冒烟、全部客户端端到端测试。版本号按 `docs/design/web-interface-and-release.md`「版本号」改 `pyproject.toml` 一行，再 `uv run python scripts/release.py --publish`。版本回归：没有发现问题、发布的就是试用的那个提交、部门的模型与上下文设置与评测相同时，试用的读数顶替这次场景 3；中间修过缺陷的，在发布提交上跑一次场景 3，结果文件提交到 `docs/evaluation/`，中文报告发 Discussions 的 General（标题前缀「证据：」，做法见验收证据规则第 5 节）。写 `TRIAL: 发布`、版本号、提交、wheel 的 SHA-256、版本回归的做法与读数、证据帖链接。
+5. **发布**：发布前检查按[测试分层设计说明](../../../docs/design/test-pyramid.md)「各角色运行哪一层」：`integration` 在要发布的提交上通过、真实模型冒烟。版本号按 `docs/design/web-interface-and-release.md`「版本号」改 `pyproject.toml` 一行，再 `uv run python scripts/release.py --publish`。版本回归：没有发现问题、发布的就是试用的那个提交、部门的模型与上下文设置与评测相同时，试用的读数顶替这次场景 3；中间修过缺陷的，在发布提交上跑一次场景 3，结果文件提交到 `docs/evaluation/`，中文报告发 Discussions 的 General（标题前缀「证据：」，做法见验收证据规则第 5 节）。写 `TRIAL: 发布`、版本号、提交、wheel 的 SHA-256、版本回归的做法与读数、证据帖链接。
 6. **走查**：用发布出来的 wheel 按「架构师的走查」走一遍用户的操作路径，用临时虚拟环境、单独的数据目录与端口，不动用户安装的那一份。指南与合理预期不一致的建缺陷工单，回到修缺陷，不改指南迁就。写 `TRIAL: 走查`、走了哪几条、结果。
 7. **导游卡**：写 `TRIAL: 导游卡`，正文是导游卡，后面列「要你定的」：复盘里的提议、B 与 C 类与建议、要总架构师改的缝。然后试用工单改成 `ready-for-human`。这一步之后不再碰这个薄片，等用户的结论。
 

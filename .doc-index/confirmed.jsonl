@@ -210,3 +210,12 @@
 {"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"501cedc1662adc79"}
 {"down":"772422e14ed2ed85","dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","up":"a572c778bea9528a"}
 {"down":"e3c77a24f6ad7dd9","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"c4489715b1654278"}
+{"down":"e86669f97a9a5c2f","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"04f2af7ad5d55506"}
+{"down":"e86669f97a9a5c2f","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"6cd634905d5ab090"}
+{"down":"d5e31ada545c97d6","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","src":"docs/agents/autopilot-runtime.md#运行配置 > 5. CI","up":"ad49142d91f90cad"}
+{"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"04f2af7ad5d55506"}
+{"down":"411be13cc234a54e","dst":".claude/skills/next/SKILL.md#下一件事 > 长运行","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 后台长运行算作失败的超时","up":"448ae0b59bc4d0bd"}
+{"down":"c867ce1dc8b9509c","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","src":"docs/agents/workflow.md#工作方式 > 10. CI","up":"ad49142d91f90cad"}
+{"down":"a153f29785e21da3","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 11. 真实用户场景验收","up":"6cd634905d5ab090"}
+{"down":"4c653cb4540ff5b4","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 3","up":"04f2af7ad5d55506"}
+{"down":"d547959c9ac9f66a","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.4 谁在什么时候发布","src":".claude/skills/trial-intake/SKILL.md#试用 > 先读什么","up":"4f53683c0ad72cb9"}
