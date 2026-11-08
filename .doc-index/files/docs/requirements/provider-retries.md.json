@@ -1,20 +1,20 @@
 {
 "schema":1,
 "path":"docs/requirements/provider-retries.md",
-"hash":"f7433bc55bb7ede2",
+"hash":"5cb45887013b5437",
 "nodes":[
-{"hash":"f7433bc55bb7ede2","id":"docs/requirements/provider-retries.md","kind":"file","title":"docs/requirements/provider-retries.md"},
-{"hash":"049af4699a08830f","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","kind":"section","parent":"docs/requirements/provider-retries.md","title":"D17 模型等待与失败重试"},
+{"hash":"5cb45887013b5437","id":"docs/requirements/provider-retries.md","kind":"file","title":"docs/requirements/provider-retries.md"},
+{"hash":"71fd2a2c3ff79eb8","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","kind":"section","parent":"docs/requirements/provider-retries.md","title":"D17 模型等待与失败重试"},
 {"hash":"af06ece75cf022f1","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"已确认"},
-{"hash":"b84a96fcea81ceb1","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 实施选择","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"实施选择"}
+{"hash":"99e6afd8dc4b1306","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 实施选择","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"实施选择"}
 ],
 "edges":[
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
-{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"845504a30d0207a7","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 实施选择"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f2264e65a3d7de26","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"cc9397dfaf732c1e","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"241863e89464a786","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 实施选择"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"573c955013deada8","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
-{"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"772422e14ed2ed85","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"}
+{"dst":"docs/requirements/operations-department.md#D27 运维 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"ca044aaef9a66108","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"}
 ]
 }

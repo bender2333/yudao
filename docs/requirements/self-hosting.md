@@ -1,18 +1,18 @@
 # D35 自举：用 Yudao 开发 Yudao
 
-状态：有效。依据：[总图](../architecture.html)第五节自举与验收（两层自举）；设计：[可信内核设计说明](../design/trusted-kernel.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 6.5 节、[规则登记与参数设计说明](../design/rules-and-parameters.md)、[循环与收敛设计说明](../design/loops-and-convergence.md)、[部门内多角色设计说明](../design/department-roles.md)、[验证的独立性设计说明](../design/independent-verification.md)；调研：[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)；相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)。路线位置：[总体路线图](../program-roadmap.md)第 2 节。第一层的试点是阶段二薄片 ⑤「Yudao 做自己的工单」，在薄片 ①「真实项目接着做」与薄片 ④「改一处、看得见、能撤回」之后、五项前置条件完成以后开始；第一层成为常态在阶段三；第二层是阶段四；圈复杂度与变异测试的研发工具在阶段三。
+状态：有效。依据：[总图](../architecture.html)第五节自举与验收（两层自举）；设计：[可信内核设计说明](../design/trusted-kernel.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 6.5 节、[规则登记与参数设计说明](../design/rules-and-parameters.md)、[循环与收敛设计说明](../design/loops-and-convergence.md)、[职能内多角色设计说明](../design/department-roles.md)、[验证的独立性设计说明](../design/independent-verification.md)；调研：[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)；相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)。路线位置：[总体路线图](../program-roadmap.md)第 2 节。第一层的试点是阶段二薄片 ⑤「Yudao 做自己的工单」，在薄片 ①「真实项目接着做」与薄片 ④「改一处、看得见、能撤回」之后、五项前置条件完成以后开始；第一层成为常态在阶段三；第二层是阶段四；圈复杂度与变异测试的研发工具在阶段三。
 
 ## 已确认
 
 1. 自举（用 Yudao 开发 Yudao）是核心目标。
 2. 同一项目同一时刻只有一个角色编写代码，是暂定默认值，放开的做法登记在[规则登记与参数设计说明](../design/rules-and-parameters.md)，多个写入者的采纳见[循环与收敛设计说明](../design/loops-and-convergence.md)「多个写入者的采纳」。将来支持多个写入者：同一执行主机上用 worktree 并发，不同执行主机之间通过分支进行。
-3. 质量检查作为部门的工序：工程部门对单元测试、圈复杂度与变异测试作自我保证，质检部门做大的验证。测试、任务流转这类可以固定下来、自动化的事做成工序（节点），后续流程只看它的输出，不再看它的内部。
+3. 质量检查作为职能的工序：工程对单元测试、圈复杂度与变异测试作自我保证，质检做大的验证。测试、任务流转这类可以固定下来、自动化的事做成工序（节点），后续流程只看它的输出，不再看它的内部。
 4. 圈复杂度与变异测试做成研发工具，在 Windows 与 Linux 上直接给出结果与诊断。目标形式是可执行工具与 skill 加 MCP；首要使用者是自主推进模式中的执行者 omp；以后由 Yudao 集成。
 5. 当前阶段不建这个工具，也不改动开发流程的规则。阶段二结束之前，用户与 Claude 手动进行一次圈复杂度与变异测试，方法见[调研记录](../research/complexity-and-mutation-testing.md)第 2 节。
 6. 边界：已发布的实例把 Yudao 仓库当作普通项目，开发下一个版本；运行中的实例不修改自己的内核（[可信内核设计说明](../design/trusted-kernel.md)）；需求来自用户；升级由用户决定；第二层（修改自己的组织与规则）建立在第一层之上，是阶段四。
 7. 第一层的试点在薄片 ① 关闭并且五项前置条件完成以后开始（见「第一层试点的配对验收约定」）：已发布的实例使用单独的数据目录与端口；接入 Yudao 仓库；采纳写回；项目级的检查时限；外部执行者的基线数字。试点期间成果以合并请求交给现有的审查流程。
-8. 质检依据回执的比例由验证密度参数决定，阶段一、二保持现值 1.0，调节规则归道 01 部门与核验。
-9. 跨平台：圈复杂度与变异测试做成稳定的跨平台工具库，现在与以后都要能在 Windows 上运行。阶段二结束之前的手动检查在控制主机的 Windows 上进行，工具与步骤见[调研记录](../research/complexity-and-mutation-testing.md)第 2 节；研发工具在阶段三建立，排在成果由 Yudao 直接采纳之前：那以后审查流程不再检查 Yudao 的成果，工程部门用它检查自己的交付。
+8. 质检依据回执的比例由验证密度参数决定，阶段一、二保持现值 1.0，调节规则归道 01 职能与核验。
+9. 跨平台：圈复杂度与变异测试做成稳定的跨平台工具库，现在与以后都要能在 Windows 上运行。阶段二结束之前的手动检查在控制主机的 Windows 上进行，工具与步骤见[调研记录](../research/complexity-and-mutation-testing.md)第 2 节；研发工具在阶段三建立，排在成果由 Yudao 直接采纳之前：那以后审查流程不再检查 Yudao 的成果，工程用它检查自己的交付。
 
 ## 前提与路线位置
 
@@ -66,7 +66,7 @@
 **前置条件**：
 
 1. 第一层作为常态运行满一个阶段（[D27](operations-department.md)「长时间运行」里阶段三的完成依据）。
-2. 流转由定义驱动，控制代码中没有部门名称。
+2. 流转由定义驱动，控制代码中没有职能名称。
 3. 由用户发起的参数对照完成 3 次以上，其中至少一次撤回；对照的记录与噪声范围可用（[规则登记与参数设计说明](../design/rules-and-parameters.md)）。
 4. 内核守卫经过演练；留出场景可用。
 5. 观察者的订阅与提案接口已经运行（阶段四的第一个薄片），判定点的合同已经运行（道 06 模型与判定点）。

@@ -1,20 +1,20 @@
 {
 "schema":1,
 "path":"docs/requirements/three-department-loop.md",
-"hash":"59661a20bb764738",
+"hash":"aa35f47da7eca00a",
 "nodes":[
-{"hash":"59661a20bb764738","id":"docs/requirements/three-department-loop.md","kind":"file","title":"docs/requirements/three-department-loop.md"},
-{"hash":"5fb1ee704d37fc1b","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","kind":"section","parent":"docs/requirements/three-department-loop.md","title":"D11 三部门循环的整体定义"},
-{"hash":"25440d5a28b9cf22","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 已确认","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"已确认"},
-{"hash":"cbb88f81b82f1597","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 责任边界","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"责任边界"},
-{"hash":"7400e826fa5e1ba4","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 设计选择","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"设计选择"}
+{"hash":"aa35f47da7eca00a","id":"docs/requirements/three-department-loop.md","kind":"file","title":"docs/requirements/three-department-loop.md"},
+{"hash":"0a0da27fba41122f","id":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义","kind":"section","parent":"docs/requirements/three-department-loop.md","title":"D11 产品 · 工程 · 质检循环的整体定义"},
+{"hash":"28064acad8dfb1b4","id":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义 > 已确认","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义","title":"已确认"},
+{"hash":"4fd5c6cf2feaa5ad","id":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义 > 责任边界","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义","title":"责任边界"},
+{"hash":"b05ae45a01bd3b89","id":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义 > 设计选择","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义","title":"设计选择"}
 ],
 "edges":[
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义"},
-{"dst":"docs/design/department-roles.md","kind":"link","raws":["../design/department-roles.md"],"seen":"f0abaea09a6b3e64","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 设计选择"},
-{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"862c19040515313f","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 设计选择"}
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义"},
+{"dst":"docs/design/department-roles.md","kind":"link","raws":["../design/department-roles.md"],"seen":"fb91d0dffb8b7ad7","src":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义 > 设计选择"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"6e3357d24c141317","src":"docs/requirements/three-department-loop.md#D11 产品 · 工程 · 质检循环的整体定义 > 设计选择"}
 ]
 }

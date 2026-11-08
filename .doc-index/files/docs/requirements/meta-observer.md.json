@@ -1,27 +1,27 @@
 {
 "schema":1,
 "path":"docs/requirements/meta-observer.md",
-"hash":"4a3423ea5e3918f5",
+"hash":"80b76e6d1ce04995",
 "nodes":[
-{"hash":"4a3423ea5e3918f5","id":"docs/requirements/meta-observer.md","kind":"file","title":"docs/requirements/meta-observer.md"},
-{"hash":"aba28d9f2d4a6443","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查","kind":"section","parent":"docs/requirements/meta-observer.md","title":"D28 元观察与规则检查"},
-{"hash":"04988e76abc3bb9e","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"已确认"},
+{"hash":"80b76e6d1ce04995","id":"docs/requirements/meta-observer.md","kind":"file","title":"docs/requirements/meta-observer.md"},
+{"hash":"0a925223b4894be8","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查","kind":"section","parent":"docs/requirements/meta-observer.md","title":"D28 元观察与规则检查"},
+{"hash":"07021f95e895b2cc","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"已确认"},
 {"hash":"8b3a847de8146b26","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > JEV 用于语义系统的证据核对","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"JEV 用于语义系统的证据核对"},
 {"hash":"93483accd3042c3e","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > JEV 的准入","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"JEV 的准入"},
-{"hash":"f0f6ee0a9bbed9c9","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 设计中待确定的规则","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"设计中待确定的规则"},
+{"hash":"4c1a5c3e7b3186fe","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 设计中待确定的规则","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"设计中待确定的规则"},
 {"hash":"13f612f70aefdbcd","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 与教训发现模块的关系（待设计）","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查","title":"与教训发现模块的关系（待设计）"}
 ],
 "edges":[
 {"dst":"docs/adr/0044-verifier-role-and-open-loop.md","kind":"link","raws":["../adr/0044-verifier-role-and-open-loop.md"],"seen":"b1c2ffdb1dc08ef3","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查"},
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查"},
 {"dst":"docs/research/jev-decision-model.md","kind":"link","raws":["../research/jev-decision-model.md"],"seen":"9d4af7c096414eb5","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查"},
 {"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"d02a872fc3efaba8","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > JEV 用于语义系统的证据核对"},
 {"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > JEV 的准入"},
 {"dst":"docs/requirements/semantic-system.md#D25 语义系统 > TODO：惊讶机制与教训发现模块","kind":"link","raws":["semantic-system.md"],"seen":"50e0595afaf6984a","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 与教训发现模块的关系（待设计）"},
-{"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["../adr/0018-single-control-host-remote-execution.md"],"seen":"67a2cd8adb1d5329","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认"},
-{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"3bf0ccde2acd0bda","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认"},
-{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"c8cf69bd1ebf5ac7","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认"},
+{"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["../adr/0018-single-control-host-remote-execution.md"],"seen":"1a08d2ab13e30da9","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c967dae939e2fda6","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"6cb344c65b218f25","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"d1aa18394662658a","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 设计中待确定的规则"}
 ]
 }

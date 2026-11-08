@@ -1,6 +1,6 @@
 # D05 研发先分解任务与计划
 
-状态：有效。依据：[总图](../architecture.html)第一节「工程」方框与第三节外环；设计：[三部门的循环结构](../design/department-loop.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」，道 01 部门与核验。
+状态：有效。依据：[总图](../architecture.html)第一节「工程」方框与第三节外环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」，道 01 职能与核验。
 
 ## 已确认
 

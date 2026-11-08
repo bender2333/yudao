@@ -1,27 +1,27 @@
 {
 "schema":1,
 "path":"CONTEXT.md",
-"hash":"307d8a6ee7df36f3",
+"hash":"e72ef441034a7ae4",
 "nodes":[
-{"hash":"307d8a6ee7df36f3","id":"CONTEXT.md","kind":"file","title":"CONTEXT.md"},
-{"hash":"64de8ed2249f3366","id":"CONTEXT.md#Yudao","kind":"section","parent":"CONTEXT.md","title":"Yudao"},
+{"hash":"e72ef441034a7ae4","id":"CONTEXT.md","kind":"file","title":"CONTEXT.md"},
+{"hash":"0ef72090aa788720","id":"CONTEXT.md#Yudao","kind":"section","parent":"CONTEXT.md","title":"Yudao"},
 {"hash":"0d3895bc0865e9cc","id":"CONTEXT.md#Yudao > Language","kind":"section","parent":"CONTEXT.md#Yudao","title":"Language"},
-{"hash":"1f9e8b412625713a","id":"CONTEXT.md#Yudao > Language > 系统结构","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"系统结构"},
+{"hash":"969b62cdabba4658","id":"CONTEXT.md#Yudao > Language > 系统结构","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"系统结构"},
 {"hash":"84a8866c5dabca48","id":"CONTEXT.md#Yudao > Language > 规则与参数","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"规则与参数"},
-{"hash":"135d6285fb2dbc93","id":"CONTEXT.md#Yudao > Language > 裁决与验证","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"裁决与验证"},
-{"hash":"8df8119a5ea6817c","id":"CONTEXT.md#Yudao > Language > 循环","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"循环"},
-{"hash":"9907a3a01c0ed447","id":"CONTEXT.md#Yudao > Language > 画面","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"画面"},
-{"hash":"bfac7370d4c1fb1a","id":"CONTEXT.md#Yudao > Language > 试用","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"试用"},
-{"hash":"a096aa08e8702b21","id":"CONTEXT.md#Yudao > Language > 网络与 MCP","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"网络与 MCP"},
-{"hash":"7ffbbedeb8841d5b","id":"CONTEXT.md#Yudao > Language > 模型接入","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"模型接入"},
-{"hash":"0e06019229762840","id":"CONTEXT.md#Yudao > Language > 运维部门","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"运维部门"},
+{"hash":"0bc25b310ff619ae","id":"CONTEXT.md#Yudao > Language > 裁决与验证","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"裁决与验证"},
+{"hash":"b9a718ee64cc5c01","id":"CONTEXT.md#Yudao > Language > 循环","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"循环"},
+{"hash":"d3b2fcc0944c5d3f","id":"CONTEXT.md#Yudao > Language > 画面","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"画面"},
+{"hash":"8696537882619176","id":"CONTEXT.md#Yudao > Language > 试用","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"试用"},
+{"hash":"dbadb50d448cbb1c","id":"CONTEXT.md#Yudao > Language > 网络与 MCP","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"网络与 MCP"},
+{"hash":"71d462e462ba8d99","id":"CONTEXT.md#Yudao > Language > 模型接入","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"模型接入"},
+{"hash":"32be9775bbf2db88","id":"CONTEXT.md#Yudao > Language > 运维","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"运维"},
 {"hash":"e0188ef0f6f69fa0","id":"CONTEXT.md#Yudao > Language > agent 试用","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"agent 试用"},
 {"hash":"c61e3d2f264687f9","id":"CONTEXT.md#Yudao > Language > 评测","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"评测"},
-{"hash":"52520bdf2b5ccbc7","id":"CONTEXT.md#Yudao > Language > 语义系统","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"语义系统"},
-{"hash":"77e99264c38787ff","id":"CONTEXT.md#Yudao > Language > 部门内多角色","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"部门内多角色"}
+{"hash":"2a604252196f2c83","id":"CONTEXT.md#Yudao > Language > 语义系统","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"语义系统"},
+{"hash":"6be87845d570692e","id":"CONTEXT.md#Yudao > Language > 职能内多角色","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"职能内多角色"}
 ],
 "edges":[
-{"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"f34b93a5ad44d0d6","src":"CONTEXT.md#Yudao > Language > 系统结构"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5d3b42fc542e8c54","src":"CONTEXT.md#Yudao > Language > 系统结构"}
+{"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"3c3f6b34acdecdaf","src":"CONTEXT.md#Yudao > Language > 系统结构"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"CONTEXT.md#Yudao > Language > 系统结构"}
 ]
 }
