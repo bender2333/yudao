@@ -312,8 +312,9 @@ class OnboardingBasis(Payload):
 
 
 class FrozenParameters(Payload):
-    # 建 run 时冻结的参数快照（工单 #1189）：13 项取值、全局参数版本、项目覆盖与其版本、事项已解析的实际限额、
-    # 事项创建时的定义版本。字段只增，#397 的三项收敛参数随后追加进 values
+    # 建 run 时冻结的参数快照（工单 #1189）：运行参数与三条可见范围的取值、全局参数版本、项目覆盖与其版本、
+    # 事项已解析的实际限额、事项创建时的定义版本。字段只增，#397 的三项收敛参数与 #1582 的浏览器调用时限
+    # 随后追加进 values
     values: dict[str, Any]
     global_version: str
     project_overrides: dict[str, Any] = {}

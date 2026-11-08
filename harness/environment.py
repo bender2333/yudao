@@ -58,7 +58,8 @@ from .tools import BROWSER_TOOL_NAMES, tool_action
 from .tree_archive import artifact_run, load_tree, store_tree
 from .trial_sessions import TrialSessionTable, TrialStartFailed
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
-# 一次工具结果的输出上限，取规则登记中的现值
+# 一次工具结果的输出上限：运行中按本 run 建 run 时冻结的 tool_output_limit（_output_limit）；
+# 这里的初值只是没有冻结字典时的回退（旧 run 与直接构造环境，工单 #1189、#1582）
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
 # 单页默认命中数；单页输出同样受 _OUTPUT_LIMIT 约束
 SEARCH_DEFAULT_PAGE = 50
@@ -71,6 +72,9 @@ CANCELLED_EXIT_CODE = 130
 _BASH_TIMEOUT_DEFAULT = DEFINITIONS.rule_value("bash_timeout_default_sec")
 _BASH_TIMEOUT_MAX = DEFINITIONS.rule_value("bash_timeout_max_sec")
 _CHECK_TIMEOUT_MAX = DEFINITIONS.rule_value("check_timeout_max_sec")
+# 浏览器动作的调用时限：运行中按本 run 建 run 时冻结的 browser.call_timeout_sec 传给浏览器会话
+# （工单 #1582）；这里的初值只是没有冻结字典时的回退（旧 run 与直接构造环境）
+_BROWSER_CALL_TIMEOUT = DEFINITIONS.rule_value("browser.call_timeout_sec")
 
 _BASH_PATH: str | None = None
 _BASH_OUTPUT_SUBDIR = "tool-output"
@@ -2061,6 +2065,8 @@ class LocalEnvironment:
             run_id=self._run_id, department=action.department, copy_root=copy_root,
             tree_digest=str(session["tree_digest"]), ready_url=str(session["ready_url"]),
             output_dir=copy_root.parent / BROWSER_OUTPUT_DIR / str(session["session_id"]),
+            # 浏览器动作的调用时限按本 run 建 run 时冻结的取值（工单 #1582）：参数事件只作用于之后创建的 run
+            call_timeout_sec=float(self._limit("browser.call_timeout_sec", _BROWSER_CALL_TIMEOUT)),
         )
 
     async def _trial_output(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
