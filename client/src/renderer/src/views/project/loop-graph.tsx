@@ -1,0 +1,177 @@
+// 循环图（工单 #1638，项目的组织设计说明 4.14「项目页是循环图加对话」）：把 loop-graph-model 推出的事实
+// 画成一张图——左边是事项的来源，中间是职能与它们之间的成果箭头，右边是结束；旁边的职能放在它对接的那个
+// 职能上方。窗口窄到 800px 以下时图收成一行（节点名与当前箭头），线程不被挤（样式里换，见 v10-project.css）。
+//
+// 这一层只画，不做判断：节点、箭头、两端写什么全部由模型给出。
+
+import { Fragment } from "react";
+import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
+import { END, SOURCE } from "./loop-graph-model";
+
+/** 面板现在打开的是哪一个：一个节点，或一条箭头。 */
+export type LoopPanelPick = { kind: "node"; id: string } | { kind: "arrow"; arrow: LoopArrow } | null;
+
+/** 箭头上的字：成果与版本（没有版本时只写成果，缺陷记录的第几版按出现的先后数）。 */
+export function arrowText(arrow: LoopArrow): string {
+  return arrow.version === null ? arrow.outcome : `${arrow.outcome} v${arrow.version}`;
+}
+
+/** 一行窄屏时写的那条「当前箭头」：最后一条不是来源的箭头。 */
+export function currentArrow(graph: LoopGraph): LoopArrow | null {
+  const all = [...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows)];
+  const ordered = all.filter((arrow) => arrow.from !== SOURCE);
+  return ordered.length === 0 ? null : ordered[ordered.length - 1];
+}
+
+function ArrowChip(props: { arrow: LoopArrow; on: boolean; onPick: (arrow: LoopArrow) => void }) {
+  const { arrow } = props;
+  return (
+    <button type="button" className={`y10-cv-chip${props.on ? " is-on" : ""}${arrow.back ? " is-back" : ""}`}
+            data-testid={`arrow-${arrow.key}`} title="看这一版与差异" onClick={() => props.onPick(arrow)}>
+      <span className="y10-cv-dir">{arrow.back ? "←" : arrow.to === END ? "↗" : "→"}</span>
+      <span className="y10-cv-kind">{arrowText(arrow)}</span>
+      {arrow.round === null ? null : <small>第 {arrow.round} 轮</small>}
+      {arrow.verdict === null ? null : (
+        <span className={`y10-cv-verdict is-${arrow.verdict.tone}`}>{arrow.verdict.text}</span>
+      )}
+    </button>
+  );
+}
+
+function NodeCard(props: { node: LoopNode; on: boolean; onPick: (id: string) => void }) {
+  const { node } = props;
+  return (
+    <button type="button" className={`y10-cv-node${node.verifier ? " is-ver" : ""}${node.working ? " is-working" : ""}${props.on ? " is-on" : ""}`}
+            data-testid={`node-${node.id}`} aria-label={`${node.label}：看这个职能的状态`} onClick={() => props.onPick(node.id)}>
+      <b>{node.label}</b>
+      <span className="y10-cv-marks">
+        {node.verifier ? <span className="y10-cv-badge is-ver">核验</span> : null}
+        {node.oldOnly ? <span className="y10-cv-badge">只在旧组织里</span> : null}
+        {node.others > 0 ? <span className="y10-cv-badge">另 {node.others} 件</span> : null}
+      </span>
+      {node.state === "" ? null : <small className="y10-cv-state">{node.state}</small>}
+    </button>
+  );
+}
+
+/**
+ * 一张循环图。`pick` 是面板打开的那一个，用来把选中的节点或箭头标出来；
+ * 点节点、点箭头都交给调用处打开同一个面板。
+ */
+export function LoopGraphView(props: {
+  graph: LoopGraph;
+  pick: LoopPanelPick;
+  onPickNode: (id: string) => void;
+  onPickArrow: (arrow: LoopArrow) => void;
+}): React.JSX.Element {
+  const { graph } = props;
+  const count = graph.chain.length;
+  // 有旁边的职能时多两行：一行放它们，一行放它们与主线之间的竖线
+  const hasSide = graph.side.length > 0;
+  const skipRow = hasSide ? 4 : 2;
+  const sideAt = new Map<number, typeof graph.side>();
+  for (const part of graph.side) {
+    const index = graph.chain.findIndex((node) => node.id === part.partner);
+    if (index < 0) {
+      continue;
+    }
+    sideAt.set(index, [...(sideAt.get(index) ?? []), part]);
+  }
+  // 列：来源 | 缝 | 节点 | 缝 | 节点 | … | 缝 | 结束
+  const template = ["auto"];
+  for (let index = 0; index < count; index += 1) {
+    template.push("minmax(56px, 1fr)", "auto");
+  }
+  template.push("minmax(56px, 1fr)", "auto");
+  const nodeColumn = (index: number): number => 3 + 2 * index;
+  const gapColumn = (index: number): number => 2 + 2 * index;
+  const selectedNode = props.pick?.kind === "node" ? props.pick.id : null;
+  const selectedArrow = props.pick?.kind === "arrow" ? props.pick.arrow.key : null;
+  const cell = (content: React.ReactNode, column: number, row = hasSide ? 3 : 1): React.ReactNode => (
+    <div key={`c-${column}-${row}`} style={{ gridColumn: column, gridRow: row }} className="y10-cv-cell">{content}</div>
+  );
+  const chain: React.ReactNode[] = [];
+  graph.gaps.forEach((arrows, index) => {
+    chain.push(cell(
+      arrows.length === 0 ? <span className="y10-cv-line" aria-hidden="true" /> : arrows.map((arrow) => (
+        <ArrowChip key={arrow.key} arrow={arrow} on={arrow.key === selectedArrow} onPick={props.onPickArrow} />
+      )),
+      gapColumn(index),
+    ));
+    const node = graph.chain[index];
+    if (node === undefined) {
+      return;
+    }
+    chain.push(cell(
+      <NodeCard node={node} on={node.id === selectedNode} onPick={props.onPickNode} />,
+      nodeColumn(index),
+    ));
+  });
+  chain.unshift(cell(<span className="y10-cv-pill is-src">{graph.sourceText}</span>, 1));
+  chain.push(cell(
+    <span className={`y10-cv-pill is-end is-${graph.endTone}`}>{graph.endText}</span>,
+    nodeColumn(count),
+  ));
+  const side: React.ReactNode[] = [];
+  if (hasSide) {
+    sideAt.forEach((parts, index) => {
+      side.push(cell(
+        <span className="y10-cv-side">{parts.map((part) => (
+          <NodeCard key={part.node.id} node={part.node} on={part.node.id === selectedNode} onPick={props.onPickNode} />
+        ))}</span>,
+        nodeColumn(index), 1,
+      ));
+      side.push(cell(
+        <span className="y10-cv-vlink" aria-hidden="true">
+          {parts.some((part) => part.node.state !== "") ? <small>{parts.map((part) => part.node.state).filter(Boolean).join("；")}</small> : null}
+        </span>,
+        nodeColumn(index), 2,
+      ));
+    });
+  }
+  const skips = graph.skip.map((arrow, index) => {
+    const from = graph.chain.findIndex((node) => node.id === arrow.from);
+    const to = graph.chain.findIndex((node) => node.id === arrow.to);
+    const low = Math.min(from, to);
+    const high = Math.max(from, to);
+    return (
+      <div key={`skip-${arrow.key}`} className="y10-cv-skip"
+           style={{ gridColumn: `${nodeColumn(low)} / ${nodeColumn(high) + 1}`, gridRow: skipRow + index }}>
+        <span className="y10-cv-line" aria-hidden="true" />
+        <ArrowChip arrow={arrow} on={arrow.key === selectedArrow} onPick={props.onPickArrow} />
+        <span className="y10-cv-skip-to">给{graph.chain[high]?.label ?? ""}</span>
+        <span className="y10-cv-line" aria-hidden="true" />
+      </div>
+    );
+  });
+  const current = currentArrow(graph);
+  return (
+    <div className="y10-cv-graph" data-testid="loop-graph">
+      <div className="y10-cv-wrap">
+        <div className="y10-cv-grid" style={{ gridTemplateColumns: template.join(" ") }}>
+          {side}
+          {chain}
+          {skips}
+        </div>
+      </div>
+      {/* 窄屏：图收成一行，节点名与当前箭头（样式里在 800px 以下显示这一行、收起上面那张图） */}
+      <div className="y10-cv-oneline" data-testid="loop-oneline">
+        {graph.chain.map((node, index) => (
+          <Fragment key={node.id}>
+            {index === 0 ? null : <span className="y10-cv-dir">→</span>}
+            <button type="button" className="y10-link" onClick={() => props.onPickNode(node.id)}>
+              {node.label}{node.verifier ? "（核验）" : ""}
+            </button>
+          </Fragment>
+        ))}
+        {current === null ? null : (
+          <span className="y10-cv-oneline-cur">
+            <button type="button" className="y10-link" onClick={() => props.onPickArrow(current)}>{arrowText(current)}</button>
+            {current.round === null ? null : <small> · 第 {current.round} 轮</small>}
+            <span> → {current.to === END ? graph.endText : graph.chain.find((node) => node.id === current.to)?.label ?? ""}</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
