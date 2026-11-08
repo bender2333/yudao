@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/department-loop.md",
-"hash":"63669943843cfecb",
+"hash":"09f0ecd94c074a4a",
 "nodes":[
-{"hash":"63669943843cfecb","id":"docs/design/department-loop.md","kind":"file","title":"docs/design/department-loop.md"},
+{"hash":"09f0ecd94c074a4a","id":"docs/design/department-loop.md","kind":"file","title":"docs/design/department-loop.md"},
 {"hash":"97f4e1292e8941bc","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","kind":"section","parent":"docs/design/department-loop.md","title":"产品 · 工程 · 质检的循环结构"},
 {"hash":"c6af00aff3e96312","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 1. 依据与范围","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"1. 依据与范围"},
 {"hash":"4f8ae39ff38e3ecc","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 2. 职能按关注的成果开始工作","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"2. 职能按关注的成果开始工作"},
@@ -14,7 +14,7 @@
 {"hash":"a2bbd4eb98c67c44","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行 > 3.2 同时运行的条件","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行","title":"3.2 同时运行的条件"},
 {"hash":"3e1d429fe72357d9","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"4. 询问与回答"},
 {"hash":"0639e7c84c0a0531","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.1 询问是一次工具调用","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","title":"4.1 询问是一次工具调用"},
-{"hash":"2e5e4b7fffb78c99","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.2 询问分支","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","title":"4.2 询问分支"},
+{"hash":"b8b502215ff2171a","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.2 询问分支","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","title":"4.2 询问分支"},
 {"hash":"29cc8fc2981c1469","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.3 回答能做什么","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","title":"4.3 回答能做什么"},
 {"hash":"d5c47ed239804b3a","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.4 询问链","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","title":"4.4 询问链"},
 {"hash":"be4afae8d3cce104","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.5 用量与失败","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答","title":"4.5 用量与失败"},
@@ -46,6 +46,7 @@
 {"dst":"docs/design/department-guidance.md#职能指导的处理设计 > 2. 送达 > 2.1 放行怎么等","kind":"link","raws":["department-guidance.md"],"seen":"20a8d54e897b93ca","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 6. 指导"},
 {"dst":"docs/design/department-guidance.md#职能指导的处理设计 > 3. 处理结果与来源","kind":"link","raws":["department-guidance.md"],"seen":"c7aa19ab1c9fe4e4","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 6. 指导"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 2. 共享的与隔开的","kind":"link","raws":["independent-verification.md"],"seen":"392718659b386b6f","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 8. 工程的计划"},
+{"dst":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明","kind":"link","raws":["work-process-titles.md"],"seen":"020521dcc0127276","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 8. 工程的计划"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 4. 动作分类与处置","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"d7551de2f1eb7109","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 9. 停止与恢复"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 5. 三道缝的契约 > 5.2 装配契约","kind":"link","raws":["skeleton-and-application.md"],"seen":"2be9f55b44f603bd","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 9. 停止与恢复"}
 ]

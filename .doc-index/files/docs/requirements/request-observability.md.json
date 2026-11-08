@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/requirements/request-observability.md",
-"hash":"c1bb4f36ef532587",
+"hash":"a57cea2d6ec3cf79",
 "nodes":[
-{"hash":"c1bb4f36ef532587","id":"docs/requirements/request-observability.md","kind":"file","title":"docs/requirements/request-observability.md"},
+{"hash":"a57cea2d6ec3cf79","id":"docs/requirements/request-observability.md","kind":"file","title":"docs/requirements/request-observability.md"},
 {"hash":"962cb11717d7188d","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","kind":"section","parent":"docs/requirements/request-observability.md","title":"D21 模型请求、原始数据与用量观测"},
-{"hash":"35968247df520916","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 用户需要的查看路径","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"用户需要的查看路径"},
+{"hash":"7b05a3a64d607ddf","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 用户需要的查看路径","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"用户需要的查看路径"},
 {"hash":"7301dacefb189d05","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 采集与事实边界","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"采集与事实边界"},
 {"hash":"35a049adf31cec81","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 用量口径","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"用量口径"},
 {"hash":"ec6b0d7884ff44b3","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 验收","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"验收"}
