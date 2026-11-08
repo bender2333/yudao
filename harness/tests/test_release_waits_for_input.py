@@ -80,6 +80,14 @@ def _wait_for_the_defect_record(holder, run_id):
         yield ModelStreamEvent(kind="stream_event", id="evt-wait")
 
 
+def _rejections_without_a_delivery(system: LoopSystem, run_id: str):
+    # 放行被裁决的那一次拒绝：理由写的是当时没有有效的交付。产品改了有效合同（PRD 新版本或产品决定）以后，
+    # 旧交付随之失效，放行按此刻的合同重新判，被拒绝一次（部门指导 docs/design/department-guidance.md「放行怎么等」第 2 点）。
+    # 预测性探索的一轮另有它自己的理由（"this work has no delivery to review"），不算在这里
+    return [event for event in _quality_events(system, run_id, EventType.PROPOSAL_REJECTED)
+            if ((event.payload or {}).get("errors") or [{}])[0].get("message") == "no active DeliverySpec"]
+
+
 def _wait_for_the_release_rejection(holder, run_id):
     # 工程按新合同重新交付的时机由这里定：等放行先因交付不再有效被拒绝，再交付。
     # 放行的裁决与工程的重新交付是同时进行的两个会话，先后随调度变化；这条用例要验的是
@@ -95,8 +103,9 @@ def _wait_for_the_release_rejection(holder, run_id):
 
 
 def test_a_release_is_rejected_after_the_product_revises_the_prd(tmp_path):
-    # 验收第 1 条（3）：放行等到产品的这一轮结束以后才裁决，产品修订了 PRD，
-    # 放行因交付依据的是旧版本被拒绝；质检下一步看到新版本的通知
+    # 验收第 1 条（3）：产品修订了 PRD，放行因交付依据的是旧版本被拒绝；质检下一步看到新版本的通知。
+    # 放行与产品这一轮谁先结束不由调度决定（工单 #1441）：放行等待的结束在旧交付失效那一刻，
+    # 产品这一轮的轮结束事件写在它自己的事务里，先后随调度变化；用例按因果判据查（见下面的注释）
     holder: dict[str, object] = {}
     seen: dict[str, str | None] = {}
 
@@ -131,12 +140,22 @@ def test_a_release_is_rejected_after_the_product_revises_the_prd(tmp_path):
     projection = system.run_until_stop(run_id)
 
     assert holder.get("release_attempted")
-    product_end = max(event.position for event in _events(system, run_id)
-                      if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
-    rejected = [event for event in _events(system, run_id)
-                if event.type == EventType.PROPOSAL_REJECTED and event.department == "quality"]
-    assert rejected, "放行没有被裁决"
-    assert rejected[0].position > product_end
+    events = _events(system, run_id)
+    # PRD 修订了一次，新版本被接纳：合同按它重算，旧交付随之不再有效。
+    # 放行的拒绝与产品这一轮的轮结束事件谁先谁后随调度变化（放行的等待在旧交付失效那一刻就结束了：
+    # 没有可以放行的交付时收紧检查不等，见 harness/tightening.py 的 tool），轮结束写在产品自己的事务里。
+    # 所以这里认的是因果：新版本被接纳 -> 交付失效 -> 放行被拒绝，不拿轮结束事件的位置当判据
+    # （测试分层 docs/design/test-pyramid.md「测试的写法」第 7 条）
+    revisions = [event for event in events if event.type == EventType.SPEC_ACCEPTED]
+    assert [event.payload["revision"] for event in revisions] == [1, 2], \
+        [event.payload.get("revision") for event in revisions]
+    gone = _rejections_without_a_delivery(system, run_id)
+    rejected = _quality_events(system, run_id, EventType.PROPOSAL_REJECTED)
+    assert rejected, "放行没有被裁决：质检没有写下拒绝"
+    assert len(gone) == 1, [event.payload["errors"] for event in rejected]
+    assert gone[0].position > revisions[-1].position, \
+        "放行在新版本被接纳之前就被裁决了：裁决时依据的还是旧交付"
+    assert [error["field"] for error in gone[0].payload["errors"]] == ["delivery_spec"]
     # 质检下一步看到 PRD 新版本的通知：修订号与改动（新的交付可能同时到达，也一并通知）
     notification = json.loads(seen["notification"])
     revised = [item for item in notification if item["kind"] == "product_spec_revised"]
@@ -541,19 +560,34 @@ def test_the_item_finishes_after_the_product_makes_a_decision(tmp_path):
     projection = system.run_until_stop(run_id)
 
     events = _events(system, run_id)
-    # 放行先确实发出了；产品决定在这一轮里被接纳，这一轮随后结束
+    # 放行先确实发出了：放行的调用排在放行检查之后，产品这一轮是在那次检查以后才提交决定的
     assert holder.get("release_attempted")
+    # 决定在收到这段输入的那一轮里被接纳，这一轮随后以正式成果结束
+    [applied] = [event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED
+                 and event.department == "product"]
     [decision] = [event for event in events if event.type == EventType.PRODUCT_DECISION_ACCEPTED]
-    product_end = max(event.position for event in events
-                      if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
-    assert decision.position < product_end
-    # 放行等到这一轮结束才裁决：合同重算，交付随之不再有效，被拒绝一次；
-    # 拒绝的理由是当时没有有效的交付，不是别的（预测性探索的一轮另有它自己的理由）
+    assert applied.position < decision.position, "决定不是在收到这段输入的那一轮里提交的"
+    [responded] = [event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   and event.department == "product"]
+    assert decision.position < responded.position, "这一轮没有以这条决定结束"
+    # 合同按决定重算，旧交付随之不再有效。放行的拒绝与这一轮的轮结束事件谁先谁后随调度变化
+    # （放行的等待在旧交付失效那一刻就结束了：没有可以放行的交付时收紧检查不等，见 harness/tightening.py 的 tool），
+    # 所以这里认的是因果：决定被接纳 -> 合同重算、交付失效 -> 放行被拒绝，不拿轮结束事件的位置当判据
+    # （测试分层 docs/design/test-pyramid.md「测试的写法」第 7 条）
+    recomputed = [event for event in events if event.type == EventType.CONTRACT_ACCEPTED
+                  and event.position > decision.position]
+    assert len(recomputed) == 1, "合同没有在决定被接纳以后重算一次"
+    invalidated = [event for event in events if event.type == EventType.ARTIFACT_INVALIDATED
+                   and (event.payload or {}).get("artifact_kind") == "delivery_spec"
+                   and event.position > decision.position]
+    assert len(invalidated) == 1, "决定被接纳以后旧交付没有失效"
+    # 被拒绝一次，拒绝的理由是当时没有有效的交付，不是别的（预测性探索的一轮另有它自己的理由）
     rejected = _quality_events(system, run_id, EventType.PROPOSAL_REJECTED)
-    gone = [event for event in rejected
-            if event.payload["errors"][0]["message"] == "no active DeliverySpec"]
+    gone = _rejections_without_a_delivery(system, run_id)
+    assert rejected, "放行没有被裁决：质检没有写下拒绝"
     assert len(gone) == 1, [event.payload["errors"] for event in rejected]
-    assert gone[0].position > product_end
+    assert gone[0].position > decision.position, \
+        "放行在决定被接纳之前就被裁决了：裁决时依据的还是旧合同"
     assert [error["field"] for error in gone[0].payload["errors"]] == ["delivery_spec"]
     # 没有新的 PRD 版本：工程按新的有效合同重新交付，第二份交付依据当前合同
     assert projection.product_spec.revision == 1
