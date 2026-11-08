@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/prototypes/CHANGELOG.md",
-"hash":"25e140b4bbb4e6e5",
+"hash":"52f64fcf3263b77a",
 "nodes":[
-{"hash":"25e140b4bbb4e6e5","id":"docs/prototypes/CHANGELOG.md","kind":"file","title":"docs/prototypes/CHANGELOG.md"},
+{"hash":"52f64fcf3263b77a","id":"docs/prototypes/CHANGELOG.md","kind":"file","title":"docs/prototypes/CHANGELOG.md"},
 {"hash":"7676f6a2985af05d","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)","kind":"section","parent":"docs/prototypes/CHANGELOG.md","title":"原型设计变更记录 (Prototype Changelog)"},
 {"hash":"76650e93a6e82d99","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)","title":"[v20] - 2026-11-08"},
 {"hash":"99f92102e4c209c6","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 原型交付","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"原型交付"},
-{"hash":"1c3ea33bf45129f1","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 这一版新增","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"这一版新增"},
+{"hash":"6e5d382d7704a37c","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 这一版新增","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"这一版新增"},
 {"hash":"005b086d1ad3f3b2","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 在设计说明之外定的事","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"在设计说明之外定的事"},
 {"hash":"c4bbc10cfbac69ab","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 设计说明里写不清的地方","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"设计说明里写不清的地方"},
 {"hash":"1d320e6a2678d077","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 请用户试用时重点看","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"请用户试用时重点看"},
