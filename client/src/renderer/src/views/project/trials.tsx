@@ -247,7 +247,7 @@ export function TrialsPanel(props: { app: ClientApp; runId: string | null; depar
   const group = trials.data.departments.find((item) => item.department === props.department) ?? null;
   const view = trialView(group, actions.data);
   if (view.sessions.length === 0 && view.cases.length === 0) {
-    return <Empty text="这个部门这次运行没有试用记录" />;
+    return <Empty text="这个职能这次运行没有试用记录" />;
   }
   return <TrialRecords app={props.app} view={view} />;
 }

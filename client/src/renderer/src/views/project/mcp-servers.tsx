@@ -220,10 +220,10 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
   return (
     <Section id="mcp-servers" title="MCP 服务器" note={sectionNote(servers)}>
       {Object.keys(servers).length === 0 ? (
-        <Empty text="还没有服务器。点「添加服务器」写一台：命令或地址、可以使用的部门，需要时写凭据名称。" />
+        <Empty text="还没有服务器。点「添加服务器」写一台：命令或地址、可以使用的职能，需要时写凭据名称。" />
       ) : (
         <Table
-          head={["名称", "传输", "可以使用的部门", "工具", "最近一次连接结果", ""]}
+          head={["名称", "传输", "可以使用的职能", "工具", "最近一次连接结果", ""]}
           rows={Object.entries(servers).map(([name, server]) => [
             name,
             transportLabel(server.transport),
@@ -287,7 +287,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
             </>
           )}
           <fieldset className="y10-field field mcp-departments">
-            <legend>可以使用的部门</legend>
+            <legend>可以使用的职能</legend>
             {departmentOptions.map((department) => (
               <label className="y10-check checkbox" key={department}>
                 <input type="checkbox" checked={draft.departments.includes(department)}

@@ -99,7 +99,7 @@ function branchOrdinals(sessions: RecoverySession[]): number[] {
 // 一个会话在页面上的名字（原型 sessionsTable 的会话一列）：部门加部门主线或询问分支，
 // 同一部门的分支再按顺序编号，免得两行重名
 export function sessionLabel(row: RecoverySession, branchOrdinal: number): string {
-  const department = departmentName(row.department) || "未知部门";
+  const department = departmentName(row.department) || "未知职能";
   const kind = label(SESSION_KIND, row.kind);
   return row.kind === "branch" ? `${department} · ${kind} ${branchOrdinal}` : `${department} · ${kind}`;
 }

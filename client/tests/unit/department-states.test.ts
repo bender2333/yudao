@@ -142,24 +142,24 @@ test("三个部门一行：按产品、工程、质检的顺序，本部门那�
   assert.equal(departmentsLineParts({}, "engineering"), null);
 });
 
-test("三个部门一行渲染成本部门加粗：本部门那一段是 <strong>，其他部门不是", () => {
+test("各职能一行渲染成本职能加粗：本职能那一段是 <strong>，其他职能不是", () => {
   const html = renderToStaticMarkup(React.createElement(DepartmentsLine, { departments: THREE, department: "engineering" }));
-  assert.match(html, /三个部门/);
+  assert.match(html, /各职能/);
   assert.match(html, /<strong>工程 询问中（在等待产品的回答）<\/strong>/);
   assert.doesNotMatch(html, /<strong>产品/);
   assert.doesNotMatch(html, /<strong>质检/);
-  // 顺序与分隔符：产品、工程、质检之间是「 · 」，开头与「三个部门」之间空一格
+  // 顺序与分隔符：产品、工程、质检之间是「 · 」，开头与「各职能」之间空一格
   assert.match(html, /<span>产品 一轮工作中（回答工程的询问）<\/span> · <strong>工程 询问中（在等待产品的回答）<\/strong> · <span>质检 等待工作<\/span>/);
   // departments 为空时不渲染这一行
   assert.equal(renderToStaticMarkup(React.createElement(DepartmentsLine, { departments: null, department: "engineering" })), "");
 });
 
-test("传信管一行：N 为 0 时不写，不为 0 时写 N 封询问等待本部门回答", () => {
+test("传信管一行：N 为 0 时不写，不为 0 时写 N 封询问等待本职能回答", () => {
   assert.equal(lettersWaitingText(0), null);
   assert.equal(lettersWaitingText(null), null);
   assert.equal(lettersWaitingText(undefined), null);
-  assert.equal(lettersWaitingText(3), "传信管：3 封询问等待本部门回答");
-  assert.equal(lettersWaitingText(1), "传信管：1 封询问等待本部门回答");
+  assert.equal(lettersWaitingText(3), "传信管：3 封询问等待本职能回答");
+  assert.equal(lettersWaitingText(1), "传信管：1 封询问等待本职能回答");
 });
 
 // ---------------------------------------------------------------------------

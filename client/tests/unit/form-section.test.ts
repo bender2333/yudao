@@ -84,11 +84,29 @@ function organization(overrides: Partial<ProjectOrganizationResult> = {}): Proje
   };
 }
 
-test("发布带每一份都有名字与一句说明，说明原样用后端的说法，不另写", () => {
+test("发布带每一份都有形态名与一句说明，说明原样用后端的说法，不另写", () => {
   const shown = formChoices(organization());
   assert.deepEqual(shown.map((item) => item.form), [THREE, SINGLE]);
+  // 形态名取自服务端的 label（工单 #1601）：显示的是「工程」，不是 single_role 这类发布带里的标识
+  assert.deepEqual(shown.map((item) => item.label), ["产品 · 工程 · 质检", "工程"]);
   assert.equal(shown[0].description, "产品、工程、质检；质检核验工程。");
   assert.equal(shown[1].description, openLoopChoice().description);
+});
+
+test("形态区显示服务端给的形态名，不显示 single_role_direct 这类标识（工单 #1602 验收第 2 条）", () => {
+  // 现在用的那一份与发布带的每一份都写 label：服务端给的三种形态名照显示
+  const shown = formChoices(organization({
+    forms: [
+      choice({ form: "default", label: "产品 · 工程 · 质检" }),
+      choice({ form: "single_role_direct", label: "工程", verifier_roles: [], open_loop: true }),
+      choice({ form: "several_roles_direct", label: "产品 · 工程", verifier_roles: [], open_loop: true }),
+    ],
+  }));
+  assert.deepEqual(shown.map((item) => item.label), ["产品 · 工程 · 质检", "工程", "产品 · 工程"]);
+  // 标识仍留在 form 上，供提交与 data-testid 使用，但不写成页面上的名字
+  assert.deepEqual(shown.map((item) => item.form), ["default", "single_role_direct", "several_roles_direct"]);
+  assert.match(currentFormText(organization({ label: "产品 · 工程 · 质检" })), /现在用 产品 · 工程 · 质检/);
+  assert.doesNotMatch(currentFormText(organization({ form: "single_role_direct", label: "工程" })), /single_role_direct/);
 });
 
 test("现在用的那一份在清单里标出来，其余不标", () => {
@@ -108,14 +126,17 @@ test("没有核验角色的那一份另写一句：开环完成结束、不经�
   assert.equal(choiceView(choice({ verifier_roles: ["quality"], open_loop: true }), THREE).openLoop, "");
 });
 
-test("现在用哪一份：在发布里时写名字与组织版本", () => {
+test("现在用哪一份：在发布里时写形态名与组织版本", () => {
   const text = currentFormText(organization());
-  assert.match(text, /three_departments/);
+  assert.match(text, /产品 · 工程 · 质检/);
   assert.match(text, /sha256:three/);
+  assert.doesNotMatch(text, /three_departments/);
 });
 
 test("现在用的那一份不在发布里时写明，不拿别的形态顶替", () => {
-  const text = currentFormText(organization({ form: "gone_form", version: null, form_in_release: false }));
+  const text = currentFormText(organization({
+    form: "gone_form", label: null, version: null, form_in_release: false }));
+  // 取不到形态名时退回标识，照实写明是哪一份
   assert.match(text, /gone_form/);
   assert.match(text, /不在这一版发布里/);
   // 没有版本时不写一个假的版本号
@@ -153,13 +174,15 @@ test("换成另一份的提交带上页面看到的当前值", () => {
 });
 
 test("历史一行：原值、新值、理由、时间与谁改的", () => {
-  const row = historyRow(change(), SINGLE);
+  const row = historyRow(change(), SINGLE, { [THREE]: "产品 · 工程 · 质检", [SINGLE]: "工程" });
   assert.equal(row.previous, THREE);
   assert.equal(row.form, SINGLE);
   assert.equal(row.reason, "先试一轮一个人做");
   assert.equal(row.at, "2026-11-05T02:03:04+00:00");
   assert.equal(row.actor, "你");
-  assert.equal(row.text, "three_departments → single_role");
+  // 页面上写形态名；标识只在没有形态名时退回
+  assert.equal(row.text, "产品 · 工程 · 质检 → 工程");
+  assert.equal(historyRow(change(), SINGLE).text, "three_departments → single_role");
 });
 
 test("没有写理由的那一次照实写「没有写理由」，不空着", () => {
@@ -179,6 +202,9 @@ test("历史按事件的先后排，早的在前，每次改动一行", () => {
   }));
   assert.deepEqual(rows.map((row) => row.eventId), ["e-1", "e-2"]);
   assert.deepEqual(rows.map((row) => [row.previous, row.form]), [[THREE, SINGLE], [SINGLE, THREE]]);
+  // 改动那一行写形态名：发布带里有的取它的 label
+  assert.deepEqual(rows.map((row) => row.text),
+    ["产品 · 工程 · 质检 → 工程", "工程 → 产品 · 工程 · 质检"]);
 });
 
 test("改回这一份：每一条都能用原值再改一次；已经是现在这一份时不给（等于没改）", () => {
@@ -196,7 +222,8 @@ test("改回这一份：每一条都能用原值再改一次；已经是现在�
 test("谁改的：认得的写成页面上的说法，认不出的照实写", () => {
   assert.equal(actorText("user:local"), "你");
   assert.equal(actorText("system"), "系统");
-  assert.equal(actorText("department:product"), "产品部门");
+  // 职能提出者写职能的显示名，不再加「部门」两字
+  assert.equal(actorText("department:product"), "产品");
   assert.equal(actorText("someone-else"), "someone-else");
 });
 

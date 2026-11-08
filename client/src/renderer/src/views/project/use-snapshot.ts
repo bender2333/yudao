@@ -141,7 +141,7 @@ export function rejectionLinks(problem: CommandProblem | null, projectId: string
     return [];
   }
   return [
-    { label: "去模型管理页设置部门默认", hash: "/sys/models" },
+    { label: "去模型管理页设置职能默认", hash: "/sys/models" },
     { label: "在本项目的设置页选择模型", hash: `/p/${projectId}/settings` },
   ];
 }

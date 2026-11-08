@@ -8,20 +8,17 @@
     "generate:api": "node scripts/generate-api.mjs",
     "build:pages": "vite build --config vite.pages.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --test-reporter=dot tests/unit/*.test.js tests/unit/*.test.ts",
-    "test:e2e": "playwright test"
+    "test": "node --test --test-reporter=dot tests/unit/*.test.js tests/unit/*.test.ts"
   },
   "dependencies": {
     "eventsource": "5.1.2"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
-    "@playwright/test": "1.63.0",
     "@types/node": "24.19.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.1.0",
-    "pngjs": "^7.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "typescript": "6.0.3",
