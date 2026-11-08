@@ -12,7 +12,8 @@ import pytest
 from harness.app.application import Application
 from harness.models import CatalogEventType
 from harness.tests.api_helpers import running_api
-from harness.tests.protocol_helpers import ScriptedProvider, model_test_responder, send_reply
+from harness.tests.protocol_helpers import (ScriptedProvider, model_test_responder, preset_base_urls,
+                                            send_reply)
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 SECRET = "selection-key-do-not-publish"
@@ -822,3 +823,149 @@ def test_late_list_from_an_older_address_does_not_replace_the_current_candidates
         old.close()
         middle.close()
         latest.close()
+
+
+# 能力表给出容量的选用（模型管理 docs/design/model-management.md「模型访问定义与准入」的「参数的来源」与
+# 「验收」第 5 条）。服务商识别的已定入口是预置表中 OpenCode Go 的请求基址；本机测试服务的地址不会被
+# 识别成任何服务商，所以连接的地址按这个预置基址提交，候选的模型列表与模型测试的请求基址在测试里临时
+# 指向本机服务（preset_base_urls，test_issue_84 用同一做法）；识别仍按原地址与原规则进行，没有放宽。
+OPENCODE_GO_BASE_URL = "https://opencode.ai/zen/go/v1"
+SHARED_MODEL = "deepseek-v4-pro"
+EMPTY_PROTOCOL_MODEL = "gemini-4-argon"
+
+
+def connect_at(client, base_url):
+    response = command(client, "catalog.connect", base_version=catalog(client)["revision"],
+                       base_url=base_url, api_key=SECRET)
+    assert response.status_code == 200, response.text
+    provider_id = response.json()["refs"]["provider_id"]
+    wait_catalog(client, lambda data: any(
+        row["id"] == provider_id and row["latest_candidates"] is not None for row in data["providers"]))
+    return provider_id
+
+
+def connect_recognized(client, upstream):
+    # 预置表的模型列表地址临时指向本机；连接的地址仍是预置表的请求基址，服务商识别走原规则。
+    with preset_base_urls(OPENCODE_GO_BASE_URL, models_url=upstream.base + "/v1/models"):
+        provider_id = connect_at(client, OPENCODE_GO_BASE_URL)
+    data = catalog(client)
+    return provider_id, next(row["latest_candidates"] for row in data["providers"]
+                             if row["id"] == provider_id)
+
+
+def capability_entry(client, model):
+    data = catalog(client)
+    return (next(item for item in data["capability_table"]["presets"]["opencode-go"]
+                 if item["model"] == model),
+            data["capability_table"]["revision"])
+
+
+def assert_capability_source(details, field, revision):
+    assert details[field] == {"source": "capability_table", "provider": "opencode-go",
+                              "revision": revision}
+
+
+def test_capability_table_capacity_enables_a_selection_without_any_numbers(tmp_path):
+    # R2、R3：识别出服务商的连接，上游列表没有容量、能力表有：选用不填任何数字，最终已启用，
+    # 窗口与输出上限的来源是能力表（验收第 5 条）。
+    upstream = ScriptedProvider([responder([{"id": SHARED_MODEL}])] * 24)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id, collected = connect_recognized(client, upstream)
+            entry, revision = capability_entry(client, SHARED_MODEL)
+            [candidate] = collected["candidates"]
+            assert candidate["context_window"] == entry["context_window"]
+            assert candidate["max_output_tokens"] == entry["max_output_tokens"]
+            assert_capability_source(candidate["source_details"], "context_window", revision)
+            assert_capability_source(candidate["source_details"], "max_output_tokens", revision)
+            with preset_base_urls(upstream.base + "/v1"):
+                select(client, provider_id, SHARED_MODEL)
+                data = wait_catalog(client, lambda data: any(
+                    row["admitted"] for row in data["admissions"]))
+            [model] = data["models"]
+            # 选用请求没有带任何数字：定义的容量就是能力表里的值，来源写明服务商与修订号
+            assert (model["context_window"], model["max_output_tokens"]) == (
+                entry["context_window"], entry["max_output_tokens"])
+            assert_capability_source(model["source_details"], "context_window", revision)
+            assert_capability_source(model["source_details"], "max_output_tokens", revision)
+            assert model["protocol"] == entry["protocol"] == "chat_completions"
+            assert model["source_details"]["protocol"]["source"] == "capability_table"
+            assert all(detail["source"] != "manual" for detail in model["source_details"].values())
+            assert data["admissions"][0]["admitted"] is True
+            assert data["bindings"] == {
+                department: {"provider_id": provider_id, "model_id": model["id"], "requested_tier": None}
+                for department in ("product", "engineering", "quality")}
+            assert data["selections"] == []
+    finally:
+        upstream.close()
+
+
+def test_capability_table_model_without_protocol_prefills_from_the_plan_and_enables(tmp_path):
+    # R2、R3：能力表里调用协议为空的模型同样走通：容量来自能力表，协议按第 4.3 节预填为方案的默认协议、
+    # 来源写明，同样不填数字即已启用（验收第 5 条）。
+    upstream = ScriptedProvider([responder([{"id": EMPTY_PROTOCOL_MODEL}])] * 24)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id, collected = connect_recognized(client, upstream)
+            entry, revision = capability_entry(client, EMPTY_PROTOCOL_MODEL)
+            assert entry["protocol"] is None
+            [candidate] = collected["candidates"]
+            assert candidate["protocol"] == "chat_completions"
+            assert candidate["protocol_source"] == "preset_default"
+            assert candidate["context_window"] == entry["context_window"]
+            assert_capability_source(candidate["source_details"], "context_window", revision)
+            with preset_base_urls(upstream.base + "/v1"):
+                select(client, provider_id, EMPTY_PROTOCOL_MODEL)
+                data = wait_catalog(client, lambda data: any(
+                    row["admitted"] for row in data["admissions"]))
+            [model] = data["models"]
+            assert (model["context_window"], model["max_output_tokens"]) == (
+                entry["context_window"], entry["max_output_tokens"])
+            assert_capability_source(model["source_details"], "context_window", revision)
+            assert_capability_source(model["source_details"], "max_output_tokens", revision)
+            # 协议为空时预填内置方案的默认协议，来源写方案默认，不冒充能力表给出的协议
+            assert model["protocol"] == "chat_completions"
+            assert model["source_details"]["protocol"]["source"] == "preset_default"
+            assert model["source_details"]["protocol"]["provider"] is None
+            assert all(detail["source"] != "manual" for detail in model["source_details"].values())
+            assert data["admissions"][0]["admitted"] is True
+            assert data["selections"] == []
+    finally:
+        upstream.close()
+
+
+def test_unrecognized_address_does_not_borrow_the_same_models_capability_table_values(tmp_path):
+    # R2、R3：识别不出服务商的连接，同一个上游模型 ID 不借用任何服务商的值，进入「容量未知」（验收第 5 条）。
+    upstream = ScriptedProvider([responder([{"id": SHARED_MODEL}])] * 24)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            recognized_id, _collected = connect_recognized(client, upstream)
+            local_id = connect_at(client, upstream.base + "/v1")
+            data = catalog(client)
+            candidates = {row["id"]: row["latest_candidates"]["candidates"][0]
+                          for row in data["providers"]}
+            entry, _revision = capability_entry(client, SHARED_MODEL)
+            # 同一个上游模型 ID：识别出的连接取到能力表的值，识别不出的连接一个值都不借用
+            assert candidates[recognized_id]["context_window"] == entry["context_window"]
+            assert candidates[recognized_id]["context_window_source"] == "capability_table"
+            assert candidates[local_id]["context_window"] is None
+            assert candidates[local_id]["max_output_tokens"] is None
+            assert candidates[local_id]["protocol_source"] == "default"
+            assert "context_window" not in candidates[local_id]["source_details"]
+            assert "max_output_tokens" not in candidates[local_id]["source_details"]
+            select(client, local_id, SHARED_MODEL)
+            pending = wait_catalog(client, lambda data: any(
+                row["status"] == "capacity_unknown" for row in data["selections"]))
+            [selection] = pending["selections"]
+            assert selection["provider_id"] == local_id
+            assert selection["missing"] == ["context_window", "max_output_tokens"]
+            [model] = pending["models"]
+            assert model["context_window"] is None and model["max_output_tokens"] is None
+            assert pending["admissions"] == [] and pending["bindings"] == {}
+            # 两次获取模型列表的请求，没有发出任何模型测试请求
+            assert upstream.requests == [None, None]
+    finally:
+        upstream.close()
