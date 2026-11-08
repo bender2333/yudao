@@ -111,6 +111,8 @@
         if (next && (next.watches.includes(k) || (next.verifies && next.verifies.kind === k))) out.push({ from: d.id, to: next.id, name: O.kindName(c, k) });
         else if (back && ix(back) === i - 1) out.push({ from: d.id, to: back.id, name: O.kindName(c, k) });
         else if (i === L.chain.length - 1 && !vs.length) out.push({ from: d.id, to: 'end', name: O.kindName(c, k) });
+        // 隔着一个职能的箭头（PRD 同时给质检：质检拿 PRD 独立判断）
+        L.chain.slice(i + 2).forEach((x) => { if (x.watches.includes(k)) out.push({ from: d.id, to: x.id, name: O.kindName(c, k), skip: true }); });
       });
     });
     L.side.forEach((s) => s.d.produces.forEach((k) => out.push({ from: s.d.id, to: s.partner.id, name: O.kindName(c, k) })));
@@ -190,7 +192,14 @@
       top = sideCells.join('') + linkCells.join('');
     }
     const tpl = cells.map((x, k) => (k % 2 === 1 ? 'minmax(max-content, 1fr)' : 'auto')).join(' ');
-    return '<div class="lp-grid' + (mini ? ' is-mini' : '') + (L.side.length ? ' has-side' : '') + '" style="grid-template-columns:' + tpl + '">' + top + cells.join('') + '</div>';
+    // 隔着职能的箭头另起一行，从发出的节点跨到收到的节点下面
+    const row = L.side.length ? 4 : 2;
+    const skips = list.filter((a) => a.from !== 'src' && a.to !== 'end' && Math.abs(at(a.to) - at(a.from)) > 1);
+    const bottom = skips.map((a, j) => {
+      const f = at(a.from), t = at(a.to), lo = Math.min(f, t), hi = Math.max(f, t);
+      return '<div class="lp-skip" style="grid-column:' + (3 + 2 * lo) + ' / ' + (4 + 2 * hi) + ';grid-row:' + (row + j) + '"><span class="lp-skip-line" aria-hidden="true"></span>' + chip(a, { mini, on: opts.arrow === a.i }) + '<span class="lp-skip-to">给' + esc(nm(null, a.to)) + '</span><span class="lp-skip-line" aria-hidden="true"></span></div>';
+    }).join('');
+    return '<div class="lp-grid' + (mini ? ' is-mini' : '') + (L.side.length ? ' has-side' : '') + '" style="grid-template-columns:' + tpl + '">' + top + cells.join('') + bottom + '</div>';
   }
 
   // 结束：有核验角色时写放行与核验角色的显示名；没有时写开环完成（外包时注明）
@@ -266,16 +275,19 @@
       s.arrows = [
         ar('w0', 'src', 'product', '原文', 1, 1, { text: '把订单状态改成明确的状态机，不再用散落的 if' }),
         ar('w0', 'product', 'engineering', 'PRD', 1, 1, { text: '状态机的 PRD：6 个状态、9 条转换' }),
+        ar('w0', 'product', 'quality', 'PRD', 1, 1, { text: '状态机的 PRD：6 个状态、9 条转换（质检拿它独立判断）' }),
         ar('w0', 'engineering', 'quality', '交付', 1, 1, { verdict: { t: 'reject', by: '质检' }, text: '状态机第 1 版', files: ['orders/state.ts'], diff: d('orders/state.ts', 'if (o.paid && !o.cancelled) {', 'transition(o, "paid") // 已取消时没有拦住') }),
         ar('w0', 'quality', 'engineering', '缺陷记录', 1, 1, { text: '已取消的订单还能被标记为已支付；转换表缺「发货中 → 已取消」' }),
         ar('w0', 'engineering', 'quality', '交付', 2, 2, { verdict: { t: 'release', by: '质检' }, text: '状态机第 2 版：6 个状态、9 条转换，12 条用例通过', files: ['orders/state.ts', 'orders/state.test.ts'], diff: d('orders/state.ts', 'transition(o, "paid") // 已取消时没有拦住', 'if (o.state !== "cancelled") transition(o, "paid")') }),
         ar('w2', 'src', 'product', '原文', 1, 1, { text: '订单列表要能分页，每页 50 条' }),
         ar('w2', 'product', 'engineering', 'PRD', 1, 1, { text: '订单列表分页：每页 50 条，按创建时间倒序' }),
+        ar('w2', 'product', 'quality', 'PRD', 1, 1, { text: '订单列表分页：每页 50 条，按创建时间倒序（质检拿它独立判断）' }),
         ar('w2', 'engineering', 'quality', '交付', 1, 1, { verdict: { t: 'reject', by: '质检' }, text: '分页第 1 版', files: ['orders/list.ts'], diff: d('orders/list.ts', 'offset = page * 50', 'offset = (page - 1) * 50 // 第 1 页从 0 开始') }),
         ar('w2', 'quality', 'engineering', '缺陷记录', 1, 1, { text: '最后一页少一条：总数正好是 50 的倍数时多出一页空页' }),
         ar('w2', 'engineering', 'quality', '交付', 2, 2, { text: '分页第 2 版：最后一页与空页都改了（质检在核验）', files: ['orders/list.ts'], diff: d('orders/list.ts', 'pages = Math.floor(total / 50) + 1', 'pages = Math.ceil(total / 50)') }),
         ar('w1', 'src', 'product', '原文', 1, 1, { text: '把订单导出成 CSV 文件' }),
         ar('w1', 'product', 'engineering', 'PRD', 1, 1, { text: '导出订单为 CSV：按创建时间倒序，最多 5 万行；orders-日期.csv，UTF-8 带 BOM' }),
+        ar('w1', 'product', 'quality', 'PRD', 1, 1, { text: '导出订单为 CSV：按创建时间倒序，最多 5 万行；orders-日期.csv，UTF-8 带 BOM（质检拿它独立判断）' }),
         ar('w1', 'engineering', 'quality', '交付', 1, 1, { verdict: { t: 'reject', by: '质检' }, text: '导出第 1 版', files, diff: d('orders/export.ts', 'amount.toFixed(2)', 'Math.round(amount * 100) / 100') }),
         ar('w1', 'quality', 'engineering', '缺陷记录', 1, 1, { text: '金额列四舍五入错一分：19.995 导出成 19.99' }),
         ar('w1', 'engineering', 'quality', '交付', 2, 2, { verdict: { t: 'reject', by: '质检' }, text: '导出第 2 版：金额改用分计算', files, diff: d('orders/export.ts', 'rows = await db.all(query)', 'for await (const row of db.stream(query))') }),
@@ -312,10 +324,12 @@
       s.cur = 'w11';
       s.arrows = [ar('w12', 'src', 'product', '原文', 1, 1, { text: '升级失败时设备要自动回到上一个版本' }),
         ar('w12', 'product', 'engineering', 'PRD', 1, 1, { text: '升级失败自动回滚：双分区，启动三次失败就切回旧分区' }),
+        ar('w12', 'product', 'quality', 'PRD', 1, 1, { text: '升级失败自动回滚：双分区，启动三次失败就切回旧分区（质检拿它独立判断）' }),
         ar('w12', 'engineering', 'quality', '交付', 1, 1, { verdict: { t: 'release', by: '质检' }, text: '回滚交付第 1 版：5 条检验全部通过', files: ['boot/rollback.c'], diff: d('boot/rollback.c', 'boot(active)', 'if (fails >= 3) boot(previous); else boot(active);') }),
         ar('w12', 'n2', 'end', '升级说明', 1, 1, { text: '回滚的现场升级说明：双分区的切换步骤与三次启动失败后的处理' }),
         ar('w11', 'src', 'product', '原文', 1, 1, { text: '升级包要校验签名，签名不对就不升级' }),
         ar('w11', 'product', 'engineering', 'PRD', 1, 1, { text: '升级包签名校验：公钥烧在只读区，升级前先验签' }),
+        ar('w11', 'product', 'quality', 'PRD', 1, 1, { text: '升级包签名校验：公钥烧在只读区，升级前先验签（质检拿它独立判断）' }),
         ar('w11', 'n1', 'engineering', '适配包', 1, 1, { text: '3 块板子的验签适配包，启动冒烟通过 2 块，1 块待查' })];
       // 工程的子组织：一轮工作开一个子事项，内部的箭头单独记
       s.innerArrows = { 'w11:engineering': [ar('w11', 'src', 'architect', '任务', 1, 1, { text: '上一层交来的任务：按 PRD v1 做签名校验' }),
@@ -612,7 +626,7 @@
     const kindOf = (d) => O.kindName(c, d.produces[0] || '');
     const vOf = (name) => s.arrows.filter((a) => a.item === it.id && a.name === name).length + 1;
     at(500, () => progress(first, '接到输入，开始工作。'));
-    if (first !== maker) at(1800, () => { const k = kindOf(first); pushArrow(p, { item: it.id, from: first.id, to: maker.id, name: k, v: vOf(k), round: 1, text: '「' + it.title + '」的' + k }); progress(maker, '照着' + k + '在做。'); });
+    if (first !== maker) at(1800, () => { const k = kindOf(first); pushArrow(p, { item: it.id, from: first.id, to: maker.id, name: k, v: vOf(k), round: 1, text: '「' + it.title + '」的' + k }); O.verifiers(c).filter((x) => x !== maker && x.watches.includes(first.produces[0])).forEach((x) => pushArrow(p, { item: it.id, from: first.id, to: x.id, name: k, v: vOf(k), round: 1, text: '「' + it.title + '」的' + k + '，质检拿它独立判断' })); progress(maker, '照着' + k + '在做。'); });
     else at(1800, () => {
       progress(maker, '正在做，并自己检查。');
       // 直做里旁边接询问的职能：工程拿不准时问它，往来折成一行
