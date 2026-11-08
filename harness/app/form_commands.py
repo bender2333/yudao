@@ -1,4 +1,4 @@
-# 项目设置里「形态」的命令（工单 #1402、#1516，项目的组织设计说明「采用与历史」「模板一键选用」；
+# 项目设置里「形态」的命令（工单 #1402、#1516，项目的组织设计说明「采用与历史」「形态一键选用」；
 # 形态与核验角色设计说明「形态随事项冻结」；总图第四节「接口」缝与「定义」缝）：
 # organization.adopt 采用一份组织：形态名、本项目的改动、理由、用户看到的组织版本与命令身份，写成项目流
 # 的一条 project_form_set 事件（原值、新值、理由，工单 #1516 只增改动与版本）；之后新建的事项按新的那一份
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from .application import Application
 
 
-# 采用的三条路（项目的组织设计说明「采用与历史」「模板一键选用」）：换模板（默认）、加或去掉核验角色、
+# 采用的三条路（项目的组织设计说明「采用与历史」「形态一键选用」）：换模板（默认）、加或去掉核验角色、
 # 高级。差别只在理由：前两条的理由可以不写，高级的理由为空时拒绝
 AdoptionMode = Literal["template", "verifier", "advanced"]
 
@@ -75,7 +75,7 @@ async def _adopt(application: "Application", command: Command, request: Organiza
                         f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
     if request.mode == "advanced" and not request.reason.strip():
         raise Rejection("not_allowed", "走高级的采用要写明理由：改了哪些项、为什么改")
-    # 三条路各是什么（设计说明「模板一键选用」「采用与历史」）：换模板是形态名加空改动的一次采用，
+    # 三条路各是什么（设计说明「形态一键选用」「采用与历史」）：换模板是形态名加空改动的一次采用，
     # 加/去掉核验角色的改动由查询给出（一定非空），高级是改定义的采用。说得与带的东西对不上时拒绝
     if request.mode == "template" and request.changes:
         raise Rejection("not_allowed", "换模板是形态名加空改动的一次采用；要带本项目的改动，请走高级或加/去掉核验角色")

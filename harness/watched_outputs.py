@@ -159,7 +159,7 @@ def _has_new_product_spec(projection: RunProjection, department: str,
     它最近一份交付依据的合同不是当前有效合同也算新工作：一个决定只重算合同、不产生新的 PRD
     版本，过期的交付要按新合同重新交付（部门指导 docs/design/department-guidance.md「放行怎么等」第 2 点、工单 #1079）。
     核验角色关注的是「PRD 被接纳」：当前有效合同与它上一次工作的依据不同，并且还没有交付要核验
-    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构 docs/design/department-loop.md「各部门在什么时候工作」）。谁核验谁取自定义里的
+    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构 docs/design/department-loop.md「各职能在什么时候工作」）。谁核验谁取自定义里的
     核验声明，不按部门名判断（工单 #1391）；取哪一份定义由这份形态决定（工单 #1509）。
     """
     definition = DEFINITIONS if definitions is None else definitions

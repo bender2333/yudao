@@ -277,7 +277,7 @@ def lan_address() -> str:
 
 
 def explore_turn() -> FakeTurn:
-    # 质检的预测性探索（循环结构 docs/design/department-loop.md「各部门在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检的预测性探索（循环结构 docs/design/department-loop.md「各职能在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
     # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
     # 提交的结论被拒绝，这一轮到此结束；交付到达以后质检开始新一轮工作。
     return FakeTurn(
@@ -353,7 +353,7 @@ def script():
         seen = marks(item, "quality")
         if not prompt_part(call, "current_delivery_spec"):
             # 预测性探索：这一轮没有交付可以核验，提交的结论被拒绝，这一轮到此结束
-            # （循环结构 docs/design/department-loop.md「各部门在什么时候工作」）。交付到达以后质检开始新一轮工作
+            # （循环结构 docs/design/department-loop.md「各职能在什么时候工作」）。交付到达以后质检开始新一轮工作
             return explore_turn()
         if item == HISTORY_ITEM:
             # 交付历史：质检先询问工程（质检 → 工程），回答以后记下缺陷记录；
