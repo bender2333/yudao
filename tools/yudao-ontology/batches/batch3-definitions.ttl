@@ -1,4 +1,4 @@
-# 第 3 批：发布带的三份形态的定义文件，由 defs.py 从 HEAD 转写，不手改。
+# 第 3 批：发布带的三份形态的定义文件，由 defs.py 从 5c25e1b 转写，不手改。
 # 形态目录、职能与成果种类到前两批个体的对应写在 defs.py 开头。
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -64,16 +64,8 @@ yd:role-min yd:docRef "harness/definitions/forms/single_role_direct/organization
         yd:src-user-input ;
     yd:watches yd:ok-guidance .
 
-yd:role-sev-engineering yd:docRef "harness/definitions/forms/several_roles_direct/organization.json" ;
-    yd:mayAsk yd:role-sev-product ;
-    yd:produces yd:ok-def-several-product-spec,
-        yd:ok-def-several-structure,
-        yd:ok-sev-completion ;
-    yd:receives yd:src-onboarding,
-        yd:src-user-input ;
-    yd:watches yd:ok-guidance .
-
-yd:role-sev-product yd:docRef "harness/definitions/forms/several_roles_direct/organization.json" .
+yd:role-sev-product yd:docRef "harness/definitions/forms/several_roles_direct/organization.json" ;
+    yd:mayAsk yd:role-sev-engineering .
 
 yd:dept-product yd:docRef "harness/definitions/organization.json" ;
     yd:mayAsk yd:dept-engineering,
@@ -103,6 +95,15 @@ yd:ok-min-completion a yd:OutcomeKind ;
 yd:ok-sev-completion a yd:OutcomeKind ;
     yd:docRef "harness/definitions/forms/several_roles_direct/outcome_kinds.json" ;
     yd:inForm yd:form-several .
+
+yd:role-sev-engineering yd:docRef "harness/definitions/forms/several_roles_direct/organization.json" ;
+    yd:mayAsk yd:role-sev-product ;
+    yd:produces yd:ok-def-several-product-spec,
+        yd:ok-def-several-structure,
+        yd:ok-sev-completion ;
+    yd:receives yd:src-onboarding,
+        yd:src-user-input ;
+    yd:watches yd:ok-guidance .
 
 yd:dept-engineering yd:docRef "harness/definitions/organization.json" ;
     yd:mayAsk yd:dept-product,

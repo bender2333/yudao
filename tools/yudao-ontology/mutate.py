@@ -100,6 +100,8 @@ CROSS_MUTATIONS = [
      lambda g: set_one(g, YD["form-several"], YD.definedName, Literal("需求 · 工程", lang="zh")), ("违例", "形态名")),
     ("x-ask-dropped", "定义里工程问不了产品", "「产品 · 工程」的定义去掉工程的询问工具",
      lambda g: g.remove((YD["role-sev-engineering"], YD.mayAsk, None)), ("确实缺", "可以询问")),
+    ("x-product-ask-dropped", "定义里产品问不了工程", "「产品 · 工程」的定义去掉产品的询问工具（4.9 默认其余职能都能问）",
+     lambda g: g.remove((YD["role-sev-product"], YD.mayAsk, None)), ("确实缺", "可以询问")),
     ("x-source-dropped", "定义里建档没人接", "「工程」的定义去掉建档的来源",
      lambda g: g.remove((YD["role-min"], YD.receives, YD["src-onboarding"])), ("确实缺", "接")),
 ]
