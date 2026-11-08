@@ -149,20 +149,46 @@ def test_cancel_wakes_a_long_retry_wait_even_when_cancelling_the_attempt_fails(t
     assert len(adapter.invocations) == 1
 
 
+class _RunClock:
+    # 运行时间读的时钟（工单 #1520）：读数由测试推到哪儿，「运行时间用完」就发生在哪儿，与真实时长无关。
+    # 它只替换运行时间的累计与判断（LoopSystem.for_testing 的 run_clock）；重试退避等多久仍由事件循环的时钟算
+    def __init__(self) -> None:
+        self.seconds = 0.0
+
+    def __call__(self) -> float:
+        return self.seconds
+
+
 def test_run_time_limit_ends_a_long_retry_wait(tmp_path):
-    # 运行时间在重试等待期间用完：等待到运行时间用完就结束，运行以 time_limit 停止
+    # 运行时间在重试等待期间用完：等待到运行时间用完就结束，运行以 time_limit 停止。
+    # 工单 #1520：先后由事件决定，不靠 1 秒墙钟（测试分层 docs/design/test-pyramid.md「测试的写法」第 7 条）。
+    # 第一次尝试与重试安排期间时钟不动，所以第一次调用一定先发生、重试一定先安排（机器忙也不影响）；
+    # MODEL_RETRY_SCHEDULED 提交以后由订阅方把时钟推到上限，接下来的安全节点一定看见运行时间用完，
+    # 等待就此结束，30 秒的退避与真实用时都不参与判定
+    clock = _RunClock()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
-                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30))
+                                    step_limits=StepLimits(retry_initial_delay_sec=30, retry_max_delay_sec=30),
+                                    run_clock=clock)
     run_id = system.create_run("original task", run_time_limit_sec=1)
 
-    started = time.monotonic()
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: setattr(clock, "seconds", 1.0))
     result = system.activate_once(run_id)
 
-    assert time.monotonic() - started < 10
+    events = system.store.list_events(run_id)
+    kinds = [item.type for item in events]
     assert result.status == "failed" and result.stop_reason == "time_limit"
-    assert len(adapter.invocations) == 1
-    assert any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in system.store.list_events(run_id))
+    assert len(adapter.invocations) == 1, "运行时间用完之前只发起了第一次尝试"
+    assert any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
+    # 先后由事件日志核对：重试安排之后这一轮才以 time_limit 结束；等待没有被走满，没有第二次尝试
+    assert kinds.index(EventType.MODEL_RETRY_SCHEDULED) < kinds.index(EventType.RUN_FAILED)
+    requested = [item.payload for item in events if item.type == EventType.MODEL_REQUESTED]
+    assert [item["attempt"] for item in requested] == [1]
+    # 运行时间确实用完：这一轮自己记下的用时达到上限，远小于它自己安排的退避
+    finished = [item.payload for item in events if item.type == EventType.ACTIVATION_FINISHED][-1]
+    retry = [item.payload for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED][0]
+    assert finished["elapsed_ms"] >= result.run_time_limit_sec * 1000
+    assert finished["elapsed_ms"] < retry["delay_sec"] * 1000
 
 
 @pytest.mark.parametrize("action", ["input", "cancel"])
