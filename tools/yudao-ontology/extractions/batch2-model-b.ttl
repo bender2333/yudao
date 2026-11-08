@@ -1,77 +1,176 @@
-@prefix yd: <https://yudao.dev/onto#> .
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix g:    <https://yudao.dev/onto-b2#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
 
-# NOTE: yd:rm-direct is not defined in core/batch0; declared here as a RotationMode individual.
-# UNSURE: dept-engineering and role IRIs: only yd:dept-engineering was given; role/form IRIs below are my own.
-# UNSURE: 4.1 table is generic (中心角色/探索者/主程/审查者); 4.1 second table names 工程架构师 as engineering center role. Objective/evidence cells taken from the generic table.
-# UNSURE: 主程 'can be' outsourced (可以是外包角色) -> typed yd:Role only, not OutsourcedRole.
-# UNSURE: 审查者 hasIndependentEvidence omitted: 4.1 only lists tool '在独立副本上运行检查' generically (not stated as the engineering verification's evidence), so Run/OtherModel/Human not asserted; no hasCheckDefinition.
-# UNSURE: 开环完成 outcome not mentioned for engineering sub-organization; no yd:completion-openloop outcome created.
-# UNSURE: yd:produces for 主程 (实现代码), 审查者 (结论) omitted; text does not state what they hand in as an outcome kind (only tools/objective).
-# UNSURE: yd:watches (关注的成果) not requested, omitted.
-# MISSING-VOCAB: no property for 写入范围/可见范围/工具许可 (role scopes), 子事项层数上限 etc.
-# MISSING-VOCAB: no property linking VerificationDecl to 'binding to content digest' (结论绑定内容摘要) or 'only 交完成 verdict ends sub-item'.
-# MISSING-VOCAB: no property for 工作中途询问审查者 (mid-work draft review, 4.3), not modelled.
-# MISSING-VOCAB: no property for 审查者 reading order (先判断再看解释), 4.4.
+g:form-center a yd:Form ;
+    rdfs:label "中心型小组"@zh ;
+    yd:archRef "4.2" ;
+    yd:quote "职能的角色定义可以指向一份子组织形态，默认是中心型小组。" ;
+    yd:rotation yd:rm-direct ;
+    yd:canSubmitCompletion g:role-center .
 
-yd:rm-direct a yd:RotationMode ; rdfs:label "直做"@zh ;
-  yd:docRef "4.3" ; yd:quote "子组织的路由就是直做，与其他形态用的是同一条直做路由，不另写" .
+# NOTE: rotation rm-direct from 子组织的路由就是直做 (4.3); canSubmitCompletion from 中心角色交完成时 (4.3)
 
-yd:src-subtask a yd:Source ; rdfs:label "上一层交来的任务"@zh ; yd:docRef "4.2" ;
-  yd:quote "子事项的来源只有「上一层交来的任务」，由中心角色接。" .
 
-yd:form-engineering-centered a yd:Form ; rdfs:label "工程的中心型小组"@zh ; yd:docRef "4.2, 4.3" ;
-  yd:quote "部门的角色定义可以指向一份子组织形态，默认是中心型小组。" ;
-  yd:rotation yd:rm-direct ;
-  yd:canSubmitCompletion yd:role-eng-architect ;
-  yd:finalOutcome yd:outcome-eng-completion .
+g:src-upper-task a yd:Source ;
+    rdfs:label "上一层交来的任务"@zh ;
+    yd:archRef "4.2" ;
+    yd:quote "子事项的来源只有「上一层交来的任务」，由中心角色接。" .
 
-yd:dept-engineering yd:subOrganization yd:form-engineering-centered ;
-  yd:hasInternalVerification yd:decl-eng-review .
+g:oc-design-plan a yd:OutcomeKind ;
+    rdfs:label "设计、计划或检查设计草案"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "只写自己的设计、计划或检查设计草案" .
 
-yd:outcome-eng-completion a yd:OutcomeKind ; rdfs:label "中心角色交的完成"@zh ; yd:docRef "4.3" ;
-  yd:quote "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版……放行则子事项结束；打回则中心角色再开始一轮。" ;
-  yd:completion yd:completion-release .
+g:oc-completion a yd:OutcomeKind ;
+    rdfs:label "中心角色交的完成"@zh ;
+    yd:archRef "4.3" ;
+    yd:quote "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版" .
 
-yd:outcome-eng-finding a yd:OutcomeKind ; rdfs:label "带来源的发现"@zh ; yd:docRef "4.1" ;
-  yd:quote "| 探索者 | 询问里交来的查证任务 | 交回带来源的发现 | 项目材料、代码、外部文档 | 本部门可见范围 | 只读，不写入 | 查询与读取、记录 | 否 |" .
-# UNSURE: completion of 带来源的发现 not stated; left unset.
+g:oc-lookup-task a yd:OutcomeKind ;
+    rdfs:label "询问里交来的查证任务"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "询问里交来的查证任务" .
 
-# ---- roles ----
-yd:role-eng-architect a yd:Role ; rdfs:label "工程架构师（中心角色）"@zh ; yd:docRef "4.1" ;
-  yd:quote "| 中心角色 | 上一层交来的任务与本部门的设计、计划或检查设计 | 把任务做成能交完成的成果 | 项目材料、同伴交回的结论、本部门记录 | 本部门可见范围 | 只写自己的设计、计划或检查设计草案 | …交完成 | 否 |；| 工程 | 工程架构师 | …" ;
-  yd:inForm yd:form-engineering-centered ; yd:belongsTo yd:dept-engineering ;
-  yd:hasObjective yd:obj-eng-architect ; yd:hasEvidenceBasis yd:evb-eng-architect ;
-  yd:receives yd:src-subtask ; yd:produces yd:outcome-eng-completion .
+g:oc-impl-task a yd:OutcomeKind ;
+    rdfs:label "询问里交来的实现任务"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "询问里交来的实现任务" .
 
-yd:role-eng-explorer a yd:Role ; rdfs:label "探索者"@zh ; yd:docRef "4.1" ;
-  yd:quote "| 探索者 | 询问里交来的查证任务 | 交回带来源的发现 | 项目材料、代码、外部文档 | 本部门可见范围 | 只读，不写入 | 查询与读取、记录 | 否 |；探索者读代码、查库与接口文档、复现问题" ;
-  yd:inForm yd:form-engineering-centered ; yd:belongsTo yd:dept-engineering ;
-  yd:hasObjective yd:obj-eng-explorer ; yd:hasEvidenceBasis yd:evb-eng-explorer ;
-  yd:produces yd:outcome-eng-finding .
+g:oc-midway-draft a yd:OutcomeKind ;
+    rdfs:label "工作中途交来的草案"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "中心角色交的完成，工作中途交来的草案" .
 
-yd:role-eng-lead-dev a yd:Role ; rdfs:label "主程"@zh ; yd:docRef "4.1" ;
-  yd:quote "| 主程 | 询问里交来的实现任务 | 按设计与计划实现并自测 | 设计与计划、代码、自测结果 | 本部门可见范围 | 工作区 | 读写工作区、运行命令与自测、记录 | 否 |；主程可以是外包角色" ;
-  yd:inForm yd:form-engineering-centered ; yd:belongsTo yd:dept-engineering ;
-  yd:hasObjective yd:obj-eng-lead-dev ; yd:hasEvidenceBasis yd:evb-eng-lead-dev .
+g:oc-finding a yd:OutcomeKind ;
+    rdfs:label "带来源的发现"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "交回带来源的发现" .
 
-yd:role-eng-reviewer a yd:Role, yd:NoAuthorHistory ; rdfs:label "审查者"@zh ; yd:docRef "4.1, 4.4" ;
-  yd:quote "| 审查者 | 中心角色交的完成，工作中途交来的草案 | 判断这一版成果是否可以放行 | 待审查的成果、它的依据、上一轮审查意见 | 成果与依据，不含作者的历史 | 检查材料，不写工作区 | … | 是，核验中心角色交的完成 |；审查者每次从新的上下文开始……看不到作者的历史。" ;
-  yd:inForm yd:form-engineering-centered ; yd:belongsTo yd:dept-engineering ;
-  yd:hasObjective yd:obj-eng-reviewer ; yd:hasEvidenceBasis yd:evb-eng-reviewer .
+g:oc-verdict a yd:OutcomeKind ;
+    rdfs:label "审查者的结论"@zh ;
+    yd:archRef "4.3" ;
+    yd:quote "提交结论" .
 
-# ---- objectives / evidence bases ----
-yd:obj-eng-architect a yd:Objective ; rdfs:label "把任务做成能交完成的成果"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，中心角色行，目标列：把任务做成能交完成的成果" .
-yd:evb-eng-architect a yd:EvidenceBasis ; rdfs:label "项目材料、同伴交回的结论、本部门记录"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，中心角色行，证据来源列：项目材料、同伴交回的结论、本部门记录" .
-yd:obj-eng-explorer a yd:Objective ; rdfs:label "交回带来源的发现"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，探索者行，目标列：交回带来源的发现" .
-yd:evb-eng-explorer a yd:EvidenceBasis ; rdfs:label "项目材料、代码、外部文档"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，探索者行，证据来源列：项目材料、代码、外部文档" .
-yd:obj-eng-lead-dev a yd:Objective ; rdfs:label "按设计与计划实现并自测"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，主程行，目标列：按设计与计划实现并自测" .
-yd:evb-eng-lead-dev a yd:EvidenceBasis ; rdfs:label "设计与计划、代码、自测结果"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，主程行，证据来源列：设计与计划、代码、自测结果" .
-yd:obj-eng-reviewer a yd:Objective ; rdfs:label "判断这一版成果是否可以放行"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，审查者行，目标列：判断这一版成果是否可以放行" .
-yd:evb-eng-reviewer a yd:EvidenceBasis ; rdfs:label "待审查的成果、它的依据、上一轮审查意见"@zh ; yd:docRef "4.1" ; yd:quote "4.1 角色清单表，审查者行，证据来源列：待审查的成果、它的依据、上一轮审查意见" .
+# UNSURE: 查证任务 / 实现任务 are tasks handed in via 询问, not outcomes; modeled as OutcomeKind only because yd:watches needs one
 
-yd:decl-eng-review a yd:VerificationDecl ; rdfs:label "审查者核验中心角色交的完成（工程）"@zh ; yd:docRef "4.1, 4.3" ;
-  yd:quote "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版：……工程审查设计与代码。" ;
-  yd:verifier yd:role-eng-reviewer ; yd:verified yd:role-eng-architect ;
-  yd:forOutcome yd:outcome-eng-completion ; yd:inForm yd:form-engineering-centered .
+
+# UNSURE: 审查者的结论 label is mine (text: 结论 / 审查意见); quote 提交结论 is from the 工具许可 cell
+
+
+g:eb-center a yd:EvidenceBasis ;
+    rdfs:label "项目材料、同伴交回的结论、本职能记录"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "项目材料、同伴交回的结论、本职能记录" .
+
+g:obj-center a yd:Objective ;
+    rdfs:label "把任务做成能交完成的成果"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "把任务做成能交完成的成果" .
+
+g:eb-explorer a yd:EvidenceBasis ;
+    rdfs:label "项目材料、代码、外部文档"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "项目材料、代码、外部文档" .
+
+g:obj-explorer a yd:Objective ;
+    rdfs:label "交回带来源的发现"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "交回带来源的发现" .
+
+g:eb-lead a yd:EvidenceBasis ;
+    rdfs:label "设计与计划、代码、自测结果"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "设计与计划、代码、自测结果" .
+
+g:obj-lead a yd:Objective ;
+    rdfs:label "按设计与计划实现并自测"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "按设计与计划实现并自测" .
+
+g:eb-reviewer a yd:EvidenceBasis ;
+    rdfs:label "待审查的成果、它的依据、上一轮审查意见"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "待审查的成果、它的依据、上一轮审查意见" .
+
+g:obj-reviewer a yd:Objective ;
+    rdfs:label "判断这一版成果是否可以放行"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "判断这一版成果是否可以放行" .
+
+g:role-center a yd:Role ;
+    rdfs:label "中心角色"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "子组织里的四个角色按定义缝的七个字段声明" ;
+    yd:receives g:src-upper-task ;
+    yd:watches g:oc-design-plan ;
+    yd:produces g:oc-design-plan, g:oc-completion ;
+    yd:inForm g:form-center ;
+    yd:hasObjective g:obj-center ;
+    yd:hasEvidenceBasis g:eb-center .
+
+g:role-explorer a yd:Role ;
+    rdfs:label "探索者"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "子组织里的四个角色按定义缝的七个字段声明" ;
+    yd:watches g:oc-lookup-task ;
+    yd:produces g:oc-finding ;
+    yd:inForm g:form-center ;
+    yd:hasObjective g:obj-explorer ;
+    yd:hasEvidenceBasis g:eb-explorer .
+
+g:role-lead a yd:Role ;
+    rdfs:label "主程"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "子组织里的四个角色按定义缝的七个字段声明" ;
+    yd:watches g:oc-impl-task ;
+    yd:inForm g:form-center ;
+    yd:hasObjective g:obj-lead ;
+    yd:hasEvidenceBasis g:eb-lead .
+
+g:role-reviewer a yd:Role ;
+    rdfs:label "审查者"@zh ;
+    yd:archRef "4.1" ;
+    yd:quote "子组织里的四个角色按定义缝的七个字段声明" ;
+    yd:watches g:oc-completion, g:oc-midway-draft ;
+    yd:produces g:oc-verdict ;
+    a yd:NoAuthorHistory ;
+    yd:inForm g:form-center ;
+    yd:hasObjective g:obj-reviewer ;
+    yd:hasEvidenceBasis g:eb-reviewer .
+
+# NOTE: all four role quotes are the 4.1 intro sentence (table rows are not sentences); per-role values come from the 4.1 table cells for 关注的成果 / 目标 / 证据来源
+
+
+# UNSURE: 主程 produces nothing asserted (text gives objective 按设计与计划实现并自测 but names no output kind)
+
+
+# UNSURE: 中心角色 produces oc-completion from 工具许可 cell 交完成 and 4.3 中心角色交完成时
+
+
+# UNSURE: 中心角色 watches 本职能的设计、计划或检查设计 -> oc-design-plan; the 上一层交来的任务 part is modeled by yd:receives src-upper-task
+
+
+# NOTE: 审查者 typed yd:NoAuthorHistory from 4.4 看不到作者的历史; the other roles' author-history property is not stated
+
+
+# NOTE: roles 产品架构师 / 工程架构师 / 测试工程师 (the three 中心角色 in the second table) not minted: belongsTo for 产品 and 质检 would need IRIs this file does not own
+
+
+g:vd-reviewer a yd:VerificationDecl ;
+    rdfs:label "审查者核验中心角色交的完成"@zh ;
+    yd:archRef "4.3" ;
+    yd:quote "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版" ;
+    yd:verifier g:role-reviewer ;
+    yd:verified g:role-center ;
+    yd:forOutcome g:oc-completion ;
+    yd:inForm g:form-center .
+
+yd:dept-engineering yd:subOrganization g:form-center ; yd:hasInternalVerification g:vd-reviewer .
+
+
+# NOTE: the line above attaches the 4.1 engineering row (三个职能同构 / 工程 row) to yd:dept-engineering; the text states the role split per function, and 默认是中心型小组 in 4.2
+
+
+# NOTE: planned: nothing in 4.1-4.4 is marked 以后/还没有; 4.5 外层返工 has no body. 工程's 主程 may be an outsourced role (D31) and 审查者 not outsourced: no individual to attach, not modeled
+

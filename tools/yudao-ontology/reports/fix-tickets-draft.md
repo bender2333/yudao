@@ -8,7 +8,9 @@
 
 **11-08 上午再对 main `48e2158`：** #1577 已合（`9d17e23`），工单一、三的前置都满足了。`ce9c688`、`02d1d59` 把结构词「部门」改成「职能」，形态改叫「产品 · 工程 · 质检」「工程」「产品 · 工程」；三张单的设计说明节名与条号没变，单里的「部门」已照改，代码标识符（`department`）照决定不动。三处代码在这一轮也没改：`LEGACY_VERIFICATION` 还在内核，`direct.py` 第 814 行与 `orchestrator.py` 第 551 行还是两种判法，`environment.py` 还取声明的第一个目录，`organization_compose.py` 第 450 行的 `list()` 还在。
 
-依据统一核对过 main `37e9d68`（11-07 夜），11-08 又对过 `4556121`。三处代码在 `eb8429e` 之后一行没改。
+**11-08 晚再对 main `5c25e1b`（随后 main 到 `59f9a33`，只动了 solo 技能与变更记录）：** 三张单都还成立。三处代码仍没改，只是前面的行挪了位置：`LEGACY_VERIFICATION` 在内核第 273 至 277 行；`Definitions.verification` 第 859 行、`workspace_writer_issues` 第 1389 行、`organization_compose.py` 第 186 行读它；`orchestrator.py` 第 573 行与 `direct.py` 第 814 行还是两种判法；`environment.py` 第 1017 至 1018 行还取声明的第一个目录；`organization_compose.py` 第 450 行的 `list()` 还在。设计说明里各单引用的条（4.2 第 1 条、4.3 第 3 与第 5 条、4.7 第 4 条、验收第 3 与第 12 条）原文没变。本体在 r3 上重跑，结论与这三处一致（开环检查仍是那一条违例，第 4 批仍报内核里的职能名）。
+
+依据统一核对过 main `37e9d68`（11-07 夜），11-08 又对过 `4556121`、`48e2158`、`5c25e1b`。三处代码在 `eb8429e` 之后一行没改。
 
 | 工单 | 改哪里 | 定的做法 | 放出前要不要先改设计说明 |
 | --- | --- | --- | --- |
@@ -31,9 +33,9 @@
 
 验收第 3 条原句：「事实与裁决、循环两层的代码里不出现职能名，也不出现 PRD、交付、质检结论这些成果种类的判断」。
 
-现在内核模块 `harness/definitions/__init__.py` 第 272 至 276 行写死了一份 `LEGACY_VERIFICATION`：质检核验工程的 `delivery_spec`，质检的写入范围是检查材料。它是旧定义（`organization.json` 没有 `verification` 字段）的兜底，读它的地方有四处：
-- `Definitions.verification`（第 855 至 858 行）
-- `workspace_writer_issues`（第 1376 行）
+现在内核模块 `harness/definitions/__init__.py` 第 273 至 277 行（`5c25e1b`）写死了一份 `LEGACY_VERIFICATION`：质检核验工程的 `delivery_spec`，质检的写入范围是检查材料。它是旧定义（`organization.json` 没有 `verification` 字段）的兜底，读它的地方有四处：
+- `Definitions.verification`（第 859 行）
+- `workspace_writer_issues`（第 1389 行）
 - `harness/organization_compose.py` 的 `write_scopes`（第 186 行）
 - 测试 `harness/tests/test_definitions.py`、`harness/tests/kernel/test_definitions_decide.py` 断言默认定义的核验声明等于它
 
@@ -76,7 +78,7 @@
 - 「定义的校验」第 4 条与验收第 12 条按最后采纳的成果种类判：核验角色核验最后采纳的那种成果，就不标开环。
 
 代码也是两种判法：
-- 事项创建时，`harness/orchestrator.py` 第 551 行用 `Definitions.is_open_loop`（`harness/definitions/__init__.py` 第 895 行）按成果种类算出开环标记，记进创建事件。
+- 事项创建时，`harness/orchestrator.py` 第 573 行（`5c25e1b`）用 `Definitions.is_open_loop`（`harness/definitions/__init__.py` 第 896 行）按成果种类算出开环标记，记进创建事件。
 - 交完成时，`harness/direct.py` 第 814 行按交的那个角色决定结不结束：`ends_run=not verified_outcome(request.department, definitions)`。
 - 结束原因由 `direct.completion_reason`（第 425 至 434 行）只读创建时的标记。
 
@@ -125,7 +127,7 @@
 设计原句：「检查材料放在哪里是主机的固定约定，公开树、交付快照与检查副本都按这一处排除与收录；定义只声明哪个角色得到这块写入范围，不另选位置，写了别的位置的定义在加载时整份拒绝。」
 
 #1577 合了，写了别的位置的定义已经加载不进来。剩下的是代码里还有两处不从同一处取目录：
-- `harness/environment.py` 第 1009 至 1012 行（`48e2158`）按定义里声明的第一个目录定这个事项的检查材料目录；公开树（`harness/public_tree.py` 第 366 行，`is_qa_tests_path(relative)` 不带目录）用的是 `harness/path_rules.py` 的 `CHECK_MATERIALS_DIR`。今天两者碰巧相等（#1577 保证），但读的不是同一处，以后谁放宽一边就又分开了。
+- `harness/environment.py` 第 1017 至 1018 行（`5c25e1b`）按定义里声明的第一个目录定这个事项的检查材料目录；公开树（`harness/public_tree.py` 第 374 行，`is_qa_tests_path(relative)` 不带目录）用的是 `harness/path_rules.py` 的 `CHECK_MATERIALS_DIR`。今天两者碰巧相等（#1577 保证），但读的不是同一处，以后谁放宽一边就又分开了。
 - `harness/organization_compose.py` 第 450 行在发布里的核验职能没有写入范围时写 `list(CHECK_MATERIALS_DIR)`，对一个字符串取 `list` 得到一个个字符。发布带的定义都写了写入范围，今天走不到；走到了，合成出的定义会被 #1577 的检查拒绝，报的却是用户没写过的位置。
 
 现有代码：`WriteScope` 的字段不删（只增）；`path_rules.py` 的判断函数不改签名。
@@ -141,6 +143,6 @@
 - [ ] 合成时给核验职能的写入范围是固定目录，包括发布里的核验职能没写写入范围的那一种（`test_organization_compose.py`）
 - [ ] 发布带的三份定义与测试用的几份定义照常加载
 - [ ] 验收层：缝，`harness/tests/test_organization_compose.py`、`harness/tests/test_public_tree.py`
-- [ ] 本体复核：在 `research/ontology-step1-r2` 上给第 3 批加一条，定义里检查材料的位置不等于主机固定目录记违例，加一处埋错确认查得出；#1577 已合，这条在 main 上应当查不出
+- [ ] 本体复核：在 `research/ontology-step1-r3` 上给第 3 批加一条，定义里检查材料的位置不等于主机固定目录记违例，加一处埋错确认查得出；#1577 已合，这条在 main 上应当查不出
 
 （11-07 的原稿里「加载时整份拒绝」那条验收与 `harness/definitions/__init__.py`、`test_definitions.py` 两处改动已归 #1577，这里删去。）

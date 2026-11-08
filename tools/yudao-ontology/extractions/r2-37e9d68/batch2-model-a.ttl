@@ -1,0 +1,156 @@
+# 第 2 批（抽取者 A）：部门内多角色设计说明 4.1–4.4，只抽工程部门的子组织（中心型小组）。
+# 只有个体与事实，不加公理。词汇来自 core.ttl 与 batch0-axioms.ttl。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ---------- 部门（别处已有，这里只加两条关系） ----------
+yd:dept-engineering yd:subOrganization yd:eng-subform ;
+    yd:hasInternalVerification yd:eng-review-decl .
+
+# ---------- 形态：工程的中心型小组 ----------
+yd:eng-subform a yd:Form ;
+    rdfs:label "中心型小组"@zh ;
+    rdfs:comment "工程部门的角色定义指向的子组织形态"@zh ;
+    yd:docRef "department-roles.md 4.2；4.1 部门表「工程」行" ;
+    yd:quote "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项；不指向，就是一个模型或一个外包会话。" ;
+    yd:rotation yd:rm-direct ;
+    yd:canSubmitCompletion yd:eng-center ;
+    yd:finalOutcome yd:eng-completion .
+# UNSURE: 文档没有直接说工程部门「指向了」中心型小组；「默认是中心型小组」加上 4.1 部门表「工程」行列出四个角色（含主程），按任务要求把它当成工程的子组织。
+# UNSURE: finalOutcome 取的是审查者放行的那一版「中心角色交的完成」（3 节图「放行，子事项结束 --> 最终成果」）；文档没有把「最终成果」另起一个名字的成果种类，这里没有另建。
+
+yd:rm-direct a yd:RotationMode ;
+    rdfs:label "直做"@zh ;
+    yd:docRef "department-roles.md 4.3" ;
+    yd:quote "子组织的路由就是直做，与其他形态用的是同一条直做路由，不另写（形态与核验角色设计说明「直做」）。" .
+
+# ---------- 子事项的来源 ----------
+yd:src-subtask a yd:Source ;
+    rdfs:label "上一层交来的任务"@zh ;
+    yd:docRef "department-roles.md 4.2" ;
+    yd:quote "子事项的来源只有「上一层交来的任务」，由中心角色接。" .
+
+# ---------- 角色 ----------
+yd:eng-center a yd:Role ;
+    rdfs:label "工程架构师"@zh ;
+    rdfs:comment "工程部门子组织里的中心角色"@zh ;
+    yd:docRef "department-roles.md 4.1（角色表「中心角色」行、部门表「工程」行）；4.2；4.3" ;
+    yd:quote "| 中心角色 | 上一层交来的任务与本部门的设计、计划或检查设计 | 把任务做成能交完成的成果 | 项目材料、同伴交回的结论、本部门记录 | 本部门可见范围 | 只写自己的设计、计划或检查设计草案 | 询问（同伴与其他部门）、更新计划、追加说明、取消进行中的询问、查询与读取、记录、起草、交完成 | 否 |" ,
+             "| 工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划，回答其他部门关于实现难度与成本的咨询；探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码 |" ;
+    yd:inForm yd:eng-subform ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:receives yd:src-subtask ;
+    yd:hasObjective yd:eng-obj-center ;
+    yd:hasEvidenceBasis yd:eng-basis-center ;
+    yd:produces yd:eng-completion .
+# UNSURE: 4.1 表里中心角色还在工作中途把草案交给审查者（审查者关注「工作中途交来的草案」，4.3「例如工程计划在交给主程之前先审」）；这类「草案」是否算一种成果种类没有定，没有建 OutcomeKind，也没有写中心角色 produces 它。
+
+yd:eng-explorer a yd:Role ;
+    rdfs:label "探索者"@zh ;
+    yd:docRef "department-roles.md 4.1（角色表「探索者」行、部门表「工程」行）" ;
+    yd:quote "| 探索者 | 询问里交来的查证任务 | 交回带来源的发现 | 项目材料、代码、外部文档 | 本部门可见范围 | 只读，不写入 | 查询与读取、记录 | 否 |" ,
+             "探索者读代码、查库与接口文档、复现问题" ;
+    yd:inForm yd:eng-subform ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:eng-obj-explorer ;
+    yd:hasEvidenceBasis yd:eng-basis-explorer ;
+    yd:produces yd:eng-findings .
+
+yd:eng-lead-programmer a yd:Role ;
+    rdfs:label "主程"@zh ;
+    yd:docRef "department-roles.md 4.1（角色表「主程」行、部门表「工程」行、写入范围的几点）" ;
+    yd:quote "| 主程 | 询问里交来的实现任务 | 按设计与计划实现并自测 | 设计与计划、代码、自测结果 | 本部门可见范围 | 工作区 | 读写工作区、运行命令与自测、记录 | 否 |" ,
+             "主程按设计与计划实现代码并自测" ;
+    yd:inForm yd:eng-subform ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:eng-obj-lead ;
+    yd:hasEvidenceBasis yd:eng-basis-lead .
+# UNSURE: 文档只说「主程可以是外包角色（D31）」，没有说它就是外包，所以只写 yd:Role，不写 yd:OutsourcedRole。
+# UNSURE: 主程「实现代码并自测」，结果写在工作区，4.3 说同伴「回答就是它的结果」；文档没有明说主程交回的是哪一种成果（代码？回答？），没有写 produces。
+
+yd:eng-reviewer a yd:Role , yd:NoAuthorHistory ;
+    rdfs:label "审查者"@zh ;
+    yd:docRef "department-roles.md 4.1（角色表「审查者」行、部门表「工程」行）；4.4" ;
+    yd:quote "| 审查者 | 中心角色交的完成，工作中途交来的草案 | 判断这一版成果是否可以放行 | 待审查的成果、它的依据、上一轮审查意见 | 成果与依据，不含作者的历史 | 检查材料，不写工作区 | 读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成 |" ,
+             "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。" ;
+    yd:inForm yd:eng-subform ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:eng-obj-reviewer ;
+    yd:hasEvidenceBasis yd:eng-basis-reviewer .
+# UNSURE: 审查者「提交结论」；结论（放行或打回）是裁决还是一种成果种类，文档没有说，没有写 produces。
+# 只有审查者明说看不到作者的历史；中心角色、探索者、主程的可见范围是「本部门可见范围」，是否含作者历史没有说，没有给它们任何一种历史性质。
+
+# ---------- 目标（4.1 角色表「目标」列） ----------
+yd:eng-obj-center a yd:Objective ;
+    rdfs:label "把任务做成能交完成的成果"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「中心角色」行「目标」列" ;
+    yd:quote "| 中心角色 | 上一层交来的任务与本部门的设计、计划或检查设计 | 把任务做成能交完成的成果 | 项目材料、同伴交回的结论、本部门记录 | 本部门可见范围 | 只写自己的设计、计划或检查设计草案 | 询问（同伴与其他部门）、更新计划、追加说明、取消进行中的询问、查询与读取、记录、起草、交完成 | 否 |" .
+yd:eng-obj-explorer a yd:Objective ;
+    rdfs:label "交回带来源的发现"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「探索者」行「目标」列" ;
+    yd:quote "| 探索者 | 询问里交来的查证任务 | 交回带来源的发现 | 项目材料、代码、外部文档 | 本部门可见范围 | 只读，不写入 | 查询与读取、记录 | 否 |" .
+yd:eng-obj-lead a yd:Objective ;
+    rdfs:label "按设计与计划实现并自测"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「主程」行「目标」列" ;
+    yd:quote "| 主程 | 询问里交来的实现任务 | 按设计与计划实现并自测 | 设计与计划、代码、自测结果 | 本部门可见范围 | 工作区 | 读写工作区、运行命令与自测、记录 | 否 |" .
+yd:eng-obj-reviewer a yd:Objective ;
+    rdfs:label "判断这一版成果是否可以放行"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「审查者」行「目标」列" ;
+    yd:quote "| 审查者 | 中心角色交的完成，工作中途交来的草案 | 判断这一版成果是否可以放行 | 待审查的成果、它的依据、上一轮审查意见 | 成果与依据，不含作者的历史 | 检查材料，不写工作区 | 读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成 |" .
+# UNSURE: 4.1 角色表是三个同构部门共用的（「三个部门同构」）；这里把目标与证据来源建成工程专用的个体（eng- 前缀），它们是否应与产品、质检共用同一个体没有定。
+
+# ---------- 证据来源（4.1 角色表「证据来源」列） ----------
+yd:eng-basis-center a yd:EvidenceBasis ;
+    rdfs:label "项目材料、同伴交回的结论、本部门记录"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「中心角色」行「证据来源」列" ;
+    yd:quote "| 中心角色 | 上一层交来的任务与本部门的设计、计划或检查设计 | 把任务做成能交完成的成果 | 项目材料、同伴交回的结论、本部门记录 | 本部门可见范围 | 只写自己的设计、计划或检查设计草案 | 询问（同伴与其他部门）、更新计划、追加说明、取消进行中的询问、查询与读取、记录、起草、交完成 | 否 |" .
+yd:eng-basis-explorer a yd:EvidenceBasis ;
+    rdfs:label "项目材料、代码、外部文档"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「探索者」行「证据来源」列" ;
+    yd:quote "| 探索者 | 询问里交来的查证任务 | 交回带来源的发现 | 项目材料、代码、外部文档 | 本部门可见范围 | 只读，不写入 | 查询与读取、记录 | 否 |" .
+yd:eng-basis-lead a yd:EvidenceBasis ;
+    rdfs:label "设计与计划、代码、自测结果"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「主程」行「证据来源」列" ;
+    yd:quote "| 主程 | 询问里交来的实现任务 | 按设计与计划实现并自测 | 设计与计划、代码、自测结果 | 本部门可见范围 | 工作区 | 读写工作区、运行命令与自测、记录 | 否 |" .
+yd:eng-basis-reviewer a yd:EvidenceBasis ;
+    rdfs:label "待审查的成果、它的依据、上一轮审查意见"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「审查者」行「证据来源」列" ;
+    yd:quote "| 审查者 | 中心角色交的完成，工作中途交来的草案 | 判断这一版成果是否可以放行 | 待审查的成果、它的依据、上一轮审查意见 | 成果与依据，不含作者的历史 | 检查材料，不写工作区 | 读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成 |" .
+
+# 文档的角色表没有「工作过程」一列，所以没有写 yd:hasWorkProcess（必有公理会推出空位）。
+
+# ---------- 成果种类 ----------
+yd:eng-completion a yd:OutcomeKind ;
+    rdfs:label "中心角色交的完成"@zh ;
+    rdfs:comment "工程部门里审查的是设计与代码"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「审查者」行；4.3" ;
+    yd:quote "是，核验中心角色交的完成" ,
+             "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版：产品审查需求与规格，工程审查设计与代码，质检审查检查设计是否覆盖每条验收条件、缺陷记录是否有依据。放行则子事项结束；打回则中心角色再开始一轮。" ;
+    yd:completion yd:completion-release .
+# 注：这里的放行只结束子事项（4.3「审查者放行只结束子事项，不是外层的放行」）；外层仍过裁决。
+# MISSING-VOCAB: 没有属性表达「放行的作用范围只到子事项、不是外层的放行」。
+
+yd:eng-findings a yd:OutcomeKind ;
+    rdfs:label "带来源的发现"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「探索者」行「目标」列" ;
+    yd:quote "| 探索者 | 询问里交来的查证任务 | 交回带来源的发现 | 项目材料、代码、外部文档 | 本部门可见范围 | 只读，不写入 | 查询与读取、记录 | 否 |" .
+# UNSURE: 「带来源的发现」交回中心角色，文档没有说它以放行还是开环完成结束，没有写 yd:completion。
+
+# ---------- 部门内的核验 ----------
+yd:eng-review-decl a yd:VerificationDecl ;
+    rdfs:label "审查者核验中心角色交的完成"@zh ;
+    yd:docRef "department-roles.md 4.1 角色表「审查者」行「核验角色」列；4.3" ;
+    yd:quote "是，核验中心角色交的完成" ,
+             "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版：产品审查需求与规格，工程审查设计与代码，质检审查检查设计是否覆盖每条验收条件、缺陷记录是否有依据。" ;
+    yd:verifier yd:eng-reviewer ;
+    yd:verified yd:eng-center ;
+    yd:forOutcome yd:eng-completion ;
+    yd:inForm yd:eng-subform .
+# UNSURE: 独立证据的种类。审查者的工具许可里有「在独立副本上运行检查」，可能对应「实际跑一遍」；但文档没有说这道核验的独立证据就是它，而审查者「每次从新的上下文开始」只是隔开上下文，没有说换了一个不同的模型，也不是人。所以没有写 yd:hasIndependentEvidence（必有公理会推出空位），也就没有检查定义。4.8 的「检查定义」是部门提交时主机运行的交出检查，不是这道部门内核验。
+# UNSURE: 工作中途中心角色询问审查者（4.3「工作中途中心角色也可以询问审查者，例如工程计划在交给主程之前先审。同样绑定版本，但只有交完成时的结论能结束子事项。」）也是一次审查；是否另起一份核验声明没有定，没有建。
+# MISSING-VOCAB: 结论绑定被审查那一版的内容摘要、改了要再审（4.3）。
+# MISSING-VOCAB: 打回后中心角色再开始一轮（4.3）。
+# MISSING-VOCAB: 审查者「先下判断再看作者的解释」（4.4），以及中途审查时装配只放成果与依据的引用、不放问话里的解释。
+# MISSING-VOCAB: 4.1 角色表的「关注的成果」中「上一层交来的任务」「询问里交来的查证任务／实现任务」是来源或任务，不是成果种类；yd:watches 的值域是 OutcomeKind，没有用 watches。
+# MISSING-VOCAB: 4.1 角色表的「可见范围」「写入范围」「工具许可」三列没有对应属性（例如工作区只由主程写入、探索者只读）。
+# MISSING-VOCAB: 中心角色经「询问」把工作交给同伴（4.3）；没有表达角色之间询问关系的属性。

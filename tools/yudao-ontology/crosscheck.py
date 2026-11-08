@@ -24,7 +24,7 @@ import run  # noqa: E402
 YD = run.YD
 FORM_PROPS = [YD.rotation, YD.finalOutcome, YD.canSubmitCompletion]
 FUNCTIONAL = {YD.rotation, YD.finalOutcome}
-ACTOR_PROPS = [YD.receives, YD.produces, YD.watches]
+ACTOR_PROPS = [YD.receives, YD.produces, YD.watches, YD.mayAsk]
 DECL_PROPS = [YD.verifier, YD.verified, YD.forOutcome]
 
 
@@ -73,6 +73,12 @@ def compare(design: rdflib.Graph, definitions: rdflib.Graph) -> list[dict]:
                 rows.append(row("违例", f"设计写的是「{run.label(both, other)}」，定义文件写的是另一个", both, form, s, p, o))
             else:
                 rows.append(row("不知道", "定义文件有，设计没写", both, form, s, p, o))
+        # 形态名（11-08 起按职能列名）：设计里的名字去掉「」与（默认），对定义推出的名字
+        want = {str(l).strip("「」").split("」")[0] for l in design.objects(form, RDFS.label)}
+        for got in definitions.objects(form, YD.definedName):
+            if str(got) not in want:
+                rows.append({"result": "违例", "why": f"设计里的形态名是「{'、'.join(sorted(want))}」，定义推出的是另一个",
+                             "form": run.label(both, form), "subject": run.label(both, form), "property": "形态名", "object": str(got)})
     return rows
 
 

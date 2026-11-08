@@ -25,7 +25,7 @@ def norm(s: str, loose: bool) -> str:
     return s
 
 
-def facts(path: Path, loose: bool):
+def facts(path: Path, loose: bool, ref: rdflib.Graph | None = None):
     g = rdflib.Graph()
     g.parse(path)
 
@@ -33,13 +33,16 @@ def facts(path: Path, loose: bool):
         if isinstance(n, rdflib.Literal):
             return str(n.toPython()).lower()
         v = g.value(n, RDFS.label)
+        if v is None and ref is not None:
+            v = ref.value(n, RDFS.label)  # 共用标识（如交给抽取的 yd:dept-engineering）没写标签时，用参照里的标签
         if v is None:
             return str(n).split("#")[-1]  # 共用的个体（如 yd:completion-release）按标识
         return norm(str(v), loose)
 
     types, rels = set(), set()
     for s, p, o in g:
-        if not str(s).startswith(YD) or str(s).split("#")[-1].startswith("slot-"):
+        # 各抽各的标识，命名空间也可以不同（11-08 的 B 用了自己的命名空间），按标签对齐，所以不看主语的命名空间
+        if isinstance(s, rdflib.BNode) or str(s).split("#")[-1].startswith("slot-"):
             continue
         if p == RDF.type and str(o).startswith(YD):
             types.add((str(o).split("#")[-1], lab(s)))
@@ -49,7 +52,8 @@ def facts(path: Path, loose: bool):
 
 
 def compare(paths: dict[str, Path], loose: bool):
-    data = {k: facts(p, loose) for k, p in paths.items()}
+    ref = rdflib.Graph().parse(next(iter(paths.values())))
+    data = {k: facts(p, loose, ref) for k, p in paths.items()}
     out = {"loose": loose, "counts": {k: {"types": len(t), "relations": len(r)} for k, (t, r) in data.items()}, "pairs": {}}
     for a, b in combinations(paths, 2):
         ta, ra = data[a]

@@ -1,5 +1,5 @@
 # 第 1 批：总图（docs/architecture.html）。参照抽取，由本线程按总图原句逐条写出，每个个体带原句。
-# 只抽方案第 6.2 节定的五处与默认三部门的方框，不抽第五、六节。
+# 只抽方案第 6.2 节定的五处与默认形态三个职能的方框，不抽第五、六节。
 @prefix yd: <https://yudao.dev/onto#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -11,45 +11,45 @@ yd:fs-boundary a yd:FixedStructure ; rdfs:label "边界"@zh ; yd:archRef "开头
 yd:fs-adjudication a yd:FixedStructure ; rdfs:label "裁决"@zh ; yd:archRef "开头一段" ; yd:batch 1 ;
     yd:quote "固定不变的只有三样：循环、边界、裁决" .
 yd:c-workitem a yd:Concept ; rdfs:label "事项"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-event a yd:Concept ; rdfs:label "事件"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-outcome-version a yd:Concept ; rdfs:label "某种成果的某一版及其依据"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-proposal a yd:Concept ; rdfs:label "提案"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-receipt a yd:Concept ; rdfs:label "回执"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-write-scope a yd:Concept ; rdfs:label "角色的写入范围"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-limit a yd:Concept ; rdfs:label "上限"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-decision-request a yd:Concept ; rdfs:label "决定请求"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-round a yd:Concept ; rdfs:label "一轮工作"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-rotation-rules a yd:Concept ; rdfs:label "轮转的规矩"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-verifier-conclusion a yd:Concept ; rdfs:label "核验角色的结论"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
-yd:c-department a yd:Concept ; rdfs:label "部门"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
+yd:c-department a yd:Concept ; rdfs:label "职能"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:c-role a yd:Concept ; rdfs:label "角色"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" .
 yd:layer-facts a yd:Layer ; rdfs:label "事实与裁决"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" ;
     yd:recognizes yd:c-workitem, yd:c-event, yd:c-outcome-version, yd:c-proposal, yd:c-receipt, yd:c-write-scope, yd:c-limit, yd:c-decision-request ;
     yd:above yd:layer-loop .
 yd:layer-loop a yd:Layer ; rdfs:label "循环"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" ;
     yd:recognizes yd:c-round ;
     yd:above yd:layer-routing .
 yd:layer-routing a yd:Layer ; rdfs:label "路由"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" ;
     yd:recognizes yd:c-rotation-rules, yd:c-verifier-conclusion ;
     yd:above yd:layer-org .
 yd:layer-org a yd:Layer ; rdfs:label "组织"@zh ; yd:archRef "第二节「四层」" ; yd:batch 1 ;
-    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填职能与角色。" ;
     yd:recognizes yd:c-department, yd:c-role .
 yd:ring-rewrite a yd:Ring ; rdfs:label "可以整体重写"@zh ; yd:archRef "第二节「什么能动」" ; yd:batch 1 ;
     yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
@@ -213,29 +213,29 @@ yd:seam-watchdog a yd:Seam ; rdfs:label "看门狗"@zh ; yd:archRef "第四节�
     yd:status yd:status-unsettled ;
     yd:inSystem "false"^^xsd:boolean .
 yd:st-asking a yd:OuterState ; rdfs:label "询问中"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-waiting-user a yd:OuterState ; rdfs:label "等用户"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-waiting-work a yd:OuterState ; rdfs:label "等待工作"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-working a yd:OuterState ; rdfs:label "一轮工作中"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-verifying a yd:OuterState ; rdfs:label "核验中"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-accepting a yd:OuterState ; rdfs:label "接纳"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-draining a yd:OuterState ; rdfs:label "排空中"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-rework a yd:OuterState ; rdfs:label "返工"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:st-stopped a yd:OuterState ; rdfs:label "停止"@zh ; yd:archRef "第三节外环" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" .
+    yd:quote "外环 · 职能之间的流转（直做、按成果、任务池共用这套状态）" .
 yd:lim-def a yd:Limit ; rdfs:label "上限（时间、次数、重试、嵌套深度）"@zh ; yd:archRef "第三节" ; yd:batch 1 ;
     yd:quote "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。" .
 yd:stop-list a yd:StopReasonList ; rdfs:label "停止原因清单"@zh ; yd:archRef "第三节外环「停止」" ; yd:batch 1 ;
     yd:quote "停止原因来自封闭清单" .
 yd:loop-outer a yd:LoopLayer ; rdfs:label "外环"@zh ; yd:archRef "第三节" ; yd:batch 1 ;
-    yd:quote "外环 · 部门之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止" ;
+    yd:quote "外环 · 职能之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止" ;
     yd:hasState yd:st-asking, yd:st-waiting-user, yd:st-waiting-work, yd:st-working, yd:st-verifying, yd:st-accepting, yd:st-draining, yd:st-rework, yd:st-stopped ;
     yd:hasLimit yd:lim-def ;
     yd:stopsBy yd:stop-list .
@@ -250,18 +250,18 @@ yd:rm-by-outcome a yd:RotationMode ; rdfs:label "按成果"@zh ; yd:archRef "第
 yd:rm-pool yd:planned true .
 yd:rm-pool a yd:RotationMode ; rdfs:label "任务池"@zh ; yd:archRef "第一节「轮转方式」" ; yd:batch 1 ;
     yd:quote "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。" .
-yd:form-default a yd:Form ; rdfs:label "三部门（默认）"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
-    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成" .
-yd:form-min a yd:Form ; rdfs:label "一个角色直做"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
-    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成" ;
+yd:form-default a yd:Form ; rdfs:label "「产品 · 工程 · 质检」（默认）"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
+    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成" .
+yd:form-min a yd:Form ; rdfs:label "「工程」"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
+    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成" ;
     yd:rotation yd:rm-direct ;
     yd:canSubmitCompletion yd:role-min .
 yd:role-min a yd:Role ; rdfs:label "一个角色"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
-    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成" ;
+    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成" ;
     yd:inForm yd:form-min ;
     yd:produces yd:ok-min-completion .
-yd:ok-min-completion a yd:OutcomeKind ; rdfs:label "完成（一个角色直做）"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
-    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成" ;
+yd:ok-min-completion a yd:OutcomeKind ; rdfs:label "完成（「工程」）"@zh ; yd:archRef "第一节" ; yd:batch 1 ;
+    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成" ;
     yd:inForm yd:form-min ;
     yd:completion yd:completion-openloop .
 yd:user a yd:User ; rdfs:label "你"@zh ; yd:archRef "第一节「你」" ; yd:batch 1 ;
@@ -273,12 +273,12 @@ yd:dept-product a yd:Department ; rdfs:label "产品"@zh ; yd:archRef "第一节
     yd:watches yd:ok-intent, yd:ok-guidance ;
     yd:produces yd:ok-prd .
 yd:dept-engineering a yd:Department ; rdfs:label "工程"@zh ; yd:archRef "第一节「工程」方框" ; yd:batch 1 ;
-    yd:quote "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个部门的内部也可以是一个子组织。" ;
+    yd:quote "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个职能的内部也可以是一个子组织。" ;
     yd:inForm yd:form-default ;
     yd:watches yd:ok-prd, yd:ok-defect, yd:ok-guidance ;
     yd:produces yd:ok-delivery .
 yd:dept-quality a yd:Department ; rdfs:label "质检"@zh ; yd:archRef "第一节「质检」方框" ; yd:batch 1 ;
-    yd:quote "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。" ;
+    yd:quote "质检交付 → 缺陷或放行。它是默认形态里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。" ;
     yd:inForm yd:form-default ;
     yd:watches yd:ok-delivery, yd:ok-guidance ;
     yd:produces yd:ok-defect .
@@ -289,7 +289,7 @@ yd:ok-intent a yd:OutcomeKind ; rdfs:label "意图"@zh ; yd:archRef "第一节�
     yd:quote "产品意图 → 要求（PRD）" ;
     yd:inForm yd:form-default .
 yd:ok-guidance a yd:OutcomeKind ; rdfs:label "指导"@zh ; yd:archRef "第一节、第三节" ; yd:batch 1 ;
-    yd:quote "你中途的指导是部门关注的成果" ;
+    yd:quote "你中途的指导是职能关注的成果" ;
     yd:inForm yd:form-default .
 yd:ok-prd a yd:OutcomeKind ; rdfs:label "要求（PRD）"@zh ; yd:archRef "第一节、第三节" ; yd:batch 1 ;
     yd:quote "产品意图 → 要求（PRD）" ;
@@ -302,18 +302,28 @@ yd:ok-defect a yd:OutcomeKind ; rdfs:label "缺陷记录"@zh ; yd:archRef "第�
     yd:quote "缺陷记录是上游关注的成果" ;
     yd:inForm yd:form-default .
 yd:decl-default-quality a yd:VerificationDecl ; rdfs:label "质检核验工程的交付"@zh ; yd:archRef "第一节「质检」方框" ; yd:batch 1 ;
-    yd:quote "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行" ;
+    yd:quote "质检交付 → 缺陷或放行。它是默认形态里的核验角色：有核验角色时只有它的结论能放行" ;
     yd:verifier yd:dept-quality ;
     yd:verified yd:dept-engineering ;
     yd:forOutcome yd:ok-delivery ;
     yd:inForm yd:form-default .
 yd:src-user-input a yd:Source ; rdfs:label "你的输入"@zh ; yd:archRef "第二节「定义」方框" ; yd:batch 1 ;
-    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能" .
 yd:src-onboarding a yd:Source ; rdfs:label "建档"@zh ; yd:archRef "第二节「定义」方框" ; yd:batch 1 ;
-    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能" .
 yd:src-subtask a yd:Source ; rdfs:label "子事项（上一层交来的任务）"@zh ; yd:archRef "第二节「定义」方框" ; yd:batch 1 ;
-    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能" .
 yd:src-incident yd:planned true .
 yd:src-incident a yd:Source ; rdfs:label "运维发现的故障（以后）"@zh ; yd:archRef "第二节「定义」方框" ; yd:batch 1 ;
-    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的职能" .
 yd:dept-product <http://www.w3.org/2002/07/owl#differentFrom> yd:dept-engineering , yd:dept-quality , yd:dept-ops . yd:dept-engineering <http://www.w3.org/2002/07/owl#differentFrom> yd:dept-quality , yd:dept-ops . yd:dept-quality <http://www.w3.org/2002/07/owl#differentFrom> yd:dept-ops .
+
+# 11-08（main 5c25e1b）：总图「最少：只有工程一个职能」——「工程」形态里的那个角色属于工程这个职能。
+# 这里不把 dept-engineering 放进 form-min（inForm 是函数性的，工程已在默认形态里）；工程这个名字由第 3 批的定义文件给出。
+# 「任何职能随时可以询问另一个职能」：默认形态里三个职能两两可以询问。
+yd:dept-product yd:mayAsk yd:dept-engineering, yd:dept-quality .
+yd:dept-engineering yd:mayAsk yd:dept-product, yd:dept-quality .
+yd:dept-quality yd:mayAsk yd:dept-product, yd:dept-engineering .
+yd:ask-between-functions a yd:Ask ; rdfs:label "职能之间的询问"@zh ; yd:archRef "第一节「一份事实」" ; yd:batch 1 ;
+    yd:quote "职能之间的询问也在这里。" .
+

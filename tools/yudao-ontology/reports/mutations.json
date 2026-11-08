@@ -23,7 +23,7 @@
   "name": "不改（对照）",
   "how": "原样跑一次",
   "expected": "没有违例、没有确实缺（假定带出的不算）",
-  "got": "没有违例、没有确实缺；已知的（假定带出或真的发现）：确实缺:form-defined:工程的中心型小组；确实缺:form-defined:一个外包角色直做",
+  "got": "没有违例、没有确实缺；已知的（假定带出或真的发现）：确实缺:form-defined:工程的中心型小组",
   "detected": true
  },
  {
@@ -66,9 +66,27 @@
   "id": "avoid-word",
   "batch": 1,
   "name": "用了要避免的词",
-  "how": "文档副本里「部门」改成「团队」（词表写明避免）",
+  "how": "文档副本里「职能」改回「部门」（11-08 起词表写明避免）",
   "expected": "违例：name-avoid",
-  "got": "一致；不知道:name-unknown:团队；违例:name-avoid:团队",
+  "got": "一致；不知道:name-unknown:部门；违例:name-avoid:部门",
+  "detected": true
+ },
+ {
+  "id": "ask-is-outcome",
+  "batch": 1,
+  "name": "询问当成成果",
+  "how": "把「职能之间的询问」也写成一种成果（11-08 决定：询问不是成果）",
+  "expected": "不一致",
+  "got": "不一致；",
+  "detected": true
+ },
+ {
+  "id": "ask-self",
+  "batch": 1,
+  "name": "问自己",
+  "how": "「工程」里那个角色可以询问它自己（只有一个职能时没有可问的）",
+  "expected": "不一致",
+  "got": "不一致；",
   "detected": true
  },
  {
@@ -102,7 +120,7 @@
   "id": "reviewer-is-author",
   "batch": 2,
   "name": "审查者就是中心角色",
-  "how": "部门内那份核验声明的核验者改成工程架构师自己",
+  "how": "职能内那份核验声明的核验者改成工程架构师自己",
   "expected": "不一致",
   "got": "不一致；",
   "detected": true
@@ -111,9 +129,18 @@
   "id": "direct-verifies-noncompleter",
   "batch": 3,
   "name": "直做核验一个交不出完成的角色",
-  "how": "几个角色直做里加一份核验声明：工程核验产品交的完成（产品交不出完成，4.3 第 5 条该在加载时拒绝）",
+  "how": "「产品 · 工程」里加一份核验声明：工程核验产品交的完成（产品交不出完成，4.3 第 5 条该在加载时拒绝）",
   "expected": "违例：direct-verified-can-complete",
   "got": "一致；违例:decl-verified-produces:decl-mutant-sev；违例:direct-verified-can-complete:decl-mutant-sev",
+  "detected": true
+ },
+ {
+  "id": "ask-cross-form",
+  "batch": 2,
+  "name": "问到别的形态里",
+  "how": "「产品 · 工程」的工程可以询问默认形态里的质检（「其余职能」只指同一份组织）",
+  "expected": "违例：ask-same-form",
+  "got": "一致；违例:ask-same-form:工程（「产品 · 工程」）",
   "detected": true
  },
  {
@@ -138,34 +165,52 @@
   "id": "x-drop-completer",
   "batch": 3,
   "name": "定义里直做没人交完成",
-  "how": "一个角色直做的定义去掉交完成的工具",
+  "how": "「工程」的定义去掉交完成的工具",
   "expected": "确实缺：能交完成",
-  "got": "确实缺:一个角色直做 能交完成 一个角色",
+  "got": "确实缺:「工程」 能交完成 一个角色",
   "detected": true
  },
  {
   "id": "x-final-wrong",
   "batch": 3,
   "name": "最后采纳的成果写错",
-  "how": "三部门的定义把最后采纳的成果从交付改成 PRD",
+  "how": "「产品 · 工程 · 质检」的定义把最后采纳的成果从交付改成 PRD",
   "expected": "违例：最后采纳的成果",
-  "got": "违例:三部门（默认） 最后采纳的成果 要求（PRD）",
+  "got": "违例:「产品 · 工程 · 质检」（默认） 最后采纳的成果 要求（PRD）",
   "detected": true
  },
  {
   "id": "x-rotation-wrong",
   "batch": 3,
   "name": "轮转方式写错",
-  "how": "几个角色直做的定义把轮转方式改成成果驱动",
+  "how": "「产品 · 工程」的定义把轮转方式改成按成果",
   "expected": "违例：轮转方式",
-  "got": "违例:几个角色直做 轮转方式 按成果",
+  "got": "违例:「产品 · 工程」 轮转方式 按成果",
+  "detected": true
+ },
+ {
+  "id": "x-form-name",
+  "batch": 3,
+  "name": "定义推出的形态名不对",
+  "how": "「产品 · 工程」的定义里产品的显示名改成「需求」，推出的名字变成「需求 · 工程」",
+  "expected": "违例：形态名",
+  "got": "违例:「产品 · 工程」 形态名 需求 · 工程",
+  "detected": true
+ },
+ {
+  "id": "x-ask-dropped",
+  "batch": 3,
+  "name": "定义里工程问不了产品",
+  "how": "「产品 · 工程」的定义去掉工程的询问工具",
+  "expected": "确实缺：可以询问",
+  "got": "确实缺:工程（「产品 · 工程」） 可以询问 产品（「产品 · 工程」）",
   "detected": true
  },
  {
   "id": "x-source-dropped",
   "batch": 3,
   "name": "定义里建档没人接",
-  "how": "一个角色直做的定义去掉建档的来源",
+  "how": "「工程」的定义去掉建档的来源",
   "expected": "确实缺：接",
   "got": "确实缺:一个角色 接 建档",
   "detected": true
@@ -173,10 +218,10 @@
  {
   "id": "c-kernel-dept-name",
   "batch": 4,
-  "name": "内核写部门名",
-  "how": "在 harness/adjudication.py 的副本末尾加一个按部门名判断的函数（department == \"quality\"）",
+  "name": "内核写职能名",
+  "how": "在 harness/adjudication.py 的副本末尾加一个按职能名判断的函数（department == \"quality\"）",
   "expected": "违例：layer-name",
-  "got": "违例:layer-name:harness/adjudication.py ['harness/adjudication.py:222 比较里的「quality」（部门名）']",
+  "got": "违例:layer-name:harness/adjudication.py ['harness/adjudication.py:222 比较里的「quality」（职能名）']",
   "detected": true
  },
  {

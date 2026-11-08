@@ -24,7 +24,7 @@ FORMS = {
     "single_role_direct": ("harness/definitions/forms/single_role_direct/", "form-min"),
     "several_roles_direct": ("harness/definitions/forms/several_roles_direct/", "form-several"),
 }
-# 每份形态里的部门 → 前两批里的承担者
+# 每份形态里的职能（定义文件里叫 departments）→ 前两批里的承担者
 ACTORS = {
     "form-default": {"product": "dept-product", "engineering": "dept-engineering", "quality": "dept-quality"},
     "form-min": {"engineering": "role-min"},
@@ -53,7 +53,7 @@ def show(commit: str, path: str):
 def convert(commit: str) -> tuple[rdflib.Graph, dict]:
     g = rdflib.Graph()
     g.bind("yd", YD)
-    count = {"forms": 0, "decls": 0, "produces": 0, "receives": 0, "watches": 0, "complete": 0}
+    count = {"forms": 0, "decls": 0, "produces": 0, "receives": 0, "watches": 0, "complete": 0, "mayAsk": 0}
     for name, (folder, form) in FORMS.items():
         org = show(commit, folder + "organization.json")
         routes = show(commit, folder + "routings.json")
@@ -98,6 +98,15 @@ def convert(commit: str) -> tuple[rdflib.Graph, dict]:
             if route["id"] == "direct" and "submit_completion" in names:
                 g.add((F, YD.canSubmitCompletion, A))
                 count["complete"] += 1
+        # 形态名：#1601 起按定义里职能的显示名与定义的顺序用「 · 」连起来，不另写一份名字
+        g.add((F, YD.definedName, Literal(" · ".join(d.get("label", d["id"]) for d in org["departments"]), lang="zh")))
+        # 可以询问谁：定义文件没有这个字段，按项目的组织设计说明 4.9 的默认读成「其余职能」；只有一个职能时没有
+        ids = [d["id"] for d in org["departments"]]
+        for a in ids:
+            for b in ids:
+                if a != b and any("ask" in t for t in granted.get(a, ())):
+                    g.add((YD[actors[a]], YD.mayAsk, YD[actors[b]]))
+                    count["mayAsk"] += 1
         for d in org["departments"]:
             A = YD[actors[d["id"]]]
             g.add((A, YD.docRef, Literal(folder + "organization.json")))
@@ -132,7 +141,7 @@ def main(argv):
     commit = argv[0] if argv else "origin/main"
     g, count = convert(commit)
     head = (f"# 第 3 批：发布带的三份形态的定义文件，由 defs.py 从 {commit} 转写，不手改。\n"
-            "# 形态目录、部门与成果种类到前两批个体的对应写在 defs.py 开头。\n")
+            "# 形态目录、职能与成果种类到前两批个体的对应写在 defs.py 开头。\n")
     out = HERE / "batches/batch3-definitions.ttl"
     out.write_text(head + g.serialize(format="turtle"), encoding="utf-8")
     print(commit, count)
