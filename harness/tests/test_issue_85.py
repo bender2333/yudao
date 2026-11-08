@@ -121,7 +121,7 @@ def _wait_for(store, predicate, *, after=0, description="catalog event"):
     # 等一条目录事件（工单 #1320）：订阅写入口的提交通知，由事件到达决定先后，不按轮询的时机赌
     # （docs/design/test-pyramid.md「测试的写法」第 7 条）。after 是起点：这条用例发出的命令被接受时
     # 返回的 position（Accepted.position），只有它之后追加的事件才算这次命令的结果。更换 Key 以后
-    # 应用自己会在同一条连接上再取一次候选并重测连接（docs/design/model-management.md「连接测试」），
+    # 应用自己会在同一条连接上再取一次候选并重测连接（docs/design/model-management.md「模型访问定义与准入」），
     # 那次的事件不能算到这次命令头上。返回第一条符合的事件
     deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
     found = []
@@ -236,7 +236,7 @@ def test_connection_test_fails_when_the_credential_is_wrong(tmp_path):
             assert ok.payload["ok"] is True
 
             # 更换 Key 以后应用自己会在同一条连接上做一次连接测试，结果写在连接旁
-            # （docs/design/model-management.md「连接测试」）：先等这一次落事件，再发这条用例要测的显式连接测试。
+            # （docs/design/model-management.md「模型访问定义与准入」）：先等这一次落事件，再发这条用例要测的显式连接测试。
             # 两件事的先后由事件日志决定，不靠时长
             changed = _set_credential(client, "issue-85-wrong-key")
             automatic = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection"
