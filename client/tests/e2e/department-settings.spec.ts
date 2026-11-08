@@ -168,21 +168,21 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
       const title = await section(page, "产品部门");
       await expect(title).toContainText("（来源 部门默认）");
 
-      // 打开弹窗：标题为「本项目 · 产品设置」；模型第一项是跟随部门默认，其后是已准入定义
+      // 打开弹窗：标题为「本项目 · 产品设置」；模型第一项是跟随职能默认，其后是已准入定义
       await title.getByRole("button", { name: "部门设置" }).click();
       const dialog = page.locator(".modal-backdrop");
       await expect(dialog.locator(".modal-head h2")).toHaveText("本项目 · 产品设置");
       const model = dialog.getByTestId("department-model-product");
-      await expect(model.locator("option").first()).toHaveText(/^跟随部门默认（当前：/);
+      await expect(model.locator("option").first()).toHaveText(/^跟随职能默认（当前：/);
       const glm = model.locator("option", { hasText: "glm-4.6" });
       await expect(glm).toHaveCount(1);
 
-      // 选择 glm-4.6 与 high 档位并保存：提示「从本部门下一次模型请求起生效」
+      // 选择 glm-4.6 与 high 档位并保存：提示「从本职能下一次模型请求起生效」
       const value = await glm.getAttribute("value");
       expect(value).not.toBeNull();
       await model.selectOption(value as string);
       await dialog.getByTestId("department-tier-product").selectOption("high");
-      await expect(dialog).toContainText("从本部门下一次模型请求起生效");
+      await expect(dialog).toContainText("从本职能下一次模型请求起生效");
       await dialog.getByRole("button", { name: "保存部门设置" }).click();
       await expect(page.locator(".modal-backdrop")).toHaveCount(0);
 

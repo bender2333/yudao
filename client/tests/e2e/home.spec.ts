@@ -227,11 +227,11 @@ test("决定卡片上的两个链接：页面四处卡片都到对应的页面�
     // 部门设置的落点：设置页的路径带上一节的名字（工单 #1161 第 3 条）
     const settingsHash = `#/p/${projectId}/settings?section=departments`;
 
-    // 点两个链接各一次，核对到了哪个页面；「前往本项目的部门设置」还要核对落在部门设置那一节
+    // 点两个链接各一次，核对到了哪个页面；「前往本项目的职能设置」还要核对落在部门设置那一节
     const clickBoth = async (where: string, open: () => Promise<Locator>): Promise<void> => {
       for (const [label, expected, landed] of [
         ["前往模型管理", "#/sys/models", page.getByRole("heading", { name: "模型管理", exact: true }).first()],
-        ["前往本项目的部门设置", settingsHash, page.locator("#departments")],
+        ["前往本项目的职能设置", settingsHash, page.locator("#departments")],
       ] as [string, string, Locator][]) {
         const card = await open();
         const button = card.getByRole("button", { name: label, exact: true });

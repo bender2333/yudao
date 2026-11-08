@@ -165,7 +165,7 @@ export function CandidateList(props: CandidateListProps) {
                   </span>
                 </label>
                 <span className="y10-small mm-candidate-state">
-                  {!applicable ? "不适用于部门任务"
+                  {!applicable ? "不适用于职能任务"
                     : checked ? "已选用" : "选择即配置"}
                 </span>
                 {test.visible ? (
