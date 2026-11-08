@@ -902,8 +902,8 @@ def test_capability_table_capacity_enables_a_selection_without_any_numbers(tmp_p
 
 
 def test_capability_table_model_without_protocol_prefills_from_the_plan_and_enables(tmp_path):
-    # R2、R3：能力表里调用协议为空的模型同样走通：容量来自能力表，协议按第 4.3 节预填为方案的默认协议、
-    # 来源写明，同样不填数字即已启用（验收第 5 条）。
+    # R2、R3：能力表里调用协议为空的模型同样走通：容量来自能力表，协议按
+    # docs/design/model-management.md「模型访问定义与准入」预填为方案的默认协议、来源写明，同样不填数字即已启用（验收第 5 条）。
     upstream = ScriptedProvider([responder([{"id": EMPTY_PROTOCOL_MODEL}])] * 24)
     opened = Opened(tmp_path)
     try:
