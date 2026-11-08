@@ -11,6 +11,7 @@ import {
   candidatePageAfter,
   candidatePageCount,
   candidatePageView,
+  candidateTestView,
   capacityInputIssue,
   capacityKnown,
   capacityMissingText,
@@ -174,6 +175,124 @@ test("上一页、下一页落在合法页内", () => {
   assert.equal(candidatePageAfter(1, "previous", 4), 1);
   assert.equal(candidatePageAfter(1, "next", 1), 1);
   assert.equal(candidatePageAfter(1, "previous", 1), 1);
+});
+
+// —— 候选测试 ——
+
+// 一个候选测试的结果：只写与这一条断言有关的字段，其余按服务端的形状留空
+function candidateTest(over = {}) {
+  return { status: "waiting", sequence: 1, elapsed_ms: null, actual_model: null,
+    accepts_required_tool_call: null, failure_group: null, failure_step: null, error: null, ...over };
+}
+
+test("候选测试：没有选用的候选才有按钮，已选用与不适用的候选没有", () => {
+  const ready = candidate("glm-4.6");
+  assert.deepEqual(candidateTestView({ candidate: ready, selected: false, busy: false }), {
+    visible: true, enabled: true, buttonText: "测试", note: "", state: "",
+  });
+  assert.equal(candidateTestView({ candidate: ready, selected: true, busy: false }).visible, false);
+  assert.equal(candidateTestView({
+    candidate: candidate("image-only", { applicable: false }), selected: false, busy: false,
+  }).visible, false);
+});
+
+test("候选测试：容量未知的按钮不可用，并写明缺哪一项", () => {
+  const both = candidateTestView({
+    candidate: candidate("no-capacity", { context_window: null, max_output_tokens: null }),
+    selected: false, busy: false,
+  });
+  assert.equal(both.visible, true);
+  assert.equal(both.enabled, false);
+  assert.match(both.note, /先选用并填写容量/);
+  assert.match(both.note, /缺少窗口与输出上限/);
+
+  const output = candidateTestView({
+    candidate: candidate("half", { max_output_tokens: null }), selected: false, busy: false,
+  });
+  assert.equal(output.enabled, false);
+  assert.match(output.note, /缺少输出上限/);
+  assert.doesNotMatch(output.note, /缺少窗口/);
+});
+
+test("候选测试：等待测试、测试中、测试通过三种状态的文字，完成后按钮改为重新测试", () => {
+  const waiting = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({ status: "waiting" }) }), selected: false, busy: false,
+  });
+  assert.equal(waiting.state, "等待测试");
+  assert.equal(waiting.buttonText, "测试");
+  assert.equal(waiting.enabled, false);
+
+  const testing = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({ status: "testing" }) }), selected: false, busy: false,
+  });
+  assert.equal(testing.state, "测试中");
+  assert.equal(testing.buttonText, "测试");
+  assert.equal(testing.enabled, false);
+
+  const passed = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({
+      status: "passed", elapsed_ms: 1234, actual_model: "maker/m-real", accepts_required_tool_call: true,
+    }) }), selected: false, busy: false,
+  });
+  assert.equal(passed.buttonText, "重新测试");
+  assert.equal(passed.enabled, true);
+  assert.match(passed.state, /测试通过/);
+  assert.match(passed.state, /用时 1234 毫秒/);
+  assert.match(passed.state, /实际返回的模型：maker\/m-real/);
+  assert.match(passed.state, /接受要求调用工具/);
+
+  const notAccepted = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({
+      status: "passed", elapsed_ms: 20, actual_model: "m", accepts_required_tool_call: false,
+    }) }), selected: false, busy: false,
+  });
+  assert.match(notAccepted.state, /不接受要求调用工具/);
+});
+
+test("候选测试未通过：写明哪一组、哪一步与原因，页面上不出现内部标识", () => {
+  const failed = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({
+      status: "failed", failure_group: "tool_round_trip", failure_step: "tool_call",
+      error: "工具往返 / 调用测试工具：模型没有调用测试工具",
+    }) }), selected: false, busy: false,
+  });
+  assert.equal(failed.buttonText, "重新测试");
+  assert.equal(failed.enabled, true);
+  assert.match(failed.state, /测试未通过/);
+  assert.match(failed.state, /工具往返/);
+  assert.match(failed.state, /调用测试工具/);
+  assert.match(failed.state, /模型没有调用测试工具/);
+  // 同一段话不写两遍
+  assert.equal((failed.state.match(/工具往返/g) ?? []).length, 1);
+
+  // 服务端只给出内部标识时页面写中文；401 与 403 只出现状态码与含义
+  const unauthorized = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({
+      status: "failed", failure_group: "minimal_qa", failure_step: "request",
+      error: "HTTP 401：凭据无效",
+    }) }), selected: false, busy: false,
+  });
+  assert.match(unauthorized.state, /最小问答/);
+  assert.match(unauthorized.state, /请求/);
+  assert.match(unauthorized.state, /HTTP 401/);
+  assert.match(unauthorized.state, /凭据无效/);
+  const forbidden = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({
+      status: "failed", failure_group: "minimal_qa", failure_step: "request",
+      error: "HTTP 403：没有访问权限",
+    }) }), selected: false, busy: false,
+  });
+  assert.match(forbidden.state, /HTTP 403/);
+  assert.match(forbidden.state, /没有访问权限/);
+  for (const text of [failed.state, unauthorized.state, forbidden.state]) {
+    assert.doesNotMatch(text, /minimal_qa|tool_round_trip|tool_call|request/);
+  }
+});
+
+test("候选测试：页面在忙时按钮不可用", () => {
+  const view = candidateTestView({ candidate: candidate("m"), selected: false, busy: true });
+  assert.equal(view.visible, true);
+  assert.equal(view.enabled, false);
 });
 
 // —— 状态的文字 ——

@@ -7,7 +7,6 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { projectsListParams, visibleProjects } from "../../src/renderer/src/views/project/project-list.ts";
 import type { FactRef, FlowRecord, ProjectLoopResult, ProjectRow, WorkItemLoop } from "../../src/renderer/src/api/generated/types.gen.ts";
 import {
@@ -186,13 +185,10 @@ test("事实元素：按门牌、包裹、章、箱子、轮次、已用时间�
   assert.deepEqual(factElementRows(loop([item({ work_item_id: "w2" })])), []);
 });
 
-// 来源详情写「种类」用页面自己的那份中文名（工单 #1416）：事件种类的清单在
-// client/tests/fixtures/event-types.json，缺一种或写成英文都可能把内部标识写到页面上。
-test("事件种类的中文名覆盖事件种类清单，每一行都是中文", () => {
-  const types = JSON.parse(
-    readFileSync(new URL("../fixtures/event-types.json", import.meta.url), "utf8"),
-  ) as string[];
-  assert.deepEqual(types.filter((type) => !(type in EVENT_KIND_LABELS)), []);
+// 来源详情写「种类」用页面自己的那份中文名（工单 #1416）：事件种类不再由服务端维护的夹具给出
+// （工单 #1419 删掉了它），页面不认识的种类由 floor-text.ts 的 eventKindLabel 写成「其他事件」，
+// 不会把英文内部标识写到页面上；这里核对每一行都有中文名。
+test("事件种类的中文名每一行都是中文，页面不出现内部标识", () => {
   for (const [type, value] of Object.entries(EVENT_KIND_LABELS)) {
     assert.match(value, /[\u4e00-\u9fa5]/, `${type} 的中文名里没有汉字：${value}`);
   }
