@@ -321,6 +321,24 @@ def test_a_write_scope_must_name_the_directories_check_materials_writes() -> Non
         WriteScope(scope="workspace", paths=(QA_TESTS_DIR,))
 
 
+def test_a_check_materials_write_scope_must_name_the_fixed_directory() -> None:
+    # 验收第 1 条（工单 #1577，docs/design/forms-and-verifier-role.md「核验角色」第 1 条）：检查材料的
+    # 目录是主机的固定约定，定义只声明谁得到这块写入范围；写了别的目录时加载拒绝，固定的那一个照常通过
+    assert _issues(write_scopes={"quality": WriteScope(scope="check_materials", paths=(QA_TESTS_DIR,))}) == []
+    issues = _issues(write_scopes={"quality": WriteScope(scope="check_materials",
+                                                         paths=(".inspection-materials",))})
+    assert issues == [("organization.json", "verification.write_scopes.quality.paths",
+                       "检查材料目录是主机固定的 .yudao-qa-tests，不能写别的目录：.inspection-materials")]
+
+
+def test_a_fixed_and_another_check_materials_directory_are_rejected_together() -> None:
+    # 固定的目录也在 paths 里，也不能带上别的：报的是别的那一个
+    issues = _issues(write_scopes={"quality": WriteScope(
+        scope="check_materials", paths=(QA_TESTS_DIR, ".inspection-materials"))})
+    assert issues == [("organization.json", "verification.write_scopes.quality.paths",
+                       "检查材料目录是主机固定的 .yudao-qa-tests，不能写别的目录：.inspection-materials")]
+
+
 def test_an_unknown_department_has_no_write_scope() -> None:
     with pytest.raises(ValueError, match="unknown department 'reviewer'"):
         DEFINITIONS.write_scope("reviewer")
@@ -356,6 +374,13 @@ def test_the_write_scope_of_a_tool_call_is_read_from_the_declaration() -> None:
         assert name not in outside.reason, outside.reason
     assert _permission(projection, "write_file", "inspection", renamed, path=f"{QA_TESTS_DIR}/test_echo.py").allowed
     assert _permission(projection, "write_file", "engineering", renamed, path="src/echo.py").allowed
+
+
+def test_a_renamed_verifier_that_keeps_the_fixed_directory_passes() -> None:
+    # 验收第 2 条（工单 #1577）：把核验角色改名的定义，目录不变时加载时的核验照常通过
+    renamed = _renamed_verifier()
+    outcomes = {tool.proposal for tool in renamed.tools.values() if tool.proposal is not None}
+    assert verification_issues(renamed.organization, outcomes) == []
 
 
 def test_an_old_definition_without_the_declaration_reads_the_three_departments() -> None:

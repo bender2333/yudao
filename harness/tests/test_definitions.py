@@ -40,6 +40,22 @@ def _write(directory: Path, name: str, content) -> None:
     (directory / name).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _renamed(value, old: str, new: str):
+    # 与 test_roles_by_declaration.py 的改名做法相同：定义文件里表示部门的字符串全部换掉，
+    # 规则登记的条目名按部门分段一起换（工单 #1404、#1577 的验收第 2 条）
+    if isinstance(value, dict):
+        return {_renamed_key(key, old, new): _renamed(item, old, new) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_renamed(item, old, new) for item in value]
+    return new if value == old else value
+
+
+def _renamed_key(key, old: str, new: str):
+    if not isinstance(key, str):
+        return key
+    return ".".join(new if part == old else part for part in key.split("."))
+
+
 def test_version_is_the_digest_of_the_content_and_ignores_the_format(tmp_path):
     directory = _copy(tmp_path)
     rules = _read(directory, "rules.json")
@@ -252,6 +268,39 @@ def test_a_verification_declaration_that_does_not_hold_is_rejected_naming_the_fi
         load_definitions(directory)
     assert raised.value.issues == (expected,)
     assert f"organization.json {expected[1]}：" in str(raised.value)
+
+
+def test_a_check_materials_write_scope_outside_the_fixed_directory_is_rejected(tmp_path):
+    # 验收第 1 条（工单 #1577）：写入范围是 check_materials 的 paths 里出现固定目录以外的目录时，
+    # 加载时整份拒绝，错误写明文件与项
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["verification"]["write_scopes"]["quality"]["paths"] = [".inspection-materials"]
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue == ("organization.json", "verification.write_scopes.quality.paths",
+                     "检查材料目录是主机固定的 .yudao-qa-tests，不能写别的目录：.inspection-materials")
+    assert "organization.json verification.write_scopes.quality.paths：" in str(raised.value)
+
+
+def test_definitions_that_keep_the_fixed_check_materials_directory_still_load(tmp_path):
+    # 验收第 2 条（工单 #1577）：目录是固定的那一个时照常加载——默认定义、三份发布带形态，
+    # 以及把核验角色改名的测试定义（目录不变）
+    assert load_definitions().write_scope("quality") == WriteScope(scope="check_materials",
+                                                                   paths=(QA_TESTS_DIR,))
+    for name in ("single_role_direct", "several_roles_direct"):
+        assert load_definitions(DEFINITIONS_DIR / "forms" / name).verifier_roles() == ()
+    directory = tmp_path / "renamed"
+    directory.mkdir()
+    for path in DEFINITIONS_DIR.glob("*.json"):
+        content = _renamed(json.loads(path.read_text(encoding="utf-8")), "quality", "inspection")
+        (directory / path.name).write_text(json.dumps(content, ensure_ascii=False, indent=2),
+                                           encoding="utf-8")
+    renamed = load_definitions(directory)
+    assert renamed.write_scope("inspection") == WriteScope(scope="check_materials",
+                                                           paths=(QA_TESTS_DIR,))
 
 
 def test_a_definition_must_name_a_department_for_every_item_source(tmp_path):

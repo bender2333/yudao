@@ -113,7 +113,7 @@
 <main>
   <header>
     <h1>Yudao 画面总图</h1>
-    <p class="muted">这一页展开<a href="architecture.html#s1">总图</a>第一节的「画面」方框与第四节「画面」的缝，写法与总图相同。画面是系统外面的一个使用方：像观察者一样只经接口读事实，操作只发现有的命令；它有自己的代码、测试与阶段，系统不等它。画面只要求诚实，不要求跟上。画面是事实的投影，不是模拟：画面上能当真的东西都能回到一条事实；关掉表演，剩下的全是事实。固定的是画面合同、播放的规矩、七种元件与诚实性；空间、场景、翻译器与画法都是填进去的内容。画面跟着定义伸缩：一个角色时是一间屋，三部门时是一层楼，子事项是屋里的一间小屋。</p>
+    <p class="muted">这一页展开<a href="architecture.html#s1">总图</a>第一节的「画面」方框与第四节「画面」的缝，写法与总图相同。画面是系统外面的一个使用方：像观察者一样只经接口读事实，操作只发现有的命令；它有自己的代码、测试与阶段，系统不等它。画面只要求诚实，不要求跟上。画面是事实的投影，不是模拟：画面上能当真的东西都能回到一条事实；关掉表演，剩下的全是事实。固定的是画面合同、播放的规矩、七种元件与诚实性；空间、场景、翻译器与画法都是填进去的内容。画面跟着定义伸缩：一个角色时是一间屋，产品 · 工程 · 质检时是一层楼，子事项是屋里的一间小屋。</p>
     <nav>
       <a href="#v1">01 全局图与方程</a><a href="#v2">02 什么能动</a><a href="#v3">03 一个事件怎样上画面</a><a href="#v4">04 要守的缝</a><a href="#v5">05 跟着定义伸缩</a><a href="#v6">06 换宿主</a>
     </nav>
@@ -181,12 +181,12 @@
         </div>
       </div>
       <div class="col">
-        <div class="box"><b>定义</b><small>画面里有几间屋、几个人、哪些管道、谁有盖章台，都从事项冻结的定义来。画面层的代码不写部门的名字，屋子长什么样写在声明里。</small></div>
+        <div class="box"><b>定义</b><small>画面里有几间屋、几个人、哪些管道、谁有盖章台，都从事项冻结的定义来。画面层的代码不写职能的名字，屋子长什么样写在声明里。</small></div>
         <p class="muted" style="font-size:12.5px"><b>调节参数</b>：落后上限、最短时长、时长倍率是填进去的内容，调节面板里改，不改合同。</p>
       </div>
     </div>
     <ul class="rules">
-      <li><b>可以落后</b>：系统加了画面不认识的部门或事件，画面画成通用的屋与小人，或者不画，测试照过；还没画的列在缺口清单里，不让测试失败。画面落后不算错，画错才算。</li>
+      <li><b>可以落后</b>：系统加了画面不认识的职能或事件，画面画成通用的屋与小人，或者不画，测试照过；还没画的列在缺口清单里，不让测试失败。画面落后不算错，画错才算。</li>
       <li><b>先事实层，后表演</b>：每加一个空间或元件，先只画事实层，状态直接换上去；走位、气泡、排队这些表演以后再补。</li>
       <li><b>只画已有的记录</b>：画面的每一步都等系统先有对应的记录；系统的验收不等画面，画面的测试不挡系统的合并。</li>
       <li><b>设计问题用草图回答</b>：要回答画面怎么画时，画一张假数据的单页草图，答完就扔；验收看画面合同与诚实性，不对照草图的像素。</li>
@@ -230,16 +230,16 @@
 
   <section id="v5">
     <h2>跟着定义伸缩<small>同一套元件，拓扑从定义推出</small></h2>
-    <p class="muted">部门是屋，角色是小人，关注与许可关系是管道，核验角色有盖章台，子事项是屋里的一间小屋。定义变了，画面跟着变，不另写代码；没有的东西不画，不留黑着灯的空屋。</p>
+    <p class="muted">职能是屋，角色是小人，关注与许可关系是管道，核验角色有盖章台，子事项是屋里的一间小屋。定义变了，画面跟着变，不另写代码；没有的东西不画，不留黑着灯的空屋。</p>
     <div class="map">
-    <svg viewBox="0 0 1000 300" role="img" aria-label="同一套元件随定义伸缩：一个角色、三部门、子组织、观察者与机房">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="同一套元件随定义伸缩：工程、产品 · 工程 · 质检、子组织、观察者与机房">
       <defs>
         <marker id="m" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
         <marker id="mb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--stop)"/></marker>
       </defs>
-      <!-- 一个角色直做 -->
+      <!-- 工程 -->
       <rect class="zone" x="8" y="8" width="234" height="284" rx="8"/>
-      <text class="zone-l" x="22" y="32">一个角色直做</text>
+      <text class="zone-l" x="22" y="32">工程</text>
       <rect class="room" x="50" y="60" width="150" height="110" rx="3"/>
       <circle class="ppl" cx="95" cy="100" r="9"/><rect class="ppl" x="87" y="111" width="16" height="22" rx="3"/>
       <rect class="room" x="112" y="118" width="44" height="14"/>
@@ -247,9 +247,9 @@
       <path class="pipe" d="M125 170 L125 200" marker-end="url(#m)"/>
       <circle class="stamp-open" cx="125" cy="232" r="28"/><text class="lbl" x="125" y="236">开环完成</text>
       <text class="cap" x="125" y="282">交完成就结束，盖虚线章</text>
-      <!-- 三部门按成果 -->
+      <!-- 产品 · 工程 · 质检按成果 -->
       <rect class="zone" x="258" y="8" width="234" height="284" rx="8"/>
-      <text class="zone-l" x="272" y="32">三部门按成果</text>
+      <text class="zone-l" x="272" y="32">产品 · 工程 · 质检按成果</text>
       <rect class="room" x="282" y="56" width="74" height="44" rx="3"/><text class="lbl" x="319" y="82">产品</text>
       <rect class="room" x="394" y="56" width="74" height="44" rx="3"/><text class="lbl" x="431" y="82">工程</text>
       <rect class="room" x="338" y="140" width="74" height="44" rx="3"/><text class="lbl" x="375" y="166">质检</text>
@@ -293,9 +293,9 @@
     <table>
       <thead><tr><th>定义里填的</th><th>画面</th><th>规则怎样看得见</th></tr></thead>
       <tbody>
-        <tr><td>一个角色直做</td><td>一间屋、一个人、出口托盘</td><td>交完成盖虚线的「开环完成」章，没有放行章</td></tr>
-        <tr><td>几个角色直做</td><td>几间屋，询问走传信管</td><td>有核验角色时，它的屋里有盖章台</td></tr>
-        <tr><td>三部门按成果</td><td>一层楼，三间屋连成环</td><td>核验角色的实心「放行」章；打回走红色回流</td></tr>
+        <tr><td>工程</td><td>一间屋、一个人、出口托盘</td><td>交完成盖虚线的「开环完成」章，没有放行章</td></tr>
+        <tr><td>产品 · 工程</td><td>两间屋，询问走传信管</td><td>有核验角色时，它的屋里有盖章台</td></tr>
+        <tr><td>产品 · 工程 · 质检</td><td>一层楼，三间屋连成环</td><td>核验角色的实心「放行」章；打回走红色回流</td></tr>
         <tr><td>任务池（以后）</td><td>大厅的任务板，成员摘卡认领</td><td>每个单元一张卡；放行仍是整份交付一次</td></tr>
         <tr><td>子组织</td><td>屋里一间小屋，门框上是余量与层数</td><td>远看是一个在转的小盒子，推近进去；结束时收成一份提案</td></tr>
         <tr><td>观察者、看门狗</td><td>楼外的观察哨；机房的两个槽位</td><td>观察者只看，信号送到写入口；候选失败切回稳定槽</td></tr>
@@ -304,7 +304,7 @@
     </div>
     <h3>三个空间</h3>
     <div class="pair" style="grid-template-columns:1fr 1fr 1fr">
-      <div class="box"><b>楼：组织</b><small>部门、角色、包裹、询问、决定板、上下文刻度。来自事项的事件流。</small></div>
+      <div class="box"><b>楼：组织</b><small>职能、角色、包裹、询问、决定板、上下文刻度。来自事项的事件流。</small></div>
       <div class="box"><b>机房：机器</b><small>执行机器、部署、交付出去的软件在运行，故障冒烟。来自机器流与运维记录。</small></div>
       <div class="box"><b>城：产品</b><small>页面、接口、数据表是建筑，要求是蓝图，证据让蓝图变成建筑。只读，只能指着说话。</small></div>
     </div>
@@ -316,7 +316,7 @@
     <p class="muted">画面是单独的应用，画面层不认识 Yudao，只认画面合同；Yudao 也只是经公开接口接上的一个宿主。换一个事实源只要换翻译器与壳。接外部 agent 是方向，不排期。</p>
     <div class="outer" style="margin-top:12px;grid-template-columns:1fr 1fr 1fr">
       <div class="col">
-        <div class="box fixed"><b>Yudao</b><small>查询快照与事件流 → Yudao 的翻译器。部门、核验、子事项、观察者都有，画面按定义长全。</small></div>
+        <div class="box fixed"><b>Yudao</b><small>查询快照与事件流 → Yudao 的翻译器。职能、核验、子事项、观察者都有，画面按定义长全。</small></div>
         <div class="box"><b>外部 agent（以后）</b><small>例如 Claude Code 的会话记录与工作区的差异 → 它自己的翻译器。只有一个角色，没有核验。</small></div>
       </div>
       <div class="col">
@@ -330,7 +330,7 @@
     <ul class="rules">
       <li><b>翻译器交出带位置的状态与动作</b>：Yudao 的状态来自查询；别的宿主没有查询，状态由它的翻译器从记录得出。这件事在画面层外面，画面层照样不累加事件。</li>
       <li><b>诚实性对任何宿主都成立</b>：每个状态能回到来源里的一个位置；来源里没有独立核验，就画开环。</li>
-      <li><b>宿主没有的东西不画</b>：外部 agent 没有部门与放行，画面就是一间屋、一个人、一枚虚线章。</li>
+      <li><b>宿主没有的东西不画</b>：外部 agent 没有职能与放行，画面就是一间屋、一个人、一枚虚线章。</li>
     </ul>
   </section>
 
