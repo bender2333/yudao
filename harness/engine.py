@@ -48,7 +48,7 @@ from .execution_contract import ActivationScope, Judgment, RoundRequest, RoundRe
 from .write_path import Transaction, WritePath
 from .models import (PRD_REVISION_FIELDS, TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType,
                      RunProjection, TrialCase, json_dumps, new_id)
-from .public_tree import UnrepresentableWorkspace
+from .public_tree import IgnoreRulesUndecidable, UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
@@ -361,6 +361,10 @@ class StepDriver:
             # 工作区在记录或其他主机工作中出现无法表示的条目：以 workspace_unrepresentable 暂停
             result = RoundResult(stop_reason="workspace_unrepresentable", message=str(exc),
                                  facts=tuple(exc.paths))
+        except IgnoreRulesUndecidable as exc:
+            # 主机判断不了忽略规则：任何位置遇到它都以 host_commit_error 停止事项，说明带诊断原文，不再按
+            # 上下文超限或上游错误记（docs/design/local-tools.md「工具边界」，工单 #604）
+            result = RoundResult(stop_reason="host_commit_error", message=str(exc))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
             result = RoundResult(stop_reason="provider_error", message=f"{type(exc).__name__}: {exc}")
@@ -953,6 +957,9 @@ class StepDriver:
             except UnrepresentableWorkspace as exc:
                 # 请求装配时发现工作区有公开树无法表示的条目：以 workspace_unrepresentable 暂停
                 return _Unassembled("workspace_unrepresentable", exc)
+            except IgnoreRulesUndecidable as exc:
+                # 装配时读公开树，主机判断不了忽略规则：以 host_commit_error 结束（工单 #604）
+                return _Unassembled("host_commit_error", exc)
             except ValueError as exc:
                 return _Unassembled("context_overflow", exc)
             department_input = pinned.department_input
@@ -963,6 +970,9 @@ class StepDriver:
                 step = self._assembly.request(pinned, history, defer_compaction=deferred)
             except UnrepresentableWorkspace as exc:
                 return _Unassembled("workspace_unrepresentable", exc)
+            except IgnoreRulesUndecidable as exc:
+                # 同一类失败在装配工作请求的这一段也要先于 ValueError 认出（工单 #604）
+                return _Unassembled("host_commit_error", exc)
             except CompactionError as exc:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             except (ValueError, FileNotFoundError) as exc:
