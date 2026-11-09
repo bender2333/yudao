@@ -1,12 +1,14 @@
-// 循环图（工单 #1638，项目的组织设计说明 4.14「项目页是循环图加对话」）：把 loop-graph-model 推出的事实
+// 循环图（工单 #1638、#1640，项目的组织设计说明 4.14「项目页是循环图加对话」）：把 loop-graph-model 推出的事实
 // 画成一张图——左边是事项的来源，中间是职能与它们之间的成果箭头，右边是结束；旁边的职能放在它对接的那个
-// 职能上方。窗口窄到 800px 以下时图收成一行（节点名与当前箭头），线程不被挤（样式里换，见 v10-project.css）。
+// 职能上方。开着的询问画成写「询问」的虚线（不带版本），隔着职能的另起一行，旁边职能与主线之间的竖线也换成它；
+// 答完的虚线消失。窗口窄到 800px 以下时图收成一行（节点名、在等谁与当前箭头），线程不被挤（样式里换，见
+// v10-project.css）。
 //
-// 这一层只画，不做判断：节点、箭头、两端写什么全部由模型给出。
+// 这一层只画，不做判断：节点、箭头、询问与两端写什么全部由模型给出。
 
 import { Fragment } from "react";
-import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
-import { END, SOURCE } from "./loop-graph-model";
+import type { LoopArrow, LoopAsk, LoopGraph, LoopNode } from "./loop-graph-model";
+import { END, SOURCE, nameOf } from "./loop-graph-model";
 
 /** 面板现在打开的是哪一个：一个节点，或一条箭头。 */
 export type LoopPanelPick = { kind: "node"; id: string } | { kind: "arrow"; arrow: LoopArrow } | null;
@@ -36,6 +38,20 @@ function ArrowChip(props: { arrow: LoopArrow; on: boolean; onPick: (arrow: LoopA
         <span className={`y10-cv-verdict is-${arrow.verdict.tone}`}>{arrow.verdict.text}</span>
       )}
     </button>
+  );
+}
+
+/**
+ * 一条开着的询问：虚线，写「询问」，不带版本（项目的组织设计说明 4.14）。
+ *
+ * 点询问线只看这两个职能留给 #1642（本单只画）；这里不是按钮，鼠标停上去能看到问题。
+ */
+function AskChip(props: { ask: LoopAsk; direction: string; title: string }) {
+  return (
+    <span className="y10-cv-ask" data-testid={`ask-${props.ask.key}`} title={props.title}>
+      <span className="y10-cv-dir">{props.direction}</span>
+      <span className="y10-cv-kind">询问</span>
+    </span>
   );
 }
 
@@ -88,15 +104,39 @@ export function LoopGraphView(props: {
   const gapColumn = (index: number): number => 2 + 2 * index;
   const selectedNode = props.pick?.kind === "node" ? props.pick.id : null;
   const selectedArrow = props.pick?.kind === "arrow" ? props.pick.arrow.key : null;
+  // 开着的询问：虚线的方向与鼠标停上去的那一句（两端与问题），按放置分组画
+  const directions = (ask: LoopAsk): string => {
+    if (ask.place === "side") {
+      // 旁边的职能在上面：主线问它朝上，它问主线朝下
+      return ask.from === ask.partner ? "↑" : "↓";
+    }
+    return ask.toIndex < ask.fromIndex ? "←" : "→";
+  };
+  const askTitle = (ask: LoopAsk): string => {
+    const pair = `${nameOf(graph, ask.from)}问${nameOf(graph, ask.to)}`;
+    return ask.question === "" ? pair : `${pair}：${ask.question}`;
+  };
+  const asksInGap = (index: number): LoopAsk[] =>
+    graph.openAsks.filter((ask) => ask.place === "gap" && ask.gap === index);
   const cell = (content: React.ReactNode, column: number, row = hasSide ? 3 : 1): React.ReactNode => (
     <div key={`c-${column}-${row}`} style={{ gridColumn: column, gridRow: row }} className="y10-cv-cell">{content}</div>
   );
   const chain: React.ReactNode[] = [];
   graph.gaps.forEach((arrows, index) => {
+    const asks = asksInGap(index);
     chain.push(cell(
-      arrows.length === 0 ? <span className="y10-cv-line" aria-hidden="true" /> : arrows.map((arrow) => (
-        <ArrowChip key={arrow.key} arrow={arrow} on={arrow.key === selectedArrow} onPick={props.onPickArrow} />
-      )),
+      arrows.length === 0 && asks.length === 0
+        ? <span className="y10-cv-line" aria-hidden="true" />
+        : (
+          <>
+            {arrows.map((arrow) => (
+              <ArrowChip key={arrow.key} arrow={arrow} on={arrow.key === selectedArrow} onPick={props.onPickArrow} />
+            ))}
+            {asks.map((ask) => (
+              <AskChip key={ask.key} ask={ask} direction={directions(ask)} title={askTitle(ask)} />
+            ))}
+          </>
+        ),
       gapColumn(index),
     ));
     const node = graph.chain[index];
@@ -123,7 +163,11 @@ export function LoopGraphView(props: {
         nodeColumn(index), 1,
       ));
       side.push(cell(
-        <span className="y10-cv-vlink" aria-hidden="true" />,
+        <span className="y10-cv-vasks">{parts.map((part) => (part.asks.length === 0 ? (
+          <span key={part.node.id} className="y10-cv-vlink" aria-hidden="true" />
+        ) : part.asks.map((ask) => (
+          <AskChip key={ask.key} ask={ask} direction={directions(ask)} title={askTitle(ask)} />
+        ))))}</span>,
         nodeColumn(index), 2,
       ));
     });
@@ -143,6 +187,20 @@ export function LoopGraphView(props: {
       </div>
     );
   });
+  // 隔着职能的询问另起一行：与跨节点的成果箭头同一排，接在它们下面
+  const skipAsks = graph.openAsks.filter((ask) => ask.place === "skip").map((ask, index) => {
+    const low = Math.min(ask.fromIndex, ask.toIndex);
+    const high = Math.max(ask.fromIndex, ask.toIndex);
+    return (
+      <div key={`ask-skip-${ask.key}`} className="y10-cv-skip is-q"
+           style={{ gridColumn: `${nodeColumn(low)} / ${nodeColumn(high) + 1}`, gridRow: skipRow + graph.skip.length + index }}>
+        <span className="y10-cv-line" aria-hidden="true" />
+        <AskChip ask={ask} direction={directions(ask)} title={askTitle(ask)} />
+        <span className="y10-cv-skip-to">{nameOf(graph, ask.from)}问{nameOf(graph, ask.to)}</span>
+        <span className="y10-cv-line" aria-hidden="true" />
+      </div>
+    );
+  });
   const current = currentArrow(graph);
   return (
     <div className="y10-cv-graph" data-testid="loop-graph">
@@ -151,6 +209,7 @@ export function LoopGraphView(props: {
           {side}
           {chain}
           {skips}
+          {skipAsks}
         </div>
       </div>
       {/* 窄屏：图收成一行，节点名与当前箭头（样式里在 800px 以下显示这一行、收起上面那张图） */}
@@ -161,6 +220,8 @@ export function LoopGraphView(props: {
             <button type="button" className="y10-link" onClick={() => props.onPickNode(node.id)}>
               {node.label}{node.verifier ? "（核验）" : ""}
             </button>
+            {/* 窄屏不画线：在节点名旁写上它在等谁的回答（设计说明 4.14） */}
+            {node.waiting.map((text) => <small key={text} className="y10-cv-qstate">{text}</small>)}
           </Fragment>
         ))}
         {current === null ? null : (

@@ -1,12 +1,13 @@
-// 循环图与时序图共用的面板（工单 #1638、#1643，项目的组织设计说明 4.14）：
-//   - 点节点：这个职能在做什么、它的状态与原因、它的标记（核验、只在旧组织里）；
+// 循环图与时序图共用的面板（工单 #1638、#1640、#1643，项目的组织设计说明 4.14）：
+//   - 点节点：这个职能在做什么、它的状态与原因、它的标记（核验、只在旧组织里），以及它的往来
+//     （开着的询问在前，标「还没回答」；答完的排在后面，和节点上的字出自同一份状态与事实）；
 //   - 点箭头：那一版与差异（改了的文件、那一版的一句话），同一种成果能逐版看；
 //   - 点时序图上的一行：成果走同一条箭头（那一版与差异），问答与你的话是全文，
 //     询问里又问的写明是回答哪一次时问的，工程回答质检的分事实与解释。
 // 面板只有一种，只显示模型给出的事实与本页读到的成果材料，不另存一份；这一版不放「看工作过程」。
 
 import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
-import { versionsOf } from "./loop-graph-model";
+import { askStateText, nameOf, versionsOf } from "./loop-graph-model";
 import { arrowText, type LoopPanelPick } from "./loop-graph";
 import { formatTime } from "./labels";
 import type { SequenceDetail, SequenceRow } from "./sequence-model";
@@ -16,18 +17,7 @@ export type LoopPanelTarget = Exclude<LoopPanelPick, null> | { kind: "row"; row:
 
 /** 一版的方向写成人能读的一句：来源 → 职能、职能 → 职能、职能 → 结束。 */
 function endsText(graph: LoopGraph, arrow: LoopArrow): string {
-  const name = (id: string): string => {
-    if (id === "src") {
-      return graph.sourceText;
-    }
-    if (id === "end") {
-      return graph.endText;
-    }
-    return graph.chain.find((node) => node.id === id)?.label
-      ?? graph.side.find((part) => part.node.id === id)?.node.label
-      ?? id;
-  };
-  return `${name(arrow.from)} → ${name(arrow.to)}`;
+  return `${nameOf(graph, arrow.from)} → ${nameOf(graph, arrow.to)}`;
 }
 
 function ArrowPanel(props: {
@@ -85,6 +75,8 @@ function ArrowPanel(props: {
 function NodePanel(props: { graph: LoopGraph; node: LoopNode; onClose: () => void }): React.JSX.Element {
   const { node } = props;
   const partner = props.graph.side.find((part) => part.node.id === node.id)?.partner ?? null;
+  // 它的往来：开着的询问在前，标「还没回答」；和节点上的字出自同一份事实（run.asks）
+  const exchanges = props.graph.asks.filter((ask) => ask.from === node.id || ask.to === node.id);
   return (
     <section className="y10-cv-panel" aria-label={node.label} data-testid="loop-panel-node">
       <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>×</button>
@@ -94,8 +86,21 @@ function NodePanel(props: { graph: LoopGraph; node: LoopNode; onClose: () => voi
         {node.verifier ? <li>它的角色是核验角色：核验交付的那一版，放行时写它的显示名</li> : null}
         {node.others > 0 ? <li>别的事项正在这个职能上的有 {node.others} 件</li> : null}
         {node.oldOnly ? <li>这个职能只在旧组织里：项目现在的组织里已经没有它，这件事项仍按它冻结的组织做完</li> : null}
-        {partner === null ? null : <li>它在旁边接询问，与主线上「{props.graph.chain.find((item) => item.id === partner)?.label ?? partner}」往来</li>}
+        {partner === null ? null : <li>它在旁边接询问，与主线上「{nameOf(props.graph, partner)}」往来</li>}
       </ul>
+      {exchanges.length === 0 ? null : (
+        <div className="y10-cv-exchanges">
+          <b>它的往来</b>
+          <ul className="y10-list">
+            {exchanges.map((ask) => (
+              <li key={ask.key} data-testid={`exchange-${ask.key}`}>
+                {nameOf(props.graph, ask.from)} → {nameOf(props.graph, ask.to)}：{ask.question}
+                <span className={`y10-cv-ask-state${ask.open ? " is-open" : ""}`}>{askStateText(ask)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

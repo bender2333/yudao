@@ -9,8 +9,8 @@
 //
 // 读的事实：project.loop（冻结的组织、职能状态、轮次与 run）、project.overview（事项标题）、
 // project.flow（箭头，以及线程里你的输入、指导、交完成与放行）、work_item.materials（版本与改了的文件）、
-// decisions.list（要你决定的气泡）、run.asks（每个展开的事项各读一次，线程与时序图的问答都从它来）、
-// system.status（模型可不可用）。页面不另存一份，也不按形态名判断。
+// decisions.list（要你决定的气泡）、run.asks（所选事项的运行：循环图的开着询问、节点的往来、线程与时序图的
+// 问答都从它来）、system.status（模型可不可用）。页面不另存一份，也不按形态名判断。
 // 一切「事实推出图与线程」的判断在 loop-graph-model.ts、sequence-model.ts 与 thread-model.ts 里，三处都有单元测试。
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -69,6 +69,16 @@ export function ConversationPage(props: {
   // 图上画哪件事项：地址里写了就画它，没有时画最近在跑的那一件
   const item = useMemo(() => pickItem(items, props.route.workItemId), [items, props.route.workItemId]);
   const itemId = item?.work_item_id ?? "";
+  // 事项到运行：循环图的开着询问与时序图都读这个运行的 run.asks（接口设计说明 4.4）
+  const runId = useMemo(
+    () => loop.data?.work_items.find((card) => card.work_item_id === itemId)?.run_id ?? "",
+    [loop.data, itemId],
+  );
+  // 开着的询问一直读：循环图在收起时序图时也要画虚线；答完的也读，节点面板列它的往来
+  const asks = useSnapshot<RunAsksResult>(props.app, "page.conversation.asks", "run.asks", {
+    run_id: runId,
+  }, item === null || runId === "");
+  const askList = useMemo(() => asks.data?.asks ?? [], [asks.data]);
   // 流转记录读整个项目（线程跨多个事项），画图与时序图时再按所选事项过滤
   const flow = useSnapshot<ProjectFlowResult>(props.app, "page.conversation.flow", "project.flow", {
     project_id: projectId,
@@ -118,7 +128,8 @@ export function ConversationPage(props: {
     current,
     currentRoles,
     others,
-  }), [item, itemFlow, materials.data, labels, current, currentRoles, others]);
+    asks: askList,
+  }), [item, itemFlow, materials.data, labels, current, currentRoles, others, askList]);
   // 同一个面板里逐版看：按出现顺序排的箭头
   const arrows = useMemo<LoopArrow[]>(() => [
     ...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows),
@@ -140,13 +151,6 @@ export function ConversationPage(props: {
   // 时序图展开在循环图下面：从线程里点过来时把它带到眼前；面板在时序图下面，点一行时也把它带到眼前
   const sequenceRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const runId = useMemo(
-    () => loop.data?.work_items.find((card) => card.work_item_id === itemId)?.run_id ?? "",
-    [loop.data, itemId],
-  );
-  const asks = useSnapshot<RunAsksResult>(props.app, "page.conversation.asks", "run.asks", {
-    run_id: runId,
-  }, item === null || !sequenceOpen || runId === "");
   // 列是这个事项冻结的组织里的职能和你（显示名用项目现在组织的名字，旧组织里的用冻结的那一份）
   const roles = useMemo(
     () => (item?.organization?.roles ?? []).map((role) => ({ id: role.id, label: labels[role.id] ?? role.label })),
@@ -155,7 +159,7 @@ export function ConversationPage(props: {
   const sequence = useMemo(() => sequenceOf({
     roles,
     flow: itemFlow,
-    asks: asks.data?.asks ?? [],
+    asks: askList,
     decisions: itemDecisions,
     materials: materials.data,
     verifiers: item?.organization?.verifiers ?? [],
@@ -163,7 +167,7 @@ export function ConversationPage(props: {
     // 「现在」：还没等到的色条画到这里。按这一份事实算一次，不跟着每次重算而抖
     now: new Date().toISOString(),
     openRounds,
-  }), [roles, itemFlow, asks.data, itemDecisions, materials.data, item, pair, itemId, openRounds]);
+  }), [roles, itemFlow, askList, itemDecisions, materials.data, item, pair, itemId, openRounds]);
   const toggleRound = (round: number): void => {
     const shown = openRounds ?? sequence.rounds.filter((entry) => entry.open).map((entry) => entry.round);
     setRoundPick({
@@ -316,10 +320,11 @@ export function ConversationPage(props: {
                     }}
                     onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
                   />
+                  {/* 询问读不出来时在图上说一句：不静默少画线（图上的虚线、节点的往来都与时序图读同一份查询） */}
+                  {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
                   {/* 时序图展开在循环图下面，不是单独的页，也不盖住线程 */}
                   {sequenceOpen && hasSequence(roles) ? (
                     <div ref={sequenceRef}>
-                      {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
                       <SequenceView
                         view={sequence}
                         pickedKey={pickedKey}

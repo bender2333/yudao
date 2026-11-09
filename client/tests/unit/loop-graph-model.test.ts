@@ -9,8 +9,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  END, SOURCE, arrowsOf, graphOf, layoutOf, outcomeOf, otherCounts, pickItem, versionsOf,
-  type FlowRecordLike, type FrozenOrganization, type LoopItemView, type MaterialsView,
+  END, SOURCE, arrowsOf, askStateText, graphOf, layoutOf, nameOf, outcomeOf, otherCounts, pickItem, versionsOf,
+  type AskViewLike, type FlowRecordLike, type FrozenOrganization, type LoopItemView, type MaterialsView,
 } from "../../src/renderer/src/views/project/loop-graph-model.ts";
 
 /** 产品 · 工程 · 质检（harness/definitions/organization.json 的那一份，结构一样）。 */
@@ -86,6 +86,11 @@ function working(departments: Record<string, string>): Record<string, { state: s
     out[id] = { state };
   }
   return out;
+}
+
+/** run.asks 的一次询问（只列循环图读的那几栏）。 */
+function ask(fields: Partial<AskViewLike> & Pick<AskViewLike, "id" | "requester" | "recipient">): AskViewLike {
+  return { question: "要不要做？", status: "进行中", depth: 1, start_position: 1, ...fields };
 }
 
 test("产品 · 工程 · 质检：三个节点，PRD、交付、缺陷记录的箭头写版本与第几轮，打回与放行标在那一版上", () => {
@@ -324,5 +329,182 @@ test("事项没有冻结的组织（形态不在这一版发布里）时没有�
   const graph = graphOf({ item: item({ work_item_id: "w6", organization: null }), flow: [], materials: null });
   assert.deepEqual(graph.nodes, []);
   assert.deepEqual(graph.gaps, []);
+  assert.deepEqual(graph.asks, []);
+  assert.deepEqual(graph.openAsks, []);
   assert.equal(graph.endText, "");
+});
+
+test("产品 · 工程：工程问产品时竖线换成写「询问」的虚线，工程写在等待、不挂角标，产品写回答、挂角标", () => {
+  const organization = productEngineering();
+  const graph = graphOf({
+    item: item({
+      work_item_id: "w18", organization,
+      departments: {
+        engineering: { state: "asking", note: "在等待产品的回答" },
+        product: { state: "working", note: "回答工程的询问" },
+      },
+    }),
+    flow: [], materials: null,
+    current: { form: "several", sources: { user_input: "engineering" } },
+    asks: [ask({
+      id: "a1", requester: "engineering", recipient: "product",
+      question: "退款金额取整到分还是到元？", start_position: 5,
+    })],
+  });
+  const engineering = graph.chain.find((node) => node.id === "engineering");
+  const product = graph.side[0]?.node;
+  assert.ok(engineering);
+  assert.ok(product);
+  // 节点上的字与节点详情读同一份状态：状态词，原因写在括号里
+  assert.equal(engineering.stateWord, "询问中");
+  assert.equal(engineering.state, "询问中（在等待产品的回答）");
+  assert.equal(engineering.working, false);
+  assert.equal(product.stateWord, "一轮工作中");
+  assert.equal(product.state, "一轮工作中（回答工程的询问）");
+  assert.equal(product.working, true);
+  // 在等的写「在等待某某的回答」（窄屏不画线时写在节点名旁）
+  assert.deepEqual(engineering.waiting, ["在等待产品的回答"]);
+  assert.deepEqual(product.waiting, []);
+  // 一次开着的询问：两端是工程与产品，画在旁边的职能与主线之间的竖线处，询问不是成果、没有版本
+  assert.equal(graph.openAsks.length, 1);
+  assert.deepEqual([graph.openAsks[0].from, graph.openAsks[0].to, graph.openAsks[0].place, graph.openAsks[0].partner],
+    ["engineering", "product", "side", "engineering"]);
+  assert.equal(graph.openAsks[0].open, true);
+  assert.equal("version" in graph.openAsks[0], false);
+  assert.equal(askStateText(graph.openAsks[0]), "还没回答");
+  // 「产品 · 工程」里开着询问时，两节点之间的竖线换成这条虚线
+  assert.equal(graph.side[0].asks.length, 1);
+});
+
+test("产品 · 工程 · 质检：相邻的询问在那一格里，隔着职能的另起一行，询问链每层一条", () => {
+  const organization = threeDepartments();
+  const graph = graphOf({
+    item: item({
+      work_item_id: "w19", organization,
+      departments: {
+        product: { state: "working", note: "回答工程的询问" },
+        engineering: { state: "asking", note: "在等待产品的回答" },
+        quality: { state: "asking", note: "在等待产品的回答" },
+      },
+    }),
+    flow: [], materials: null,
+    asks: [
+      ask({ id: "a1", requester: "engineering", recipient: "product", question: "取整到分？", depth: 1, start_position: 4 }),
+      ask({ id: "a2", requester: "quality", recipient: "product", question: "验收条件按哪一版？", depth: 2, start_position: 7 }),
+    ],
+  });
+  // 同时开着两次就有两条：工程问产品在 1 号格；质检问产品隔着工程，另起一行
+  assert.deepEqual(graph.openAsks.map((entry) => [entry.from, entry.to, entry.place, entry.gap, entry.depth]),
+    [["engineering", "product", "gap", 1, 1], ["quality", "product", "skip", -1, 2]]);
+  assert.deepEqual([graph.openAsks[1].fromIndex, graph.openAsks[1].toIndex], [2, 0]);
+  // 等的两组都写在等谁；被问的产品在回答，挂「在做」，等回答的不挂
+  assert.deepEqual(graph.chain.map((node) => [node.label, node.working]),
+    [["产品", true], ["工程", false], ["质检", false]]);
+  assert.deepEqual(graph.chain.find((node) => node.id === "engineering")?.waiting, ["在等待产品的回答"]);
+  assert.deepEqual(graph.chain.find((node) => node.id === "quality")?.waiting, ["在等待产品的回答"]);
+});
+
+test("答完的询问虚线消失，收进往来；回答里修订的 PRD 是新的一条实线箭头", () => {
+  const organization = threeDepartments();
+  const flow: FlowRecordLike[] = [
+    record({ flow_id: "prd-1", kind: "PRD 新版本", position: 2, direction_from: "product", direction_to: "engineering", round: 1 }),
+    record({
+      flow_id: "prd-2", kind: "PRD 新版本", position: 9, direction_from: "product", direction_to: "engineering",
+      round: 2, content: "取整规则：到分",
+    }),
+  ];
+  const graph = graphOf({
+    item: item({
+      work_item_id: "w20", organization,
+      departments: working({ product: "waiting", engineering: "waiting", quality: "waiting" }),
+    }),
+    flow,
+    materials: { contracts: [{ event_id: "evt-prd-1", revision: 1 }, { event_id: "evt-prd-2", revision: 2 }] },
+    asks: [
+      ask({ id: "a1", requester: "engineering", recipient: "product", status: "已回答", start_position: 5 }),
+      ask({ id: "a2", requester: "quality", recipient: "product", status: "没能回答", start_position: 6 }),
+    ],
+  });
+  // 答完与没能回答的都不画线；仍留在节点面板的往来里
+  assert.deepEqual(graph.openAsks, []);
+  assert.deepEqual(graph.asks.map((entry) => [entry.key, entry.open, askStateText(entry)]),
+    [["a1", false, "已回答"], ["a2", false, "没能回答"]]);
+  // 修订的 PRD 是新的一版，照常是一条实线成果箭头（LoopArrow 没有虚线之分）
+  assert.deepEqual(graph.gaps[1].map((arrow) => [arrow.outcome, arrow.version, arrow.round]),
+    [["PRD", 1, 1], ["PRD", 2, 2]]);
+});
+
+test("定义上可以询问谁不画成常挂的线：没有开着的询问时图上没有虚线", () => {
+  const organization = productEngineering();
+  const graph = graphOf({
+    item: item({ work_item_id: "w22", organization }),
+    flow: [], materials: null,
+    current: { form: "several", sources: { user_input: "engineering" } },
+  });
+  // 冻结的组织里有可以询问谁（双向），但那不是常挂的线；开着的询问从 run.asks 读
+  assert.ok((organization.asks ?? []).length > 0);
+  assert.deepEqual(graph.openAsks, []);
+  assert.deepEqual(graph.side[0]?.asks, []);
+});
+
+test("五个状态逐条核对节点上的字、「在做」角标与节点详情：等你决定不挂，核验中与等待工作写状态词", () => {
+  const organization = threeDepartments();
+  const cases: { state: string; note: string | null; word: string; working: boolean }[] = [
+    { state: "waiting_user", note: null, word: "等用户", working: false },
+    { state: "working", note: "回答产品的询问", word: "一轮工作中", working: true },
+    { state: "asking", note: "在等待产品的回答", word: "询问中", working: false },
+    { state: "verifying", note: "等质检核验交付 r1", word: "核验中", working: false },
+    { state: "waiting", note: null, word: "等待工作", working: false },
+  ];
+  for (const entry of cases) {
+    const graph = graphOf({
+      item: item({
+        work_item_id: `w-${entry.state}`, organization,
+        departments: { engineering: { state: entry.state, note: entry.note } },
+      }),
+      flow: [], materials: null,
+    });
+    const node = graph.chain.find((candidate) => candidate.id === "engineering");
+    assert.ok(node);
+    // 节点上的字与节点详情读同一份状态：状态词，有具体原因时写在括号里
+    assert.equal(node.stateWord, entry.word);
+    assert.equal(node.state, entry.note === null ? entry.word : `${entry.word}（${entry.note}）`);
+    assert.ok(node.state.startsWith(node.stateWord));
+    // 「在做」角标只挂在一轮工作中的节点（等你决定、询问中、核验中、等待工作都不挂）
+    assert.equal(node.working, entry.working);
+    assert.equal(node.working, entry.word === "一轮工作中");
+    // 不出现英文内部标识（职能标识是 product / engineering / quality）
+    for (const id of ["product", "engineering", "quality"]) {
+      assert.ok(!node.state.includes(id), `${entry.state} 的节点字里出现了 ${id}`);
+    }
+  }
+});
+
+test("点节点面板的往来：开着的在前、标「还没回答」，显示名用服务端 label", () => {
+  const organization = productEngineering();
+  const graph = graphOf({
+    item: item({
+      work_item_id: "w21", organization,
+      departments: {
+        product: { state: "asking", note: "在等待开发的回答" },
+        engineering: { state: "working", note: "回答需求的询问" },
+      },
+    }),
+    flow: [], materials: null,
+    current: { form: "several", sources: { user_input: "engineering" } },
+    labels: { product: "需求", engineering: "开发" },
+    asks: [
+      ask({ id: "done", requester: "engineering", recipient: "product", status: "已回答", question: "旧的问法", start_position: 2 }),
+      ask({ id: "open", requester: "product", recipient: "engineering", question: "现在的问法", start_position: 8 }),
+    ],
+  });
+  // 往来按开着的在前排；开着的写「还没回答」，答完的写查询给的状态
+  assert.deepEqual(graph.asks.map((entry) => entry.key), ["open", "done"]);
+  assert.equal(askStateText(graph.asks[0]), "还没回答");
+  assert.equal(askStateText(graph.asks[1]), "已回答");
+  // 显示名用服务端给的 label（现在的组织）：节点、等待的那句话、面板里的往来都用它
+  assert.equal(nameOf(graph, "product"), "需求");
+  assert.equal(nameOf(graph, "engineering"), "开发");
+  assert.deepEqual(graph.side.find((part) => part.node.id === "product")?.node.waiting, ["在等待开发的回答"]);
+  assert.deepEqual(graph.chain.find((node) => node.id === "engineering")?.waiting, []);
 });
