@@ -735,6 +735,36 @@ def test_project_commands_refuse_a_form_that_is_not_in_the_release(tmp_path):
     system.close()
 
 
+def test_restarting_onboarding_is_refused_when_the_project_form_is_not_in_the_release(tmp_path):
+    # 审查发现（第 4 轮）：项目现在的形态不在这一版发布里时，`onboarding.restart` 抛未处理的 ValueError
+    # （接口 500）。与 `work_item.create` 同一条拒绝：`not_allowed`，说明里写出是哪一个形态与可以选的形态，
+    # 不写事件、不建出事项
+    data_dir = tmp_path / "loop"
+    system = _system(data_dir, {department: [] for department in DEFINITIONS.departments},
+                     resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("形态不在这一版发布里", ONBOARDING_GOAL, source="existing")
+    system.projects.configure_source_directory(project_id, "src",
+                                               str(onboarding_source(tmp_path / "source")), base_version=0)
+    adopted = _adopt(application, project_id, {}, form=SEVERAL_ROLES_DIRECT, reason="换成两份角色的形态")
+    assert isinstance(adopted, Accepted), adopted
+    assert system.projects.projection(project_id).form_name == SEVERAL_ROLES_DIRECT
+    system.close()
+
+    # 换一份只加载默认形态的发布：项目现在用的那一份不在里面
+    second = _system(data_dir, {department: [] for department in DEFINITIONS.departments},
+                     release=DEFINITIONS, resume_on_startup=False)
+    application = _application(second)
+    rejected = asyncio.run(application.command("onboarding.restart", OnboardingRestart(
+        command_id=str(uuid.uuid4()), project_id=project_id, source_name="src"), actor="user:local"))
+    assert isinstance(rejected, Rejected), rejected
+    assert rejected.reason == "not_allowed"
+    assert SEVERAL_ROLES_DIRECT in rejected.message
+    assert list(second.forms) == [DEFAULT_FORM] and DEFAULT_FORM in rejected.message
+    assert second.projects.projection(project_id).work_items == []
+    second.close()
+
+
 def test_the_frozen_organization_reads_back_as_the_same_definition(tmp_path):
     # 存进事实的那份合成结果读回来是同一份定义：逐文件相同，版本（内容摘要）也相同，重放与恢复读的是它
     system = _system(tmp_path / "loop", _three_departments_script(), resume_on_startup=False)

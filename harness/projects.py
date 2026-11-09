@@ -146,8 +146,9 @@ def _flatten_definitions(definitions: Definitions) -> dict[str, str]:
     # 项写定义的路径，覆盖设计说明「冻结与升级」说的五项：轮转（轮转方式与它那份定义）、职能（显示名、
     # 三样说明、关注的成果、建议能力、工具许可、可见范围、是不是核验角色）、成果（种类与分组的名与说明）、
     # 核验（谁核验谁的哪种成果、各角色的写入范围）、事项的来源。清单类的项按排序后的一项一行。
-    # 不在这里的：角色 Prompt、部门的 Prompt 底稿、提案合同、事项种类里的说明文字与规则登记——它们属于
-    # 模型与 Prompt 那一层或发布随事项照常读的其余内容（见交付说明的「自定的边界」，工单 #1517 第 4 轮）
+    # 不在这里的：角色 Prompt、部门的 Prompt 底稿、提案合同、事项种类的说明文字、停止原因与仓库概况的分类、
+    # 部门的角色清单（现在一个部门一个角色）、规则登记——它们属于模型与 Prompt 那一层，或是发布随事项照常读的
+    # 其余内容，不是「组织这一层」的五项（见交付说明的「自定的边界」第 15 条，工单 #1517 第 4 轮）
     flat: dict[str, str] = {"routing": definitions.routing}
     # 轮转方式自己那份定义（设计说明「冻结与升级」比五项里的轮转）：清单、最后采纳的成果、上限与结束原因
     routing = next((item for item in definitions.routings.routings if item.id == definitions.routing), None)
@@ -965,6 +966,13 @@ class ProjectService:
         if any(item.status in ("in_progress", "awaiting_initial_prd")
                for item in _compose(self.store, deepcopy(project)).work_items):
             raise WorkItemInProgressError(f"work item in progress: {project_id}")
+        # 项目现在的形态不在这一版发布里（工单 #1517 第 4 轮审查，项目的组织设计说明「冻结与升级」）：
+        # 与新建事项同一条拒绝——重新开始建档以 `not_allowed` 收场并列出可以选的形态，不写事件；
+        # 不先核这一步时 `_work_item_created` 里的 form_named 会抛未处理的 ValueError（接口 500）
+        if project.form_name not in self.orchestrator.forms:
+            raise OrganizationRejectedError(
+                f"项目现在用的形态 {project.form_name} 不在这一版发布里，重新开始建档被拒绝；"
+                f"可以选的形态是：{'、'.join(self.orchestrator.forms)}")
         directory = project.source_directories.get(source_name)
         if directory is None:
             raise SourceDirectoryNotFoundError(f"unknown source directory: {source_name}")

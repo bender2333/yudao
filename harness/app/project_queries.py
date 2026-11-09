@@ -541,7 +541,6 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
     # 取不到（形态不在这一版发布里或改动合不到一起）时为空
     project_definitions, _issues = current_organization(forms, state.form_name, state.organization_changes,
                                                         store=store)
-    project_version = None if project_definitions is None else project_definitions.version
     # 事项冻结的合成结果按内容摘要只读一次（工单 #1517）：几个事项用同一份组织时不必各读一遍那件工件
     frozen: dict[str, Any] = {}
     rows: list[WorkItemLoop] = []
@@ -565,7 +564,6 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             refs=_fact_refs(store, item, run, state),
             organization=_work_item_organization(forms, store, item, through,
                                                  artifacts=application.system.artifacts,
-                                                 project_version=project_version,
                                                  project_definitions=project_definitions,
                                                  frozen=frozen),
         ))
@@ -782,7 +780,6 @@ def _watched_relations(definitions: Any, kind: str, ref: FactRef) -> list[Watche
 
 def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
                             through: int | None = None, *, artifacts: Any = None,
-                            project_version: str | None = None,
                             project_definitions: Any = None,
                             frozen: dict[str, Any] | None = None) -> WorkItemOrganization | None:
     """这个事项冻结定义里的组织（工单 #1381、#1517）。
