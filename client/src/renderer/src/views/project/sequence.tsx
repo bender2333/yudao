@@ -164,7 +164,10 @@ export function SequenceView(props: {
                 {round.open
                   ? round.rows.map((row) => <Row key={row.key} view={view} row={row} />)
                   : null}
-                {round.round === view.latestRound && view.now !== null ? <NowRow view={view} bars={nowBars} /> : null}
+                {/* 还没等到的色条画到这里：紧跟最新一轮的最后一行（这一轮折起来时不画，免得底下留下一段没有来处的色条） */}
+                {round.open && round.round === view.latestRound && view.now !== null
+                  ? <NowRow view={view} bars={nowBars} />
+                  : null}
               </Fragment>
             ))}
           </div>
