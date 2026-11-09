@@ -260,7 +260,9 @@ def test_compaction_uses_the_same_retry_path(tmp_path):
         work_count += 1
         return _read(request, "large.txt") if work_count == 1 else product_spec()
 
-    adapter = FakeAdapter([respond] * 8)
+    # 脚本给足轮次：压缩轮的数目由窗口与历史的大小关系定，固定材料变大以后（工单 #1660）会多几轮，
+    # 这条用例只核对压缩与工作请求走同一条重试路径，不核对轮数
+    adapter = FakeAdapter([respond] * 20)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     # 上下文窗口按这个场景的需要设置（测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」）：读一个大文件以后历史装不下、
     # 要压缩，固定材料（部门提示与事项种类的说明）装得下并留出余量；窗口不随提示词的篇幅调整
