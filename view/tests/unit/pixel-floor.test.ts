@@ -5,13 +5,19 @@
 // 几个部门同时工作时几个房间都算忙（#958：事项的 departments）、询问在房间之间传（#958：信沿传信管走、
 // 提问方在管口等待、回答以后回桌前）、自主行为、管道流动、包裹沿管道走、运维数据出现时世界重新声明、状态机、
 // 决定单与大厅的板、画面合同接线后的四条行为（交付箱还在管道里走时质检不提前显示收到、PRD 被接纳盖有效章加交接、
-// 进行中的事项进房间、决定单一到就贴在大厅的板上）、跳到最新不补播、以及画面层的导入方向。
+// 进行中的事项进房间、决定单一到就贴在大厅的板上）、跳到最新不补播、点画布上的事实元件就能点开回链（#1612：
+// 没有打开覆盖层「来源」时也交出回调，这一条要真浏览器与画布，与 pixel-honesty.test.ts 同一做法）、
+// 以及画面层的导入方向。
 //
 // 事件 → 动作的翻译由 translate/floor.ts 负责，它的测试在 translate-floor.test.ts；这里只用它翻好的动作。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "vite";
+import { chromium } from "@playwright/test";
 
 import { buildCatalog, sayCatalogTypes } from "../../src/pixel/world/floor-decl.ts";
 import { declareLinks, declareRooms, createWorld, polyLength, pointAt, route } from "../../src/pixel/world/declare.ts";
@@ -748,6 +754,152 @@ test("状态的取值按画面合同校验：服务端的说法（running）进�
 test("事项的颜色按色板取，色板之外不越界", () => {
   assert.equal(itemColor({ color_index: 0 }), "#d9534f");
   assert.equal(itemColor({ color_index: 7 }), "#4a90d9");
+});
+
+// ---------------------------------------------------------------------------
+// 点画布上的事实元件就能点开回链（工单 #1612）
+//
+// 画面用 PixiJS 画，画布要真浏览器：与 pixel-honesty.test.ts 同一做法，模块由 Vite 的模块服务器提供，
+// 在页面里建一层楼层、推进几帧，再在画布上按事实元素的位置点一下（页面坐标按画布的位置与逻辑坐标换算）。
+// 不启动 Yudao、不连网络：状态是手写的一份楼层状态，覆盖层一次也没有打开。
+
+/** 一次点击的读数：画出来的事实元素、覆盖层、回调收到的（事项、元件）与指针的样子。 */
+interface FactClickReport {
+  /** 画面上画出来的事实元素（点之前读的）。 */
+  facts: { work_item_id: string; element: string; drawn: boolean }[];
+  /** 此刻的覆盖层：没有打开任何覆盖层时为 null。 */
+  overlay: string | null;
+  /** 点了画出来的那个事实元件以后，回调收到的（事项、元件），按点击顺序。 */
+  drawn: { work_item_id: string; element: string }[];
+  /** 再点一下没有画出来的那个元件（缺来源）以后，回调一共收到的（事项、元件）。 */
+  missing: { work_item_id: string; element: string }[];
+  /** 鼠标移到画出来的元件与缺来源的元件上时，画布上的指针。 */
+  cursor: { drawn: string; missing: string };
+}
+
+/** 页面里的驱动：建画面、读事实元素、点两下、读指针（状态由用例交进来，只收一个参数）。 */
+async function factClick(input: { model: unknown }): Promise<FactClickReport> {
+  const P = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+  const clockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px;z-index:9999;background:#000";
+  document.body.appendChild(host);
+  const clock = clockMod.createManualClock();
+  // 画面交出的「点开回链」回调：只记下来，交给用例断言（壳把它变成页面地址是壳的事）
+  const seen: { work_item_id: string; element: string }[] = [];
+  const view = await P.createFloorView({
+    host,
+    clock,
+    onOpenSource: (work_item_id, element) => { seen.push({ work_item_id, element }); },
+  });
+  const advance = (ms: number): void => {
+    const frames = Math.max(1, Math.round(ms / 50));
+    for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+  };
+  view.jump(input.model as never);
+  advance(250);
+  // 点之前先确认画面上没有覆盖层：这一条用例说的是「不必先打开来源覆盖层」
+  const overlay = view.inspect().renderer.overlay.id;
+  const facts = view.factRects();
+  const canvas = host.querySelector("canvas");
+  if (!canvas) throw new Error("画面没有挂上画布");
+  const box = canvas.getBoundingClientRect();
+  const centerOf = (rect: { x: number; y: number; w: number; h: number }): [number, number] => [
+    box.left + ((rect.x + rect.w / 2) / view.size.W) * box.width,
+    box.top + ((rect.y + rect.h / 2) / view.size.H) * box.height,
+  ];
+  const moveTo = (rect: { x: number; y: number; w: number; h: number }): string => {
+    const [clientX, clientY] = centerOf(rect);
+    canvas.dispatchEvent(new MouseEvent("mousemove", { clientX, clientY }));
+    return canvas.style.cursor;
+  };
+  const clickAt = (rect: { x: number; y: number; w: number; h: number }): void => {
+    const [clientX, clientY] = centerOf(rect);
+    canvas.dispatchEvent(new MouseEvent("click", { clientX, clientY }));
+  };
+  const drawnFact = facts.find((fact) => fact.drawn && fact.element === "sign") ?? facts.find((fact) => fact.drawn);
+  const missingFact = facts.find((fact) => !fact.drawn);
+  if (!drawnFact || !missingFact) throw new Error(`样例状态没有给出两种事实元素：${JSON.stringify(facts)}`);
+  const cursorDrawn = moveTo(drawnFact);
+  clickAt(drawnFact);
+  const afterDrawn = seen.slice();
+  const cursorMissing = moveTo(missingFact);
+  clickAt(missingFact);
+  const afterMissing = seen.slice();
+  view.destroy();
+  host.remove();
+  return {
+    facts: facts.map((fact) => ({ work_item_id: fact.work_item_id, element: fact.element, drawn: fact.drawn })),
+    overlay,
+    drawn: afterDrawn,
+    missing: afterMissing,
+    cursor: { drawn: cursorDrawn, missing: cursorMissing },
+  };
+}
+
+const factClickModel: FloorModel = model({
+  // 门牌、轮次与已用时间有来源；包裹缺来源（画面上没有它，覆盖层「来源」才按它的位置标出来）
+  items: [{
+    ...item("working", "engineering"),
+    refs: {
+      sign: { source: "user", position: 2 },
+      round: { source: "rule", position: 3 },
+      elapsed: { source: "host_measurement", position: 4 },
+    },
+  }],
+});
+
+test("点画布上的事实元件就能点开回链：没有打开覆盖层也交出事项与元件，缺来源的点不中（工单 #1612）", async () => {
+  const viewRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const server = await createServer({
+    root: viewRoot,
+    // 与 pixel-honesty.test.ts 分开缓存：单元测试文件之间并行运行，两个服务器不同时改写同一份缓存
+    cacheDir: join(viewRoot, "node_modules", ".vite-pixel-floor"),
+    plugins: [],
+    server: { host: "127.0.0.1", port: 0, strictPort: false },
+    logLevel: "error",
+    appType: "spa",
+  });
+  await server.listen();
+  const address = server.resolvedUrls?.local[0];
+  if (!address) throw new Error("画面的模块服务器没有给出地址");
+  const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+  const page = await browser.newPage();
+  try {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.route(address + "facts.html", (route) => route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>",
+    }));
+    await page.goto(address + "facts.html");
+    const result = await page.evaluate(async (payload: { fnSource: string; model: unknown }) => {
+      try {
+        const fn = (0, eval)(`(${payload.fnSource})`) as (i: { model: unknown }) => Promise<FactClickReport>;
+        return { ok: await fn({ model: payload.model }) };
+      } catch (e) {
+        return { failed: String((e as Error)?.stack ?? e) };
+      }
+    }, { fnSource: factClick.toString(), model: factClickModel });
+    if ("failed" in result) throw new Error(`驱动失败：${String(result.failed)}`);
+    assert.deepEqual(pageErrors, [], `页面不应报错：${pageErrors.join("\n")}`);
+    const report = result.ok as FactClickReport;
+    // 画面上没有打开任何覆盖层，事实元件照样画出来了的一部分、缺来源的那一个没画
+    assert.equal(report.overlay, null, "这一条用例说的是没有打开覆盖层的情形");
+    assert.ok(report.facts.some((fact) => fact.drawn), `样例状态没有画出事实元素：${JSON.stringify(report.facts)}`);
+    assert.ok(report.facts.some((fact) => !fact.drawn), `样例状态没有缺来源的元件：${JSON.stringify(report.facts)}`);
+    // 点画出来的事实元件：画面交出「点开回链」，带事项与元件
+    assert.deepEqual(report.drawn, [{ work_item_id: "w1", element: "sign" }], "点画出来的门牌应交出它的事项与元件");
+    // 点没有画出来的那一个（缺来源）：不交出
+    assert.deepEqual(report.missing, report.drawn, "缺来源的元件画面上没有它，不应交出回链");
+    // 鼠标移上去照旧显示可点；缺来源的那一个不显示
+    assert.equal(report.cursor.drawn, "pointer", "画出来的事实元件移上去应显示可点");
+    assert.equal(report.cursor.missing, "default", "缺来源的元件上没有可点的东西");
+  } finally {
+    await page.close();
+    await browser.close();
+    await server.close();
+  }
 });
 
 // ---------------------------------------------------------------------------
