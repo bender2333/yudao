@@ -21,6 +21,8 @@ run 创建事件上的一个工件引用，旧事件照样读、重放结果不�
 from __future__ import annotations
 
 import asyncio
+import json
+import sqlite3
 import uuid
 from copy import deepcopy
 from pathlib import Path
@@ -35,14 +37,15 @@ from harness.app.project_and_work_item_commands import WorkItemCreate
 from harness.app.project_commands import ProjectCreate, ProjectOnboard
 from harness.app.project_queries import ProjectLoop
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, Definitions, definitions_from_contents
-from harness.event_store import Command, run_stream
+from harness.event_store import Command, project_stream, run_stream
 from harness.models import EventType, ProjectEventType, new_id
 from harness.projection import RunProjection
 from harness.projects import definitions_from_ref
 from harness.runtime import SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, LoopSystem
-from harness.tests.helpers import delivery_turn, product_spec, quality_turns
+from harness.tests.helpers import delivery_turn, merge_scripts, product_spec, quality_turns
 from harness.tests.onboarding_project import ONBOARDING_GOAL, onboarding_source
 from harness.tightening import WATCHED_OUTPUTS
+from harness.write_path import NewProjectEvent
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
@@ -270,6 +273,32 @@ def test_a_restarted_instance_runs_the_organization_the_item_froze_not_the_chang
     second.close()
 
 
+def test_restarting_does_not_ask_about_the_definitions_version_when_only_the_project_changed(tmp_path):
+    # 回归（审查发现）：采用过组织改动以后建的事项，冻结的合成结果里有本项目的改动，版本与发布里那个形态的
+    # 版本本来就不同；重启时发布没有变，不该发「定义版本不同」的决定请求，照旧直接接着跑
+    data_dir = tmp_path / "loop"
+    script = _three_departments_script()
+    first = _system(data_dir, script, resume_on_startup=False)
+    application = _application(first)
+    project_id = first.projects.register("采用过改动的项目", GOAL)
+    adopted = _adopt(application, project_id, {"departments": {"quality": {"label": RENAMED_LABEL}}})
+    assert isinstance(adopted, Accepted), adopted
+    item_id, run_id = first.projects.start_work_item(project_id, "采用之后建的事项")
+    assert first.activate_once(run_id).status == "running"
+    frozen_version = _created(first, project_id, item_id)["definitions_version"]
+    assert frozen_version != DEFINITIONS.version             # 冻结的是合成结果的版本，不是发布里那一份
+    first.close()
+
+    second = _system(data_dir, script)
+    assert _definitions_requests(second, run_id) == []
+    assert second.resumed_runs.get(run_id) is not None
+    ended = second.run_until_stop(run_id)
+    assert ended.status == "done" and ended.stop_reason == "released"
+    assert second.orchestrator.item_form(run_id).definitions.version == frozen_version
+    assert second.orchestrator.item_form(run_id).definitions.department_labels["quality"] == RENAMED_LABEL
+    second.close()
+
+
 # ---------------------------------------------------------------------------
 # 验收第 3 条：发布改了工程的工具、本项目没碰它，下一个事项用上新工具、本项目加过的工具仍在，
 # 查询写明不同；发布不再带本项目加过的工具时新建事项被拒绝并写明原因
@@ -454,6 +483,98 @@ def test_adopting_an_existing_project_can_choose_a_form(tmp_path):
     assert onboarding["form"] == SINGLE_ROLE_DIRECT
     assert onboarding["definitions_version"] == system.forms[SINGLE_ROLE_DIRECT].definitions.version
     assert onboarding["definitions_ref"]["kind"] == "item_definitions"
+    system.close()
+
+
+def test_the_running_items_count_counts_items_not_organizations(tmp_path):
+    # 审查发现：同一份组织有两个事项在用，`running_items` 要数事项（2），不是数几种组织（1）
+    system = _system(tmp_path / "loop", merge_scripts(_three_departments_script(),
+                                                      _three_departments_script()),
+                     resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("两个事项在跑", GOAL)
+    first_item, first_run = system.projects.start_work_item(project_id, "第一件在跑的事项")
+    second_item, second_run = system.projects.start_work_item(project_id, "第二件在跑的事项")
+    assert system.activate_once(first_run).status == "running"
+    assert system.activate_once(second_run).status == "running"
+
+    adopted = _adopt(application, project_id, {
+        "remove_departments": ["quality"],
+        "departments": {"product": {"watched": {"remove": ["baseline_review"]}},
+                        "engineering": {"watched": {"remove": ["defect_record"]}}}})
+    assert isinstance(adopted, Accepted), adopted
+    organization = _project_organization(application, project_id)
+    departments = {row.id: row for row in organization.departments}
+    assert [row.id for row in organization.departments] == ["product", "engineering", "quality"]
+    # 两个事项还在跑，两个都用了质检
+    assert (departments["quality"].origin, departments["quality"].running_items) == ("running_item", 2)
+    assert departments["product"].running_items == 2
+    assert (_item_organization(application, project_id, first_item).same_as_project,
+            _item_organization(application, project_id, second_item).same_as_project) == (False, False)
+    system.close()
+
+
+def test_an_old_item_without_a_frozen_organization_still_adds_its_departments(tmp_path):
+    # 审查发现：只记了形态名的旧事项（没有 definitions_ref）也要算进项目的部门清单：
+    # 它的组织按它在那一版发布里取（工单 #1392 的读法），项目改掉组织以后旧组织的部门照样列举并标出
+    data_dir = tmp_path / "loop"
+    system = _system(data_dir, _three_departments_script(), resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("旧事项还在跑", GOAL)
+    item_id, run_id = system.projects.start_work_item(project_id, "冻结之前建的事项")
+    assert system.activate_once(run_id).status == "running"
+    system.close()
+    _forget_frozen_organization(data_dir, item_id)
+
+    reopened = _system(data_dir, _three_departments_script(), resume_on_startup=False)
+    application = _application(reopened)
+    assert _created(reopened, project_id, item_id).get("definitions_ref") is None
+    adopted = _adopt(application, project_id, {
+        "remove_departments": ["quality"],
+        "departments": {"product": {"watched": {"remove": ["baseline_review"]}},
+                        "engineering": {"watched": {"remove": ["defect_record"]}}}})
+    assert isinstance(adopted, Accepted), adopted
+    organization = _project_organization(application, project_id)
+    departments = {row.id: row for row in organization.departments}
+    assert (departments["quality"].origin, departments["quality"].running_items) == ("running_item", 1)
+    reopened.close()
+
+
+def _forget_frozen_organization(data_dir: Path, work_item_id: str) -> None:
+    # 把事项创建事件里的冻结结果去掉，模拟这一单之前登记的事项（只记了形态名）。项目的部门清单只按事项创建
+    # 事件里的引用看，这条用例要的就是那一路；事件库里 run 的创建事件原样留着
+    connection = sqlite3.connect(data_dir / "events.sqlite")
+    try:
+        rows = connection.execute(
+            "SELECT event_id, payload_json FROM events WHERE type = ?",
+            (ProjectEventType.WORK_ITEM_CREATED,)).fetchall()
+        for event_id, payload in rows:
+            document = json.loads(payload)
+            if document.get("work_item_id") != work_item_id:
+                continue
+            document.pop("definitions_ref", None)
+            connection.execute("UPDATE events SET payload_json = ? WHERE event_id = ?",
+                               (json.dumps(document, ensure_ascii=False, sort_keys=True), event_id))
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def test_the_work_item_command_refuses_when_the_project_form_is_not_in_the_release(tmp_path):
+    # 审查发现：项目现在的形态不在这一版发布里时，新建事项走命令层要给 not_allowed 与说明，不是未处理的错误
+    system = _system(tmp_path / "loop", _three_departments_script(), resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("项目的形态不在发布里", GOAL)
+    system.writes.append(project_stream(project_id), NewProjectEvent(
+        ProjectEventType.PROJECT_FORM_SET,
+        {"previous_form": DEFAULT_FORM, "form": "form_from_a_newer_release", "reason": ""},
+        actor="user:local"))
+    rejected = asyncio.run(application.command("work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text="不该开始的事项"), actor="user:local"))
+    assert isinstance(rejected, Rejected), rejected
+    assert rejected.reason == "not_allowed"
+    assert "form_from_a_newer_release" in rejected.message
+    assert system.projects.projection(project_id).work_items == []
     system.close()
 
 

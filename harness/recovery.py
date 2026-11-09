@@ -336,7 +336,8 @@ class RunRecovery:
     def __init__(self, *, writes: Any, store: Any, view: Callable[[str], Any], artifacts: Any,
                  run_environment: Callable[[str], Any], wake: Callable[[str], None],
                  definitions_of: Callable[[str], Definitions] | None = None,
-                 release_version_of: Callable[[str], str | None] | None = None) -> None:
+                 release_version_of: Callable[[str], str | None] | None = None,
+                 recorded_version_of: Callable[[str, Any], str] | None = None) -> None:
         self._writes = writes
         self._store = store
         self._view = view
@@ -349,6 +350,11 @@ class RunRecovery:
         # 但「定义版本不同时继续或停止」的决定请求照旧按发布现在的这一份判。不给时按事项所用的那份
         self._release_version_of = ((lambda run_id: self._definitions_of(run_id).version)
                                     if release_version_of is None else release_version_of)
+        # 拿哪一个版本跟发布现在的这一版比（工单 #1517）：有冻结结果的事项按它创建时这一版发布里那个形态的
+        # 版本（记录在 run_created 上），旧事项按事项记录的定义版本。不给时按事项记录的定义版本
+        self._recorded_version_of = (
+            (lambda _run_id, projection: projection.definitions_version)
+            if recorded_version_of is None else recorded_version_of)
 
     def resume(self, run_id: str) -> tuple[int, Any] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（ADR-0018、恢复契约 docs/design/recovery-contract-and-fault-matrix.md「角色任务的恢复」）：
@@ -365,8 +371,8 @@ class RunRecovery:
         if blocks_run(decisions):
             return None
         release = self._release_version_of(run_id)
-        if release is not None and projection.definitions_version != release \
-                and self.await_definitions(run_id):
+        recorded = self._recorded_version_of(run_id, projection)
+        if release is not None and recorded != release and self.await_definitions(run_id):
             return None
         # 工单 #17：检查是否有未确认的动作，为结果未知的动作写核实记录
         self.await_unknown_actions(run_id)
@@ -395,11 +401,12 @@ class RunRecovery:
                     "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
                     "facts": [], "department": current.active_department,
                     "reason": "definitions_version_changed",
-                    "recorded_definitions_version": current.definitions_version,
+                    "recorded_definitions_version": self._recorded_version_of(run_id, current),
                     "current_definitions_version": self._release_version_of(run_id)
                     or self._definitions_of(run_id).version,
                     "description": (
-                        f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
+                        f"事项使用的定义版本 {self._recorded_version_of(run_id, current) or '（未记录）'} "
+                        f"与当前加载的版本 "
                         f"{self._release_version_of(run_id) or self._definitions_of(run_id).version} 不同。"
                         "按新版本继续以后，后续的模型请求与裁决记录新版本；"
                         "选择停止事项则运行结束。"),

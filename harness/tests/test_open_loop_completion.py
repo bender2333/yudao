@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from copy import deepcopy
 from typing import Any
 
 from harness import orchestrator, routing_contract, watched_outputs
@@ -24,8 +25,7 @@ from harness.app.application import Application
 from harness.app.home import AwayReportRequest
 from harness.app.labels import OPEN_LOOP_LABEL, event_label
 from harness.app.payloads import RunCreatedPayload
-from harness.definitions import (DEFAULT_FORM, DEFINITIONS, VerificationDeclaration, VerifiedOutcomes,
-                                 VerifierRole)
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, definitions_from_contents
 from harness.event_store import project_stream
 from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
@@ -38,22 +38,24 @@ from harness.write_path import NewProjectEvent
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
 # 没有核验角色的形态（工单 #1402 的形态机制）：定义内容与三部门相同，只有核验声明为空。
-# 发布带里「一个角色直做」「几个角色直做」就是这个样子，本单先按成果驱动的那一份核对
+# 发布带里「一个角色直做」「几个角色直做」就是这个样子，本单先按成果驱动的那一份核对。
+# 按定义文件的副本造出来（工单 #1517）：与真实的发布一样是一份完整的定义，内容与版本由同一套加载与校验
+# 得出，事项创建时冻结的与后来读回来的因此是同一份
 OPEN_LOOP_FORM = "three_departments_without_verifier"
-OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
-    "version": "sha256:three-departments-without-verifier",
-    "organization": DEFINITIONS.organization.model_copy(
-        update={"verification": VerificationDeclaration(verifiers=())}),
-})
+
+
+def _release_with_verifiers(verifiers: list[dict[str, Any]]) -> Any:
+    contents = deepcopy(DEFINITIONS.contents)
+    contents["organization.json"]["verification"]["verifiers"] = verifiers
+    return definitions_from_contents(contents)
+
+
+OPEN_LOOP_DEFINITIONS = _release_with_verifiers([])
 # 有核验角色、但它只核验中途的成果（docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」后半句）：最后采纳的成果（交付）没有人核验，
 # 同样标为开环。核验角色在定义里，检查也是它做，只是它核验的不是交付
 MIDWAY_FORM = "three_departments_verifier_of_a_midway_outcome"
-MIDWAY_DEFINITIONS = DEFINITIONS.model_copy(update={
-    "version": "sha256:three-departments-verifier-of-a-midway-outcome",
-    "organization": DEFINITIONS.organization.model_copy(update={"verification": VerificationDeclaration(
-        verifiers=(VerifierRole(role="quality", verifies=(
-            VerifiedOutcomes(role="engineering", outcomes=("product_spec",)),)),))}),
-})
+MIDWAY_DEFINITIONS = _release_with_verifiers([
+    {"role": "quality", "verifies": [{"role": "engineering", "outcomes": ["product_spec"]}]}])
 FORMS = {
     DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
     OPEN_LOOP_FORM: (OPEN_LOOP_DEFINITIONS, WATCHED_OUTPUTS),

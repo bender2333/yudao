@@ -1172,8 +1172,9 @@ class ProjectService:
                 onboarding_basis=onboarding_basis, additional_input=additional_input,
                 mcp_servers=frozen_mcp, form=frozen_form.name,
                 # 这个 run 按事项冻结的那份合成结果跑（工单 #1517）：形态名与整份定义各传一份，
-                # 发布里后来换掉这个名字指向的内容时不重新取
-                item_definitions=definitions,
+                # 发布里后来换掉这个名字指向的内容时不重新取。form_version 是创建时这一版发布里这个形态的
+                # 版本：「定义版本不同时继续或停止」按它与发布现在的那一版比（事项本身不随发布变化）
+                item_definitions=definitions, form_version=frozen_form.definitions.version,
                 **({} if not definitions_ref else {"item_definitions_ref": definitions_ref}),
             ),
         )

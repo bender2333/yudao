@@ -194,12 +194,17 @@ async def _create_work_item(application: "Application", command: Command, reques
         if any(item.status in ("in_progress", "awaiting_initial_prd") for item in onboarding):
             raise Rejection("work_item_in_progress", "项目正在建档，结束以后才能新建事项")
         raise Rejection("not_allowed", "项目还没有完成建档，请重新开始建档")
+    # 临时选的那一份形态、或者项目现在的形态不在这一版发布里（工单 #1517，项目的组织设计说明「冻结与升级」）：
+    # 新建事项被拒绝并列出可以选的形态，不写事件
+    forms = release_forms(system)
+    if request.form is not None and request.form not in forms:
+        raise Rejection("not_allowed",
+                        f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
+    if request.form is None and project.form_name not in forms:
+        raise Rejection("not_allowed",
+                        f"项目现在用的形态 {project.form_name} 不在这一版发布里，新建事项被拒绝；"
+                        f"可以选的形态是：{'、'.join(forms)}")
     # 排空期间（3.1，ADR-0019）：Yudao 停止开始新事项，新建的事项排队不开始
-    if request.form is not None:
-        forms = release_forms(system)
-        if request.form not in forms:
-            raise Rejection("not_allowed",
-                            f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
     if system.drain.state != "idle":
         try:
             system.projects.queue_work_item(request.project_id, request.text, title=request.title,

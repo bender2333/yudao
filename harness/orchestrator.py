@@ -337,8 +337,9 @@ class Orchestrator:
             wake=self._wake,
             # 定义版本的核对与恢复时的写入按事项冻结的形态取（工单 #1392）
             definitions_of=self.item_definitions,
-            # 「定义版本不同时继续或停止」比的是这一版发布里同一个形态现在的版本（工单 #1517）：
-            # 事项冻结的合成结果不因发布变化而改变，这个决定请求照旧（骨架与应用设计说明「薄驱动」）
+            # 「定义版本不同时继续或停止」比的是哪两个版本（工单 #1517）：有冻结结果的事项比它创建时这一版
+            # 发布里那个形态的版本与现在这一版，旧事项比它记录的定义版本
+            recorded_version_of=self.compared_recorded_version,
             release_version_of=self.release_definitions_version,
         )
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
@@ -521,9 +522,11 @@ class Orchestrator:
         form: str | None = None,
         # 事项创建时冻结的整份合成结果（工单 #1517，项目的组织设计说明「冻结与升级」）：形态加本项目的改动
         # 合成的结果。给了就按它跑，不再按形态名在这一版发布里取；不给时按形态名取（直接建 run 的调用与旧事项）。
-        # item_definitions_ref 是这份合成结果的工件引用，随 run_created 记下，之后读事项定义都按它
+        # item_definitions_ref 是这份合成结果的工件引用，随 run_created 记下，之后读事项定义都按它；
+        # form_version 是创建时这一版发布里这个形态的版本，随 run_created 记下，「定义版本不同」按它比
         item_definitions: Definitions | None = None,
         item_definitions_ref: dict[str, Any] | None = None,
+        form_version: str | None = None,
     ) -> str:
         frozen_form = self.form_named(form)
         definitions = frozen_form.definitions if item_definitions is None else item_definitions
@@ -637,6 +640,9 @@ class Orchestrator:
                 # 事项创建时冻结的整份合成结果（工单 #1517）：按内容摘要落盘的工件，读这个 run 的定义时按它取；
                 # 直接建 run 的调用与旧事项没有这一项，按形态名在这一版发布里取
                 **({} if not item_definitions_ref else {"definitions_ref": item_definitions_ref}),
+                # 事项创建时这一版发布里这个形态的版本（工单 #1517）：「定义版本不同时继续或停止」按它与现在的
+                # 这一版比——冻结了合成结果的事项不随发布变化，这条请求问的是发布换没换这一份形态
+                **({} if form_version is None else {"form_version": form_version}),
                 # 事项创建时按冻结的定义算出的开环标记（工单 #1394）：为真时这个事项以开环完成结束
                 "open_loop": open_loop,
                 "parameters_version": parameter_values.current_version(self.store),
@@ -1173,6 +1179,20 @@ class Orchestrator:
         # 现在的这一份判（骨架与应用设计说明「薄驱动」）。形态不在这一版发布里时为空（这时按 #1392 停在原处）
         form = self._forms.get(self.recorded_form(run_id) or DEFAULT_FORM)
         return None if form is None else form.definitions.version
+
+    def recorded_form_version(self, run_id: str) -> str | None:
+        # run_created 里记下的、创建时这一版发布里这个形态的版本（工单 #1517）：旧事件没有这个字段时为空
+        for event in self.store.list_events(run_id):
+            if event.type == EventType.RUN_CREATED:
+                return (event.payload or {}).get("form_version")
+        return None
+
+    def compared_recorded_version(self, run_id: str, projection: Any) -> str:
+        # 「定义版本不同时继续或停止」拿哪一个版本跟发布现在的比（工单 #1517）：
+        # 有冻结的合成结果的事项按创建时这一版发布里那个形态的版本（run_created 的 form_version）——
+        # 事项本身不随发布变化，这条请求问的是发布换没换这一份形态；旧事项没有这一项，按事项记录的定义版本
+        recorded = self.recorded_form_version(run_id)
+        return projection.definitions_version if recorded is None else recorded
 
     def recorded_form(self, run_id: str) -> str | None:
         # run_created 里记下的形态名（工单 #1392）：旧事件没有这个字段时为空，按默认的那一份读

@@ -73,7 +73,9 @@ def _unfinished_run(data_dir, script=None, *, to_stop=False):
 
 def _older_definitions_version(data_dir, version="sha256:定义版本在升级之前的内容"):
     # 模拟一次升级：把 run_created 记录的定义版本改成另一个版本。定义版本只有发布新版本时改变（总体架构 docs/design/architecture/overall-architecture.md「十项长期决定」），
-    # 因此测试改写事件库中的事实，不加载第二套定义文件
+    # 因此测试改写事件库中的事实，不加载第二套定义文件。
+    # 工单 #1517 起事项冻结了整份合成结果，这类事项按「创建时这一版发布里这个形态的版本」（form_version）与发布
+    # 现在的那一版比，所以升级也要把它改到旧版本；只记了形态名的旧事件没有这一项，按 definitions_version 比
     connection = sqlite3.connect(data_dir / "events.sqlite")
     try:
         rows = connection.execute(
@@ -82,6 +84,8 @@ def _older_definitions_version(data_dir, version="sha256:定义版本在升级�
         for event_id, payload in rows:
             document = json.loads(payload)
             document["definitions_version"] = version
+            if "form_version" in document:
+                document["form_version"] = version
             connection.execute("UPDATE events SET payload_json = ? WHERE event_id = ?",
                                (json.dumps(document, ensure_ascii=False, sort_keys=True), event_id))
         connection.commit()

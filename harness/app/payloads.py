@@ -376,6 +376,10 @@ class RunCreatedPayload(Payload):
     # 合成结果按内容摘要落盘的工件引用。读这个 run 的定义时按它取，发布后来改了形态也不影响它；
     # 旧事件与直接建 run 的调用没有这个字段，按形态名在这一版发布里取
     definitions_ref: ArtifactRef | None = None
+    # 事项创建时这一版发布里这个形态的版本（工单 #1517）：「定义版本不同时继续或停止」按它与发布现在的那一版
+    # 比——冻结了合成结果的事项本身不随发布变化，这条请求问的是发布换没换这一份形态。旧事件没有这个字段时
+    # 按事项记录的定义版本比
+    form_version: str | None = None
 
 
 class UserInputReceivedPayload(InputRecord):

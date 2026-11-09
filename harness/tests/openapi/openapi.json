@@ -37308,6 +37308,17 @@
                 "type": "null"
               }
             ]
+          },
+          "form_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Version"
           }
         },
         "required": [

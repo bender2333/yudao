@@ -277,10 +277,10 @@ def _history(events: list[Any], forms: dict[str, Definitions]) -> list[FormChang
     return records
 
 
-def _running_items(store: Any, artifacts: Any, project_id: str,
-                   work_items: list[Any]) -> list[tuple[str, Definitions]]:
+def _running_items(store: Any, artifacts: Any, project_id: str, work_items: list[Any],
+                   forms: dict[str, Definitions]) -> list[tuple[str, Definitions]]:
     # 还在跑的事项与它冻结的组织（工单 #1517，设计说明「冻结与升级」）：同一个事项取最后一条创建事件里的
-    # 那份合成结果；同一份合成结果只读一次（按内容摘要去重），页面的部门清单与上一个事项的比较都按它看
+    # 那份合成结果；旧事项只记了形态名，按它在那一版发布里取（工单 #1392 的读法）。同一份组织只读一次
     creation = [event for event in store.list_project_events(project_id)
                 if event.type == ProjectEventType.WORK_ITEM_CREATED]
     refs: dict[str, Any] = {}
@@ -292,9 +292,11 @@ def _running_items(store: Any, artifacts: Any, project_id: str,
         if item.status not in RUNNING_ITEM_STATUSES:
             continue
         ref = refs.get(item.work_item_id)
-        key = "" if not isinstance(ref, dict) else str(ref.get("content_hash") or "")
+        key = (f"form:{item.form or DEFAULT_FORM}" if not isinstance(ref, dict)
+               else str(ref.get("content_hash") or ""))
         if key not in loaded:
-            loaded[key] = definitions_from_ref(artifacts, ref)
+            loaded[key] = (definitions_from_ref(artifacts, ref)
+                           or forms.get(item.form or DEFAULT_FORM))
         definitions = loaded[key]
         if definitions is not None:
             rows.append((item.work_item_id, definitions))
@@ -315,24 +317,23 @@ def _departments_of_current(definitions: Definitions, changes: dict[str, Any],
 def _departments_of_running_items(definitions: Definitions | None,
                                   rows: list[tuple[str, Definitions]]) -> list[OrganizationDepartment]:
     # 只在还在跑的事项冻结的组织里有的部门（工单 #1517，设计说明「冻结与升级」与补充条 7）：项目现在这份
-    # 组织里已经没有它（例如后来去掉了这个部门），名单仍然包含它并标出来源是还在跑的事项，个数是几个事项在用
+    # 组织里已经没有它（例如后来去掉了这个部门），名单仍然包含它并标出来源是还在跑的事项；
+    # 个数是几个还在跑的事项在用它（不是几种组织在用它）
     current = set() if definitions is None else set(definitions.departments)
-    counts: dict[str, list[Definitions]] = {}
+    counts: dict[str, int] = {}
+    first: dict[str, Definitions] = {}
     for _work_item_id, frozen in rows:
         for department in frozen.organization.departments:
             if department.id in current:
                 continue
-            counts.setdefault(department.id, [])
-            if all(item.version != frozen.version for item in counts[department.id]):
-                counts[department.id].append(frozen)
-    extra: list[OrganizationDepartment] = []
-    for department_id in sorted(counts):
-        versions = counts[department_id]
-        label = next(frozen.department_labels.get(department_id, department_id) for frozen in versions)
-        extra.append(OrganizationDepartment(
-            id=department_id, label=label, verifier=versions[0].is_verifier(department_id),
-            origin="running_item", running_items=len(versions)))
-    return extra
+            counts[department.id] = counts.get(department.id, 0) + 1
+            first.setdefault(department.id, frozen)
+    return [OrganizationDepartment(
+        id=department_id,
+        label=first[department_id].department_labels.get(department_id, department_id),
+        verifier=first[department_id].is_verifier(department_id),
+        origin="running_item", running_items=counts[department_id])
+        for department_id in sorted(counts)]
 
 
 def _previous_item(store: Any, artifacts: Any, project_id: str,
@@ -374,7 +375,7 @@ def _project_organization(application: Application,
     added, removed = verifier_changes(forms, current, changes, definitions, store=store)
     # 还在跑的事项冻结着旧组织时（工单 #1517）：按它们各自的部门计数，并补上现在这份组织里已经没有了、
     # 但还在跑的事项仍在用的部门
-    running = _running_items(store, application.system.artifacts, request.project_id, state.work_items)
+    running = _running_items(store, application.system.artifacts, request.project_id, state.work_items, forms)
     counts: dict[str, int] = {}
     for _work_item_id, frozen in running:
         for department in frozen.organization.departments:
