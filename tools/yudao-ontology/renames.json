@@ -1,0 +1,54 @@
+{
+ "about": "样例，不是要谁维护的记录。11-09 Bender 定先不加约束：改名不靠人登记，从术语表与 git 改动推出（见 reports/change-impact-plan.md 第 8 节）。这 4 条是我照 docs/decision.md 11-08 那条手写的，推断做好以后由它生成确认过的缓存，手写的作废。",
+ "renames": [
+  {
+   "from": "三部门",
+   "to": "「产品 · 工程 · 质检」",
+   "commit": "ce9c688",
+   "kind": "形态名",
+   "source": "docs/decision.md 2026-11-08 组织命名，决策第 3 条"
+  },
+  {
+   "from": "几个角色直做",
+   "to": "「产品 · 工程」",
+   "commit": "ce9c688",
+   "kind": "形态名",
+   "source": "docs/decision.md 2026-11-08 组织命名，决策第 3 条"
+  },
+  {
+   "from": "一个角色直做",
+   "to": "「工程」",
+   "commit": "ce9c688",
+   "kind": "形态名",
+   "source": "docs/decision.md 2026-11-08 组织命名，决策第 3 条"
+  },
+  {
+   "from": "部门内多角色设计说明",
+   "to": "职能内多角色设计说明",
+   "commit": "02d1d59",
+   "kind": "文档名（文件名不改）",
+   "source": "02d1d59 提交说明：标题与链接文字一起改，文件名、链接路径与代码名不动"
+  },
+  {
+   "from": "部门",
+   "to": "职能",
+   "commit": "ce9c688",
+   "kind": "结构词",
+   "source": "docs/decision.md 2026-11-08 组织命名，决策第 1 条",
+   "keep": {
+    "docs/adr/": "决定：ADR 是记录，不改",
+    "docs/prototypes/": "决定：v19 等原型是记录，不改",
+    "docs/archive/": "归档的原型（998d4e2 把 v15 到 v19 移到这里），同上",
+    "docs/decision.md": "决定记录本身，旧说法是历史",
+    "docs/CHANGELOG.md": "变更记录是历史（我按记录的性质加的，决定里没写）",
+    "claude_jour.md": "日记是历史（我按记录的性质加的，决定里没写）",
+    ".doc-index/": "文档一致性工具的索引，随它自己重建（我按记录的性质加的，决定里没写）",
+    "harness/": "决定：harness 里的角色材料与提示随代码工单改，代码名立缝时改",
+    "client/": "决定：客户端界面文字随代码工单改",
+    "README.md": "决定：README 随代码工单改",
+    ".claude/skills/": "决定：五份技能是受保护的文件，这一轮写不进去",
+    "agents_jour/": "日记是历史（我按记录的性质加的，决定里没写）"
+   }
+  }
+ ]
+}
