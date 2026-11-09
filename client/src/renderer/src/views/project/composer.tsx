@@ -8,7 +8,7 @@
 //
 // 草稿、收件人与页面的滚动都不随事项进展更新而清掉；发送成功以后清空草稿、回到按状态选的默认。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import { CommandFeedback, hasCommand } from "./common";
 import { useCommand } from "./use-snapshot";
@@ -36,6 +36,24 @@ export function Composer(props: {
   const command = useCommand(props.app, props.dataKey);
   const options = useMemo(() => recipientOptions(props.input), [props.input]);
   const chosen = chosenRecipient(props.input, state);
+  // 点循环图的节点：收件人切到给这个职能的指导。这是用户的一次选择，输入框里有字也照切（与原型一致），
+  // 切过去以后重新冻住；点的职能不在这份组织里时不理会。
+  const seenFocus = useRef(props.input.focus);
+  useEffect(() => {
+    const next = props.input.focus;
+    if (next === seenFocus.current) {
+      return;
+    }
+    seenFocus.current = next;
+    if (next === null) {
+      return;
+    }
+    const id = `guide:${next}`;
+    if (!options.some((option) => option.id === id)) {
+      return;
+    }
+    setState({ manual: id, hold: draft.trim() === "" ? null : id });
+  }, [props.input.focus, options, draft]);
   const option: RecipientOption = options.find((candidate) => candidate.id === chosen) ?? options[0];
   const hint = recipientHint(props.input, option.id, props.activeTitle);
   // 指导与追加输入要发到在跑的那件事项上；没有在跑的事项时这两项发不出去，写明原因

@@ -269,7 +269,8 @@ function endingOf(item: ThreadItemView, flow: readonly ThreadFlowRecord[]): Endi
   const ordered = [...flow].sort((left, right) => left.position - right.position);
   const release = ordered.filter((record) => record.kind === RELEASE_KIND).at(-1) ?? null;
   const delivery = ordered.filter((record) => record.kind === DELIVERY_KIND).at(-1) ?? null;
-  const openLoop = item.status === "released_unsettled" && item.stop_reason === "open_loop";
+  // 开环完成按事项的结束原因认，不按状态：采纳以后状态是 adopted，结束原因仍是 open_loop
+  const openLoop = item.stop_reason === "open_loop";
   if (openLoop) {
     return delivery === null ? null : { done: delivery, delivery, release: false, openLoop: true };
   }

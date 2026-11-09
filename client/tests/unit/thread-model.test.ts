@@ -256,6 +256,22 @@ test("已结束的事项默认收起：只露细线与交完成那一条，展�
   assert.deepEqual(expanded.map((entry) => entry.kind), ["sep", "you", "done"]);
 });
 
+test("开环完成的事项被采纳以后，线程里仍写开环完成，不写成放行", () => {
+  const flow = [
+    rec({ flow_id: "in1", kind: "你的输入", position: 0, round: 0, content: "把日志清掉" }),
+    rec({ flow_id: "del1", kind: "版本交付", position: 3, direction_from: "engineering", direction_to: null, content: "清掉 412 个文件" }),
+  ];
+  const entries = itemThread({
+    item: item({ work_item_id: "w1", status: "adopted", stop_reason: "open_loop", organization: directOne() }),
+    flow, asks: [], decisions: [], titles: { w1: "清理日志" }, expanded: false,
+  });
+  const done = entries.find((entry) => entry.kind === "done");
+  assert.equal(done?.kind === "done" ? done.label : "", "交完成");
+  assert.equal(done?.kind === "done" ? done.release : true, false);
+  assert.match(done?.kind === "done" ? done.text : "", /开环完成：没有人核验/);
+  assert.equal(done?.kind === "done" ? done.whoLabel : "", "工程");
+});
+
 test("放行那一条写核验角色的显示名与那一版；看这一版指向交完成的那一版交付", () => {
   const flow = [
     rec({ flow_id: "del1", kind: "版本交付", position: 2, direction_from: "engineering", direction_to: "quality", content: "导出第 1 版" }),
