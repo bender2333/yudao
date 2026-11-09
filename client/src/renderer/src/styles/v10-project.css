@@ -504,6 +504,20 @@
 .y10-cv-skip .y10-cv-line { flex: 1; min-width: 12px; }
 .y10-cv-skip-to { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
+/* 开着的询问：写「询问」的虚线，不带版本；成果箭头都是实线（项目的组织设计说明 4.14、术语表「循环图」） */
+.y10-cv-ask {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 6px; border: 1px dashed var(--blue);
+  border-radius: 6px; background: var(--bg); color: var(--blue); font-size: 12px; white-space: nowrap;
+}
+.y10-cv-ask .y10-cv-dir { color: var(--blue); }
+.y10-cv-ask-state { margin-left: 6px; font-size: 11px; color: var(--muted); }
+.y10-cv-ask-state.is-open { color: var(--blue); }
+/* 隔着职能的询问另起一行：两边的线与箭头一样用虚线 */
+.y10-cv-skip.is-q .y10-cv-line { border-top-style: dashed; border-top-color: var(--blue); }
+.y10-cv-skip.is-q .y10-cv-line::after { color: var(--blue); }
+/* 旁边的职能与主线之间的竖线：开着询问时换成这一条虚线 */
+.y10-cv-vasks { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; }
+
 /* 窄屏：图收成一行（节点名与当前箭头），线程不被挤 */
 .y10-cv-oneline {
   display: none; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; padding: 6px 10px;
@@ -512,6 +526,8 @@
 .y10-cv-oneline-cur { color: var(--muted); }
 .y10-cv-oneline-cur::before { content: " · 当前："; }
 .y10-cv-oneline .y10-link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+/* 窄屏不画线：节点名旁写「在等待某某的回答」（设计说明 4.14） */
+.y10-cv-qstate { color: var(--text); font-size: 12px; }
 
 /* 点节点、点箭头打开的面板：同一个位置、同一种画法 */
 .y10-cv-panel {
@@ -534,6 +550,10 @@
 .y10-cv-block b { font-size: 12.5px; }
 .y10-cv-files b { font-size: 12.5px; }
 .y10-cv-facts { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
+/* 节点面板的往来：开着的询问在前，标「还没回答」 */
+.y10-cv-exchanges { display: grid; gap: 4px; }
+.y10-cv-exchanges b { font-size: 12.5px; }
+.y10-cv-exchanges .y10-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
 
 /* ---------------------------------------------------------------- 对话线程与输入框（工单 #1639） */
 
