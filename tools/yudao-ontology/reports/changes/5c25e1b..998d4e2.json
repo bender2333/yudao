@@ -1,0 +1,42 @@
+{
+ "old": "5c25e1b",
+ "new": "998d4e2",
+ "record": [
+  {
+   "doc": "docs/design/project-organization.md",
+   "added": 110,
+   "removed": 18
+  },
+  {
+   "doc": "docs/design/skeleton-and-application.md",
+   "added": 1,
+   "removed": 1
+  }
+ ],
+ "candidates": [
+  {
+   "from": "设置页",
+   "to": "「高级」",
+   "count": 2,
+   "why": "改动里出现 2 次",
+   "status": "要确认",
+   "healed": 0,
+   "in_labels": 0,
+   "matters": false
+  }
+ ],
+ "ask": [],
+ "quotes": 158,
+ "stale": 0,
+ "healed": [],
+ "reworded": [],
+ "deleted": [],
+ "labels": [],
+ "concepts": [],
+ "generated": {
+  "added": [],
+  "removed": []
+ },
+ "coverage": [],
+ "diff4": null
+}

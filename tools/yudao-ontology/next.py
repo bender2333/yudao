@@ -24,9 +24,10 @@ import rdflib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from quotecheck import DOCS  # noqa: E402
+import changes  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+REPO = Path(os.environ.get("YUDAO_REPO", HERE.parent.parent))
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 RDFS = rdflib.RDFS
 # 模型最后一次逐句对齐的提交，与开环规则抽自哪个提交；增量更新做好以前手改
@@ -99,13 +100,13 @@ def section_no(head: str) -> str:
     return m.group(1) if m else ""
 
 
-def unextracted(commit: str, quotes: list[str], docs: list[str], cited: dict[str, set[str]]) -> list[dict]:
+def unextracted(commit: str, quotes: list[str], docs: list[str], cited: dict[str, set[str]], base: str | None = None) -> list[dict]:
     """模型对齐以后，模型读的文档里新加的行，哪一行都没被模型的原句引用。原句核对查不出这一种。
     按所在的节分两种：模型挂过的节（in_cited，多半要重抽）与模型没挂过的节（多半在范围外，只提一句）。"""
     qn = [norm(q) for q in quotes]
     rows = []
     for path in docs:
-        diff = git("diff", "-U0", ALIGNED["commit"], commit, "--", path)
+        diff = git("diff", "-U0", base or ALIGNED["commit"], commit, "--", path)
         text = git("show", f"{commit}:{path}").splitlines() if diff else []
         line_no = 0
         for line in diff.splitlines():
@@ -201,6 +202,19 @@ def collect(commit: str, tools: Path) -> dict:
 
     # 四类里没写成工单的违例、确实缺，各给一条建议
     advice = []
+    imp = None
+    if git("rev-parse", "--short", ALIGNED["commit"]).strip() != commit:
+        imp = changes.impact(ALIGNED["commit"], commit)
+        auto = len(imp["healed"]) + len(imp["labels"])
+        if auto:
+            advice.append(f"先跑 heal.py {commit} --apply：自动接上 {len(imp['healed'])} 条原句、换 {len(imp['labels'])} 处名字，"
+                          "三道检查过了才写回，不用人")
+        if imp["ask"]:
+            advice.append("点一下改名：" + "；".join(f"{a['from']} → {a['to']}" for a in imp["ask"][:6])
+                          + "（renames.py confirm 或 reject）")
+        nre = len({x["quote"] for x in imp["reworded"]})
+        if nre:
+            advice.append(f"判 {nre} 句改写：意思没变就 heal.py --accept 序号；变了就当删掉重抽")
     inside = [u for u in new_lines if u["in_cited"]]
     if stale or inside:
         secs = "、".join(dict.fromkeys(f"{Path(u['doc']).stem} {u['number'] or u['section']}" for u in inside))
@@ -220,7 +234,7 @@ def collect(commit: str, tools: Path) -> dict:
     newer = subprocess.run(["git", "-C", str(REPO), "merge-base", "--is-ancestor", ALIGNED["commit"], commit]).returncode == 0
     return {"commit": commit, "newer": newer, "date": git("show", "-s", "--format=%cs", commit).strip(),
             "aligned": ALIGNED, "quotes": len(quote_rows), "stale": stale, "spliced": len(spliced),
-            "unextracted": new_lines, "docs": docs, "found": found, "filled": filled, "advice": advice}
+            "unextracted": new_lines, "docs": docs, "found": found, "filled": filled, "advice": advice, "impact": imp}
 
 
 def render(r: dict) -> str:
@@ -248,6 +262,24 @@ def render(r: dict) -> str:
         out.append(f"- 模型没挂过的节里新加的（只提一句）：{Path(outside[0]['doc']).name} 等，{secs}")
     if len(by_doc) > 6:
         out.append(f"- 没抽：另有 {len(by_doc) - 6} 节")
+
+    imp = r.get("impact")
+    if imp:
+        nq = lambda rows: len({x["quote"] for x in rows})  # noqa: E731
+        sure = [c for c in imp["candidates"] if c["status"] in ("确定", "确认过")]
+        out.extend(["", f"## 零、对齐以后的变动（{imp['old']} → {imp['new']}，全文见 reports/changes/{imp['old']}..{imp['new']}.md）"])
+        out.append(f"- 模型读的文档与术语表改了 {len(imp['record'])} 份；推出的改名确定 {len(sure)} 条，要你点 {len(imp['ask'])} 条")
+        out.append(f"- 原句对不上 {imp['stale']} 条：换词接上 {len(imp['healed'])} 条（不用确认），改写 {nq(imp['reworded'])} 句，删掉 {nq(imp['deleted'])} 句")
+        out.append(f"- 手写的名字与出处里用旧词 {len(imp['labels'])} 处；定义文件与代码生成的事实加 {len(imp['generated']['added'])}、少 {len(imp['generated']['removed'])}")
+        froms = [c["from"] for c in imp["coverage"]]
+        for c in imp["coverage"]:
+            if c["lines"] and not any(f != c["from"] and f in c["from"] for f in froms):
+                areas = "、".join(f"{a} {n}" for a, n in c["areas"][:4])
+                out.append(f"- 「{c['from']}」→「{c['to']}」还没跟上的：{c['files']} 份文件 {c['lines']} 行（{areas}）")
+        d = imp.get("diff4") or {}
+        for k, v in d.get("by", {}).items():
+            if v["new"] or v["gone"]:
+                out.append(f"- 第{k}类和上一版比：新冒出 {len(v['new'])} 条，消失 {len(v['gone'])} 条")
 
     def block(title, items, limit=None):
         out.extend(["", f"## {title}（{len(items)}）"])
@@ -282,6 +314,15 @@ def main(argv: list[str]) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         tools = run_tools(commit, Path(tmp))
         r = collect(commit, tools)
+    if r.get("impact"):
+        imp = r["impact"]
+        prev = HERE / "reports" / "next" / f"{imp['old']}.json"
+        if prev.exists():
+            imp["diff4"] = {"prev": prev.name, "by": changes.compare_found(json.loads(prev.read_text(encoding="utf-8")), r)}
+        cdir = HERE / "reports" / "changes"
+        cdir.mkdir(parents=True, exist_ok=True)
+        (cdir / f"{imp['old']}..{imp['new']}.json").write_text(json.dumps(imp, ensure_ascii=False, indent=1), encoding="utf-8")
+        (cdir / f"{imp['old']}..{imp['new']}.md").write_text(changes.render(imp), encoding="utf-8")
     outdir = HERE / "reports" / "next"
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / f"{commit}.json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")

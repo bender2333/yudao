@@ -24,6 +24,9 @@
 | `quotecheck.py` | 跟版本走：模型里每一句原句，到给定的提交里逐句核对还在不在，写 `reports/quotecheck.json`；`python3 quotecheck.py 5159317 eb8429e 37e9d68` |
 | `names.py` | 正名表：`CONTEXT.md` 词条与 _Avoid_、name-map 第一列 |
 | `next.py`、`aligned.json` | 「该做什么了」：对一个提交在临时副本里跑全部检查，归成四类与建议，写 `reports/next/<提交>.md`；`aligned.json` 记模型最后对齐的提交；`python3 next.py`（默认 `origin/main`） |
+| `renames.py`、`renames.json` | 改名从术语表与 git 改动推出，不靠人登记；术语表有证据的算确定，其余是候选，`renames.py confirm/reject` 记用户点的，存进 `renames.json`（缓存） |
+| `changes.py` | 变动影响清单：对齐的提交到这次的提交之间改了什么、对不上的原句怎么归类、波及哪些概念、哪里还用旧词；`next.py` 会调它，写 `reports/changes/` |
+| `heal.py` | 把模型跟上：副本上自动接原句、换名字、重新生成定义那一批，三道检查都过才写回，什么都不剩才挪 `aligned.json` |
 | `reports/skill-plan.md` | 把本体做成「该做什么了」技能的方案草稿（还没建） |
 | `reports/fix-tickets-draft.md` | 第 4 批三处代码问题的修复工单草稿（没建 GitHub 工单） |
 | `reports/` | `results.json`、`mutations.json`、两批的抽取对照、报告 |
