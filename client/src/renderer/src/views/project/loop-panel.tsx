@@ -11,13 +11,16 @@
 // 给出（成果按第几轮，询问与回答按询问编号对激活的会话编号）。
 
 import type { ClientApp } from "../../contract/client-app";
+import type { RunStepsResult } from "../../api/generated/types.gen";
+import { readFailureText } from "../../contract/read-failure";
 import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
 import { askStateText, nameOf, versionsOf } from "./loop-graph-model";
 import { arrowText, type LoopPanelPick } from "./loop-graph";
 import { formatTime } from "./labels";
 import type { SequenceDetail, SequenceRow } from "./sequence-model";
+import { useSnapshot } from "./use-snapshot";
 import { WorkProcess } from "./work-process.tsx";
-import { workTargetOfArrow, workTargetOfRow, type WorkTarget } from "./work-process-model.ts";
+import { doingText, nodeDoing, workTargetOfArrow, workTargetOfRow, type WorkTarget } from "./work-process-model.ts";
 
 /** 面板打开的是哪一个：一个节点、一条箭头，或时序图上的一行（原文）。 */
 export type LoopPanelTarget = Exclude<LoopPanelPick, null> | { kind: "row"; row: SequenceRow } | null;
@@ -124,15 +127,38 @@ function ArrowPanel(props: WorkSource & {
   );
 }
 
-function NodePanel(props: { graph: LoopGraph; node: LoopNode; onClose: () => void }): React.JSX.Element {
+function NodePanel(props: {
+  app: ClientApp;
+  runId: string;
+  graph: LoopGraph;
+  node: LoopNode;
+  onClose: () => void;
+}): React.JSX.Element {
   const { node } = props;
   const partner = props.graph.side.find((part) => part.node.id === node.id)?.partner ?? null;
   // 它的往来：开着的询问在前，标「还没回答」；和节点上的字出自同一份事实（run.asks）
   const exchanges = props.graph.asks.filter((ask) => ask.from === node.id || ask.to === node.id);
+  // 「在做什么」（工单 #1662）：这个职能正在工作时读同一个 run.steps，写当前任务加最近一个动作的标题；
+  // 不在工作时不读也不写（外部 agent 的状态条不在这里）
+  const steps = useSnapshot<RunStepsResult>(
+    props.app,
+    `page.cv.node.steps.${node.id}`,
+    "run.steps",
+    { run_id: props.runId, department: node.id },
+    !node.working || props.runId === "",
+  );
+  const doing = nodeDoing(steps.data, node.working);
   return (
     <section className="y10-cv-panel" aria-label={node.label} data-testid="loop-panel-node">
       <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>×</button>
       <h3>{node.label}<small> {node.state === "" ? "现在没有状态" : node.state}</small></h3>
+      {doing === null ? null : (
+        <p className="y10-cv-doing" data-testid="node-doing">
+          <b>在做什么</b>
+          <span>{doingText(doing)}</span>
+        </p>
+      )}
+      {steps.error === null ? null : <p className="y10-cv-note">{readFailureText(steps.error)}</p>}
       <ul className="y10-list y10-cv-facts">
         <li>职能：{node.label}{node.state === "" ? "" : `，${node.state}`}</li>
         {node.verifier ? <li>它的角色是核验角色：核验交付的那一版，放行时写它的显示名</li> : null}
@@ -279,5 +305,8 @@ export function LoopPanel(props: WorkSource & {
   }
   const id = props.pick.id;
   const node = props.graph.nodes.find((item) => item.id === id);
-  return node === undefined ? null : <NodePanel graph={props.graph} node={node} onClose={props.onClose} />;
+  return node === undefined
+    ? null
+    : <NodePanel graph={props.graph} node={node} onClose={props.onClose}
+                 app={props.app} runId={props.runId} />;
 }

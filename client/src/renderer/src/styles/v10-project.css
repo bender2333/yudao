@@ -747,6 +747,14 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
 .y10-cv-time .y10-btn.danger { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
 .y10-cv-time .error, .y10-cv-time .hint { margin: 0; font-size: 12.5px; }
 
+/* 节点面板的「在做什么」：正在工作的职能写当前任务与最近一个动作的标题（工单 #1662） */
+.y10-cv-doing {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  padding: 4px 8px; border-radius: 6px; background: var(--soft); font-size: 12.5px;
+}
+.y10-cv-doing b { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.y10-cv-doing span { min-width: 0; overflow-wrap: anywhere; }
+
 /* ---------------------------------------------------------------- 原文面板里的「看工作过程」（工单 #1658） */
 
 /* 入口在原文面板里，点开就地展开在下面；再点一次收起（按钮写「收起工作过程」） */
@@ -770,6 +778,16 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
 .y10-wp-lines, .y10-wp-sublines { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .y10-wp-sublines { margin-top: 2px; padding-left: 18px; }
 .y10-wp-item { display: grid; min-width: 0; }
+
+/* 任务分组（工单 #1662）：最上面一层是任务 1、2、3，每个任务一句话加状态，下面归到它的动作行。
+   没有编号的动作按时间留在两段任务之间，不带任务标题。 */
+.y10-wp-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.y10-wp-task { display: grid; gap: 2px; min-width: 0; }
+.y10-wp-task + .y10-wp-task, .y10-wp-loose + .y10-wp-task, .y10-wp-task + .y10-wp-loose { padding-top: 6px; border-top: 1px dashed var(--line); }
+.y10-wp-task-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0; font-size: 13px; }
+.y10-wp-task-number { flex: none; color: var(--green); font-weight: 600; }
+.y10-wp-task-content { min-width: 0; overflow-wrap: anywhere; }
+.y10-wp-loose { display: grid; gap: 2px; min-width: 0; }
 .y10-wp-line {
   display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; width: 100%;
   padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: none;
