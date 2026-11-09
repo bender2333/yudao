@@ -747,6 +747,57 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
 .y10-cv-time .y10-btn.danger { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
 .y10-cv-time .error, .y10-cv-time .hint { margin: 0; font-size: 12.5px; }
 
+/* ---------------------------------------------------------------- 原文面板里的「看工作过程」（工单 #1658） */
+
+/* 入口在原文面板里，点开就地展开在下面；再点一次收起（按钮写「收起工作过程」） */
+.y10-wp { display: grid; gap: 6px; }
+.y10-wp-toggle { justify-self: start; font-size: 12.5px; }
+.y10-wp-body { display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.y10-wp-head { font-size: 12.5px; font-weight: 600; }
+.y10-wp-head small { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+/* 同一轮有几次激活时的那一排：与部门工作间的激活选择同一个样子 */
+.y10-wp-activations { display: flex; flex-wrap: wrap; gap: 6px; }
+.y10-wp-activation {
+  text-align: left; font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); cursor: pointer;
+  min-width: 0; overflow-wrap: anywhere;
+}
+.y10-wp-activation:hover { border-color: var(--green); color: var(--text); }
+.y10-wp-activation.is-active { border-color: var(--green); background: var(--tint); color: var(--text); font-weight: 600; }
+
+/* 行：每个动作一行标记加标题；连续同一种类的动作折成一行，写数量，点开看每一行 */
+.y10-wp-lines, .y10-wp-sublines { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.y10-wp-sublines { margin-top: 2px; padding-left: 18px; }
+.y10-wp-item { display: grid; min-width: 0; }
+.y10-wp-line {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; width: 100%;
+  padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: none;
+  font: inherit; font-size: 13px; color: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.y10-wp-line:hover { background: var(--soft); border-color: var(--line); }
+.y10-wp-mark {
+  flex: none; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 4px;
+  border: 1px solid var(--line-strong); color: var(--green); font-weight: 600;
+}
+.y10-wp-title { min-width: 0; overflow-wrap: anywhere; }
+
+/* 原始数据：命令、参数、退出状态、输出、这一步的推理与模型文字，后面是请求详情 */
+.y10-wp-raw {
+  display: grid; gap: 6px; margin: 2px 0 6px 14px; padding: 8px 10px; min-width: 0;
+  border-left: 2px solid var(--line-strong); border-radius: 0 6px 6px 0; background: var(--surface-2);
+  font-size: 12.5px;
+}
+.y10-wp-fields { margin: 0; display: grid; gap: 6px; }
+.y10-wp-field { display: grid; gap: 2px; min-width: 0; }
+.y10-wp-field dt { font-size: 11.5px; color: var(--muted); }
+.y10-wp-field dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.y10-wp-raw-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; font-size: 12px; }
+.y10-wp-raw-row .y10-link { font-size: 12px; }
+.y10-wp-attempts { padding-top: 4px; border-top: 1px dashed var(--line); }
+.y10-wp-texts { display: grid; gap: 4px; min-width: 0; }
+.y10-wp-texts-title { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+
 @media (max-width: 1100px) {
   .y10-phead { padding-left: 22px; padding-right: 22px; }
 }
@@ -767,4 +818,6 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
   /* 时序图退回按时间排的列表（窄屏时每行写谁到谁与那句标题） */
   .y10-sq-wide { display: none; }
   .y10-sq-list { display: grid; }
+  /* 原始数据在窄屏不再缩进：面板本身已经很窄，再缩就只剩几个字一行 */
+  .y10-wp-raw { margin-left: 0; }
 }
