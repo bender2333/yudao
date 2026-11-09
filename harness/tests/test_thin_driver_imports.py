@@ -16,9 +16,9 @@
 # 薄驱动只读最小投影（工单 #1678，骨架与应用 docs/design/skeleton-and-application.md「薄驱动」第 1 条、
 # 「最小投影」）：运行视图里的字段不在最小投影里，要读它们的判断归路由实现或钩子；薄驱动问钩子要答案，
 # 从钩子拿到的运行视图只原样交回钩子或路由。这个文件的后半段用 ast 查薄驱动没有读运行视图的字段：
-# 字段名从 harness/models.py 的 RunProjection 取，运行视图对象的来路是钩子返回的（project、read_run）
-# 与事务、快照上的 `.projection`。检查本身也证明会失败：给一段故意写 `projection.cycle_count` 的源码，
-# 检查报出它；给一段只读最小投影、钩子的答案与契约类型的源码，检查通过。
+# 字段名从 harness/models.py 的 RunProjection 取，运行视图对象的来路是钩子返回的（project、run_view、
+# settled、assign_new_inputs、read_run）与事务、快照上的 `.projection`。检查本身也证明会失败：给一段故意写
+# `projection.cycle_count` 的源码，检查报出它；给一段只读最小投影、钩子的答案与契约类型的源码，检查通过。
 #
 # 守 R1（测试分层 docs/design/test-pyramid.md「测试按三环留」）：只由你批准的一环的不变式——薄驱动只经内核与契约连接。
 
@@ -177,9 +177,10 @@ DEFAULT_VIEW_NAMES = frozenset({"projection", "current", "view", "run_view"})
 
 
 def _hook_returns_a_view(node: ast.AST) -> bool:
-    # 钩子交回运行视图的两个方法：project 与 read_run（read_run 交回的快照上也只有一个 `.projection`）
+    # 钩子交回运行视图的方法：project、run_view、settled、assign_new_inputs 直接交回运行视图；
+    # read_run 交回的是写入口的快照，快照上的 `.projection` 另有一条检查
     return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"project", "read_run"})
+            and node.func.attr in {"project", "read_run", "run_view", "settled", "assign_new_inputs"})
 
 
 def _is_view_expression(node: ast.AST | None, names: set[str]) -> bool:
@@ -275,6 +276,35 @@ def test_a_run_view_returned_by_a_hook_is_tracked_the_same_way():
         "harness/thin_driver.py:3: view.status",
         "harness/thin_driver.py:4: view.stop_reason",
     ]
+
+
+def test_every_hook_that_answers_with_the_run_view_is_tracked():
+    # run_view、settled 与 assign_new_inputs 也交回运行视图：原样传出去不算读，改名以后取字段或就地取字段都算
+    # （独立审查发现 run_view 漏在检查外，工单 #1678）
+    probe = (
+        "def end(transaction, run_id):\n"
+        "    current = self._hooks.run_view(transaction)\n"
+        "    if current.status == 'failed':\n"
+        "        return current.cycle_count\n"
+        "    if self._hooks.settled(run_id).provider == 'fake':\n"
+        "        return self._hooks.assign_new_inputs(transaction).stop_reason\n"
+        "    return None\n"
+    )
+    assert projection_reads(probe, THIN_DRIVER) == [
+        "harness/thin_driver.py:3: current.status",
+        "harness/thin_driver.py:4: current.cycle_count",
+        "harness/thin_driver.py:5: self._hooks.settled(run_id).provider",
+        "harness/thin_driver.py:6: self._hooks.assign_new_inputs(transaction).stop_reason",
+    ]
+
+
+def test_passing_the_run_view_to_a_hook_or_the_routing_is_allowed():
+    # 允许的范围也守：钩子交回的运行视图原样传给路由，不算薄驱动读它
+    probe = (
+        "def end(self, transaction, run_id):\n"
+        "    return self._hooks.routing(run_id).item_end(self._hooks.run_view(transaction))\n"
+    )
+    assert projection_reads(probe, THIN_DRIVER) == []
 
 
 def test_the_minimal_projection_the_hook_answers_and_contract_types_are_allowed():
