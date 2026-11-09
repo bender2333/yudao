@@ -9,7 +9,8 @@
 # 部门标识与成果种类不在这个文件里：检索由 harness/tests/test_thin_driver_names.py 覆盖。
 #
 # 薄驱动自己只读最小投影；运行视图、路由实现、定义与应用的会话状态是应用的东西，经钩子取得，
-# 读应用投影的判断也在应用一侧。部门与成果的名称一律从定义取。
+# 读运行视图的判断（停止判断是否过期、暂停或失败事件的应用字段）也问钩子，从钩子拿到的运行视图
+# 只原样交回钩子或路由（工单 #1678）。部门与成果的名称一律从定义取。
 
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ from .bounds import TIME_BOUND, time_left_sec, time_limit_message, time_used_up
 from .event_store import run_stream
 from .kernel_events import TERMINAL_STATUSES, SkeletonEventType
 from .minimal_projection import MinimalProjection, SessionState
-from .write_path import NewEvent, Transaction, WritePath
+from .write_path import NewEvent, Snapshot, Transaction, WritePath
 
 
 class DriverHooks(Protocol):
@@ -38,8 +39,9 @@ class DriverHooks(Protocol):
         # 这个 run 的运行视图（应用从事件折叠的那一份）
         ...
 
-    def read_run(self, run_id: str) -> Any:
-        # 这个 run 的只读快照：运行视图与还没回答的决定请求；run 不存在时抛出应用的错误
+    def read_run(self, run_id: str) -> Snapshot:
+        # 这个 run 的只读快照：写入口的 Snapshot，最小投影与还没回答的决定请求从它读；
+        # 它的运行视图薄驱动不读（run 不存在时抛出应用的错误）
         ...
 
     def item_form_available(self, run_id: str) -> bool:
@@ -58,12 +60,8 @@ class DriverHooks(Protocol):
         # 这个事项冻结的那份定义：停止原因与部门按它核对
         ...
 
-    def guidance_version(self, projection: Any, department: str) -> int:
-        # 这个部门指导当前这一版的编号（指导是应用的数据，最小投影里没有它）
-        ...
-
-    def user_events(self) -> frozenset[str]:
-        # 用户提出的事件种类（输入与指导）：停止判断核对流版本时用
+    def run_view(self, transaction: Transaction) -> Any:
+        # 这个事务里的运行视图：薄驱动不读它的字段，原样交给路由（工单 #1678）
         ...
 
     # 取消与结算
@@ -132,6 +130,14 @@ class DriverHooks(Protocol):
         ...
 
     # 事项结束
+    def stop_superseded(self, transaction: Transaction, basis: Any, department: str, version: int) -> bool:
+        # 停止判断已经过期：这次激活期间新的用户输入或指导到达（输入与指导的版本是应用的数据，按运行视图判断）
+        ...
+
+    def stop_event_fields(self, transaction: Transaction) -> StopEventFields:
+        # 暂停或失败事件要写的应用字段：当前部门、模型引用与累计用量
+        ...
+
     def await_model(self, transaction: Transaction, round_work: Any, reason: str, message: str, *,
                     target: dict[str, Any] | None = None) -> None:
         # 模型引用无法使用（或整理连续没有推进）：发待恢复的决定请求，不结束运行
@@ -142,9 +148,8 @@ class DriverHooks(Protocol):
         # 暂停以后可以继续时发出决定请求（哪些停止原因可以继续由定义与这一层决定）
         ...
 
-    def record_lesson_candidate(self, transaction: Transaction, reason: str, source_event: Any,
-                                projection: Any) -> None:
-        # 运行失败时记下教训候选（取消不算）
+    def record_lesson_candidate(self, transaction: Transaction, reason: str, source_event: Any) -> None:
+        # 运行失败时记下教训候选（取消不算）：运行视图由应用在自己的事务里读
         ...
 
     # 安全节点上的动作
@@ -208,6 +213,18 @@ class RoundFailure:
     reason: str
     message: str
     facts: list[str] | None = None
+
+
+@dataclass
+class StopEventFields:
+    # 暂停与失败事件要写的应用字段（工单 #1678）：当前部门、模型引用与累计用量是运行视图里的数据，
+    # 由应用经钩子给出，薄驱动原样写进事件，不读运行视图的字段
+    department: str | None
+    provider: str | None
+    model: str | None
+    cycle_count: int
+    max_cycles: int
+    token_used: int
 
 
 @dataclass
@@ -398,20 +415,22 @@ class ThinDriver:
         prepared = self._hooks.prepare_round(run_id, transaction, connections, department)
         if prepared is None:
             return None
-        projection = transaction.projection
+        # 开始事件的状态与轮次读最小投影（工单 #1678）：运行视图不在薄驱动的读取范围里
+        minimal = transaction.minimal()
         session_id = prepared.session_id
+        cycle = minimal.used.activations + 1
         # 派发编号：开始一轮工作时写一条事件取得编号，这一轮写入的事件都带它；重派先写事件、编号加一，
         # 旧编号交回的结果只记录、不改变事项的状态
         transaction.claim_dispatch_number(session_id)
         parent = transaction.append(NewEvent(
             SkeletonEventType.DISPATCH_NUMBER_ACQUIRED, actor="system", department=department,
-            state_before=projection.status, state_after=projection.status, session_id=session_id,
-            payload={"activation_id": prepared.activation_id, "cycle": projection.cycle_count + 1},
+            state_before=minimal.status, state_after=minimal.status, session_id=session_id,
+            payload={"activation_id": prepared.activation_id, "cycle": cycle},
         ), NewEvent(
             SkeletonEventType.DEPARTMENT_ACTIVATED, actor="system", department=department,
-            state_before=projection.status, state_after=projection.status, session_id=session_id,
+            state_before=minimal.status, state_after=minimal.status, session_id=session_id,
             provider=prepared.provider,
-            payload={"activation_id": prepared.activation_id, "cycle": projection.cycle_count + 1,
+            payload={"activation_id": prepared.activation_id, "cycle": cycle,
                      "effective_contract_hash": prepared.basis.effective_contract_hash,
                      "guidance_ids": list(prepared.guidance_ids),
                      "guidance_version": prepared.basis.guidance_version,
@@ -427,9 +446,11 @@ class ThinDriver:
         )
         # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
         self.start_session_segment(run_id, session_id)
+        # 开始时的流版本读最小投影（工单 #1678）：停止判断核对流版本时用这一个
+        version = transaction.minimal().stream_versions.get(transaction.stream, 0)
         # 这个会话自己的停止开关（工单 #856）：停这个会话只停这个会话，不改变事项的状态
         return RoundWork(scope, prepared.prompt, Event(), prepared.adapter,
-                         transaction.projection.stream_version, settings=prepared.settings)
+                         version, settings=prepared.settings)
 
     def start_execution(self, round_work: RoundWork, request: execution_contract.RoundRequest,
                         dependencies: RoundDependencies) -> Any:
@@ -477,7 +498,8 @@ class ThinDriver:
                          stalled_compaction=result.stalled_compaction)
             return
         current = self._hooks.project(run_id)
-        if current.status in TERMINAL_STATUSES:
+        # 运行是否已经结束读最小投影（工单 #1678）：运行视图原样交给应用收尾，不在这里读它的字段
+        if self._writes.minimal(run_stream(run_id)).status in TERMINAL_STATUSES:
             return
         if result.submission is None:
             # 这一轮没有经提议方式交上东西（在安全节点停下，或只有文字回答）：按当时的运行状态收尾
@@ -506,11 +528,10 @@ class ThinDriver:
         scope = round_work.scope
 
         def finish(transaction: Transaction) -> None:
-            current = transaction.projection
             elapsed_ms = self.settle_run_segment(scope.run_id, scope.department)
             happened = transaction.events()
-            # 这一轮结束时的已用量读最小投影（S1e 工单 #1015）：事项一级与会话一级的激活次数与
-            # 模型步数都由投影折出来，不在这里从事件数一遍。会话的已用时间含当前这一段，
+            # 这一轮结束时的状态与已用量读最小投影（S1e 工单 #1015，工单 #1678）：事项一级与会话一级的
+            # 激活次数与模型步数都由投影折出来，不在这里从事件数一遍。会话的已用时间含当前这一段，
             # 投影要等这条事件写进去才结算，所以由驱动算好写进事件
             measured = transaction.minimal()
             session = measured.sessions.get(scope.session_id, SessionState())
@@ -520,8 +541,8 @@ class ThinDriver:
                 actor="system",
                 department=scope.department,
                 parent_event_id=scope.parent_event_id,
-                state_before=current.status,
-                state_after=current.status,
+                state_before=measured.status,
+                state_after=measured.status,
                 session_id=scope.session_id,
                 payload={
                     "activation_id": scope.activation_id,
@@ -533,7 +554,7 @@ class ThinDriver:
                     "session_elapsed_ms": session_elapsed_ms,
                     "session_activations": session.activations,
                     "session_model_steps": session.model_steps,
-                    "stop_reason": current.stop_reason,
+                    "stop_reason": measured.stop_reason,
                 },
             ))
             self._hooks.after_round_finished(transaction, round_work, happened)
@@ -567,15 +588,9 @@ class ThinDriver:
     def superseded(self, transaction: Transaction, round_work: RoundWork, version: int) -> bool:
         # 停止判断过期：这次激活的工作期间有新的用户输入或指导到达，停止判断不再适用：
         # 这一轮按安全节点结束，运行继续，由下一次激活处理新的输入（工单 #964，循环结构「工作中途要求变化」「指导」）。
-        # 输入到达不再结束部门当前这一轮：它作为通知在这个会话的下一步送达，部门接着工作
-        projection = transaction.projection
-        basis = round_work.scope.basis
-        if projection.input_version != basis.input_version:
-            return True
-        # 新的指导在停止判断以后到达：同样过期，由下一次激活处理
-        if not any(event.type in self._hooks.user_events() for event in transaction.events_after(version)):
-            return False
-        return self._hooks.guidance_version(projection, round_work.department) > basis.guidance_version
+        # 输入与指导的版本是应用的数据（最小投影里没有），读它们的判断归应用：薄驱动问钩子要答案（工单 #1678）
+        return self._hooks.stop_superseded(
+            transaction, round_work.scope.basis, round_work.department, version)
 
     def end(self, transaction: Transaction, reason: str, message: str,
             *, facts: list[str] | None = None) -> None:
@@ -591,64 +606,67 @@ class ThinDriver:
             raise ValueError(f"stop reason {reason} ends a run as completed, which only an accepted final proposal records")
 
     def stop_reason(self, transaction: Transaction, reason: str):
-        # 停止原因按这个事项冻结的形态的那份定义核对（工单 #1392）：路由自己的结束原因也在它那份清单里
-        return self._hooks.definitions(transaction.projection.run_id).stop_reason(reason)
+        # 停止原因按这个事项冻结的形态的那份定义核对（工单 #1392）：路由自己的结束原因也在它那份清单里。
+        # 事项编号读最小投影（工单 #1678）
+        return self._hooks.definitions(transaction.minimal().run_id).stop_reason(reason)
 
     def pause(self, transaction: Transaction, reason: str, message: str | None = None,
               *, facts: list[str] | None = None) -> None:
-        projection = transaction.projection
-        if projection.status in TERMINAL_STATUSES:
+        minimal = transaction.minimal()
+        if minimal.status in TERMINAL_STATUSES:
             return
-        department = projection.active_department
+        # 暂停事件的部门、模型引用与累计用量由应用经钩子给出（工单 #1678）：薄驱动原样写进事件
+        fields = self._hooks.stop_event_fields(transaction)
         self.withdraw_decisions(transaction, reason)
         transaction.append(NewEvent(
-            SkeletonEventType.RUN_PAUSED, actor="system", department=department,
-            state_before=projection.status, state_after="paused", stop_reason=reason,
+            SkeletonEventType.RUN_PAUSED, actor="system", department=fields.department,
+            state_before=minimal.status, state_after="paused", stop_reason=reason,
             error=message,
-            provider=projection.provider, model=projection.model,
+            provider=fields.provider, model=fields.model,
             payload={
                 "stop_reason": reason,
                 "human_action": self.stop_reason(transaction, reason).human_action,
                 **({"message": message} if message else {}),
-                "cycle_count": projection.cycle_count,
-                "max_cycles": projection.max_cycles,
-                "token_used": projection.token_used,
+                "cycle_count": fields.cycle_count,
+                "max_cycles": fields.max_cycles,
+                "token_used": fields.token_used,
             },
         ))
         # 因不调用工具或工作区无法表示而暂停时由应用发出决定请求（D09，工单 #204）：阻塞整个 run，
         # 选项为「处理以后继续执行」与「停止事项」；哪些停止原因可以继续由定义与这一层决定
-        self._hooks.resume_after_pause(transaction, reason, department, message, facts or [])
-        transaction.on_commit(lambda: self._hooks.close_run(projection.run_id))
+        self._hooks.resume_after_pause(transaction, reason, fields.department, message, facts or [])
+        transaction.on_commit(lambda: self._hooks.close_run(minimal.run_id))
 
     def fail(self, transaction: Transaction, reason: str, message: str,
              *, input_save_failure: dict[str, str] | None = None) -> None:
         human = self.stop_reason(transaction, reason).human_action
-        projection = transaction.projection
-        if projection.status in TERMINAL_STATUSES:
+        minimal = transaction.minimal()
+        if minimal.status in TERMINAL_STATUSES:
             return
-        department = projection.active_department
+        # 失败事件的部门、模型引用由应用经钩子给出（工单 #1678）：薄驱动原样写进事件
+        fields = self._hooks.stop_event_fields(transaction)
         self.withdraw_decisions(transaction, reason)
         source_event = transaction.append(NewEvent(
-            SkeletonEventType.RUN_FAILED, actor="system", department=department,
-            state_before=projection.status, state_after="failed", stop_reason=reason, error=message,
-            provider=projection.provider, model=projection.model,
+            SkeletonEventType.RUN_FAILED, actor="system", department=fields.department,
+            state_before=minimal.status, state_after="failed", stop_reason=reason, error=message,
+            provider=fields.provider, model=fields.model,
             payload={"stop_reason": reason, "human_action": human, "message": message,
                      **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
         ))[0]
-        transaction.on_commit(lambda: self._hooks.close_run(projection.run_id))
-        self._hooks.record_lesson_candidate(transaction, reason, source_event, projection)
+        transaction.on_commit(lambda: self._hooks.close_run(minimal.run_id))
+        self._hooks.record_lesson_candidate(transaction, reason, source_event)
 
     def withdraw_decisions(self, transaction: Transaction, reason: str) -> None:
         # 运行结束：撤销未回答的决定请求，reason 是结束运行的停止原因
-        projection = transaction.projection
+        status = transaction.minimal().status
         for decision in list(transaction.decisions.values()):
             if decision.status != "open":
                 continue
             transaction.append(NewEvent(
                 SkeletonEventType.DECISION_WITHDRAWN, actor="system",
                 department=decision.request["department"],
-                parent_event_id=decision.decision_id, state_before=projection.status,
-                state_after=projection.status,
+                parent_event_id=decision.decision_id, state_before=status,
+                state_after=status,
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
 
@@ -657,32 +675,33 @@ class ThinDriver:
     def at_safe_node(self, round_work: RoundWork) -> execution_contract.Judgment:
         # 安全节点：激活没有中止、运行时间没有用完时先分派新输入，再作停止判断；回答是否继续与判断时的流版本
         def judge(transaction: Transaction) -> execution_contract.Judgment:
-            projection = transaction.projection
             if not (round_work.stop_flag.is_set()
                     or self._hooks.aborted(round_work.run_id)
                     or (round_work.deadline is not None and time.monotonic() >= round_work.deadline)
                     or time_used_up(transaction.minimal(), self.elapsed_sec(round_work.run_id))):
-                projection = self._hooks.assign_new_inputs(transaction)
+                self._hooks.assign_new_inputs(transaction)
+            minimal = transaction.minimal()
             decisions = list(transaction.decisions.values())
-            stop = self.stop_requested(round_work, projection, transaction.minimal(), decisions)
+            stop = self.stop_requested(round_work, minimal, decisions)
             # 别的会话已经写下待恢复的决定请求：这个会话照常停下（事项的状态不变）；
             # 它自己也被挡住时（这次的模型请求发不出去），它要写下自己的那一条，各写明自己的部门、模型与问题
             blocked = self._hooks.blocked_by_other_session(decisions, round_work.department)
-            return execution_contract.Judgment(not stop, projection.stream_version, blocked)
+            return execution_contract.Judgment(
+                not stop, minimal.stream_versions.get(transaction.stream, 0), blocked)
 
         return self._hooks.transact_run(round_work.run_id, judge)
 
-    def stop_requested(self, round_work: RoundWork, projection: Any, minimal: MinimalProjection,
+    def stop_requested(self, round_work: RoundWork, minimal: MinimalProjection,
                        decisions: Iterable[Any]) -> bool:
         # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求；
         # 只读取，不写入。会话自己的开关与事项的开关都看：停下一个会话只停这个会话，用户取消事项时全部会话都停。
         # 有效合同、指导与用户输入变了都不再停止：它们作为通知送达，部门接着工作，一轮工作因此不结束。
-        # 输入仍然分派给产品部门处理：产品在自己的那一轮处理它
+        # 状态读最小投影（工单 #1678）
         return (round_work.stop_flag.is_set()
                 or self._hooks.aborted(round_work.run_id)
                 or (round_work.deadline is not None and time.monotonic() >= round_work.deadline)
                 or time_used_up(minimal, self.elapsed_sec(round_work.run_id))
-                or projection.status in TERMINAL_STATUSES or self._hooks.blocks_run(decisions))
+                or minimal.status in TERMINAL_STATUSES or self._hooks.blocks_run(decisions))
 
     def safe_node(self, round_work: RoundWork, declared: int) -> execution_contract.SafeNode:
         # 交给执行实现的安全节点按它声明的契约版本给：当前版拿到设计说明写的五样；
@@ -739,8 +758,8 @@ class ThinDriver:
             while True:
                 changed.clear()
                 snapshot = self._hooks.read_run(run_id)
-                projection = snapshot.projection
-                if projection.status in TERMINAL_STATUSES:
+                # 运行状态读最小投影（工单 #1678）：运行视图只在应用一侧读
+                if snapshot.minimal().status in TERMINAL_STATUSES:
                     await self.stop_sessions(run_id, tasks)
                     return self._hooks.project(run_id)
                 if self._hooks.aborted(run_id):
@@ -781,10 +800,11 @@ class ThinDriver:
             await connections.aclose()
 
     def ready_departments(self, run_id: str) -> list[str]:
-        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些。判断归路由实现
-        projection = self._hooks.project(run_id)
+        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些。判断归路由实现；
+        # 运行视图从钩子取得，只原样交给路由（工单 #1678）
+        run_view = self._hooks.project(run_id)
         return self._hooks.routing(run_id).ready_departments(
-            projection, waiting=self._hooks.waiting_departments(run_id))
+            run_view, waiting=self._hooks.waiting_departments(run_id))
 
     async def stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[Any]]) -> None:
         # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
@@ -800,9 +820,10 @@ class ThinDriver:
         await asyncio.gather(*pending, return_exceptions=True)
 
     async def no_new_work(self, run_id: str) -> Any:
-        # 没有部门可以开始一轮工作：事项以什么结束由路由判断，薄驱动只把它的判断写成停止
+        # 没有部门可以开始一轮工作：事项以什么结束由路由判断，薄驱动只把它的判断写成停止。
+        # 运行视图从钩子取得，只原样交给路由（工单 #1678）
         def end(transaction: Transaction) -> None:
-            judgment = self._hooks.routing(run_id).item_end(transaction.projection)
+            judgment = self._hooks.routing(run_id).item_end(self._hooks.run_view(transaction))
             if judgment is None:
                 return
             self.fail(transaction, judgment.stop_reason, judgment.message)
