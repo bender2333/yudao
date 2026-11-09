@@ -11,6 +11,7 @@ from typing import Any
 from ..definitions import DEFINITIONS
 from ..models import (OPEN_LOOP_STOP_REASON, RUN_STATUSES, CatalogEventType, EventType, ProjectEventType,
                       stop_reason_name)
+from .action_titles import action_title
 
 
 # run 状态的中文名（harness/models.py 的 RUN_STATUSES 是同一份取值）：事件说明里的状态按中文写
@@ -145,12 +146,28 @@ def item_count(items: Any) -> str:
 GENERIC_EVENT_LABEL = "发生了一条事件"
 
 
+# 工具开始与工具结果两种事件的文字由 action_titles 算（工单 #1657）：写的是动作标题，与 run.steps 的动作行
+# 逐字相同。_LABELS 里这两项留着，给同一事件种类里不是动作的那种记录用（用量记账也写成 tool_called），
+# 每一种事件都有中文说明这件事仍由 test_event_classification.py 核对
+TOOL_TITLE_EVENTS = frozenset({EventType.TOOL_STARTED, EventType.TOOL_CALLED})
+
+
+def _is_tool_call(payload: dict[str, Any]) -> bool:
+    # 载荷是一次工具调用（有工具名与参数）而不是同一事件种类里的另一种记录：用量记账也写成 tool_called，
+    # 但它没有参数、不是动作，照旧用登记表里的说明
+    return "args" in payload or "id" in payload
+
+
 def event_label(event_type: str, payload: dict[str, Any]) -> str:
     # 一条事件的中文说明；载荷中的关键字段填进说明里。
     # 没有登记说明的种类、或者载荷里缺了说明要的字段时，退回一句通用说明：
     # 事件流播到这一条就断掉，客户端会每秒重连一次，永远过不去（工单 #664）。
     # 标签表与事件种类清单的一致性由 test_event_classification.py 核对，
     # 说明里用的字段都在载荷里也由那一条核对。
+    if event_type in TOOL_TITLE_EVENTS and _is_tool_call(payload):
+        # 工具开始与工具结果的文字是动作标题（工作过程的任务与动作标题设计说明「接口」「谁来读」，工单 #1657）：
+        # 与 run.steps 的动作行用同一个函数算，两处逐字相同
+        return action_title(payload.get("name"), payload.get("args"))
     template = _LABELS.get(event_type)
     if template is None:
         return GENERIC_EVENT_LABEL
@@ -203,6 +220,8 @@ _LABELS: dict[str, str] = {
     EventType.MODEL_RETRY_SCHEDULED: "安排第 {next_attempt} 次尝试，等待 {delay_sec} 秒：{reason}",
     EventType.COMPACTION_RECORDED: "记录了一次上下文压缩（第 {step_id} 步）",
     EventType.MODEL_REASONING: "记录了模型的思考内容（第 {step_id} 步）",
+    # 这两项的文字由 action_titles 算（上面 TOOL_TITLE_EVENTS 那一段）：一次工具调用的文字是动作标题。
+    # 登记表里留着的是同一事件种类里不是动作的那种记录的说法——用量记账也写成 tool_called，它没有参数
     EventType.TOOL_CALLED: "执行了工具 {name}：{ok}",
     EventType.TOOL_STARTED: "开始执行工具 {name}",
     EventType.ACTION_VERIFIED: "核实了动作 {name}：{resolution}",

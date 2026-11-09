@@ -39,6 +39,8 @@ from ..recovery import (
 from ..runtime import FORM_REGISTRY
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
+from .action_titles import (ActionLine, Fact, Mark, ReceiptFacts, Source, action_line, text_title,
+                            tool_definition)
 from .labels import NO_BASELINE_REVIEW_LABEL, actor_name, department_name, event_label, status_name
 from .payloads import (PAYLOADS, BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure,
                        Department)
@@ -1760,6 +1762,14 @@ class ActionView(Contract):
     receipt: ActionReceipt | None
     before_snapshot_ref: dict[str, Any] | None = None
     after_snapshot_ref: dict[str, Any] | None = None
+    # 动作标记与标题（工作过程的任务与动作标题设计说明「动作标记」「动作标题」，工单 #1657）：
+    # mark 是种类标记（读、写、运行、询问、提交），facts 是系统量到的事实（失败、超时、结果未知、
+    # 被拒绝、改了文件），title 是一行标题（上限 60 字符），来源是系统或作者（运行命令那一句，工单 #1659）。
+    # 三者都从工具定义与回执重算，不保存，与事件流里工具事件的文字同一个函数算
+    mark: Mark | None = None
+    title: str = ""
+    title_source: Source = "系统"
+    facts: list[Fact] = Field(default_factory=list)
 
 class BackgroundCommandView(Contract):
     command: str
@@ -1926,6 +1936,49 @@ def _tool_output(application: Application, run_id: str, output_ref: Any) -> dict
     return output if isinstance(output, dict) else None
 
 
+def _line(name: str, args: Any, receipt: ReceiptFacts | None = None) -> ActionLine:
+    # 一个动作的一行（工单 #1657）：工具定义从发布带的定义里查，事件流用同一份查找，两处逐字相同
+    return action_line(tool_definition(name), name, args, receipt)
+
+
+def _line_fields(line: ActionLine) -> dict[str, Any]:
+    # 动作行放进 ActionView 的四项：种类标记、标题、标题来源与系统量到的事实
+    return {"mark": line.mark, "title": line.title, "title_source": line.source, "facts": list(line.facts)}
+
+
+def _snapshot_hash(ref: Any) -> str | None:
+    # 快照引用的 content_hash：两个引用都在、摘要不同时标「改了文件」。只比摘要，不比整个引用（两个引用的 kind 不同）
+    if not isinstance(ref, dict):
+        return None
+    value = ref.get("content_hash")
+    return value if isinstance(value, str) and value else None
+
+
+def _receipt_facts(payload: dict[str, Any], *, before_ref: Any = None, after_ref: Any = None,
+                   refused: bool = False, unknown: bool = False) -> ReceiptFacts:
+    # 工具结果里的几项事实（工单 #1657）：退出状态与超时在 input_item.output 里（JSON 的 output.exit_code、
+    # output.status），不读输出工件——读长激活时一个动作一次工件读取，一秒读不完
+    ok = bool(payload.get("ok"))
+    error = payload.get("error")
+    output: Any = None
+    item = payload.get("input_item")
+    if isinstance(item, dict):
+        try:
+            result = json.loads(item.get("output") or "")
+        except (TypeError, ValueError):
+            result = None
+        if isinstance(result, dict):
+            output = result.get("output")
+    exit_code = status = None
+    if isinstance(output, dict):
+        code = output.get("exit_code")
+        exit_code = code if isinstance(code, int) and not isinstance(code, bool) else None
+        status = output.get("status") if isinstance(output.get("status"), str) else None
+    return ReceiptFacts(ok=ok, error=error, exit_code=exit_code, status=status, refused=refused,
+                        before_hash=_snapshot_hash(before_ref), after_hash=_snapshot_hash(after_ref),
+                        unknown=unknown)
+
+
 def _action_view(result_event: Any | None, identity: tuple[str, int | None, str],
                  started_event: Any | None, *, live: bool = False,
                  fetch: FetchReceipt | None = None,
@@ -1933,44 +1986,56 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
                  browser_session: dict[str, Any] | None = None) -> ActionView:
     # 一个动作的读取视图（工单 #17）：状态、回执，以及动作前后的快照引用（动作前取自 tool_started，
     # 动作后取自 tool_called）。result_event 为空表示只有 tool_started、还没有结果。
+    # 标记与标题（工单 #1657）从工具定义与回执重算，与事件流里工具事件的文字同一个函数算
     action_id = identity[2]
     if result_event is None:
         payload = {} if started_event is None else (started_event.payload or {})
+        name = str(payload.get("name") or "")
+        args = redact_tool_args(dict(payload.get("args") or {}))
         return ActionView(
-            action_id=action_id, tool=str(payload.get("name") or ""),
+            action_id=action_id, tool=name,
             department=None if started_event is None else started_event.department,
             status=("running" if live else "unknown"),
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
             created_at="" if started_event is None else started_event.created_at, receipt=None,
             before_snapshot_ref=payload.get("before_snapshot_ref"),
+            **_line_fields(_line(name, args, ReceiptFacts(unknown=not live))),
         )
     payload = result_event.payload or {}
     if result_event.type == EventType.ACTION_VERIFIED:
         resolution = payload.get("resolution")
         started_payload = {} if started_event is None else (started_event.payload or {})
+        name = str(payload.get("name") or started_payload.get("name") or "")
+        # 核实记录里没有参数：标题按动作开始时记下的参数算，与原来那一行相同
+        args = redact_tool_args(dict(started_payload.get("args") or {}))
         return ActionView(
-            action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
+            action_id=action_id, tool=name,
             department=result_event.department,
             status="unknown" if resolution == "handed_back" else "completed",
             activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
             input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
             created_at=result_event.created_at, receipt=None,
             before_snapshot_ref=started_payload.get("before_snapshot_ref"),
+            **_line_fields(_line(name, args, _receipt_facts(payload, unknown=resolution == "handed_back"))),
         )
     ok = bool(payload.get("ok"))
     started_payload = {} if started_event is None else (started_event.payload or {})
     refused = bool(payload.get("refused"))
     session = browser_session or {}
+    name = str(payload.get("name") or started_payload.get("name") or "")
+    args = redact_tool_args(dict(payload.get("args") or started_payload.get("args") or {}))
+    before_ref = started_payload.get("before_snapshot_ref")
+    after_ref = payload.get("after_snapshot_ref")
     return ActionView(
-        action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
+        action_id=action_id, tool=name,
         department=result_event.department,
         status="refused" if refused else ("completed" if ok else "failed"),
         activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
         input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
         created_at=result_event.created_at,
         receipt=ActionReceipt(
-            args=redact_tool_args(dict(payload.get("args") or started_payload.get("args") or {})),
+            args=args,
             ok=ok, error=payload.get("error"),
             output_ref=payload.get("output_ref"), event_id=result_event.event_id,
             created_at=result_event.created_at,
@@ -1979,8 +2044,10 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
             session_id=session.get("session_id"),
             session_tree_digest=session.get("tree_digest"),
         ),
-        before_snapshot_ref=started_payload.get("before_snapshot_ref"),
-        after_snapshot_ref=payload.get("after_snapshot_ref"),
+        before_snapshot_ref=before_ref,
+        after_snapshot_ref=after_ref,
+        **_line_fields(_line(name, args, _receipt_facts(payload, before_ref=before_ref, after_ref=after_ref,
+                                                       refused=refused))),
 
     )
 
@@ -2006,21 +2073,29 @@ class StepText(Contract):
 
 class RunStepView(Contract):
     # 一步（一次模型请求；重试与它重试的那一步算一步）：请求时间、被丢弃的调用尝试数、
-    # 这一步的推理与模型文字、这一步发起的动作与回执
+    # 这一步的推理与模型文字、这一步发起的动作与回执。
+    # 每一步带它的调用尝试编号（含被丢弃的，工单 #1657）：页面由它进请求详情（run.attempt）。
+    # 只有文字、没有动作的一步只有一行：title 是这段文字的开头，title_source 记作者，没有种类标记
     step_id: int
     requested_at: str
     discarded_attempts: int
     reasoning: list[StepText]
     texts: list[StepText]
     actions: list[ActionView]
+    attempt_ids: list[str] = Field(default_factory=list)
+    title: str | None = None
+    title_source: Source | None = None
 
 
 class ActivationView(Contract):
-    # 一次激活：开始与结束时间（进行中时结束为空）与步数
+    # 一次激活：开始与结束时间（进行中时结束为空）、步数，以及它所在的会话与第几轮（工单 #1657）：
+    # 询问分支的激活，会话编号就是 run.asks 的询问编号；第几轮取自激活事件
     activation_id: str
     started_at: str
     finished_at: str | None
     step_count: int
+    session_id: str | None = None
+    cycle: int | None = None
 
 
 class RunStepsResult(Contract):
@@ -2052,18 +2127,20 @@ def _department_events(store: Any, run_id: str, department: str) -> list[Any]:
 
 
 def _activation_windows(events: list[Any]) -> tuple[list[str], dict[str, dict[str, Any]]]:
-    # 这个部门的激活：开始与结束时间，按开始时间升序（事件本来就按位置排列）
+    # 这个部门的激活：开始与结束时间、所在的会话与第几轮（工单 #1657），按开始时间升序（事件本来就按位置排列）
     order: list[str] = []
     windows: dict[str, dict[str, Any]] = {}
     for event in events:
-        activation_id = str((event.payload or {}).get("activation_id") or "")
+        payload = event.payload or {}
+        activation_id = str(payload.get("activation_id") or "")
         if not activation_id:
             continue
         if event.type == EventType.DEPARTMENT_ACTIVATED:
             if activation_id in windows:
                 continue
             windows[activation_id] = {"activation_id": activation_id, "started_at": event.created_at,
-                                      "finished_at": None}
+                                      "finished_at": None, "session_id": event.session_id,
+                                      "cycle": payload.get("cycle")}
             order.append(activation_id)
         elif event.type == EventType.ACTIVATION_FINISHED and activation_id in windows:
             windows[activation_id]["finished_at"] = event.created_at
@@ -2125,7 +2202,9 @@ def _run_steps(application: Application, request: RunSteps) -> Snapshot[RunSteps
     activations = [
         ActivationView(activation_id=activation_id, started_at=windows[activation_id]["started_at"],
                        finished_at=windows[activation_id]["finished_at"],
-                       step_count=step_counts.get(activation_id, 0))
+                       step_count=step_counts.get(activation_id, 0),
+                       session_id=windows[activation_id]["session_id"],
+                       cycle=windows[activation_id]["cycle"])
         for activation_id in order
     ]
     groups, root_of_step = ({}, {}) if selected is None else _steps_by_root(events, selected)
@@ -2136,6 +2215,9 @@ def _run_steps(application: Application, request: RunSteps) -> Snapshot[RunSteps
                     discarded_attempts=sum(
                         1 for event in groups[root]
                         if str((event.payload or {}).get("attempt_id") or "") in discarded),
+                    # 这一步的调用尝试编号，含被丢弃的（工单 #1657）：页面由它进请求详情
+                    attempt_ids=[str((event.payload or {}).get("attempt_id") or "") for event in groups[root]
+                                 if (event.payload or {}).get("attempt_id")],
                     reasoning=[], texts=[], actions=[])
         for root in sorted(groups)
     ]
@@ -2172,6 +2254,9 @@ def _run_steps(application: Application, request: RunSteps) -> Snapshot[RunSteps
             unassigned.append(action)
             continue
         view.actions.append(action)
+    # 只有文字、没有动作的一步只有一行（工单 #1657）：这段文字的开头作标题，没有种类标记，来源记作者
+    steps = [view if view.actions or not view.texts else view.model_copy(update={
+        "title": text_title(view.texts[0].preview), "title_source": "作者"}) for view in steps]
     return Snapshot[RunStepsResult](
         position=store.end_position(),
         data=RunStepsResult(
