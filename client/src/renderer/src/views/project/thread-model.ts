@@ -293,29 +293,38 @@ function doneText(ending: Ending): string {
   return `${head}开环完成：没有人核验`;
 }
 
-/** 核验角色问被核验的一方时，解释旁写明它对哪一版下了结论以后才看到：数它问之前这个职能交给它的交付。 */
-function explanationNoteOf(
-  ask: ThreadAsk,
-  organization: ThreadOrganization | null,
-  labels: Record<string, string>,
-  flow: readonly ThreadFlowRecord[],
-): string | null {
-  const explanation = ask.answer_explanation ?? "";
-  if (organization === null || explanation.trim() === "") {
+/**
+ * 核验角色问被核验的一方时，解释旁写明它对哪一版下了结论以后才看到：数它问之前这个职能交给它的交付。
+ *
+ * 线程的折叠行与时序图的原文面板读同一句话，两处都调这一个函数，不各写一份。
+ */
+export function explanationNoteOf(input: {
+  requester: string;
+  recipient: string;
+  /** 回答里的解释；没有解释时不写这句话 */
+  explanation: string | null;
+  /** 这次询问在事件流里的位置：比它早的交付才算「下结论之前」 */
+  startPosition: number;
+  verifiers: readonly { role: string; verifies: readonly { role: string; outcomes: readonly string[] }[] }[];
+  /** 职能的显示名 */
+  nameOf: (id: string) => string;
+  flow: readonly { kind: string; direction_from: string | null; direction_to: string | null; position: number }[];
+}): string | null {
+  if ((input.explanation ?? "").trim() === "") {
     return null;
   }
-  const verifies = organization.verifiers.some(
-    (verifier) => verifier.role === ask.requester
-      && verifier.verifies.some((verified) => verified.role === ask.recipient),
+  const verifies = input.verifiers.some(
+    (verifier) => verifier.role === input.requester
+      && verifier.verifies.some((verified) => verified.role === input.recipient),
   );
   if (!verifies) {
     return null;
   }
-  const before = flow.filter((record) => record.kind === DELIVERY_KIND
-    && record.direction_from === ask.recipient
-    && record.direction_to === ask.requester
-    && record.position < ask.start_position).length;
-  const name = roleLabel(ask.requester, organization, labels);
+  const before = input.flow.filter((record) => record.kind === DELIVERY_KIND
+    && record.direction_from === input.recipient
+    && record.direction_to === input.requester
+    && record.position < input.startPosition).length;
+  const name = input.nameOf(input.requester);
   return before === 0 ? `${name}对交付下结论以后才看到` : `${name}对交付第 ${before} 版下结论以后才看到`;
 }
 
@@ -407,7 +416,15 @@ export function itemThread(input: ItemThreadInput): ThreadEntry[] {
       toLabel: null, text: ask.answer ?? "", at: answered.at, role: "answer",
       facts: ask.answer_facts ?? null,
       explanation: ask.answer_explanation ?? null,
-      explanationNote: explanationNoteOf(ask, organization, labels, input.flow),
+      explanationNote: explanationNoteOf({
+        requester: ask.requester,
+        recipient: ask.recipient,
+        explanation: ask.answer_explanation ?? "",
+        startPosition: ask.start_position,
+        verifiers: organization?.verifiers ?? [],
+        nameOf: (id) => roleLabel(id, organization, labels),
+        flow: input.flow,
+      }),
     };
     atoms.push({ kind: "role", time: answered.time, at: answered.at, order: order++, from: ask.requester, to: ask.recipient, messages: [question, answer] });
   }

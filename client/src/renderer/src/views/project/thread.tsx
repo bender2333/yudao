@@ -34,6 +34,8 @@ export function ThreadView(props: {
   onSelectItem: (workItem: string) => void;
   /** 交完成或放行那一条的「看这一版」：在循环图上打开那条箭头 */
   onLook: (workItem: string, flowId: string) => void;
+  /** 折叠行末尾的「在时序图里看」：只看这两个职能的时序图 */
+  onSequence: (workItem: string, roles: readonly string[]) => void;
   onNavigate: (hash: string) => void;
   /** 发送一条以后加一：线程滚到最新一条；别的时候不动滚动位置 */
   scrollSignal: number;
@@ -96,6 +98,7 @@ export function ThreadView(props: {
           onToggle={() => props.onToggleItem(item.work_item_id)}
           onSelect={() => props.onSelectItem(item.work_item_id)}
           onLook={(flowId) => props.onLook(item.work_item_id, flowId)}
+          onSequence={(roles) => props.onSequence(item.work_item_id, roles)}
           onNavigate={props.onNavigate}
         />
       ))}
@@ -124,6 +127,7 @@ function ThreadItem(props: {
   onToggle: () => void;
   onSelect: () => void;
   onLook: (flowId: string) => void;
+  onSequence: (roles: readonly string[]) => void;
   onNavigate: (hash: string) => void;
 }) {
   const runId = props.item.run_id ?? "";
@@ -154,6 +158,7 @@ function ThreadItem(props: {
           onToggle={props.onToggle}
           onSelect={props.onSelect}
           onLook={props.onLook}
+          onSequence={props.onSequence}
           app={props.app}
           onNavigate={props.onNavigate}
         />
@@ -169,6 +174,7 @@ function ThreadRow(props: {
   onToggle: () => void;
   onSelect: () => void;
   onLook: (flowId: string) => void;
+  onSequence: (roles: readonly string[]) => void;
   app: ClientApp | null;
   onNavigate: (hash: string) => void;
 }) {
@@ -190,7 +196,7 @@ function ThreadRow(props: {
     case "you":
       return <YouLine entry={entry} />;
     case "fold":
-      return <FoldRow entry={entry} />;
+      return <FoldRow entry={entry} onSequence={props.onSequence} />;
     case "done":
       return <DoneLine entry={entry} onLook={props.onLook} />;
     case "decision":
@@ -221,8 +227,11 @@ function YouLine(props: { entry: Extract<ThreadEntry, { kind: "you" }> }) {
   );
 }
 
-/** 角色之间的往来折成的一行：点开才展开；问答里工程回答质检的那一条分事实与解释。 */
-function FoldRow(props: { entry: Extract<ThreadEntry, { kind: "fold" }> }) {
+/** 角色之间的往来折成的一行：点开才展开；末尾「在时序图里看」只看这两个职能。 */
+function FoldRow(props: {
+  entry: Extract<ThreadEntry, { kind: "fold" }>;
+  onSequence: (roles: readonly string[]) => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="y10-th-fold">
@@ -237,6 +246,14 @@ function FoldRow(props: { entry: Extract<ThreadEntry, { kind: "fold" }> }) {
       {open ? (
         <ul className="y10-th-fold-body">
           {props.entry.messages.map((message) => <li key={message.key}><FoldMessage message={message} /></li>)}
+          {/* 折叠行是读内容的地方：展开以后末尾「在时序图里看」，点开只看这两个职能（设计说明 4.14 交互骨架第 3 条） */}
+          {props.entry.roles.length === 2 ? (
+            <li className="y10-th-fold-more">
+              <button type="button" className="y10-link" onClick={() => props.onSequence(props.entry.roles)}>
+                在时序图里看
+              </button>
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>
