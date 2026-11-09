@@ -2,17 +2,20 @@
 //
 // 页面上半是循环图：按所选事项冻结的组织画节点、成果箭头与结论。图上方的行选事项（默认最近在跑的），
 // 点节点、点箭头打开同一个面板。最上面是时间条（工单 #1653）：所选事项的已用时间与上限，在跑时另有「停止」。
-// 线程与循环图下面的时序图留出位置，由后面的工单接上。
+// 图右上角的「看经过」展开时序图（工单 #1641）：按轮折起来的经过，展开在循环图下面，不盖住线程；
+// 只有一个职能时没有这个按钮，也没有时序图。线程的位置这一页只留出来，由后面的工单接上。
 //
-// 读的事实：project.loop（冻结的组织、职能状态、轮次）、project.overview（事项标题）、
-// project.flow（箭头）、work_item.materials（版本与改了的文件）；页面不另存一份，也不按形态名判断。
-// 一切「事实推出图」的判断在 loop-graph-model.ts 里，那里有单元测试。
+// 读的事实：project.loop（冻结的组织、职能状态、轮次、运行）、project.overview（事项标题）、
+// project.flow（箭头、你的输入、指导、打回与放行）、work_item.materials（版本与改了的文件）；
+// 打开时序图以后另读 run.asks（询问与回答、等待）与 decisions.list（要你决定、你决定）。
+// 页面不另存一份，也不按形态名判断。
+// 一切「事实推出图」的判断在 loop-graph-model.ts 与 sequence-model.ts 里，那里有单元测试。
 
 import { useMemo, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
-  ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
-  WorkItemMaterialsResult,
+  DecisionList, ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
+  RunAsksResult, WorkItemMaterialsResult,
 } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import type { Route } from "../../shell/routing";
@@ -24,6 +27,8 @@ import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } fro
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
 import { LoopPanel } from "./loop-panel";
 import { ProjectTimeBar } from "./project-head";
+import { SequenceView } from "./sequence";
+import { hasSequence, sequenceOf } from "./sequence-model";
 import { useSnapshot } from "./use-snapshot";
 
 /** 面板打开的那一个，连同它在哪件事项上打开：换了事项就收起，不在新图上留着旧的一版。 */
@@ -95,6 +100,44 @@ export function ConversationPage(props: {
   const [panel, setPanel] = useState<PanelState>({ item: null, value: null });
   const pick: LoopPanelPick = panel.item === itemId ? panel.value : null;
   const open = (value: LoopPanelPick): void => setPanel({ item: itemId, value });
+  // 时序图（工单 #1641）：图右上角的「看经过」展开它；展开以后才读询问与决定，收起来就不再读
+  const [sequenceOpen, setSequenceOpen] = useState(false);
+  // 展开的是哪几轮：没有点过时按模型给的默认（只展开最新一轮）；挂了哪一件事项一起记，换了事项就不留着旧选择
+  const [roundPick, setRoundPick] = useState<{ item: string; rounds: readonly number[] } | null>(null);
+  const openRounds = roundPick?.item === itemId ? roundPick.rounds : null;
+  const runId = useMemo(
+    () => loop.data?.work_items.find((card) => card.work_item_id === itemId)?.run_id ?? "",
+    [loop.data, itemId],
+  );
+  const asks = useSnapshot<RunAsksResult>(props.app, "page.conversation.asks", "run.asks", {
+    run_id: runId,
+  }, item === null || !sequenceOpen || runId === "");
+  const decisions = useSnapshot<DecisionList>(props.app, "page.conversation.decisions", "decisions.list", {
+    project_id: projectId,
+    work_item_id: itemId,
+  }, item === null || !sequenceOpen);
+  // 列是这个事项冻结的组织里的职能和你（显示名用项目现在组织的名字，旧组织里的用冻结的那一份）
+  const roles = useMemo(
+    () => (item?.organization?.roles ?? []).map((role) => ({ id: role.id, label: labels[role.id] ?? role.label })),
+    [item, labels],
+  );
+  const sequence = useMemo(() => sequenceOf({
+    roles,
+    flow: flow.data?.records ?? [],
+    asks: asks.data?.asks ?? [],
+    decisions: decisions.data?.decisions ?? [],
+    materials: materials.data,
+    // 「现在」：还没等到的色条画到这里。按这一份事实算一次，不跟着每次重算而抖
+    now: new Date().toISOString(),
+    openRounds,
+  }), [roles, flow.data, asks.data, decisions.data, materials.data, openRounds]);
+  const toggleRound = (round: number): void => {
+    const shown = openRounds ?? sequence.rounds.filter((entry) => entry.open).map((entry) => entry.round);
+    setRoundPick({
+      item: itemId,
+      rounds: shown.includes(round) ? shown.filter((value) => value !== round) : [...shown, round],
+    });
+  };
 
   return (
     <div className="y10-cv-page y10-pp" data-testid="conversation-page">
@@ -117,6 +160,15 @@ export function ConversationPage(props: {
             <Empty text="这件事项冻结的组织不在这一版发布里，图上没有可画的节点。" />
           ) : (
             <>
+              {/* 图右上角的入口（工单 #1641）：只有一个职能时没有「看经过」，也没有时序图（设计说明 4.15） */}
+              {hasSequence(roles) ? (
+                <div className="y10-cv-tools">
+                  <button type="button" className="y10-btn small" aria-pressed={sequenceOpen}
+                          data-testid="show-sequence" onClick={() => setSequenceOpen(!sequenceOpen)}>
+                    看经过
+                  </button>
+                </div>
+              ) : null}
               <LoopGraphView
                 graph={graph}
                 pick={pick}
@@ -130,6 +182,14 @@ export function ConversationPage(props: {
                 onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
                 onClose={() => open(null)}
               />
+              {/* 时序图展开在循环图下面，不是单独的页，也不盖住线程 */}
+              {sequenceOpen && hasSequence(roles) ? (
+                <>
+                  {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
+                  {decisions.error === null ? null : <Empty text={readFailureText(decisions.error)} />}
+                  <SequenceView view={sequence} onClose={() => setSequenceOpen(false)} onToggleRound={toggleRound} />
+                </>
+              ) : null}
             </>
           )}
           {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}

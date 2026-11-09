@@ -537,6 +537,79 @@
   background: var(--surface-2);
 }
 
+/* ---------------------------------------------------------------- 时序图（工单 #1641） */
+
+/* 图右上角的入口「看经过」：只有一个职能时没有这个按钮，也没有时序图 */
+.y10-cv-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 4px; }
+.y10-cv-tools .y10-btn[aria-pressed="true"] { background: var(--tint); border-color: var(--green); color: var(--green); font-weight: 600; }
+
+/* 时序图：每个职能和你一列，一行一条消息；展开在循环图下面，不是单独的页，也不盖住线程 */
+.y10-sq {
+  display: grid; gap: 4px; padding: 10px 14px 12px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.y10-sq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.y10-sq-scope { font-size: 12px; color: var(--muted); }
+.y10-sq-legend {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-left: auto;
+  font-size: 11px; color: var(--muted);
+}
+.y10-sq-key { display: inline-block; margin-left: 8px; }
+.y10-sq-key.is-dash { width: 18px; border-top: 1px dashed var(--blue); }
+.y10-sq-key.is-ask, .y10-sq-key.is-user { width: 6px; height: 12px; border-radius: 2px; }
+.y10-sq-key.is-ask, .y10-sq-bar.is-ask { background: color-mix(in srgb, var(--blue) 45%, transparent); }
+.y10-sq-key.is-user, .y10-sq-bar.is-user { background: color-mix(in srgb, var(--amber) 55%, transparent); }
+.y10-sq-close {
+  border: 0; background: none; color: var(--muted); font: inherit; font-size: 18px; line-height: 1;
+  padding: 0 4px; cursor: pointer;
+}
+.y10-sq-close:hover { color: var(--text); }
+
+.y10-sq-wide { display: grid; }
+.y10-sq-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); width: 100%; min-height: 34px; }
+.y10-sq-row.is-cols { min-height: 22px; }
+.y10-sq-row.is-now { min-height: 14px; }
+.y10-sq-time { font-size: 11px; color: var(--faint); padding-top: 3px; white-space: nowrap; overflow: hidden; }
+.y10-sq-track { position: relative; display: block; }
+.y10-sq-track > b { position: absolute; top: 0; transform: translateX(-50%); font-size: 12px; white-space: nowrap; }
+.y10-sq-life { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.y10-sq-bar { position: absolute; top: 0; bottom: 0; width: 6px; margin-left: -3px; }
+/* 一行的那一句标题：压在线上，底下一层底色让它读得清 */
+.y10-sq-text {
+  position: absolute; top: 2px; font-size: 12px; line-height: 16px; padding: 0 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.y10-sq-text > span { background: color-mix(in srgb, var(--surface) 85%, transparent); }
+/* 询问与回答是虚线，其余是实线；箭头指向收的那一方 */
+.y10-sq-line { position: absolute; bottom: 7px; border-top: 1px solid var(--muted); }
+.y10-sq-line.is-dash { border-top: 1px dashed var(--blue); }
+.y10-sq-line::after { content: ""; position: absolute; top: -4px; border: 3.5px solid transparent; }
+.y10-sq-line.is-r::after { right: -1px; border-left: 6px solid var(--muted); border-right-width: 0; }
+.y10-sq-line.is-l::after { left: -1px; border-right: 6px solid var(--muted); border-left-width: 0; }
+.y10-sq-line.is-dash.is-r::after { border-left-color: var(--blue); }
+.y10-sq-line.is-dash.is-l::after { border-right-color: var(--blue); }
+.y10-sq-dot { position: absolute; bottom: 5px; width: 5px; height: 5px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
+.y10-sq-verdict { font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: 4px; }
+.y10-sq-verdict.is-reject { background: var(--red-bg); color: var(--red); }
+.y10-sq-verdict.is-release { background: var(--tint); color: var(--green); }
+
+/* 按轮折起来的那一行：展开时写「第 N 轮」，折起来时后面接这一轮的摘要 */
+.y10-sq-round {
+  width: 100%; margin-top: 2px; padding: 2px 8px; border: 0; border-radius: 4px; background: var(--soft);
+  color: var(--muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.y10-sq-round:hover { color: var(--text); }
+
+/* 窄屏那一条：按时间排的列表，每行写谁到谁与那句标题（800px 以下换上来） */
+.y10-sq-list { display: none; margin: 0; padding: 0; list-style: none; gap: 4px; }
+.y10-sq-list ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.y10-sq-item {
+  display: grid; gap: 1px; width: 100%; border-left: 2px solid var(--line-strong);
+  font-size: 13px; padding: 3px 8px;
+}
+.y10-sq-item.is-dash { border-left: 2px dashed var(--blue); }
+.y10-sq-item small { color: var(--muted); font-size: 11px; }
+
 /* ---------------------------------------------------------------- 项目头部一行与时间条（工单 #1653） */
 
 /* 项目头部一行标签（项目的组织设计说明 4.15 的「其余规矩」）：形态名（改过几处）、轮转方式、有核验或开环。
@@ -569,4 +642,7 @@
   .y10-cv-wrap { display: none; }
   .y10-cv-oneline { display: flex; }
   .y10-cv-thread { min-height: 160px; }
+  /* 时序图退回按时间排的列表（窄屏时每行写谁到谁与那句标题） */
+  .y10-sq-wide { display: none; }
+  .y10-sq-list { display: grid; }
 }
