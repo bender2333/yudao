@@ -53,7 +53,8 @@
             "browser_generate_locator",
             "browser_take_screenshot",
             "ask",
-            "submit_completion"
+            "submit_completion",
+            "update_plan"
           ],
           "current_work": "按用户的原文完成这件事，需要时问产品，然后交完成。",
           "notes": [
@@ -84,7 +85,8 @@
             "submit_product_spec",
             "submit_structure",
             "ask",
-            "submit_completion"
+            "submit_completion",
+            "update_plan"
           ],
           "current_work": "读取现有代码与文档，提交描述现有行为的初始 PRD 与绑定当前快照的现有结构说明，然后交完成；需要时问产品。",
           "notes": [

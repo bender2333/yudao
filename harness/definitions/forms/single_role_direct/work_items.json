@@ -52,7 +52,8 @@
             "browser_verify_value",
             "browser_generate_locator",
             "browser_take_screenshot",
-            "submit_completion"
+            "submit_completion",
+            "update_plan"
           ],
           "current_work": "按用户的原文完成这件事，然后交完成。",
           "notes": [
@@ -81,7 +82,8 @@
             "stop_job",
             "submit_product_spec",
             "submit_structure",
-            "submit_completion"
+            "submit_completion",
+            "update_plan"
           ],
           "current_work": "读取现有代码与文档，提交描述现有行为的初始 PRD 与绑定当前快照的现有结构说明，然后交完成。",
           "notes": [
