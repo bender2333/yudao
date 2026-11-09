@@ -38,6 +38,11 @@ TITLES = [
     ("trial_stop", {}, "结束试用"),
     ("trial_case_begin", {"title": "没有订单时"}, "开始用例：没有订单时"),
     ("trial_case_end", {"result": "passed"}, "结束用例：passed"),
+    # 表里没有列的已知工具：按同类工具的写法写一句，对象取参数里的那一项（写进交付说明的「自定的边界」）
+    ("read_external_source", {"source": "sha256:ab", "start_line": 2, "end_line": 4},
+     "读取外部来源 sha256:ab 第 2–4 行"),
+    ("read_output", {"job_id": "job-1"}, "读取后台命令的输出"),
+    ("stop_job", {"job_id": "job-1"}, "停止后台命令"),
 ]
 
 
