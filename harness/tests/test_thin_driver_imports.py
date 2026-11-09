@@ -13,14 +13,24 @@
 # 契约、标准库与 pydantic 的源码，检查通过。检查用 ast 读静态文件，不执行被检查的代码，
 # 不开数据库、不用子进程与网络，属于单元层。
 #
+# 薄驱动只读最小投影（工单 #1678，骨架与应用 docs/design/skeleton-and-application.md「薄驱动」第 1 条、
+# 「最小投影」）：运行视图里的字段不在最小投影里，要读它们的判断归路由实现或钩子；薄驱动问钩子要答案，
+# 从钩子拿到的运行视图只原样交回钩子或路由。这个文件的后半段用 ast 查薄驱动没有读运行视图的字段：
+# 字段名从 harness/models.py 的 RunProjection 取，运行视图对象的来路是钩子返回的（project、read_run）
+# 与事务、快照上的 `.projection`。检查本身也证明会失败：给一段故意写 `projection.cycle_count` 的源码，
+# 检查报出它；给一段只读最小投影、钩子的答案与契约类型的源码，检查通过。
+#
 # 守 R1（测试分层 docs/design/test-pyramid.md「测试按三环留」）：只由你批准的一环的不变式——薄驱动只经内核与契约连接。
 
 from __future__ import annotations
 
 import ast
+import dataclasses
 import json
 import sys
 from pathlib import Path
+
+from harness.models import RunProjection
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 THIN_DRIVER = "harness/thin_driver.py"
@@ -155,3 +165,125 @@ def test_the_allowed_module_list_is_not_empty_and_lists_existing_files():
     assert len(CONTRACT_MODULES) == 5
     missing = [name for name in CONTRACT_MODULES if not (REPO_ROOT / name).is_file()]
     assert missing == [], "契约模块清单里有不存在的文件：" + "、".join(missing)
+
+
+# 薄驱动不读运行视图的字段（工单 #1678） ----------------------------------------------------
+
+# 运行视图的字段：以 harness/models.py 的 RunProjection 为准，不从别处另抄一份
+PROJECTION_FIELDS = frozenset(item.name for item in dataclasses.fields(RunProjection))
+
+# 薄驱动里表示运行视图的变量名：从钩子或 `.projection` 赋值的变量按赋值追下去，这几个是按名字认的
+DEFAULT_VIEW_NAMES = frozenset({"projection", "current", "view", "run_view"})
+
+
+def _hook_returns_a_view(node: ast.AST) -> bool:
+    # 钩子交回运行视图的两个方法：project 与 read_run（read_run 交回的快照上也只有一个 `.projection`）
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"project", "read_run"})
+
+
+def _is_view_expression(node: ast.AST | None, names: set[str]) -> bool:
+    # 这个表达式是运行视图：按名字认的变量、`.projection`，或钩子的返回值
+    if node is None:
+        return False
+    if isinstance(node, ast.Name):
+        return node.id in names
+    if isinstance(node, ast.Attribute):
+        return node.attr == "projection"
+    return _hook_returns_a_view(node)
+
+
+def _view_names(tree: ast.AST) -> set[str]:
+    # 源码里表示运行视图的变量名：按赋值一路追下去（`view = current` 也算）
+    names = set(DEFAULT_VIEW_NAMES)
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                targets, value = node.targets, node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets, value = [node.target], node.value
+            else:
+                continue
+            if not _is_view_expression(value, names):
+                continue
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id not in names:
+                    names.add(target.id)
+                    changed = True
+    return names
+
+
+def projection_reads(source: str, file: str) -> list[str]:
+    """这份源码里读运行视图的地方，逐条写出文件、行与读法。
+
+    `.projection` 直接取运行视图本身也算一条：薄驱动只把它原样交回钩子或路由。
+    """
+    tree = ast.parse(source)
+    names = _view_names(tree)
+    found: set[tuple[int, str]] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Attribute):
+            continue
+        if node.attr == "projection":
+            found.add((node.lineno, ".projection（运行视图只原样转交，不在薄驱动里取）"))
+        elif node.attr in PROJECTION_FIELDS and _is_view_expression(node.value, names):
+            found.add((node.lineno, ast.unparse(node)))
+    return [f"{file}:{line}: {text}" for line, text in sorted(found)]
+
+
+def test_the_thin_driver_reads_only_the_minimal_projection():
+    # 验收第 1 条：薄驱动自己只读最小投影，运行视图的字段一个也不读（工单 #1678）
+    found = projection_reads(_read(THIN_DRIVER), THIN_DRIVER)
+    assert found == [], (
+        "薄驱动读了运行视图的字段：薄驱动自己只读最小投影，要读运行视图的判断归路由实现或钩子，"
+        "薄驱动问钩子要答案（docs/design/skeleton-and-application.md「薄驱动」第 1 条）：\n"
+        + "\n".join(found))
+
+
+def test_the_checked_field_names_come_from_the_run_projection():
+    # 检查的对象不是空的：工单点到的字段都在 RunProjection 里（改名或搬走时这条先失败）
+    for name in ("status", "cycle_count", "input_version", "active_department", "provider", "model",
+                 "token_used", "max_cycles", "stream_version"):
+        assert name in PROJECTION_FIELDS, f"RunProjection 里没有 {name}，检查的对象变了"
+
+
+def test_a_projection_field_read_is_reported_with_the_line():
+    # 验收第 1 条后半：故意在薄驱动里加一处 `projection.cycle_count` 时检查失败，并写出行号
+    probe = (
+        "def begin_round(transaction):\n"
+        "    projection = transaction.projection\n"
+        "    return projection.cycle_count + 1\n"
+    )
+    assert projection_reads(probe, THIN_DRIVER) == [
+        "harness/thin_driver.py:2: .projection（运行视图只原样转交，不在薄驱动里取）",
+        "harness/thin_driver.py:3: projection.cycle_count",
+    ]
+
+
+def test_a_run_view_returned_by_a_hook_is_tracked_the_same_way():
+    # 从钩子拿到的运行视图也照这条查：变量追到钩子的返回值上
+    probe = (
+        "def judge(self, run_id):\n"
+        "    view = self._hooks.project(run_id)\n"
+        "    if view.status == 'failed':\n"
+        "        return view.stop_reason\n"
+        "    return None\n"
+    )
+    assert projection_reads(probe, THIN_DRIVER) == [
+        "harness/thin_driver.py:3: view.status",
+        "harness/thin_driver.py:4: view.stop_reason",
+    ]
+
+
+def test_the_minimal_projection_the_hook_answers_and_contract_types_are_allowed():
+    # 允许的范围也守：最小投影、钩子的答案与契约类型上的字段不报
+    probe = (
+        "def end(transaction, fields, prepared, scope):\n"
+        "    minimal = transaction.minimal()\n"
+        "    if minimal.status in TERMINAL_STATUSES:\n"
+        "        return fields.provider, fields.cycle_count, prepared.provider, scope.provider\n"
+        "    return minimal.used.activations\n"
+    )
+    assert projection_reads(probe, THIN_DRIVER) == []

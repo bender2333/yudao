@@ -2,12 +2,13 @@
 # 骨架与应用 docs/design/skeleton-and-application.md「薄驱动」；总图第二节「只由你批准」、
 # 第四节「写入口」「执行」的缝；工单 #1514）。
 #
-# 薄驱动直接调用，用真实的 SQLite 事件日志与流处理者，看它写下的结果。四条：
+# 薄驱动直接调用，用真实的 SQLite 事件日志与流处理者，看它写下的结果。五条：
 # 1. 每一步先问边界：执行实现拿到的是薄驱动的安全节点，每一步都经它问一次边界，没到上限就继续；
 # 2. 到上限会停，停止原因来自封闭清单：运行时间用完时这一步停下，run 以 time_limit 结束；
 # 3. 结果只经写入口写回：一轮的收尾由写入口写下（带这一轮的派发编号、用量与身份），最小投影从这条
-#    事件折出已结算量；
-# 4. 旧派发编号交回的结果不生效：重派以后拿旧编号交回的收尾只记录，不并入投影与最小投影。
+#    事件折出已结算量；暂停或失败事件的应用字段由应用经钩子给出；
+# 4. 旧派发编号交回的结果不生效：重派以后拿旧编号交回的收尾只记录，不并入投影与最小投影；
+# 5. 停止判断过期由应用回答：应用说这次判断已经过期时，薄驱动不写暂停或失败事件，运行继续（工单 #1678）。
 #
 # 一轮工作的准备（选模型与提示词）是应用的事，这里用测试里的最小钩子；读事实、写入与折叠仍走真实的
 # 运行视图、写入口与事件库。不跑模型、不起服务、不用网络，属于模块层。
@@ -28,7 +29,7 @@ from harness.definitions import DEFINITIONS
 from harness.event_store import run_stream
 from harness.kernel_events import SkeletonEventType
 from harness.runtime import LoopSystem
-from harness.thin_driver import RoundDependencies, RoundPreparation, ThinDriver
+from harness.thin_driver import RoundDependencies, RoundPreparation, StopEventFields, ThinDriver
 
 DEPARTMENT = "product"
 SESSION = "ses_product_1"
@@ -91,6 +92,10 @@ class _Hooks:
         self.finished: list[object] = []
         self.lessons: list[str] = []
         self.dependencies: RoundDependencies | None = None
+        # 停止判断过期与暂停、失败事件的应用字段由应用回答（工单 #1678）：这里按运行视图给答案，
+        # 与 orchestrator.py 的钩子实现同一读法
+        self.superseded = False
+        self.superseded_asks = 0
 
     # 运行视图、定义与判断 ---------------------------------------------------------------
     def project(self, run_id: str):
@@ -99,11 +104,21 @@ class _Hooks:
     def definitions(self, run_id: str):
         return DEFINITIONS
 
-    def user_events(self) -> frozenset[str]:
-        return frozenset()
+    def stop_superseded(self, transaction, basis, department: str, version: int) -> bool:
+        self.superseded_asks += 1
+        return self.superseded
 
-    def guidance_version(self, projection, department: str) -> int:
-        return 0
+    def stop_event_fields(self, transaction) -> StopEventFields:
+        # 暂停与失败事件要写的应用字段：从事务里的运行视图读，与真实的应用钩子同一读法
+        projection = transaction.projection
+        return StopEventFields(
+            department=projection.active_department, provider=projection.provider, model=projection.model,
+            cycle_count=projection.cycle_count, max_cycles=projection.max_cycles, token_used=projection.token_used,
+        )
+
+    def run_view(self, transaction):
+        # 事务里的运行视图：薄驱动不读它，原样交给路由
+        return transaction.projection
 
     def aborted(self, run_id: str) -> bool:
         return False
@@ -149,7 +164,7 @@ class _Hooks:
     def apply_round_result(self, round_work, result, current) -> None:
         raise AssertionError("这一组用例的一轮没有交上提案")
 
-    def record_lesson_candidate(self, transaction, reason: str, source_event, projection) -> None:
+    def record_lesson_candidate(self, transaction, reason: str, source_event) -> None:
         self.lessons.append(reason)
 
     def close_run(self, run_id: str) -> None:
@@ -214,7 +229,7 @@ def test_every_step_asks_the_bound_before_it_runs(tmp_path):
         # 三步各问了一次边界，三次都在上限以内：三次都继续，一轮没有因此停下
         assert execution.instance.asked == [True, True, True]
         assert rig.system.project(rig.run_id).status == "running"
-        assert rig.driver.stop_requested(round_work, rig.system.project(rig.run_id),
+        assert rig.driver.stop_requested(round_work,
                                          rig.system.writes.minimal(run_stream(rig.run_id)), ()) is False
 
 
@@ -234,8 +249,28 @@ def test_the_bound_stops_the_round_and_the_stop_reason_comes_from_the_closed_lis
         [failed] = rig.events(SkeletonEventType.RUN_FAILED)
         assert failed.stop_reason == failed.payload["stop_reason"] == "time_limit"
         assert "exceeded limit of 1s" in failed.error
+        # 暂停或失败事件的应用字段由应用经钩子给出（工单 #1678）：部门与模型引用照旧写进事件；
+        # 运行时间用完不核对停止判断是否过期，应用不被问这一项
+        assert (failed.department, failed.provider, failed.model) == (DEPARTMENT, "fake", None)
+        assert rig.hooks.superseded_asks == 0
         # 这是薄驱动的安全节点给的停止，记下教训候选（应用一侧的钩子）也带着同一个原因
         assert rig.hooks.lessons == ["time_limit"]
+
+
+def test_a_pause_writes_the_application_fields_from_the_hook(tmp_path):
+    # 暂停事件的应用字段由应用经钩子给出（工单 #1678）：部门、模型引用与累计用量原样写进事件；
+    # 暂停以后按定义发出可以继续的决定请求，运行进入暂停
+    with _Rig(tmp_path, run_time_limit_sec=10) as rig:
+        round_work = rig.begin()
+        rig.driver.end_run(round_work, "no_tool_call", "the model kept answering without a tool call",
+                           round_work.version)
+        [paused] = rig.events(SkeletonEventType.RUN_PAUSED)
+        assert (paused.department, paused.provider, paused.model) == (DEPARTMENT, "fake", None)
+        assert paused.stop_reason == paused.payload["stop_reason"] == "no_tool_call"
+        assert paused.payload["cycle_count"] == 1
+        assert paused.payload["max_cycles"] == rig.system.project(rig.run_id).max_cycles
+        assert paused.payload["token_used"] == 0
+        assert rig.system.project(rig.run_id).status == "paused"
 
 
 def test_the_result_is_written_back_through_the_write_path(tmp_path):
@@ -253,6 +288,9 @@ def test_the_result_is_written_back_through_the_write_path(tmp_path):
         assert finished.payload["activation_id"] == round_work.round_id == "act_1"
         assert finished.payload["elapsed_ms"] == 250
         assert finished.payload["stop_reason"] is None
+        # 开始事件的轮次读最小投影（工单 #1678）：第一轮是 1
+        [activated] = rig.events(SkeletonEventType.DEPARTMENT_ACTIVATED)
+        assert activated.payload["cycle"] == 1
         minimal = rig.system.writes.minimal(run_stream(rig.run_id))
         assert minimal.used.settled_ms == 250
         assert minimal.sessions[SESSION].settled_ms == 250
@@ -287,3 +325,16 @@ def test_a_result_returned_under_a_superseded_dispatch_number_is_only_recorded(t
         assert rig.system.writes.minimal(stream).used.settled_ms == 500
         numbers = [event.dispatch_number for event in rig.events(SkeletonEventType.ACTIVATION_FINISHED)]
         assert numbers == [1, 2]
+
+
+def test_a_stop_judgment_the_application_calls_expired_does_not_end_the_run(tmp_path):
+    # 停止判断过期与否由应用回答（工单 #1678）：应用说这次判断已经过期时，薄驱动不写暂停或失败事件，
+    # 运行继续；输入与指导的版本是应用的数据，判断在应用一侧，薄驱动只把答案写进事实
+    with _Rig(tmp_path, run_time_limit_sec=10) as rig:
+        round_work = rig.begin()
+        rig.hooks.superseded = True
+        rig.driver.end_run(round_work, "provider_error", "the model reference is unavailable",
+                           round_work.version)
+        assert rig.hooks.superseded_asks == 1
+        assert rig.events(SkeletonEventType.RUN_FAILED) == []
+        assert rig.system.project(rig.run_id).status == "running"
