@@ -517,6 +517,10 @@
 .y10-cv-skip.is-q .y10-cv-line::after { color: var(--blue); }
 /* 旁边的职能与主线之间的竖线：开着询问时换成这一条虚线 */
 .y10-cv-vasks { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; }
+/* 询问线点得开：只看这两个职能的时序图（工单 #1642）。累计往来写的是次数，字数多时折行 */
+button.y10-cv-ask { font: inherit; cursor: pointer; text-align: left; }
+button.y10-cv-ask:hover { border-color: var(--blue); background: var(--tint); }
+.y10-cv-ask.is-accum { white-space: normal; max-width: 220px; }
 
 /* 窄屏：图收成一行（节点名与当前箭头），线程不被挤 */
 .y10-cv-oneline {
@@ -754,6 +758,8 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
 @media (max-width: 800px) {
   .y10-cv-wrap { display: none; }
   .y10-cv-oneline { display: flex; }
+  /* 窄屏没有「累计往来」（项目的组织设计说明 4.14）：图已经收成一行，没有地方画累计的线 */
+  .y10-cv-accum { display: none; }
   /* 窄屏时线程不被图挤掉：占满宽度，输入框竖着放 */
   .y10-th { min-height: 160px; max-height: none; }
   .y10-cv-input { flex-direction: column; align-items: stretch; }
