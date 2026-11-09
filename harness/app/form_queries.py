@@ -19,7 +19,7 @@ from pydantic import AwareDatetime, Field
 from ..definitions import (
     DEFAULT_FORM, ITEM_SOURCES, Definitions, parse_organization_changes, submitted_outcomes,
 )
-from ..models import ProjectEventType
+from ..models import EventType, ProjectEventType
 from ..organization_compose import (
     change_diff, compose_checked, current_organization, dropped_changes, finish_statement, reminders,
     verifier_changes, write_scopes,
@@ -406,8 +406,15 @@ PROJECT_ORGANIZATION = QueryDefinition(
     name="project.organization", request=ProjectOrganization, result=ProjectOrganizationResult,
     handle=_project_organization,
     # 项目现在用哪一份、带哪些改动只由形态改动改变；发布带的清单与合成用的定义来自这个实例加载的形态，
-    # 不来自事件
-    changed_by=(ProjectEventType.PROJECT_FORM_SET,),
+    # 不来自事件。这份读取还看事项（工单 #1517）：新建事项以后 `departments[*].running_items` 加一、
+    # `previous_item` 变成这个事项，跑完或停下以后减一；事项被采纳、被扣下、建档基线被采纳，以及
+    # 撤销初始 PRD 的请求都让事项离开「还在跑」；恢复的 run 让它回到「还在跑」。会改变结果的种类都列在这里
+    # （docs/design/app-and-interface.md「读取模型」：宁多勿漏），由 test_query_refresh_lists.py 的重放核对守住
+    changed_by=(ProjectEventType.PROJECT_FORM_SET, ProjectEventType.WORK_ITEM_CREATED,
+                ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
+                ProjectEventType.BASELINE_ADOPTED, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+                EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+                EventType.RUN_RESUMED, EventType.RUN_CONTINUED),
 )
 
 

@@ -680,6 +680,61 @@ def test_restarting_onboarding_is_refused_when_the_release_no_longer_has_a_tool_
     second.close()
 
 
+def test_a_change_of_only_the_write_scopes_is_named_in_the_differences(tmp_path):
+    # 审查发现（第 4 轮第 1 条）：`same_as_project` 与「高级」里的逐项差异比的是设计说明「冻结与升级」的五项；
+    # 核验这一项包括写入范围（「组织」一行把写入范围与工具许可并列），只改写入范围时差异要列出来、
+    # 事项详情的 `same_as_project` 要是假；没改的核验关系不跟着出现
+    system = _system(tmp_path / "loop", _three_departments_script(), resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("只改写入范围", GOAL)
+    item_id, run_id = system.projects.start_work_item(project_id, "写入范围改了以后看差异")
+    assert system.activate_once(run_id).status == "running"
+
+    # 采用一条只改写入范围的改动：核验关系原样，产品也改写成只写检查材料
+    adopted = _adopt(application, project_id, {"verification": {
+        "verifiers": [{"role": "quality", "verifies": [
+            {"role": "engineering", "outcomes": ["delivery_spec"]}]}],
+        "write_scopes": {
+            "quality": {"scope": "check_materials", "paths": [".yudao-qa-tests"]},
+            "product": {"scope": "check_materials", "paths": [".yudao-qa-tests"]},
+        }}})
+    assert isinstance(adopted, Accepted), adopted
+
+    organization = _project_organization(application, project_id)
+    assert organization.previous_item is not None
+    differences = {row.item: (row.before, row.after) for row in organization.previous_item.differences}
+    assert differences["verification.write_scopes.product"] == ("", "check_materials:.yudao-qa-tests")
+    # 只改了写入范围：核验关系这一项没有变，不出现在差异里
+    assert "verification.quality" not in differences
+    # 这个事项还按它冻结的那一份跑：产品仍写运行工作区
+    frozen = system.orchestrator.item_form(run_id).definitions
+    assert frozen.write_scope("product").scope == "workspace"
+    assert _item_organization(application, project_id, item_id).same_as_project is False
+    system.close()
+
+
+def test_project_commands_refuse_a_form_that_is_not_in_the_release(tmp_path):
+    # 审查「另记」（第 4 轮）：`project.create` / `project.onboard` 的 `_chosen_form` 拒绝分支
+    # （发布里没有选的那一份）没有用例走到；这条核两条命令都以 not_allowed 拒绝、说明列出可以选的形态，
+    # 而且没有建出项目
+    system = _system(tmp_path / "loop", _three_departments_script(), resume_on_startup=False)
+    application = _application(system)
+    rejected = asyncio.run(application.command("project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name="形态不在发布里", goal=GOAL, form="form_not_in_release"),
+        actor="user:local"))
+    assert isinstance(rejected, Rejected), rejected
+    assert rejected.reason == "not_allowed"
+    assert all(name in rejected.message for name in system.forms)
+    source = onboarding_source(tmp_path / "source")
+    onboarded = asyncio.run(application.command("project.onboard", ProjectOnboard(
+        command_id=str(uuid.uuid4()), name="接入时形态不在发布里", goal=ONBOARDING_GOAL,
+        source_name="src", source_path=str(source), form="form_not_in_release"), actor="user:local"))
+    assert isinstance(onboarded, Rejected), onboarded
+    assert onboarded.reason == "not_allowed"
+    assert system.projects.list_projects() == []
+    system.close()
+
+
 def test_the_frozen_organization_reads_back_as_the_same_definition(tmp_path):
     # 存进事实的那份合成结果读回来是同一份定义：逐文件相同，版本（内容摘要）也相同，重放与恢复读的是它
     system = _system(tmp_path / "loop", _three_departments_script(), resume_on_startup=False)

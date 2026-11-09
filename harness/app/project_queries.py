@@ -481,8 +481,8 @@ class WorkItemOrganization(Contract):
     # 这个事项用的组织的版本（工单 #1517，项目的组织设计说明「冻结与升级」）：合成结果的内容摘要，
     # 事项创建时冻结，发布或项目后来改了组织都不变
     version: str = ""
-    # 和项目现在的组织相同或不同（比较两份合成结果的版本，不含观察者，观察者不在冻结的内容里）：
-    # 项目现在的组织取不到时为空
+    # 和项目现在的组织相同或不同（按设计说明「冻结与升级」比职能、角色、成果、核验与轮转五项，与「高级」里
+    # `previous_item.differences` 的取法一致；不含观察者，观察者不在冻结的内容里）：项目现在的组织取不到时为空
     same_as_project: bool | None = None
 
 
@@ -3598,6 +3598,8 @@ PROJECT_LOOP = QueryDefinition(
     name="project.loop", request=ProjectLoop, result=ProjectLoopResult, handle=_project_loop,
     replayable=True,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
+                # 事项详情里「和项目现在的组织相同或不同」跟着项目现在的组织变（工单 #1517）
+                ProjectEventType.PROJECT_FORM_SET,
                 EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
                 EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,

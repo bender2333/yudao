@@ -305,4 +305,11 @@ def test_the_command_and_the_query_are_registered_with_the_reasons_they_can_retu
     assert DEFAULT_REGISTRY.reasons("organization.adopt") == (
         "not_found", "stale_base", "project_archived", "not_allowed", "command_id_reused")
     assert DEFAULT_REGISTRY.queries["project.organization"] is PROJECT_ORGANIZATION
-    assert PROJECT_ORGANIZATION.changed_by == (ProjectEventType.PROJECT_FORM_SET,)
+    # 这份读取还看事项（工单 #1517）：事项开始、结束、采纳与撤销改变还在跑的事项数与上一个事项的比较，
+    # 形态改动改变它自己那一份。会改变结果的种类都在这份清单里，由 test_query_refresh_lists.py 的重放核对守住
+    assert PROJECT_ORGANIZATION.changed_by == (
+        ProjectEventType.PROJECT_FORM_SET, ProjectEventType.WORK_ITEM_CREATED,
+        ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
+        ProjectEventType.BASELINE_ADOPTED, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+        EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+        EventType.RUN_RESUMED, EventType.RUN_CONTINUED)

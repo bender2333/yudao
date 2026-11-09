@@ -143,9 +143,29 @@ def _form_chosen(form: Any) -> NewProjectEvent:
 
 def _flatten_definitions(definitions: Definitions) -> dict[str, str]:
     # 一份合成结果摊平成「项 → 文字」（工单 #1517）：两类合成结果之间的差异按它比较，不另存状态。
-    # 项写定义的路径：轮转方式、部门与它的显示名/三样说明/关注的成果/工具/是不是核验角色、成果种类、
-    # 核验关系、事项的来源。清单类的项按排序后的一项一行
+    # 项写定义的路径，覆盖设计说明「冻结与升级」说的五项：轮转（轮转方式与它那份定义）、职能（显示名、
+    # 三样说明、关注的成果、建议能力、工具许可、可见范围、是不是核验角色）、成果（种类与分组的名与说明）、
+    # 核验（谁核验谁的哪种成果、各角色的写入范围）、事项的来源。清单类的项按排序后的一项一行。
+    # 不在这里的：角色 Prompt、部门的 Prompt 底稿、提案合同、事项种类里的说明文字与规则登记——它们属于
+    # 模型与 Prompt 那一层或发布随事项照常读的其余内容（见交付说明的「自定的边界」，工单 #1517 第 4 轮）
     flat: dict[str, str] = {"routing": definitions.routing}
+    # 轮转方式自己那份定义（设计说明「冻结与升级」比五项里的轮转）：清单、最后采纳的成果、上限与结束原因
+    routing = next((item for item in definitions.routings.routings if item.id == definitions.routing), None)
+    if routing is not None:
+        prefix = f"routings.{routing.id}"
+        flat[f"{prefix}.label"] = routing.label
+        flat[f"{prefix}.why"] = routing.why
+        flat[f"{prefix}.departments"] = "、".join(routing.departments)
+        # 成果种类：引用分组的新写法与直接列出的旧写法各按自己写的读
+        flat[f"{prefix}.outcomes"] = routing.outcomes or "、".join(routing.outcome_kinds)
+        flat[f"{prefix}.final_outcome"] = routing.final_outcome or ""
+        flat[f"{prefix}.proposal_methods"] = "、".join(routing.proposal_methods)
+        for name in sorted(routing.limits):
+            flat[f"{prefix}.limits.{name}"] = str(routing.limits[name])
+        for name in sorted(routing.end_reasons):
+            reason = routing.end_reasons[name]
+            flat[f"{prefix}.end_reasons.{name}"] = (
+                f"{reason.label}｜{reason.outcome}｜{reason.human_action or ''}")
     for department in definitions.organization.departments:
         prefix = f"departments.{department.id}"
         flat[f"{prefix}.label"] = department.label
@@ -153,16 +173,38 @@ def _flatten_definitions(definitions: Definitions) -> dict[str, str]:
         flat[f"{prefix}.evidence"] = department.evidence
         flat[f"{prefix}.work"] = department.work
         flat[f"{prefix}.watched"] = "、".join(department.watched)
+        flat[f"{prefix}.suggested_capabilities"] = "、".join(department.suggested_capabilities)
         role = definitions.roles.get(department.id)
         flat[f"{prefix}.tools"] = "、".join(sorted(role.tools)) if role is not None else ""
+        # 可见范围（roles.json 的 visibility）：权限的一项，与工具许可、写入范围并列（设计说明「职能详情」）
+        flat[f"{prefix}.visibility"] = "、".join(sorted(role.visibility)) if role is not None else ""
         flat[f"{prefix}.verifier"] = "是" if definitions.is_verifier(department.id) else "不是"
+    # 事项种类里各部门的工具许可（work_items.json）：按种类覆盖角色的清单，跑起来用的是这一份
+    for kind_id in sorted(definitions.work_items.kinds):
+        work = definitions.work_items.kinds[kind_id].departments
+        for department_id in sorted(work):
+            flat[f"work_items.{kind_id}.departments.{department_id}.tools"] = "、".join(
+                sorted(work[department_id].tools))
     for kind in definitions.outcome_kinds.kinds:
-        flat[f"outcome_kinds.{kind.id}"] = kind.label
+        flat[f"outcome_kinds.{kind.id}.label"] = kind.label
+        flat[f"outcome_kinds.{kind.id}.why"] = kind.why
+    for kind in definitions.outcome_kinds.skeleton:
+        flat[f"outcome_kinds.skeleton.{kind.id}.label"] = kind.label
+        flat[f"outcome_kinds.skeleton.{kind.id}.why"] = kind.why
+    for group in definitions.outcome_kinds.groups:
+        prefix = f"outcome_kinds.groups.{group.id}"
+        flat[f"{prefix}.label"] = group.label
+        flat[f"{prefix}.why"] = group.why
+        flat[f"{prefix}.kinds"] = "、".join(group.kinds)
     edges: dict[str, list[str]] = {}
     for verifier, verified, outcome in definitions.rejection_edges():
         edges.setdefault(verifier, []).append(f"{verified}:{outcome}")
     for verifier, outcomes in edges.items():
         flat[f"verification.{verifier}"] = "、".join(sorted(outcomes))
+    # 写入范围（organization.json 的 verification.write_scopes）：核验声明里的一项，与核验关系同一处比较；
+    # 项名与「高级」里采用历史那处差异（organization_compose._flatten）一致
+    for role, scope in definitions.verification.write_scopes.items():
+        flat[f"verification.write_scopes.{role}"] = f"{scope.scope}:{'/'.join(scope.paths)}"
     for source in ITEM_SOURCES:
         flat[f"sources.{source}"] = definitions.source_department(source)
     return flat

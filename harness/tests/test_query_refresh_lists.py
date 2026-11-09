@@ -21,6 +21,7 @@ from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.catalog_queries import ChangeImpactRequest
 from harness.app.decision_queries import DecisionsList
 from harness.app.evidence_queries import ScreenshotEvidence
+from harness.app.form_queries import ProjectOrganization
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
     DepartmentWorkspace, DeliveryFile, EventDetail, EventPositions, NotFound, ProjectAttempts,
@@ -229,6 +230,9 @@ def _requests(scope: _Scope) -> dict[str, Any]:
         "projects.list": ProjectsList(),
         "project.overview": ProjectOverview(project_id=project_id),
         "project.loop": ProjectLoop(project_id=project_id),
+        # 项目现在的组织（工单 #1517）：还在跑的事项数与上一个事项的比较跟着事项的开始与结束变，
+        # 形态改动改变它自己那一份（审查发现这三类此前没进两份清单）
+        "project.organization": ProjectOrganization(project_id=project_id),
         "project.flow": ProjectFlow(project_id=project_id),
         "work_item.inputs": WorkItemInputs(project_id=project_id, work_item=work_item_id),
         "event.detail": EventDetail(event_id=scope.first_event_id or "none"),
