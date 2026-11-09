@@ -531,11 +531,85 @@
 .y10-cv-files b { font-size: 12.5px; }
 .y10-cv-facts { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
 
-/* 线程的位置：这一页只留出位置，线程与时序图由后面的工单接上 */
-.y10-cv-thread {
-  min-height: 120px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
-  background: var(--surface-2);
+/* ---------------------------------------------------------------- 对话线程与输入框（工单 #1639） */
+
+/* 线程：一条线程跨多个事项，事项之间一条细线写标题与结果；已结束的事项默认收起。
+   线程自己滚动，发送一条以后滚到最新一条；其余更新不动滚动位置。 */
+.y10-th {
+  display: grid; gap: 10px; align-content: start; min-height: 180px; max-height: 52vh; overflow-y: auto;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2);
 }
+.y10-th-item { display: grid; gap: 8px; }
+.y10-th-sep { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 2px; color: var(--muted); font-size: 12px; }
+.y10-th-sep::before, .y10-th-sep::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.y10-th-sep-btn { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.y10-th-sep-btn:hover { color: var(--green); }
+.y10-th-sep.is-sel .y10-th-sep-btn { color: var(--green); font-weight: 600; }
+
+/* 你写的话靠右，角色的话与折叠行靠左 */
+.y10-th-msg { display: grid; gap: 3px; max-width: 86%; justify-self: start; }
+.y10-th-msg.is-you { justify-self: end; }
+.y10-th-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 12px; color: var(--faint); }
+.y10-th-msg.is-you .y10-th-meta { justify-content: flex-end; }
+.y10-th-tag { font-size: 11px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 0 8px; }
+.y10-th-bubble { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; overflow-wrap: anywhere; }
+.y10-th-msg.is-you .y10-th-bubble { background: var(--tint); border-color: transparent; }
+.y10-th-msg.is-done .y10-th-bubble { border-color: var(--green); }
+.y10-th-msg.is-release .y10-th-bubble { border-color: var(--green); background: color-mix(in srgb, var(--green) 8%, var(--surface)); }
+.y10-th-bubble .y10-link { margin-left: 8px; }
+
+/* 折叠行：角色之间的往来折成一行，点开才展开；问答里工程回答质检的分事实与解释 */
+.y10-th-fold { justify-self: start; max-width: 86%; }
+.y10-th-fold-head { background: none; border: 0; padding: 2px 0; color: var(--muted); font-size: 13px; cursor: pointer; }
+.y10-th-fold-head::before { content: "▸ "; }
+.y10-th-fold-head[aria-expanded="true"]::before { content: "▾ "; }
+.y10-th-fold-head:hover { color: var(--green); }
+.y10-th-fold-body {
+  margin: 4px 0; padding: 6px 12px; list-style: none; display: grid; gap: 6px;
+  border-left: 2px solid var(--line-strong); font-size: 13px; color: var(--muted);
+}
+.y10-th-fold-body b { color: var(--text); font-weight: 600; }
+.y10-th-fold-body p { margin: 0; overflow-wrap: anywhere; }
+.y10-th-facts, .y10-th-why { display: grid; gap: 2px; margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--line); }
+.y10-th-why { border-left-style: dashed; }
+.y10-th-facts small, .y10-th-why small { color: var(--muted); font-size: 11px; }
+.y10-th-facts p, .y10-th-why p { white-space: pre-wrap; }
+
+.y10-th-notice { justify-self: center; margin: 0; font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 12px; text-align: center; }
+.y10-th-note { margin: 0; font-size: 12px; color: var(--muted); }
+.y10-th-project { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+
+/* 要你决定的气泡：按钮在气泡里，回答以后变成已回答 */
+.y10-th-decide {
+  display: grid; gap: 6px; justify-self: start; max-width: 92%; padding: 10px 12px;
+  border: 1px solid var(--amber); border-radius: var(--radius); background: var(--surface);
+}
+.y10-th-decide.is-answered { border-color: var(--line); }
+.y10-th-ask { margin: 0; overflow-wrap: anywhere; }
+.y10-th-answered { margin: 0; color: var(--green); font-size: 13px; }
+.y10-th-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.y10-th-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
+.y10-th-decide .y10-textarea { min-height: 52px; }
+
+/* 输入框在底部，上方一行收件人；收件人的说明写在新事项排在哪件后面 */
+.y10-cv-composer { display: grid; gap: 6px; padding-top: 4px; }
+.y10-cv-to { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.y10-cv-to-label { font-size: 12px; color: var(--muted); }
+.y10-cv-pill { border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.y10-cv-pill:hover { border-color: var(--green); }
+.y10-cv-pill.is-on { border-color: var(--green); background: var(--tint); color: var(--green); font-weight: 600; }
+.y10-cv-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.y10-cv-input { display: flex; gap: 8px; align-items: flex-end; }
+.y10-cv-input .y10-textarea { flex: 1; min-height: 56px; }
+.y10-cv-input .y10-btn { min-height: 34px; }
+.y10-cv-composer .error, .y10-cv-composer .hint, .y10-cv-composer .y10-note { margin: 0; font-size: 12.5px; }
+
+/* 模型不可用：对话里一句话提示并链到模型管理，写明不能开始 */
+.y10-cv-model {
+  margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 13px;
+  padding: 6px 10px; border: 1px solid var(--amber); border-radius: var(--radius); background: var(--amber-bg); color: var(--text);
+}
+.y10-cv-model .y10-link { color: var(--green); }
 
 /* ---------------------------------------------------------------- 时序图（工单 #1641） */
 
@@ -641,7 +715,10 @@
 @media (max-width: 800px) {
   .y10-cv-wrap { display: none; }
   .y10-cv-oneline { display: flex; }
-  .y10-cv-thread { min-height: 160px; }
+  /* 窄屏时线程不被图挤掉：占满宽度，输入框竖着放 */
+  .y10-th { min-height: 160px; max-height: none; }
+  .y10-cv-input { flex-direction: column; align-items: stretch; }
+  .y10-cv-input .y10-btn { width: 100%; }
   /* 时序图退回按时间排的列表（窄屏时每行写谁到谁与那句标题） */
   .y10-sq-wide { display: none; }
   .y10-sq-list { display: grid; }

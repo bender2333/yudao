@@ -102,3 +102,31 @@ def test_every_label_renders_without_a_blank_placeholder(kind):
     assert "部门部门" not in label, label
 
 
+def test_tool_started_and_tool_result_write_the_action_title():
+    # R2：工具开始与工具结果两种事件的文字是一个动作标题（工单 #1657）：写明对象，与 run.steps 的动作行
+    # 逐字相同（同一个函数算）；run.steps 那一侧由 test_run_steps.py 的那一条对着事件的原文核
+    args = {"path": "src/a.py", "start_line": 3, "end_line": 5}
+    for kind in (EventType.TOOL_STARTED, EventType.TOOL_CALLED):
+        assert event_label(kind, {"name": "read_range", "args": args}) == "读取 src/a.py 第 3–5 行"
+        assert event_label(kind, {"name": "bash", "args": {"command": "uv run pytest -q"}}) == \
+            "运行命令：uv run pytest -q"
+    # 参数不是合法 JSON、工具已经不存在时写工具名，不报错
+    assert event_label(EventType.TOOL_CALLED, {"name": "read_range", "args": {"invalid_arguments": "{"}}) == \
+        "read_range"
+    assert event_label(EventType.TOOL_STARTED, {"name": "no_such_tool", "args": {}}) == "no_such_tool"
+
+
+def test_tool_skipped_and_action_verified_keep_their_words():
+    # 跳过工具与核实动作这两种事件的载荷里没有参数：保留现在的文字（工单 #1657）
+    assert event_label(EventType.TOOL_SKIPPED, {"name": "bash", "error": "没有许可"}) == \
+        "跳过了工具 bash：没有许可"
+    assert event_label(EventType.ACTION_VERIFIED, {"name": "write_file", "resolution": "handed_back"}) == \
+        "核实了动作 write_file：handed_back"
+
+
+def test_a_usage_record_is_not_an_action_and_keeps_its_words():
+    # 用量记账也写成 tool_called，但它没有参数、不是动作：照旧用登记表里的说明（工单 #1657）
+    assert event_label(EventType.TOOL_CALLED, {"name": "provider_usage", "ok": True}) == \
+        "执行了工具 provider_usage：True"
+
+

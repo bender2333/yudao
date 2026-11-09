@@ -320,6 +320,22 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Mark
+     */
+    mark?: '读' | '写' | '运行' | '询问' | '提交' | null;
+    /**
+     * Title
+     */
+    title?: string;
+    /**
+     * Title Source
+     */
+    title_source?: '系统' | '作者';
+    /**
+     * Facts
+     */
+    facts?: Array<'失败' | '超时' | '结果未知' | '被拒绝' | '改了文件'>;
 };
 
 /**
@@ -342,6 +358,14 @@ export type ActivationView = {
      * Step Count
      */
     step_count: number;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Cycle
+     */
+    cycle?: number | null;
 };
 
 /**
@@ -6168,6 +6192,18 @@ export type RunStepView = {
      * Actions
      */
     actions: Array<ActionView>;
+    /**
+     * Attempt Ids
+     */
+    attempt_ids?: Array<string>;
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Title Source
+     */
+    title_source?: '系统' | '作者' | null;
 };
 
 /**

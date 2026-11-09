@@ -5090,6 +5090,52 @@
               }
             ],
             "title": "After Snapshot Ref"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "读",
+                  "写",
+                  "运行",
+                  "询问",
+                  "提交"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "title_source": {
+            "type": "string",
+            "enum": [
+              "系统",
+              "作者"
+            ],
+            "title": "Title Source",
+            "default": "系统"
+          },
+          "facts": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "失败",
+                "超时",
+                "结果未知",
+                "被拒绝",
+                "改了文件"
+              ]
+            },
+            "type": "array",
+            "title": "Facts"
           }
         },
         "additionalProperties": false,
@@ -5132,6 +5178,28 @@
           "step_count": {
             "type": "integer",
             "title": "Step Count"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle"
           }
         },
         "additionalProperties": false,
@@ -15238,6 +15306,39 @@
             },
             "type": "array",
             "title": "Actions"
+          },
+          "attempt_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Attempt Ids"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "title_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "系统",
+                  "作者"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Source"
           }
         },
         "additionalProperties": false,
