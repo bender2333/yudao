@@ -350,6 +350,12 @@ export function ConversationPage(props: {
                   {pick === null ? null : (
                     <div ref={panelRef}>
                       <LoopPanel
+                        app={props.app}
+                        projectId={projectId}
+                        workItemId={itemId}
+                        runId={runId}
+                        // 询问编号：询问分支的激活带着它，按第几轮找工作过程时排掉那几次（工单 #1658）
+                        branchSessions={askList.map((ask) => ask.id)}
                         graph={graph}
                         arrows={arrows}
                         pick={pick}
