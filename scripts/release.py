@@ -1,16 +1,21 @@
 # Yudao 版本的发布脚本（网页界面的提供与发布 docs/design/web-interface-and-release.md「发布」）。
-# 架构师在里程碑交给用户之前运行：核对版本与工作区，构建页面文件，组装 Yudao 服务的 wheel，
-# 输出 wheel 的路径与 SHA-256；带 --publish 时另外打标签、推送并把 wheel 上传到私有仓库的 Release。
+# 架构师在里程碑交给用户之前运行：核对版本与工作区，构建页面文件与画面，组装 Yudao 服务的 wheel，
+# 输出 wheel 的路径与 SHA-256 以及这一版带不带画面；带 --publish 时另外打标签、推送并把 wheel
+# 上传到私有仓库的 Release。
 #
 # 步骤：
 #   1. 核对：工作区干净；当前提交在 main 上并已推送；pyproject.toml 的版本号；Node 不低于 22.12，uv 可用。
 #   2. 构建页面：npm ci，Vite 把页面文件构建到 client/out/renderer。
+#      构建画面：在 view/ 里安装依赖并构建到 view/out（画面与播放 docs/design/visualization.md
+#      「搬出：画面成为单独的应用」）；构建不过时记下原因，这一版不带画面，发布照常进行。
 #   3. M3 起构建执行代理的 wheel（#144 加入）。
-#   4. 清空 harness/release_assets/，把页面文件复制进去，写下这一份页面文件对应的接口版本（#704），
+#   4. 清空 harness/release_assets/，把页面文件复制进去，画面文件放进 view/ 子目录
+#      （构建不过时放一页「这一版没有画面」的说明），写下这一份页面文件对应的接口版本（#704），
 #      删除仓库根下的 build/ 与 *.egg-info，
-#      uv build --wheel 生成 wheel；核对 wheel 内的页面文件与页面构建输出逐个一致。
+#      uv build --wheel 生成 wheel；核对 wheel 内的页面文件与页面构建输出逐个一致、
+#      画面文件与画面构建输出逐个一致。
 #   5. 仅带 --publish 时：打标签 v<版本> 并推送，gh release create 把 wheel 上传到 Release。
-#   6. 输出 wheel 的路径与 SHA-256。
+#   6. 输出 wheel 的路径、SHA-256，以及这一版带不带画面。
 #
 # 脚本只构建与上传，不安装、不升级这台电脑上已经安装的 Yudao 服务。
 #
@@ -45,6 +50,14 @@ MIN_NODE = (22, 12)
 TAG_PREFIX = "v"
 # 页面构建输出目录（vite.pages.config.ts 的 build.outDir）
 PAGES_OUTPUT = Path("out") / "renderer"
+# 画面的目录与构建输出（view/vite.config.ts 的 build.outDir；画面与播放
+# docs/design/visualization.md「搬出：画面成为单独的应用」）
+VIEW_DIR = Path("view")
+VIEW_OUTPUT = VIEW_DIR / "out"
+# 画面文件在发布资源目录里的子目录：接口层按文件路径提供，地址是服务地址下的 /view/
+VIEW_ASSETS = "view"
+# 画面入口页面的文件名：构建得出时是画面的入口，构建不过时是那一页说明
+VIEW_INDEX = "index.html"
 # 页面文件对应的接口版本写在发布资源目录的这个文件里（工单 #704）
 PAGES_API_VERSION_FILE = "api-version.json"
 # 发布资源目录：页面文件与执行代理的 wheel 随 wheel 一起发布
@@ -171,6 +184,48 @@ def build_pages(repo_root: Path, *, version: str) -> Path:
         raise ReleaseError(f"页面构建没有生成 {output / 'index.html'}")
     return output
 
+def _command_failure(label: str, result: subprocess.CompletedProcess[str]) -> str:
+    # 外部命令失败的原因：命令、退出码与输出末尾几行。npm 的输出很长，只留能说明问题的尾部，
+    # 原因要写进发布脚本的输出里，也要足够短，能一眼看出是装依赖还是构建失败
+    details = (result.stderr or "").strip() or (result.stdout or "").strip()
+    tail = "\n".join(details.splitlines()[-10:])
+    return f"{label} 退出码 {result.returncode}：" + (f"\n{tail}" if tail else "（没有输出）")
+
+def build_view(repo_root: Path) -> tuple[Path | None, str | None]:
+    # 第 2 步后半：在画面的目录里安装依赖并构建（画面有自己的依赖清单与构建，构建结果是一组
+    # 静态文件）。构建不过时返回失败原因：这一版不带画面，发布照常进行（画面与播放
+    # docs/design/visualization.md「搬出：画面成为单独的应用」）
+    view_root = repo_root / VIEW_DIR
+    if not (view_root / "package.json").is_file():
+        return None, f"{VIEW_DIR.as_posix()}/package.json 不存在，没有可构建的画面"
+    npm = _tool("npm")
+    for label, command in (("npm ci", [npm, "ci"]), ("npm run build", [npm, "run", "build"])):
+        result = subprocess.run(command, cwd=view_root, check=False, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            return None, _command_failure(label, result)
+    output = repo_root / VIEW_OUTPUT
+    if not (output / VIEW_INDEX).is_file():
+        return None, f"画面构建没有生成 {output / VIEW_INDEX}"
+    return output, None
+
+def no_view_page() -> bytes:
+    # 这一版不带画面时放进 view/ 的说明页：文字写在脚本里，不新增文件。接口层照常按文件路径
+    # 提供它，打开 /view/ 得到这一页
+    return (
+        "<!doctype html>\n"
+        '<html lang="zh-CN">\n'
+        "  <head>\n"
+        '    <meta charset="UTF-8" />\n'
+        "    <title>这一版没有画面</title>\n"
+        "  </head>\n"
+        "  <body>\n"
+        "    <p>这一版没有画面。</p>\n"
+        "    <p>发布时画面的构建没有通过，这一版发布不带画面。原因写在发布脚本的输出里。</p>\n"
+        "  </body>\n"
+        "</html>\n"
+    ).encode("utf-8")
+
 def _pages_api_version(repo_root: Path) -> int | None:
     # 这一份页面文件对应哪个接口版本（工单 #704）：从客户端生成的版本常量读出；
     # 读不到就写不了，服务那时的日志只说「不知道」
@@ -183,13 +238,21 @@ def _pages_api_version(repo_root: Path) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def assemble_assets(repo_root: Path, pages: Path) -> Path:
-    # 第 4 步前半：清空发布资源目录（该目录被 git 忽略），把页面文件整个复制进去。
+def assemble_assets(repo_root: Path, pages: Path, view: Path | None) -> Path:
+    # 第 4 步前半：清空发布资源目录（该目录被 git 忽略），把页面文件整个复制进去，
+    # 画面文件放进页面文件的 view/ 子目录（接口层按文件路径提供，地址是服务地址下的 /view/）。
+    # 这一版不带画面（view 为空）时放一页说明，发布照常完成。
     # 先清空，避免上一次发布留下的文件混进 wheel；执行代理的 wheel 在 M3 由 #144 复制进来
     assets_dir = repo_root / RELEASE_ASSETS
     if assets_dir.exists():
         shutil.rmtree(assets_dir)
     shutil.copytree(pages, assets_dir)
+    view_assets = assets_dir / VIEW_ASSETS
+    if view is not None:
+        shutil.copytree(view, view_assets)
+    else:
+        view_assets.mkdir(parents=True)
+        (view_assets / VIEW_INDEX).write_bytes(no_view_page())
     # 这份页面文件对应哪个接口版本（工单 #704）：服务启动时读出来写进日志，
     # 页面与服务不匹配时能说清是哪一边落后了
     version = _pages_api_version(repo_root)
@@ -238,18 +301,21 @@ def verify_wheel_contents(wheel: Path, built: Path) -> None:
     # 核对 wheel 内的页面文件与页面构建输出逐个一致（第 4 步）：缺少、多出
     # 与内容不同都写明文件名退出。M3 起执行代理的 wheel 也放在发布资源目录里（#144 加入）
     #
-    # 发布资源目录里除页面文件以外还有接口版本这一个元数据文件（工单 #704 写下）：
-    # 它不是页面文件，不参与与页面构建输出的比对，但要读得出它记的版本（工单 #753）
+    # 发布资源目录里除页面文件以外还有两样东西：接口版本这一个元数据文件（工单 #704 写下），
+    # 它不是页面文件，不参与与页面构建输出的比对，但要读得出它记的版本（工单 #753）；
+    # 画面文件在 view/ 子目录里（工单 #1575），由 verify_view_files 单独核对，这一版可能不带画面
     prefix = RELEASE_ASSETS.as_posix() + "/"
+    view_prefix = VIEW_ASSETS + "/"
     expected = page_files(built)
     with zipfile.ZipFile(wheel) as archive:
         packaged = sorted(name[len(prefix):] for name in archive.namelist()
                           if name.startswith(prefix) and not name.endswith("/"))
-        contents = {name: archive.read(prefix + name) for name in packaged}
-    missing = sorted(set(expected) - set(packaged))
+        page_packaged = [name for name in packaged if not name.startswith(view_prefix)]
+        contents = {name: archive.read(prefix + name) for name in page_packaged}
+    missing = sorted(set(expected) - set(page_packaged))
     if missing:
         raise ReleaseError(f"wheel {wheel.name} 中缺少页面文件：" + "、".join(missing))
-    foreign = sorted(set(packaged) - set(expected) - {PAGES_API_VERSION_FILE})
+    foreign = sorted(set(page_packaged) - set(expected) - {PAGES_API_VERSION_FILE})
     if foreign:
         raise ReleaseError(f"wheel {wheel.name} 的 {prefix} 中有页面构建输出以外的文件："
                            + "、".join(foreign))
@@ -259,6 +325,28 @@ def verify_wheel_contents(wheel: Path, built: Path) -> None:
     metadata = contents.get(PAGES_API_VERSION_FILE)
     if metadata is not None and _api_version_record(metadata) is None:
         raise ReleaseError(f"wheel {wheel.name} 的 {PAGES_API_VERSION_FILE} 读不出页面文件对应的接口版本")
+
+def verify_view_files(wheel: Path, view: Path | None) -> None:
+    # 核对 wheel 内的画面文件与画面构建输出逐个一致（第 4 步）：缺少、多出与内容不同都写明
+    # 文件名退出。这一版不带画面（view 为空）时，view/ 里应当只有那一页说明（工单 #1575）
+    prefix = (RELEASE_ASSETS / VIEW_ASSETS).as_posix() + "/"
+    with zipfile.ZipFile(wheel) as archive:
+        packaged = {name[len(prefix):]: archive.read(name) for name in archive.namelist()
+                    if name.startswith(prefix) and not name.endswith("/")}
+    if view is None:
+        expected = {VIEW_INDEX: no_view_page()}
+    else:
+        expected = {name: path.read_bytes() for name, path in page_files(view).items()}
+    missing = sorted(set(expected) - set(packaged))
+    if missing:
+        raise ReleaseError(f"wheel {wheel.name} 中缺少画面文件：" + "、".join(missing))
+    foreign = sorted(set(packaged) - set(expected))
+    if foreign:
+        raise ReleaseError(f"wheel {wheel.name} 的 {prefix} 中有画面构建输出以外的文件："
+                           + "、".join(foreign))
+    changed = [name for name in expected if packaged[name] != expected[name]]
+    if changed:
+        raise ReleaseError(f"wheel {wheel.name} 中的画面文件与画面构建输出不同：" + "、".join(changed))
 
 def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
     # 第 5 步：仅带 --publish 时。打标签 v<版本> 并推送，
@@ -282,16 +370,19 @@ def _check_release(repo_root: Path) -> None:
 
 def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: str,
             remote: str) -> dict[str, object]:
-    # 依顺序执行，返回 wheel 的路径与核对值
+    # 依顺序执行，返回 wheel 的路径、核对值与这一版带不带画面
     version = verify(repo_root, branch=branch, remote=remote)
     pages = build_pages(repo_root, version=version)
-    assets = assemble_assets(repo_root, pages)
+    view, view_failure = build_view(repo_root)
+    assemble_assets(repo_root, pages, view)
     wheel = build_wheel(repo_root, version, output_dir)
     verify_wheel_contents(wheel, pages)
+    verify_view_files(wheel, view)
     if publish_flag:
         _check_release(repo_root)
         publish(repo_root, version, wheel, remote=remote)
-    return {"version": version, "wheel": wheel, "sha256": sha256_hex(wheel)}
+    return {"version": version, "wheel": wheel, "sha256": sha256_hex(wheel),
+            "view": view, "view_failure": view_failure}
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="构建并发布一个 Yudao 版本")
@@ -316,6 +407,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"wheel: {result['wheel']}")
     print(f"sha256: {result['sha256']}")
+    view = result["view"]
+    if isinstance(view, Path):
+        print(f"view: 带画面（{len(page_files(view))} 个文件）")
+    else:
+        print("view: 这一版不带画面")
+        print(f"view-reason: {result['view_failure']}")
     return 0
 
 if __name__ == "__main__":

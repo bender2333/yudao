@@ -2,6 +2,9 @@
 # 建立 main 分支与一个本地 bare 远端，运行 scripts/release.py（不带 --publish），核对 wheel 的路径、
 # SHA-256、wheel 内含页面文件且与页面构建输出逐个一致、不含客户端安装程序与更新清单，
 # 以及 wheel 的发布资源目录里只有本次构建的文件（#313 的清理逻辑沿用）。
+# 画面随发布带上（工单 #1575，画面与播放 docs/design/visualization.md「搬出：画面成为单独的应用」）：
+# 画面构建得出时 wheel 的 view/ 与画面构建输出逐个一致；画面构建坏了也照常发布，wheel 不带画面，
+# 脚本输出写明「这一版不带画面」与原因，/view/ 得到那一页说明。
 # 同时核对工作区不干净、发布标签已存在、当前提交不在 main 上时脚本拒绝。
 #
 # 构建走真实流程：npm ci、Vite 构建页面文件、uv build 生成 wheel。不使用任何 mock；
@@ -151,7 +154,8 @@ def test_build_produces_a_wheel_with_the_page_files(release_build):
 
 def test_wheel_page_files_match_the_build_output(release_build):
     # 验收第 1 项：wheel 内的页面文件与页面构建输出目录中的文件逐个一致。
-    # 发布资源目录里另有接口版本这一个元数据文件（工单 #704），它不是页面文件，不参与比对（工单 #753）
+    # 发布资源目录里另有接口版本这一个元数据文件（工单 #704），它不是页面文件，不参与比对（工单 #753）；
+    # 画面文件在 view/ 子目录里（工单 #1575），由画面自己的一条用例比对
     version = _version(REPO_ROOT / "pyproject.toml")
     wheel = _wheel_path(release_build["output_dir"], version)
     built = release_build["source"] / "client" / "out" / "renderer"
@@ -162,7 +166,8 @@ def test_wheel_page_files_match_the_build_output(release_build):
     with zipfile.ZipFile(wheel) as archive:
         packaged = {name[len(prefix):]: archive.read(name) for name in archive.namelist()
                     if name.startswith(prefix) and not name.endswith("/")
-                    and name != prefix + "api-version.json"}
+                    and name != prefix + "api-version.json"
+                    and not name.startswith(prefix + "view/")}
     assert set(packaged) == set(expected), \
         set(packaged) ^ set(expected)
     changed = [name for name, content in expected.items() if packaged[name] != content]
@@ -179,6 +184,111 @@ def test_the_wheel_carries_the_api_version_of_the_page_files(release_build):
     with zipfile.ZipFile(wheel) as archive:
         packaged = archive.read("harness/release_assets/api-version.json")
     assert packaged == metadata.read_bytes()
+
+def test_a_wheel_with_the_view_matches_the_view_build_output(release_build, tmp_path):
+    # 验收第 1 项（工单 #1575）：画面的构建得出时，wheel 里有 view/，画面文件与画面构建输出
+    # 逐个一致；脚本输出写明这一版带画面
+    version = _version(REPO_ROOT / "pyproject.toml")
+    wheel = _wheel_path(release_build["output_dir"], version)
+    built = release_build["source"] / "view" / "out"
+    expected = {path.relative_to(built).as_posix(): path.read_bytes()
+                for path in sorted(built.rglob("*")) if path.is_file()}
+    assert "index.html" in expected, "画面构建没有生成入口页面"
+    prefix = "harness/release_assets/view/"
+    with zipfile.ZipFile(wheel) as archive:
+        packaged = {name[len(prefix):]: archive.read(name) for name in archive.namelist()
+                    if name.startswith(prefix) and not name.endswith("/")}
+    assert set(packaged) == set(expected), set(packaged) ^ set(expected)
+    changed = [name for name, content in expected.items() if packaged[name] != content]
+    assert not changed, changed
+    assert "view: 带画面" in release_build["result"].stdout
+
+    # 页面文件的核对不把 view/ 当成页面构建输出以外的文件；画面文件的核对单独走一遍
+    module = _load_release_module()
+    module.verify_wheel_contents(wheel, release_build["source"] / "client" / "out" / "renderer")
+    module.verify_view_files(wheel, built)
+
+    def refused(view_dir: Path, needle: str) -> None:
+        # 画面文件缺少、多出、内容不同时都要写明文件名退出
+        try:
+            module.verify_view_files(wheel, view_dir)
+        except module.ReleaseError as error:
+            assert needle in str(error)
+        else:
+            raise AssertionError(f"verify_view_files accepted a view outside the build output: {needle}")
+
+    extra = tmp_path / "view-extra"
+    shutil.copytree(built, extra)
+    (extra / "extra.html").write_bytes(b"extra")
+    refused(extra, "extra.html")
+
+    fewer = tmp_path / "view-fewer"
+    shutil.copytree(built, fewer)
+    removed = next(iter(expected))
+    (fewer / removed).unlink()
+    refused(fewer, removed)
+
+    modified = tmp_path / "view-modified"
+    shutil.copytree(built, modified)
+    (modified / removed).write_bytes(b"different bytes")
+    refused(modified, removed)
+
+
+def test_a_broken_view_build_still_releases_without_the_view(release_template, tmp_path):
+    # 验收第 2 项（工单 #1575）：把画面的构建弄坏再运行发布脚本，wheel 照常生成、不带画面，
+    # 脚本输出写明「这一版不带画面」与原因；接口层照常按文件路径提供，请求 /view/ 得到那一页说明
+    source, _remote = _clone_checkout(release_template, tmp_path)
+    # 弄坏画面的构建：Vite 读取配置时抛错，npm run build 以非零状态退出
+    (source / "view" / "vite.config.ts").write_text(
+        'throw new Error("画面构建故意弄坏");\n', encoding="utf-8")
+    _git(["add", "view/vite.config.ts"], source)
+    _git(["commit", "-q", "-m", "broken view build"], source)
+    _git(["push", "-q", "origin", "main"], source)
+
+    output_dir = tmp_path / "dist-broken-view"
+    result = _run_release(source, output_dir)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    output = result.stdout
+    assert "view: 这一版不带画面" in output, output
+    reason = next(line for line in output.splitlines() if line.startswith("view-reason: "))
+    assert "npm run build" in reason and "退出码 1" in reason, reason
+    assert "画面构建故意弄坏" in output, output
+
+    version = _version(source / "pyproject.toml")
+    wheel = _wheel_path(output_dir, version)
+    assert wheel.is_file()
+    members = _wheel_members(wheel)
+    # 页面照常带上，画面只有那一页说明
+    assert "harness/release_assets/index.html" in members
+    view_members = sorted(name for name in members
+                          if name.startswith("harness/release_assets/view/"))
+    assert view_members == ["harness/release_assets/view/index.html"], view_members
+    with zipfile.ZipFile(wheel) as archive:
+        note = archive.read("harness/release_assets/view/index.html").decode("utf-8")
+    assert "这一版没有画面" in note
+    _load_release_module().verify_view_files(wheel, None)
+
+    # 起服务以后 /view/ 返回那一页说明：服务端没有为画面写代码
+    import httpx
+
+    data_dir = tmp_path / "data"
+    log = tmp_path / "view-api.log"
+    spawn = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+             else {"start_new_session": True})
+    with log.open("wb") as stream:
+        api = subprocess.Popen([str(_python()), "-m", "harness", "api", "--data-dir", str(data_dir),
+                                "--port", "0", "--provider-config", ""],
+                               cwd=source, stdout=stream, stderr=subprocess.STDOUT, **spawn)
+    try:
+        port = _wait_port(api, log, data_dir)
+        _wait_until_serving(api, f"http://127.0.0.1:{port}/api/queries/system.status", log)
+        view = httpx.get(f"http://127.0.0.1:{port}/view/", timeout=10)
+        assert view.status_code == 200
+        assert "这一版没有画面" in view.text
+    finally:
+        _stop(api)
+
 
 def test_the_wheel_carries_no_stale_file_and_rejects_foreign_files(release_template, tmp_path):
     # 工单 #313 的清理逻辑沿用：setuptools 不清理 build/lib，上一次构建的文件会跟着这次构建进 wheel；
@@ -443,14 +553,15 @@ def _stop(process: subprocess.Popen) -> None:
 
 def test_installed_wheel_serves_the_pages(release_build, tmp_path):
     # 工单验收第 2 项：脚本生成的 wheel 安装进临时虚拟环境后，用临时数据目录与端口启动 yudao api：
-    # yudao --version 输出发布版本号；请求 / 得到入口页面；/api/capabilities 给出与 yudao --version
-    # 相同的服务版本；同一数据目录第二次启动失败并写明原因
+    # yudao --version 输出发布版本号；请求 / 得到入口页面；请求 /view/ 得到画面入口页面（#1575）；
+    # /api/capabilities 给出与 yudao --version 相同的服务版本；同一数据目录第二次启动失败并写明原因
     import httpx
 
     version = _version(REPO_ROOT / "pyproject.toml")
     wheel = _wheel_path(release_build["output_dir"], version)
     with zipfile.ZipFile(wheel) as archive:
         packaged_index = archive.read("harness/release_assets/index.html")
+        packaged_view = archive.read("harness/release_assets/view/index.html")
 
     venv = tmp_path / "venv"
     subprocess.run(["uv", "venv", str(venv), "--python", "3.12"], check=True, capture_output=True)
@@ -478,6 +589,9 @@ def test_installed_wheel_serves_the_pages(release_build, tmp_path):
         _wait_until_serving(api, f"http://127.0.0.1:{port}/api/queries/system.status", log)
         index = httpx.get(f"http://127.0.0.1:{port}/", timeout=10)
         assert index.status_code == 200 and index.content == packaged_index
+        # 工单 #1575：画面在服务地址下的 /view/，接口层照常按文件路径提供
+        view = httpx.get(f"http://127.0.0.1:{port}/view/", timeout=10)
+        assert view.status_code == 200 and view.content == packaged_view
         capabilities = httpx.get(f"http://127.0.0.1:{port}/api/capabilities", timeout=10)
         assert capabilities.status_code == 200
         assert capabilities.json()["deployment"]["version"] == version
