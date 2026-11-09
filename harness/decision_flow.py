@@ -29,6 +29,7 @@ from .decisions import (
 from .event_store import Command, EventStore, is_catalog_stream, is_run_stream, run_stream
 from .models import ArtifactRef, CatalogEventType, DecisionRequest, EventType, ProjectEventType, new_id
 from .projection import project_run, saved_decision
+from .projects import definitions_from_ref, frozen_definitions_ref
 from .tree_archive import artifact_run, load_tree
 from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Transaction, WritePath
 
@@ -262,6 +263,10 @@ class DecisionFlow:
         item = driver.projects.projection(project_id).work_item(candidate.work_item_id)
         if item is None or prior.project_context_ref is None:
             raise ValueError(f"work item {candidate.work_item_id} is gone")
+        # 修改轮沿用事项创建时冻结的整份合成结果（工单 #1517）：这一轮仍是同一个事项，组织不换。
+        # 旧事项没有这一项时按形态名取（工单 #1392 的读法）
+        frozen_ref = frozen_definitions_ref(driver.store, project_id, candidate.work_item_id)
+        frozen = definitions_from_ref(driver.artifacts, frozen_ref)
         round_limit = driver.projects.onboarding_round_limit(project_id)
         note_ref = None
         if (note or "").strip():
@@ -280,8 +285,9 @@ class DecisionFlow:
             mcp_servers=item.mcp_servers,
             # 修改轮沿用事项创建时冻结的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：
             # 这一轮仍是同一个事项，换的只是 run 的应用版本。不交这一项时 create_run 会取默认的三部门，
-            # 形态的部门与默认那一份不同的时候（#1395 的第二份形态）部门核对会失败
-            form=item.form,
+            # 形态的部门与默认那一份不同的时候（#1395 的第二份形态）部门核对会失败。
+            # 工单 #1517：冻结的整份合成结果与它的工件引用一并沿用，组织与事项创建时那一份相同
+            form=item.form, item_definitions=frozen, item_definitions_ref=frozen_ref,
             round=round_number,
             onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
                               "note_ref": note_ref},

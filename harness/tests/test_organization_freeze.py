@@ -28,7 +28,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.contracts import Accepted, Rejected
 from harness.app.form_commands import OrganizationAdopt
@@ -39,11 +39,12 @@ from harness.app.project_queries import ProjectLoop
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, Definitions, definitions_from_contents
 from harness.event_store import Command, project_stream, run_stream
 from harness.models import EventType, ProjectEventType, new_id
-from harness.projection import RunProjection
+from harness.projection import RunProjection, saved_decisions
 from harness.projects import definitions_from_ref
+from harness.proposals import baseline_review_turn, structure_turn
 from harness.runtime import SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, LoopSystem
 from harness.tests.helpers import delivery_turn, merge_scripts, product_spec, quality_turns
-from harness.tests.onboarding_project import ONBOARDING_GOAL, onboarding_source
+from harness.tests.onboarding_project import ONBOARDING_GOAL, ONBOARDING_REQUIREMENT, onboarding_source
 from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
 
@@ -575,6 +576,54 @@ def test_the_work_item_command_refuses_when_the_project_form_is_not_in_the_relea
     assert rejected.reason == "not_allowed"
     assert "form_from_a_newer_release" in rejected.message
     assert system.projects.projection(project_id).work_items == []
+    system.close()
+
+
+def _onboarding_script() -> dict[str, list[Any]]:
+    # 建档一轮的三部门回答（与 test_forms_per_item 的做法相同）：产品交初始 PRD、工程交结构说明、
+    # 质检做基线核验；质检一轮里可能被唤醒两次，给两条回答
+    requirement = ONBOARDING_REQUIREMENT
+    return {
+        "product": [FakeTurn(proposal=product_spec(
+            goal=ONBOARDING_GOAL, requirements=[requirement], acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(
+            requirement_locations=[{"requirement": requirement, "locations": ["src/echo.py"]}],
+            overall="一个包加一个命令行入口")],
+        "quality": [baseline_review_turn(conclusions=[
+            {"requirement": requirement, "status": "verified", "evidence": "smoke"}]) for _ in range(2)],
+    }
+
+
+def test_an_onboarding_revision_run_keeps_the_frozen_organization(tmp_path):
+    # 审查发现：建档修改轮建 run 时只带了形态名，没有带冻结的整份合成结果——项目改过组织时修改轮会按发布里
+    # 那一份跑，与事项创建时冻结的那一份不一致。这条看修改轮的 run 记的引用与它读到的组织
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter(_onboarding_script()),
+                                    resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("两轮建档", ONBOARDING_GOAL, source="existing")
+    system.projects.configure_source_directory(project_id, "src",
+                                               str(onboarding_source(tmp_path / "source")), base_version=0)
+    adopted = _adopt(application, project_id, {"departments": {"quality": {"label": RENAMED_LABEL}}})
+    assert isinstance(adopted, Accepted), adopted
+    item_id, first_run = system.projects.restart_onboarding(project_id, "src")
+    frozen = _created(system, project_id, item_id)["definitions_version"]
+    assert frozen != DEFINITIONS.version
+    first = system.run_until_stop(first_run)
+    assert first.status == "done", first.error
+    assert system.projects.settle(first_run) is not None
+    _position, open_decisions = saved_decisions(system.store, statuses=("open",))
+    [decision] = open_decisions
+    assert decision.kind == "initial_prd"
+
+    revision_run = system.orchestrator.answer_decision(
+        decision.decision_id, "revise", "把用法说明写进初始 PRD", base_version=decision.version,
+        command=_answer_command())
+    assert revision_run is not None
+    created = _run_created(system, revision_run)
+    assert created["definitions_ref"] == _created(system, project_id, item_id)["definitions_ref"]
+    assert created["definitions_version"] == frozen
+    assert system.orchestrator.item_form(revision_run).definitions.version == frozen
+    assert system.orchestrator.item_form(revision_run).definitions.department_labels["quality"] == RENAMED_LABEL
     system.close()
 
 

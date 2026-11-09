@@ -530,6 +530,10 @@ class Orchestrator:
     ) -> str:
         frozen_form = self.form_named(form)
         definitions = frozen_form.definitions if item_definitions is None else item_definitions
+        # 交了冻结的合成结果却没写明创建时这一版发布里那个形态的版本时，按现在这一版记（同一个事项换 run 的
+        # 几条路都传了冻结的那一份，只有发布换了内容时两者才不同）
+        if form_version is None and item_definitions is not None:
+            form_version = frozen_form.definitions.version
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
         if max_cycles < 1:
