@@ -3,6 +3,8 @@
 // 页面上半是循环图：按所选事项冻结的组织画节点、成果箭头与结论。图上方的行选事项（默认最近在跑的），
 // 点节点、点箭头打开同一个面板。最上面是时间条（工单 #1653）：所选事项的已用时间与上限，在跑时另有「停止」。
 // 图右上角的「看经过」展开时序图（工单 #1641）：按轮折起来的经过，展开在循环图下面，不盖住线程。
+// 同一行还有「累计往来」（工单 #1642）：打开以后图上按两个职能合成一条线，写问了几次（次数含开着的）。
+// 点图上的询问线（开着的或累计的）只看这两个职能的时序图，上面一行写「只看 A 与 B · 看全部」。
 // 点时序图上的一行打开同一个面板（工单 #1643）：成果是那一版与差异，问答与你的话是全文。
 // 下面是线程与输入框（工单 #1639）：一条线程跨多个事项，已结束的事项默认收起；输入框上方一行收件人。
 // 线程的折叠行展开以后末尾有「在时序图里看」：只看这两个职能的时序图（工单 #1643）。
@@ -120,6 +122,8 @@ export function ConversationPage(props: {
     [props.departments],
   );
   const others = useMemo(() => otherCounts(items, itemId === "" ? null : itemId), [items, itemId]);
+  // 累计往来（工单 #1642）：由用户点开，同一对职能的询问合成一条线；关掉回到只画开着的询问
+  const [accumulated, setAccumulated] = useState(false);
   const graph = useMemo(() => graphOf({
     item,
     flow: itemFlow,
@@ -129,7 +133,8 @@ export function ConversationPage(props: {
     currentRoles,
     others,
     asks: askList,
-  }), [item, itemFlow, materials.data, labels, current, currentRoles, others, askList]);
+    accumulated,
+  }), [item, itemFlow, materials.data, labels, current, currentRoles, others, askList, accumulated]);
   // 同一个面板里逐版看：按出现顺序排的箭头
   const arrows = useMemo<LoopArrow[]>(() => [
     ...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows),
@@ -293,9 +298,13 @@ export function ConversationPage(props: {
                 <Empty text="这件事项冻结的组织不在这一版发布里，图上没有可画的节点。" />
               ) : (
                 <>
-                  {/* 图右上角的入口（工单 #1641）：只有一个职能时没有「看经过」，也没有时序图（设计说明 4.15） */}
+                  {/* 图右上角的入口（工单 #1641、#1642）：只有一个职能时两个都没有，也没有时序图（设计说明 4.15） */}
                   {hasSequence(roles) ? (
                     <div className="y10-cv-tools">
+                      <button type="button" className="y10-btn small y10-cv-accum" aria-pressed={accumulated}
+                              data-testid="show-accumulated" onClick={() => setAccumulated((value) => !value)}>
+                        累计往来
+                      </button>
                       <button type="button" className="y10-btn small" aria-pressed={sequenceOpen}
                               data-testid="show-sequence" onClick={() => {
                                 // 「看经过」看整件事：只看过两个职能时点它回到整件事，已经看整件事时收起
@@ -319,6 +328,8 @@ export function ConversationPage(props: {
                       open({ kind: "node", id });
                     }}
                     onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
+                    // 点询问线（开着的或累计的）只看这两个职能的时序图（设计说明 4.14 第 2 层）
+                    onPickAsk={(from, to) => showPair(itemId, [from, to])}
                   />
                   {/* 询问读不出来时在图上说一句：不静默少画线（图上的虚线、节点的往来都与时序图读同一份查询） */}
                   {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
