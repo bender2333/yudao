@@ -1,6 +1,6 @@
 {
   "owner": "user",
-  "updated": "2026-11-06",
+  "updated": "2026-11-09",
   "kinds": {
     "module": "控制核心的裁决模块：接受导入方向的检查",
     "material": "评价材料与守卫自身：路径守卫保护它们，导入方向不适用（测试要导入 pytest，评分器按场景运行，文档与发布脚本不是 Python 模块）"
@@ -65,6 +65,31 @@
       "path": "harness/tools.py",
       "kind": "module",
       "why": "工具登记表与部门可用工具集合，工具许可的依据之一"
+    },
+    {
+      "path": "harness/thin_driver.py",
+      "kind": "module",
+      "why": "薄驱动：问路由、每一步问边界、按执行契约开始一轮工作、结果经写入口写回、事项结束与派发编号（总图第二节「只由你批准」、第四节「写入口」「执行」的缝）"
+    },
+    {
+      "path": "harness/routing_contract.py",
+      "kind": "module",
+      "why": "插件加载：路由实现登记名称、启动时按组织定义里的名称接上（register、select），路由契约本身同在这个模块（总图第二节「只由你批准」）"
+    },
+    {
+      "path": "harness/assembly_contract.py",
+      "kind": "module",
+      "why": "装配契约：薄驱动经它接上装配实现（骨架与应用设计说明「可信内核」「契约」）"
+    },
+    {
+      "path": "harness/execution_contract.py",
+      "kind": "module",
+      "why": "执行契约：薄驱动经它开始一轮工作，把安全节点交给执行实现（总图第四节「执行」的缝）"
+    },
+    {
+      "path": "harness/contract_versions.py",
+      "kind": "module",
+      "why": "契约版本：薄驱动在一个发布里接受当前版与上一版（骨架与应用设计说明「契约」）"
     },
     {
       "path": "harness/definitions/__init__.py",
