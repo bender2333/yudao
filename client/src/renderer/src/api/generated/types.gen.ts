@@ -336,6 +336,10 @@ export type ActionView = {
      * Facts
      */
     facts?: Array<'失败' | '超时' | '结果未知' | '被拒绝' | '改了文件'>;
+    /**
+     * Task
+     */
+    task?: number | null;
 };
 
 /**
@@ -6230,6 +6234,10 @@ export type RunStepsResult = {
      * Background Commands
      */
     background_commands: Array<BackgroundCommandView>;
+    /**
+     * Tasks
+     */
+    tasks?: Array<TaskView>;
 };
 
 /**
@@ -6896,6 +6904,24 @@ export type SystemStatus = {
     drain: DrainStatus;
     recovery: RecoveryStatus;
     home: HomeStatus;
+};
+
+/**
+ * TaskView
+ */
+export type TaskView = {
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Status
+     */
+    status: '待做' | '进行中' | '完成' | '已从计划里去掉';
 };
 
 /**

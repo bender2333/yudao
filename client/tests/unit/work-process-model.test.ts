@@ -8,10 +8,13 @@ import {
   activationOf,
   askIdOfRowKey,
   attemptLinks,
+  doingText,
   foldedLineText,
+  nodeDoing,
   noActivationText,
   rawFields,
   targetText,
+  workBlocks,
   workGroups,
   workLines,
   workTargetOfArrow,
@@ -23,6 +26,7 @@ import type {
   RunStepView,
   RunStepsResult,
   StepText,
+  TaskView,
 } from "../../src/renderer/src/api/generated/types.gen.ts";
 import type { LoopArrow } from "../../src/renderer/src/views/project/loop-graph-model.ts";
 import type { SequenceRow } from "../../src/renderer/src/views/project/sequence-model.ts";
@@ -100,6 +104,15 @@ function activation(overrides: Partial<ActivationView> = {}): ActivationView {
     cycle: 1,
     ...overrides,
   };
+}
+
+function task(number: number, content: string, status: TaskView["status"] = "进行中"): TaskView {
+  return { number, content, status };
+}
+
+/** 一块里的全部行（折起来的那几组展开），按显示先后。 */
+function linesOf(block: ReturnType<typeof workBlocks>[number]): ReturnType<typeof workLines> {
+  return block.groups.flatMap((group) => group.lines);
 }
 
 function arrow(overrides: Partial<LoopArrow> = {}): LoopArrow {
@@ -429,4 +442,194 @@ test("入口旁边写的是哪一轮或哪一次回答", () => {
   // R3：用户在面板上认得出看的是哪一轮
   assert.equal(targetText({ kind: "cycle", department: "engineering", cycle: 2 }), "第 2 轮");
   assert.equal(targetText({ kind: "session", department: "engineering", sessionId: "ask-1" }), "这次回答");
+});
+
+// ---------------------------------------------------------------------------
+// 按任务分组：任务 1、2、3 在最上面一层，没有编号的动作按时间放在两段任务之间
+
+test("有计划的一轮按任务分组：每个任务一句话加状态，动作归到它的所属任务", () => {
+  // R3：工作过程按任务分组（设计说明「任务分组」，工单 #1662 验收第 1 条）
+  const data = result({
+    tasks: [task(1, "弄清现在的总页数怎么算", "完成"), task(2, "确认页面上显示什么", "进行中")],
+    steps: [
+      step({ step_id: 1, actions: [action({ action_id: "a_1", mark: "读", title: "读取 orders/list.ts", task: 1 })] }),
+      step({ step_id: 2, actions: [action({ action_id: "a_2", mark: "运行", title: "运行命令：npm test", task: 1 })] }),
+      step({ step_id: 3, actions: [action({ action_id: "a_3", mark: "写", title: "写入 orders/list.ts", task: 2 })] }),
+    ],
+  });
+  const blocks = workBlocks(workLines(data), data.tasks ?? []);
+  assert.deepEqual(blocks.map((block) => block.kind), ["task", "task"]);
+  assert.deepEqual(blocks.map((block) => (block.kind === "task" ? [block.task.number, block.task.content, block.task.status] : null)), [
+    [1, "弄清现在的总页数怎么算", "完成"],
+    [2, "确认页面上显示什么", "进行中"],
+  ]);
+  assert.deepEqual(blocks.map((block) => linesOf(block).map((line) => line.title)), [
+    ["读取 orders/list.ts", "运行命令：npm test"],
+    ["写入 orders/list.ts"],
+  ]);
+});
+
+test("任务内部把连续同一种类的动作折成一行，点开才是每一行", () => {
+  // R3：工作过程读得懂（设计说明「任务分组」最后一条：折叠规则也用在任务内部）
+  const data = result({
+    tasks: [task(1, "读完分页相关的三个文件")],
+    steps: [step({
+      actions: [
+        action({ action_id: "a_1", mark: "读", title: "读取 a.ts", task: 1 }),
+        action({ action_id: "a_2", mark: "读", title: "读取 b.ts", task: 1 }),
+        action({ action_id: "a_3", mark: "读", title: "读取 c.ts", task: 1 }),
+      ],
+    })],
+  });
+  const blocks = workBlocks(workLines(data), data.tasks ?? []);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].groups.length, 1);
+  assert.equal(blocks[0].groups[0].foldedTitle, "读了 3 次");
+  assert.deepEqual(blocks[0].groups[0].lines.map((line) => line.title), ["读取 a.ts", "读取 b.ts", "读取 c.ts"]);
+});
+
+test("没有进行中条目时的动作不编号，按时间放在两段任务之间", () => {
+  // R3：没有编号的动作在两段任务之间（设计说明「任务分组」，工单 #1662 验收第 2 条）
+  const data = result({
+    tasks: [task(1, "先看实现", "完成"), task(2, "再改实现", "进行中")],
+    steps: [
+      step({ step_id: 1, actions: [action({ action_id: "a_1", mark: "读", title: "读取 a.ts", task: 1 })] }),
+      step({ step_id: 2, actions: [action({ action_id: "a_2", mark: "运行", title: "运行命令：npm test" })] }),
+      step({ step_id: 3, actions: [action({ action_id: "a_3", mark: "写", title: "写入 b.ts", task: 2 })] }),
+      step({ step_id: 4, actions: [action({ action_id: "a_4", mark: "运行", title: "运行命令：npm run typecheck" })] }),
+    ],
+  });
+  const blocks = workBlocks(workLines(data), data.tasks ?? []);
+  assert.deepEqual(blocks.map((block) => block.kind), ["task", "loose", "task", "loose"]);
+  assert.deepEqual(blocks.map((block) => linesOf(block).map((line) => line.title)), [
+    ["读取 a.ts"],
+    ["运行命令：npm test"],
+    ["写入 b.ts"],
+    ["运行命令：npm run typecheck"],
+  ]);
+  // 没有编号的那一块不带任务：不写成「任务 0」，也不编号
+  assert.equal(blocks[1].kind === "task", false);
+});
+
+test("从没进行过的任务排在最后，后来没有了的写「已从计划里去掉」", () => {
+  // R3：从没进行过的排在最后、已从计划里去掉的写明（设计说明「任务分组」）
+  const data = result({
+    tasks: [task(1, "改完分页", "完成"), task(2, "补边界用例", "待做"), task(3, "换掉旧实现", "已从计划里去掉")],
+    steps: [step({ actions: [action({ action_id: "a_1", task: 1 })] })],
+  });
+  const blocks = workBlocks(workLines(data), data.tasks ?? []);
+  assert.deepEqual(blocks.map((block) => (block.kind === "task" ? block.task.number : null)), [1, 2, 3]);
+  assert.deepEqual(blocks.map((block) => (block.kind === "task" ? block.task.status : null)), ["完成", "待做", "已从计划里去掉"]);
+  // 没有动作归到它的任务只有那一句任务，不拿空占位补
+  assert.deepEqual(blocks.slice(1).map((block) => block.groups.length), [0, 0]);
+});
+
+test("一条任务有几段动作时归到同一个任务块里", () => {
+  // R3：一条任务可以有几段动作（设计说明「任务分组」）
+  const data = result({
+    tasks: [task(1, "先看实现"), task(2, "再改实现")],
+    steps: [
+      step({ step_id: 1, actions: [action({ action_id: "a_1", mark: "读", title: "读取 a.ts", task: 1 })] }),
+      step({ step_id: 2, actions: [action({ action_id: "a_2", mark: "写", title: "写入 b.ts", task: 2 })] }),
+      step({ step_id: 3, actions: [action({ action_id: "a_3", mark: "读", title: "读取 c.ts", task: 1 })] }),
+    ],
+  });
+  const blocks = workBlocks(workLines(data), data.tasks ?? []);
+  assert.deepEqual(blocks.map((block) => (block.kind === "task" ? block.task.number : null)), [1, 2]);
+  assert.deepEqual(blocks.map((block) => linesOf(block).map((line) => line.title)), [
+    ["读取 a.ts", "读取 c.ts"],
+    ["写入 b.ts"],
+  ]);
+});
+
+test("没有计划的轮次平铺，页面不报错", () => {
+  // R3：没有计划的轮次平铺（设计说明「老事件」「任务分组」，工单 #1662 验收第 3 条）
+  const data = result({
+    steps: [step({
+      actions: [
+        action({ action_id: "a_1", mark: "读", title: "读取 a.ts" }),
+        action({ action_id: "a_2", mark: "读", title: "读取 b.ts" }),
+        action({ action_id: "a_3", mark: "运行", title: "运行命令：npm test" }),
+      ],
+    })],
+  });
+  const blocks = workBlocks(workLines(data), data.tasks ?? []);
+  assert.deepEqual(blocks.map((block) => block.kind), ["loose"]);
+  assert.deepEqual(blocks[0].groups.map((group) => group.foldedTitle), ["读了 2 次", ""]);
+});
+
+test("一次工作没有步骤时没有块：页面照实说没有留下步骤", () => {
+  // R3：事实照实说，不拿空占位补
+  assert.deepEqual(workBlocks([], []), []);
+  assert.deepEqual(workBlocks([], [task(1, "从没开始过的任务")]), []);
+});
+
+// ---------------------------------------------------------------------------
+// 节点面板的「在做什么」：当前任务加最近一个动作的标题，读同一个 run.steps
+
+test("节点面板：正在工作时写当前任务与最近一个动作的标题", () => {
+  // R3：节点面板写当前任务与最近一个动作（设计说明 4.5「谁来读」，工单 #1662 验收第 4 条）
+  const data = result({
+    tasks: [task(1, "按 PRD 做分页")],
+    steps: [
+      step({ step_id: 1, actions: [action({ action_id: "a_1", mark: "读", title: "读取 orders/list.ts", task: 1 })] }),
+      step({ step_id: 2, actions: [action({ action_id: "a_2", mark: "运行", title: "补一条空列表的用例", task: 1 })] }),
+    ],
+  });
+  const doing = nodeDoing(data, true);
+  assert.deepEqual(doing, { task: data.tasks?.[0], action: "补一条空列表的用例" });
+  assert.equal(doingText(doing!), "当前任务 1：按 PRD 做分页 · 最近一个动作：补一条空列表的用例");
+});
+
+test("节点面板：没有计划时只写最近一个动作的标题", () => {
+  // R3：没有计划时只写最近一个动作（工单 #1662 验收第 4 条）
+  const data = result({ steps: [step({ actions: [action({ title: "读取 orders/list.ts" })] })] });
+  const doing = nodeDoing(data, true);
+  assert.deepEqual(doing, { task: null, action: "读取 orders/list.ts" });
+  assert.equal(doingText(doing!), "读取 orders/list.ts");
+});
+
+test("节点面板：不在工作时不写", () => {
+  // R3：不在工作时不写（工单 #1662 验收第 4 条）
+  const data = result({
+    tasks: [task(1, "按 PRD 做分页")],
+    steps: [step({ actions: [action({ title: "读取 orders/list.ts" })] })],
+  });
+  assert.equal(nodeDoing(data, false), null);
+  assert.equal(nodeDoing(null, true), null);
+});
+
+test("节点面板：最后一步只有文字时仍写最近一个动作；一条动作都没有就只写当前任务", () => {
+  // 自定的边界：只有文字的一步不算「最近一个动作」，没动作时不拿这段文字顶替
+  const data = result({
+    tasks: [task(1, "先想清楚再动手")],
+    steps: [
+      step({ step_id: 1, actions: [action({ action_id: "a_1", title: "读取 orders/list.ts", task: 1 })] }),
+      step({ step_id: 2, title: "先看分页实现，再决定问谁", title_source: "作者", texts: [text()] }),
+    ],
+  });
+  assert.deepEqual(nodeDoing(data, true), { task: data.tasks?.[0], action: "读取 orders/list.ts" });
+  const planOnly = result({
+    tasks: [task(1, "先想清楚再动手")],
+    steps: [step({ title: "先看分页实现", title_source: "作者", texts: [text()] })],
+  });
+  assert.deepEqual(nodeDoing(planOnly, true), { task: planOnly.tasks?.[0], action: "" });
+  assert.equal(doingText(nodeDoing(planOnly, true)!), "当前任务 1：先想清楚再动手");
+  // 没有计划、也没有动作：没有可写的一句
+  const textOnly = result({ steps: [step({ title: "先看分页实现", title_source: "作者", texts: [text()] })] });
+  assert.equal(nodeDoing(textOnly, true), null);
+});
+
+test("节点面板：进行中的那条是当前任务，没有进行中的条目时用最近一个动作的所属任务", () => {
+  // 自定的边界：当前任务是角色最后写下的进行中那一条；都写完了用最近一个动作的所属任务
+  const data = result({
+    tasks: [task(1, "按 PRD 做分页", "完成"), task(2, "补边界用例", "进行中")],
+    steps: [step({ actions: [action({ title: "写入 orders/list.ts", task: 1 })] })],
+  });
+  assert.deepEqual(nodeDoing(data, true), { task: data.tasks?.[1], action: "写入 orders/list.ts" });
+  const noInProgress = result({
+    tasks: [task(1, "按 PRD 做分页", "完成"), task(2, "补边界用例", "待做")],
+    steps: [step({ actions: [action({ title: "写入 orders/list.ts", task: 1 })] })],
+  });
+  assert.deepEqual(nodeDoing(noInProgress, true), { task: noInProgress.tasks?.[0], action: "写入 orders/list.ts" });
 });

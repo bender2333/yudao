@@ -47,6 +47,7 @@ from .payloads import (PAYLOADS, BaselineCheck, BaselineConclusion, BaselineOmis
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position
+from .task_groups import PLAN_TOOL, TaskStatus, ToolRecord, group_tasks
 
 if TYPE_CHECKING:
     from .application import Application
@@ -1773,6 +1774,9 @@ class ActionView(Contract):
     title: str = ""
     title_source: Source = "系统"
     facts: list[Fact] = Field(default_factory=list)
+    # 所属任务（工作过程的任务与动作标题设计说明「任务分组」，工单 #1661）：这一轮的任务列表里
+    # 排在最前的进行中条目的编号；没有进行中条目时不带。只有 run.steps 算它（run.actions 不带）
+    task: int | None = None
 
 class BackgroundCommandView(Contract):
     command: str
@@ -2101,14 +2105,24 @@ class ActivationView(Contract):
     cycle: int | None = None
 
 
+class TaskView(Contract):
+    # 一条任务（工作过程的任务与动作标题设计说明「任务分组」，工单 #1661）：编号、角色写的那句话与状态。
+    # 从这一轮的更新计划记录重算，不保存；没有计划的一轮任务列表为空
+    number: int
+    content: str
+    status: TaskStatus
+
+
 class RunStepsResult(Contract):
     # 这次返回的是哪个激活的步骤（这个部门还没有激活时为空），该部门的全部激活、所选激活的每一步、
-    # 没有归到步骤的动作与这个部门的后台命令。动作的取法与回执和 run.actions 是同一段代码
+    # 没有归到步骤的动作与这个部门的后台命令。动作的取法与回执和 run.actions 是同一段代码。
+    # 另外带这一轮的任务列表（工单 #1661）：动作的所属任务在 ActionView.task 里
     activation_id: str | None
     activations: list[ActivationView]
     steps: list[RunStepView]
     unassigned_actions: list[ActionView]
     background_commands: list[BackgroundCommandView]
+    tasks: list[TaskView] = Field(default_factory=list)
 
 
 STEP_EVENT_TYPES = (EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE, EventType.MODEL_REASONING,
@@ -2245,12 +2259,20 @@ def _run_steps(application: Application, request: RunSteps) -> Snapshot[RunSteps
             # 模型文字只取文字条目：工具调用条目没有文字，不进这一步的 texts
             if text != "":
                 view.texts.append(_step_text(event, text))
+    # 任务分组（工单 #1661）：这一轮更新计划写下的任务、以及每个动作开始时进行中的那一条。
+    # 更新计划自己不单独成行——它只参与分组，原始调用仍能从事件详情读到
+    grouping = group_tasks(_activation_tool_records(store, request.run_id, request.department, selected))
+    tasks = [TaskView(number=task.number, content=task.content, status=task.status)
+             for task in grouping.tasks]
     # 动作：取法与归并和 run.actions 共用同一段代码，这里只按部门与激活过滤
     actions, background = _run_action_views(application, request.run_id)
     unassigned: list[ActionView] = []
     for action in actions:
+        if action.tool == PLAN_TOOL:
+            continue
         if action.department != request.department or action.activation_id != selected:
             continue
+        action = action.model_copy(update={"task": grouping.owners.get(action.action_id)})
         view = None if action.step_id is None else by_step.get(root_of_step.get(action.step_id))
         if view is None:
             # 没有归到任何一步的动作照实列出，不丢弃（工单 #1234）
@@ -2267,8 +2289,63 @@ def _run_steps(application: Application, request: RunSteps) -> Snapshot[RunSteps
             unassigned_actions=unassigned,
             background_commands=[view for department, view in background
                                  if department == request.department],
+            tasks=tasks,
         ),
     )
+
+
+# 任务分组要读的工具事件（工单 #1661）：工具开始与三种结果。与 _tool_events 取的那几种同样的
+# 动作语义，这里按部门读取、按激活过滤
+TOOL_RECORD_TYPES = (EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                     EventType.ACTION_VERIFIED)
+
+
+def _activation_tool_records(store: Any, run_id: str, department: str,
+                             activation_id: str | None) -> list[ToolRecord]:
+    """一次激活的工具调用记录（任务分组用，工单 #1661）：按 run 与部门的索引分页读取，不扫整个日志。
+
+    一个动作取它工具开始那一条的位置与参数；只有结果、没有开始的动作按结果那一条的位置。
+    结果还没写下的更新计划不当成计划（`accepted` 为假），格式错误的那一份同理。
+    """
+    if activation_id is None:
+        return []
+    collected: list[Any] = []
+    cursor = 0
+    while True:
+        batch = store.read(after=cursor, runs=(run_id,), departments=(department,), limit=500,
+                           types=TOOL_RECORD_TYPES)
+        if not batch:
+            break
+        collected.extend(event for event in batch
+                         if str((event.payload or {}).get("activation_id") or "") == activation_id)
+        cursor = batch[-1].position
+    starts: dict[str, Any] = {}
+    records: dict[str, ToolRecord] = {}
+    for event in collected:
+        payload = event.payload or {}
+        action_id = action_identity(event)[2]
+        if event.type == EventType.TOOL_STARTED:
+            starts[action_id] = event
+            continue
+        # 同一个动作的第二次处置（工具结果之后又有核实记录）：按第一次那条算，不重复成两个动作
+        if action_id in records:
+            continue
+        start = starts.pop(action_id, None)
+        start_payload = {} if start is None else (start.payload or {})
+        args = payload.get("args")
+        records[action_id] = ToolRecord(
+            position=event.position if start is None else start.position, action_id=action_id,
+            name=str(payload.get("name") or start_payload.get("name") or ""),
+            args=args if isinstance(args, dict) else {},
+            accepted=payload.get("ok") is not False)
+    for action_id, start in starts.items():
+        # 只有开始、还没有结果的动作也各算一条（运行中或结果未知）：更新计划的结果还没写下，不算计划
+        payload = start.payload or {}
+        args = payload.get("args")
+        records[action_id] = ToolRecord(
+            position=start.position, action_id=action_id, name=str(payload.get("name") or ""),
+            args=args if isinstance(args, dict) else {}, accepted=False)
+    return sorted(records.values(), key=lambda record: record.position)
 
 
 # ---------------------------------------------------------------------------

@@ -1,10 +1,11 @@
-// 原文面板里的「看工作过程」（工单 #1658，项目的组织设计说明 4.14「项目页是循环图加对话」第 4 层、
-// 工作过程的任务与动作标题设计说明「动作标记」「动作标题」「任务分组」的最后一条）。
+// 原文面板里的「看工作过程」（工单 #1658、#1662，项目的组织设计说明 4.14「项目页是循环图加对话」第 4 层、
+// 工作过程的任务与动作标题设计说明「动作标记」「动作标题」「任务分组」）。
 //
-// 就地展开在原文面板里：每个动作一行标记加标题，连续同一种类的动作折成一行；点一行是原始数据
-// （命令、参数、退出状态、输出、这一步的推理与模型文字），原始数据后面用这一步的调用尝试编号
-// 进请求详情页（被丢弃的那几次也能点）。行、折叠、原始数据的几格与时序图一行到激活的对应都在
-// work-process-model.ts 里，这个文件只做取数与排版。
+// 就地展开在原文面板里：有计划的一轮最上面一层是任务 1、2、3（每个任务一句话加状态），下面是归到它的
+// 动作行；没有编号的动作按时间留在两段任务之间；没有计划的轮次平铺。每行一个标记加标题，连续同一种类
+// 的动作折成一行（任务内部也一样）；点一行是原始数据（命令、参数、退出状态、输出、这一步的推理与模型文字），
+// 原始数据后面用这一步的调用尝试编号进请求详情页（被丢弃的那几次也能点）。行、折叠、任务分组、原始数据的
+// 几格与时序图一行到激活的对应都在 work-process-model.ts 里，这个文件只做取数与排版。
 //
 // 读的事实只有 run.steps：先按职能取这个职能的激活，找出与这一行对得上的那一次（成果按第几轮，
 // 询问与回答按会话编号）；同一轮有几次激活时都列出来，默认最后一次，点别的格用那个编号重取。
@@ -28,8 +29,9 @@ import {
   noActivationText,
   rawFields,
   targetText,
-  workGroups,
+  workBlocks,
   workLines,
+  type WorkBlock,
   type WorkGroup,
   type WorkLine,
   type WorkTarget,
@@ -156,16 +158,61 @@ export function WorkProcessBody(props: {
         </div>
       ) : null}
       {props.data === null ? null : (
-        <WorkLineList
+        <WorkBlockList
           app={props.app}
           projectId={props.projectId}
           workItemId={props.workItemId}
           runId={props.runId}
           department={props.target.department}
-          groups={workGroups(workLines(props.data))}
+          blocks={workBlocks(workLines(props.data), props.data.tasks ?? [])}
         />
       )}
     </div>
+  );
+}
+
+/** 一条任务的标记写在标题后面：完成是绿的，进行中是正文色，待做与已从计划里去掉是灰的。 */
+function taskTone(status: "待做" | "进行中" | "完成" | "已从计划里去掉"): "ok" | "muted" | undefined {
+  return status === "完成" ? "ok" : status === "进行中" ? undefined : "muted";
+}
+
+/**
+ * 工作过程的最上面一层：有计划时是任务 1、2、3（每个任务一句话加状态），下面归到它的动作行；
+ * 没有编号的动作按时间留在两段任务之间，不带任务标题。没有计划的轮次平铺（一块里折成几行）。
+ */
+function WorkBlockList(props: {
+  app: ClientApp;
+  projectId: string;
+  workItemId: string;
+  runId: string;
+  department: string;
+  blocks: WorkBlock[];
+}) {
+  if (props.blocks.length === 0) {
+    return <Empty text="这次工作没有留下步骤" />;
+  }
+  return (
+    <ol className="y10-wp-tasks">
+      {props.blocks.map((block) => (
+        <li key={block.key} className={block.kind === "task" ? "y10-wp-task" : "y10-wp-loose"}>
+          {block.kind !== "task" ? null : (
+            <p className="y10-wp-task-head" data-testid={`work-task-${block.task.number}`}>
+              <b className="y10-wp-task-number">任务 {block.task.number}</b>
+              <span className="y10-wp-task-content">{block.task.content}</span>
+              <Tag tone={taskTone(block.task.status)}>{block.task.status}</Tag>
+            </p>
+          )}
+          <WorkLineList
+            app={props.app}
+            projectId={props.projectId}
+            workItemId={props.workItemId}
+            runId={props.runId}
+            department={props.department}
+            groups={block.groups}
+          />
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -200,7 +247,7 @@ function WorkLineList(props: {
     />
   );
   if (props.groups.length === 0) {
-    return <Empty text="这次工作没有留下步骤" />;
+    return null;
   }
   return (
     <ol className="y10-wp-lines">
