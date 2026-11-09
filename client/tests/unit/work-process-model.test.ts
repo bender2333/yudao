@@ -4,12 +4,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  NO_ACTIVATION_TEXT,
   activationsOf,
   activationOf,
   askIdOfRowKey,
   attemptLinks,
   foldedLineText,
+  noActivationText,
   rawFields,
   targetText,
   workGroups,
@@ -401,11 +401,28 @@ test("询问分支的激活按会话编号找：它的第几轮可能是空的",
     .map((item) => item.activation_id), ["act-main"]);
 });
 
+test("按第几轮找时不把「回答一次询问」当成产生这一版的那一轮", () => {
+  // R3：成果那一行看产生这一版的那一轮（询问分支的会话编号就是 run.asks 的询问编号）
+  const activations = [
+    activation({ activation_id: "act-main", session_id: "sess-engineering", cycle: 2 }),
+    activation({ activation_id: "act-branch", session_id: "ask-1", cycle: 2 }),
+  ];
+  const target = { kind: "cycle" as const, department: "engineering", cycle: 2 };
+  assert.deepEqual(activationsOf(activations, target, ["ask-1"]).map((item) => item.activation_id), ["act-main"]);
+  assert.equal(activationOf(activations, target, ["ask-1"])?.activation_id, "act-main");
+  // 不把询问编号传进来时两次都列出来：页面从图上的询问取这一串
+  assert.deepEqual(activationsOf(activations, target).map((item) => item.activation_id), ["act-main", "act-branch"]);
+});
+
 test("找不到对应激活时为空：页面照实说没有读到，不拿最近一次顶替", () => {
   // R3：事实照实说
   const activations = [activation({ activation_id: "act-1", cycle: 4 })];
   assert.equal(activationOf(activations, { kind: "cycle", department: "engineering", cycle: 3 }), null);
-  assert.equal(NO_ACTIVATION_TEXT, "没有找到这一轮的工作过程");
+  assert.equal(noActivationText({ kind: "cycle", department: "engineering", cycle: 3 }), "没有找到这一轮的工作过程");
+  assert.equal(
+    noActivationText({ kind: "session", department: "engineering", sessionId: "ask-9" }),
+    "没有找到这次回答的工作过程",
+  );
 });
 
 test("入口旁边写的是哪一轮或哪一次回答", () => {

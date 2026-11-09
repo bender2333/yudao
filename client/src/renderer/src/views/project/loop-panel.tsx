@@ -4,23 +4,69 @@
 //   - 点箭头：那一版与差异（改了的文件、那一版的一句话），同一种成果能逐版看；
 //   - 点时序图上的一行：成果走同一条箭头（那一版与差异），问答与你的话是全文，
 //     询问里又问的写明是回答哪一次时问的，工程回答质检的分事实与解释。
-// 面板只有一种，只显示模型给出的事实与本页读到的成果材料，不另存一份；这一版不放「看工作过程」。
+// 面板只有一种，只显示模型给出的事实与本页读到的成果材料，不另存一份。
+//
+// 「看工作过程」（工单 #1658）在原文面板里就地展开：成果那一行与询问、回答那一行有入口，
+// 决定、指导、你的输入那一行没有，还没有对应激活的询问也没有。看哪一次工作由 work-process-model
+// 给出（成果按第几轮，询问与回答按询问编号对激活的会话编号）。
 
+import type { ClientApp } from "../../contract/client-app";
 import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
 import { askStateText, nameOf, versionsOf } from "./loop-graph-model";
 import { arrowText, type LoopPanelPick } from "./loop-graph";
 import { formatTime } from "./labels";
 import type { SequenceDetail, SequenceRow } from "./sequence-model";
+import { WorkProcess } from "./work-process.tsx";
+import { workTargetOfArrow, workTargetOfRow, type WorkTarget } from "./work-process-model.ts";
 
 /** 面板打开的是哪一个：一个节点、一条箭头，或时序图上的一行（原文）。 */
 export type LoopPanelTarget = Exclude<LoopPanelPick, null> | { kind: "row"; row: SequenceRow } | null;
+
+/** 看工作过程要的几样：从哪个页面读、进请求详情时带哪一项范围，以及这个事项的询问编号。 */
+interface WorkSource {
+  app: ClientApp;
+  projectId: string;
+  workItemId: string;
+  runId: string;
+  /** 图上的询问编号：询问分支的激活带着它，按第几轮找激活时排掉（接口设计说明 4.4 第 4 条） */
+  branchSessions: readonly string[];
+}
+
+/** 这一行对应的工作：哪一次激活（或哪一次回答），以及它属于哪个职能的显示名。 */
+interface WorkPick {
+  target: WorkTarget;
+  departmentLabel: string;
+}
+
+/**
+ * 原文面板里的「看工作过程」：有对应的那一次工作时才有这条入口，点开就地展开。
+ *
+ * 换了面板上的那样东西（别的箭头、别的行）就收起：入口用那一样东西的身份做键。
+ */
+function WorkEntry(props: WorkSource & { work: WorkPick | null; sourceKey: string }) {
+  if (props.work === null) {
+    return null;
+  }
+  return (
+    <WorkProcess
+      key={props.sourceKey}
+      app={props.app}
+      projectId={props.projectId}
+      workItemId={props.workItemId}
+      runId={props.runId}
+      target={props.work.target}
+      departmentLabel={props.work.departmentLabel}
+      branchSessions={props.branchSessions}
+    />
+  );
+}
 
 /** 一版的方向写成人能读的一句：来源 → 职能、职能 → 职能、职能 → 结束。 */
 function endsText(graph: LoopGraph, arrow: LoopArrow): string {
   return `${nameOf(graph, arrow.from)} → ${nameOf(graph, arrow.to)}`;
 }
 
-function ArrowPanel(props: {
+function ArrowPanel(props: WorkSource & {
   graph: LoopGraph;
   arrow: LoopArrow;
   arrows: readonly LoopArrow[];
@@ -31,6 +77,8 @@ function ArrowPanel(props: {
   // 同一种成果、同两端的几版：点箭头时逐版看
   const versions = versionsOf(props.arrows, arrow);
   const at = versions.findIndex((item) => item.key === arrow.key);
+  // 产生这一版的那个职能那一轮（工单 #1658）：来源那一端（你的输入）与没有轮次时没有入口
+  const work = workTargetOfArrow(arrow);
   return (
     <section className="y10-cv-panel" aria-label="这一版" data-testid="loop-panel-arrow">
       <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>×</button>
@@ -68,6 +116,10 @@ function ArrowPanel(props: {
           </ul>
         </div>
       )}
+      <WorkEntry app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
+                 branchSessions={props.branchSessions}
+                 sourceKey={arrow.key}
+                 work={work === null ? null : { target: work, departmentLabel: nameOf(props.graph, arrow.from) }} />
     </section>
   );
 }
@@ -106,12 +158,15 @@ function NodePanel(props: { graph: LoopGraph; node: LoopNode; onClose: () => voi
 }
 
 /** 时序图上的询问与回答：问题与回答的全文；又问的写明是回答哪一次时问的。 */
-function AskPanel(props: {
+function AskPanel(props: WorkSource & {
   row: SequenceRow;
   detail: Extract<SequenceDetail, { kind: "ask" }>;
   onClose: () => void;
 }): React.JSX.Element {
   const { detail } = props;
+  // 看工作过程：被询问职能那一次回答的经过（工单 #1658）；还没回答的询问没有对应的激活
+  const work = workTargetOfRow(props.row);
+  const departmentLabel = props.row.kind === "answer" ? detail.fromLabel : detail.toLabel;
   return (
     <section className="y10-cv-panel" aria-label="询问" data-testid="loop-panel-ask">
       <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>×</button>
@@ -140,6 +195,10 @@ function AskPanel(props: {
           )}
         </>
       )}
+      <WorkEntry app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
+                 branchSessions={props.branchSessions}
+                 sourceKey={props.row.key}
+                 work={work === null ? null : { target: work, departmentLabel }} />
     </section>
   );
 }
@@ -151,6 +210,7 @@ function TextPanel(props: {
   note: string | null;
   at: string;
   onClose: () => void;
+  children?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <section className="y10-cv-panel" aria-label={props.heading} data-testid="loop-panel-text">
@@ -158,27 +218,41 @@ function TextPanel(props: {
       <h3>{props.heading}<small> {formatTime(props.at)}</small></h3>
       {props.text === "" ? null : <p className="y10-cv-full">{props.text}</p>}
       {props.note === null || props.note === "" ? null : <p className="y10-cv-note">{props.note}</p>}
+      {props.children}
     </section>
   );
 }
 
 /** 时序图上的一行：成果走箭头那块面板，问答与你的话是全文。 */
-function RowPanel(props: { row: SequenceRow; onClose: () => void }): React.JSX.Element {
+function RowPanel(props: WorkSource & { graph: LoopGraph; row: SequenceRow; onClose: () => void }): React.JSX.Element {
   const detail = props.row.detail;
   if (detail.kind === "ask") {
-    return <AskPanel row={props.row} detail={detail} onClose={props.onClose} />;
+    return (
+      <AskPanel row={props.row} detail={detail} onClose={props.onClose}
+                app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
+                branchSessions={props.branchSessions} />
+    );
   }
   if (detail.kind === "text") {
     return (
       <TextPanel heading={detail.heading} text={detail.text} note={detail.note} at={props.row.at} onClose={props.onClose} />
     );
   }
-  // 成果那一行：图上找得到对应的箭头时由调用处打开箭头面板；走到这里时仍把这版的原文写出来
-  return <TextPanel heading={props.row.title} text={detail.text} note={null} at={props.row.at} onClose={props.onClose} />;
+  // 成果那一行：图上找得到对应的箭头时由调用处打开箭头面板；走到这里时仍把这版的原文写出来，
+  // 「看工作过程」照样有入口（这一行仍是成果那一行）
+  const work = workTargetOfRow(props.row);
+  return (
+    <TextPanel heading={props.row.title} text={detail.text} note={null} at={props.row.at} onClose={props.onClose}>
+      <WorkEntry app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
+                 branchSessions={props.branchSessions}
+                 sourceKey={props.row.key}
+                 work={work === null ? null : { target: work, departmentLabel: nameOf(props.graph, work.department) }} />
+    </TextPanel>
+  );
 }
 
 /** 同一个面板：打开的是哪一样就画哪一样。没有打开的东西时整块不出现。 */
-export function LoopPanel(props: {
+export function LoopPanel(props: WorkSource & {
   graph: LoopGraph;
   arrows: readonly LoopArrow[];
   pick: LoopPanelTarget;
@@ -191,11 +265,17 @@ export function LoopPanel(props: {
   if (props.pick.kind === "arrow") {
     return (
       <ArrowPanel graph={props.graph} arrow={props.pick.arrow} arrows={props.arrows}
-                  onPickArrow={props.onPickArrow} onClose={props.onClose} />
+                  onPickArrow={props.onPickArrow} onClose={props.onClose}
+                  app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
+                  branchSessions={props.branchSessions} />
     );
   }
   if (props.pick.kind === "row") {
-    return <RowPanel row={props.pick.row} onClose={props.onClose} />;
+    return (
+      <RowPanel graph={props.graph} row={props.pick.row} onClose={props.onClose}
+                app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
+                  branchSessions={props.branchSessions} />
+    );
   }
   const id = props.pick.id;
   const node = props.graph.nodes.find((item) => item.id === id);

@@ -2,6 +2,9 @@
 // 一个激活一个格，每一步一块；块里按「模型的思考」「模型说的话」「动作与回执」的顺序排，
 // 回执单独一行、底色与前面几块不同。每一步的标题与标记、折叠时的预览来自 step-timeline.ts
 // 的纯函数；这个文件只做排版与取数（run.steps 与展开全文时的 event.detail）。
+//
+// 原文面板里的「看工作过程」（工单 #1658）的原始数据里也写这一步的推理与模型文字，用的是这里同一份：
+// StepTextItem 导出给 work-process.tsx，不另抄一遍展开全文与「读不出来」的写法。
 
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
@@ -109,7 +112,7 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
                   <section key={block.kind} className={`y10-ws-step-block is-${block.kind}`}>
                     <h3 className="y10-h3 sub">{BLOCK_TITLES[block.kind]}</h3>
                     {block.items.map((item) => (
-                      <TextItem
+                      <StepTextItem
                         key={item.event_id}
                         app={props.app}
                         kind={block.kind}
@@ -178,8 +181,9 @@ function ActivationStrip(props: {
   );
 }
 
-// 一段可读文字：思考默认折叠（预览前两行与字数），点开以后读取全文；读不出来时照实说明，不能展开
-function TextItem(props: {
+// 一段可读文字：思考默认折叠（预览前两行与字数），点开以后读取全文；读不出来时照实说明，不能展开。
+// 导出给原文面板的「看工作过程」用（工单 #1658）：两处读的事实与写法一样，不各写一份
+export function StepTextItem(props: {
   app: ClientApp;
   kind: "thinking" | "saying";
   item: StepText;

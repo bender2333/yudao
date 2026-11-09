@@ -27,9 +27,6 @@ import type {
 import { END, SOURCE, type LoopArrow } from "./loop-graph-model.ts";
 import { YOU, type SequenceRow } from "./sequence-model.ts";
 
-/** 没有找到对应激活时页面上说的一句：不拿最近一次顶替，也不留一块空白。 */
-export const NO_ACTIVATION_TEXT = "没有找到这一轮的工作过程";
-
 /** 折起来的那些动作点开以前的那把钥匙：每一组一个，展开状态按它记。 */
 const GROUP_SEPARATOR = "+";
 
@@ -101,30 +98,43 @@ export function askIdOfRowKey(key: string): string | null {
 /**
  * 与目标对得上的全部激活，按开始时间升序（`run.steps` 给出的顺序）。
  *
- * 同一轮有几次激活时都列出来，页面默认用最后一次；询问分支的激活第几轮是空的，只按会话编号找。
+ * 同一轮有几次激活时都列出来，页面默认用最后一次。按第几轮找（成果）时要排掉询问分支的激活：
+ * 询问分支的会话编号就是 `run.asks` 的询问编号（接口设计说明 4.4 第 4 条），它和主线那一轮记着
+ * 同一个第几轮，不排掉就会把「回答一次询问」当成「产生这一版的那一轮」。按会话编号找的（询问与回答）
+ * 正好相反：找的就是那一次分支。
  */
 export function activationsOf(
   activations: readonly ActivationView[],
   target: WorkTarget,
+  branchSessions: readonly string[] = [],
 ): ActivationView[] {
-  if (target.kind === "cycle") {
-    return activations.filter((activation) => activation.cycle !== null && activation.cycle !== undefined
-      && activation.cycle === target.cycle);
+  if (target.kind === "session") {
+    return activations.filter((activation) => activation.session_id === target.sessionId);
   }
-  return activations.filter((activation) => activation.session_id === target.sessionId);
+  const branches = new Set(branchSessions);
+  return activations.filter((activation) => activation.cycle !== null && activation.cycle !== undefined
+    && activation.cycle === target.cycle
+    && !(activation.session_id !== null && activation.session_id !== undefined
+      && branches.has(activation.session_id)));
 }
 
 /** 默认看的那一次激活：与目标对得上的最后一次；一次都对不上时为空。 */
 export function activationOf(
   activations: readonly ActivationView[],
   target: WorkTarget,
+  branchSessions: readonly string[] = [],
 ): ActivationView | null {
-  return activationsOf(activations, target).at(-1) ?? null;
+  return activationsOf(activations, target, branchSessions).at(-1) ?? null;
 }
 
 /** 入口旁边写的是哪一轮或哪一次回答：页面上认得出看的是哪一次工作。 */
 export function targetText(target: WorkTarget): string {
   return target.kind === "cycle" ? `第 ${target.cycle} 轮` : "这次回答";
+}
+
+/** 一次都没对上的时候说的一句：不拿最近一次顶替，也不留一块空白。 */
+export function noActivationText(target: WorkTarget): string {
+  return target.kind === "cycle" ? "没有找到这一轮的工作过程" : "没有找到这次回答的工作过程";
 }
 
 // ---------------------------------------------------------------------------
