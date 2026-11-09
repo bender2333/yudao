@@ -1,4 +1,4 @@
-// 时序图（工单 #1641，项目的组织设计说明 4.14「项目页是循环图加对话」的「时序图（经过）」一节、
+// 时序图（工单 #1641、#1643，项目的组织设计说明 4.14「项目页是循环图加对话」的「时序图（经过）」一节、
 // 4.15「循环图跟着组织长」的时序图一行）：把 sequence-model 推出的事实画成一行一条消息的经过。
 //
 // 左边一列时间，右边是「你 + 这个事项冻结的组织里的职能」几列：一行一条消息，从发的那一列画到收的那一列，
@@ -7,8 +7,10 @@
 // 提问方等着的时段在它那一列上画一段色条，等你决定也一样；还没等到的画到「现在」。
 // 按轮折起来，只展开最新一轮，折起来的一行写这一轮的摘要。
 // 窗口窄到 800px 以下时换成按时间排的列表，每行写谁到谁与那句标题（样式里换，见 v10-project.css）。
+// 点一行打开和点箭头、点节点同一个面板（那一版与差异，或者问题、回答与你的话的全文）。
+// 只看这两个职能时（线程折叠行里的「在时序图里看」）上面一行写「只看 A 与 B · 看全部」。
 //
-// 这一层只画，不做判断：列、行、轮、摘要与色条全部由模型给出，单元测试在 sequence-model.test.ts。
+// 这一层只画，不做判断：列、行、轮、摘要、色条与点开看什么全部由模型给出，单元测试在 sequence-model.test.ts。
 
 import { Fragment } from "react";
 import { formatTime } from "./labels";
@@ -45,8 +47,13 @@ function Lane(props: { view: SequenceView; bars: SequenceRow["bars"] }): React.J
   );
 }
 
-/** 一行：从谁那一列到谁那一列，虚线还是实线，那句话说在线的哪一头。 */
-function Row(props: { view: SequenceView; row: SequenceRow }): React.JSX.Element {
+/** 一行：从谁那一列到谁那一列，虚线还是实线，那句话说在线的哪一头；整行是按钮，点开看原文。 */
+function Row(props: {
+  view: SequenceView;
+  row: SequenceRow;
+  on: boolean;
+  onPick: (row: SequenceRow) => void;
+}): React.JSX.Element {
   const { view, row } = props;
   const from = centerOf(view, row.from);
   const targets = row.to
@@ -66,7 +73,13 @@ function Row(props: { view: SequenceView; row: SequenceRow }): React.JSX.Element
     ? { left: `${lo}%`, right: 0, paddingLeft: indent }
     : { left: 0, right: `${100 - hi}%`, textAlign: "right" as const, paddingRight: indent };
   return (
-    <div className="y10-sq-row" data-testid={`sequence-row-${row.key}`}>
+    <button
+      type="button"
+      className={`y10-sq-row${props.on ? " is-on" : ""}`}
+      data-testid={`sequence-row-${row.key}`}
+      title="看原文"
+      onClick={() => props.onPick(row)}
+    >
       <span className="y10-sq-time">{clockText(row.at)}</span>
       <span className="y10-sq-track">
         <Lane view={view} bars={row.bars} />
@@ -90,7 +103,7 @@ function Row(props: { view: SequenceView; row: SequenceRow }): React.JSX.Element
           </span>
         </span>
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -116,10 +129,19 @@ function whoNote(row: SequenceRow): string {
 
 export function SequenceView(props: {
   view: SequenceView;
+  /** 面板打开的那一行（成果那一行在图上打开的是箭头）；用来把选中的那一行标出来 */
+  pickedKey: string | null;
+  /** 点一行：打开和点箭头、点节点同一个面板 */
+  onPickRow: (row: SequenceRow) => void;
+  /** 只看这两个职能时点「看全部」回到整件事 */
+  onShowAll: () => void;
   onClose: () => void;
   onToggleRound: (round: number) => void;
 }): React.JSX.Element {
   const { view } = props;
+  const picked = props.pickedKey;
+  const on = (row: SequenceRow): boolean => picked !== null
+    && (row.key === picked || (row.detail.kind === "outcome" && row.detail.flowIds.includes(picked)));
   const roundHead = (round: number, open: boolean, summary: string): React.ReactNode => (
     <button
       type="button"
@@ -137,16 +159,26 @@ export function SequenceView(props: {
     <section className="y10-sq" aria-label="时序图" data-testid="sequence">
       <div className="y10-sq-head">
         <b>经过</b>
-        <span className="y10-sq-scope">整件事</span>
+        <span className="y10-sq-scope">
+          {view.scoped ? (
+            <>
+              只看 {view.columns.map((column) => column.label).join(" 与 ")} ·{" "}
+              <button type="button" className="y10-link" onClick={props.onShowAll}>看全部</button>
+            </>
+          ) : "整件事"}
+        </span>
         <span className="y10-sq-legend">
           <i className="y10-sq-key is-dash" aria-hidden="true" />询问与回答
           <i className="y10-sq-key is-ask" aria-hidden="true" />在等回答
-          <i className="y10-sq-key is-user" aria-hidden="true" />等你决定
+          {/* 只看这两个职能时不会有等你决定那一行（它总是落在「你」那一列）：图例里也不写 */}
+          {view.scoped ? null : <><i className="y10-sq-key is-user" aria-hidden="true" />等你决定</>}
         </span>
         <button type="button" className="y10-sq-close" aria-label="收起时序图" onClick={props.onClose}>×</button>
       </div>
       {view.empty ? (
-        <p className="y10-note">这件事项还没有往来，图上没有可画的一行。</p>
+        <p className="y10-note">
+          {view.scoped ? "这两个职能之间还没有往来。" : "这件事项还没有往来，图上没有可画的一行。"}
+        </p>
       ) : (
         <>
           <div className="y10-sq-wide">
@@ -162,7 +194,9 @@ export function SequenceView(props: {
               <Fragment key={round.round}>
                 {roundHead(round.round, round.open, round.summary)}
                 {round.open
-                  ? round.rows.map((row) => <Row key={row.key} view={view} row={row} />)
+                  ? round.rows.map((row) => (
+                    <Row key={row.key} view={view} row={row} on={on(row)} onPick={props.onPickRow} />
+                  ))
                   : null}
                 {/* 还没等到的色条画到这里：紧跟最新一轮的最后一行（这一轮折起来时不画，免得底下留下一段没有来处的色条） */}
                 {round.open && round.round === view.latestRound && view.now !== null
@@ -178,13 +212,19 @@ export function SequenceView(props: {
                 {round.open ? (
                   <ol>
                     {round.rows.map((row) => (
-                      <li key={row.key} className={`y10-sq-item${row.dashed ? " is-dash" : ""}`}>
-                        <small>{formatTime(row.at)} · {row.who}{whoNote(row)}</small>
-                        <span>
-                          {row.depth === 0 ? "" : "↳ "}
-                          {row.title}
-                          {row.verdict === null ? null : ` · ${row.verdict.text}`}
-                        </span>
+                      <li key={row.key}>
+                        <button
+                          type="button"
+                          className={`y10-sq-item${row.dashed ? " is-dash" : ""}${on(row) ? " is-on" : ""}`}
+                          onClick={() => props.onPickRow(row)}
+                        >
+                          <small>{formatTime(row.at)} · {row.who}{whoNote(row)}</small>
+                          <span>
+                            {row.depth === 0 ? "" : "↳ "}
+                            {row.title}
+                            {row.verdict === null ? null : ` · ${row.verdict.text}`}
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ol>
