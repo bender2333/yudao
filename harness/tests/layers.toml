@@ -246,6 +246,7 @@
 "test_startup_run_version.py" = "integration"
 "test_stream_deltas.py" = "module"
 "test_system_stop.py" = "integration"
+"test_task_groups.py" = "unit"
 "test_terminal_checks.py" = "module"
 "test_test_imports.py" = "unit"
 "test_text_only_reply.py" = "integration"
