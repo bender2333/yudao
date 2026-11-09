@@ -1,29 +1,37 @@
-// 对话页（工单 #1638，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
+// 对话页（工单 #1638、#1639，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
 //
 // 页面上半是循环图：按所选事项冻结的组织画节点、成果箭头与结论。图上方的行选事项（默认最近在跑的），
 // 点节点、点箭头打开同一个面板。最上面是时间条（工单 #1653）：所选事项的已用时间与上限，在跑时另有「停止」。
-// 线程与循环图下面的时序图留出位置，由后面的工单接上。
+// 下面是线程与输入框（工单 #1639）：一条线程跨多个事项，已结束的事项默认收起；输入框上方一行收件人。
 //
-// 读的事实：project.loop（冻结的组织、职能状态、轮次）、project.overview（事项标题）、
-// project.flow（箭头）、work_item.materials（版本与改了的文件）；页面不另存一份，也不按形态名判断。
-// 一切「事实推出图」的判断在 loop-graph-model.ts 里，那里有单元测试。
+// 读的事实：project.loop（冻结的组织、职能状态、轮次与 run）、project.overview（事项标题）、
+// project.flow（箭头，以及线程里你的输入、指导、交完成与放行）、run.asks（每个事项的问答，线程里各读一次）、
+// decisions.list（要你决定的气泡）、work_item.materials（版本与改了的文件）、system.status（模型可不可用）。
+// 页面不另存一份，也不按形态名判断。一切「事实推出图与线程」的判断在 loop-graph-model.ts 与 thread-model.ts 里，
+// 两处都有单元测试。
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
-  ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
-  WorkItemMaterialsResult,
+  DecisionList, ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
+  SystemStatus, WorkItemMaterialsResult,
 } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
+import { providerNotice } from "../../shell/provider-status";
 import type { Route } from "../../shell/routing";
 import { paths } from "../../shell/routing";
 import { Empty, Loading } from "./common";
+import { Composer } from "./composer";
 import { workItemStatusText } from "./labels";
 import type { DepartmentView } from "./organization";
 import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } from "./loop-graph-model";
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
 import { LoopPanel } from "./loop-panel";
 import { ProjectTimeBar } from "./project-head";
+import { ThreadView } from "./thread";
+import {
+  receiverOf, runningItem, workingRoleOf, type ComposerInput, type ThreadDecision,
+} from "./thread-model";
 import { useSnapshot } from "./use-snapshot";
 
 /** 面板打开的那一个，连同它在哪件事项上打开：换了事项就收起，不在新图上留着旧的一版。 */
@@ -41,7 +49,7 @@ export function ConversationPage(props: {
   const loop = useSnapshot<ProjectLoopResult>(props.app, "page.conversation.loop", "project.loop", {
     project_id: projectId,
   });
-  // 事项标题（图上方选事项那一行用）
+  // 事项标题（图上方选事项那一行与线程里的事项细线用）
   const overview = useSnapshot<ProjectOverviewResult>(props.app, "page.conversation.overview", "project.overview", {
     project_id: projectId,
   });
@@ -56,15 +64,25 @@ export function ConversationPage(props: {
   // 图上画哪件事项：地址里写了就画它，没有时画最近在跑的那一件
   const item = useMemo(() => pickItem(items, props.route.workItemId), [items, props.route.workItemId]);
   const itemId = item?.work_item_id ?? "";
-  // 箭头读 project.flow，版本与改了的文件读 work_item.materials；两处都按所选事项过滤
+  // 流转记录读整个项目（线程跨多个事项），画图时再按所选事项过滤
   const flow = useSnapshot<ProjectFlowResult>(props.app, "page.conversation.flow", "project.flow", {
     project_id: projectId,
-    work_item: itemId,
-  }, item === null);
+  });
+  const records = useMemo(() => flow.data?.records ?? [], [flow.data]);
+  const itemFlow = useMemo(() => records.filter((record) => record.work_item_id === itemId), [records, itemId]);
+  // 版本与改了的文件按所选事项读（面板里逐版看用）
   const materials = useSnapshot<WorkItemMaterialsResult>(props.app, "page.conversation.materials", "work_item.materials", {
     project_id: projectId,
     work_item: itemId,
   }, item === null);
+  // 要你决定的气泡（项目这一层；线程里按事项与项目层面分开摆）
+  const decisions = useSnapshot<DecisionList>(props.app, "page.conversation.decisions", "decisions.list", {
+    project_id: projectId,
+  });
+  const decisionList = useMemo<ThreadDecision[]>(() => decisions.data?.decisions ?? [], [decisions.data]);
+  // 模型可不可用：没有可用的模型时对话里一句话提示并链到模型管理，写明不能开始
+  const status = useSnapshot<SystemStatus>(props.app, "page.conversation.status", "system.status", {});
+  const provider = providerNotice(status.data?.provider ?? null);
   const labels = useMemo(() => {
     const merged: Record<string, string> = {};
     for (const department of props.departments) {
@@ -78,16 +96,20 @@ export function ConversationPage(props: {
     sources: props.organization?.organization?.sources ?? null,
   }), [props.organization]);
   const currentRoles = useMemo(() => props.departments.map((department) => department.id), [props.departments]);
+  const departmentChoices = useMemo(
+    () => props.departments.map((department) => ({ id: department.id, label: department.label })),
+    [props.departments],
+  );
   const others = useMemo(() => otherCounts(items, itemId === "" ? null : itemId), [items, itemId]);
   const graph = useMemo(() => graphOf({
     item,
-    flow: flow.data?.records ?? [],
+    flow: itemFlow,
     materials: materials.data,
     labels,
     current,
     currentRoles,
     others,
-  }), [item, flow.data, materials.data, labels, current, currentRoles, others]);
+  }), [item, itemFlow, materials.data, labels, current, currentRoles, others]);
   // 同一个面板里逐版看：按出现顺序排的箭头
   const arrows = useMemo<LoopArrow[]>(() => [
     ...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows),
@@ -96,6 +118,58 @@ export function ConversationPage(props: {
   const pick: LoopPanelPick = panel.item === itemId ? panel.value : null;
   const open = (value: LoopPanelPick): void => setPanel({ item: itemId, value });
 
+  // 线程：展开过的结束事项、点过的节点（收件人跟着切到给它的指导）、发送以后滚到最新一条
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  const [focus, setFocus] = useState<string | null>(null);
+  const [scrollSignal, setScrollSignal] = useState(0);
+  // 「看这一版」点的是别的事项：切过去以后在它的图上打开那条箭头（数据到了才打开）
+  const [pendingLook, setPendingLook] = useState<{ item: string; flowId: string } | null>(null);
+  useEffect(() => {
+    if (pendingLook === null || pendingLook.item !== itemId) {
+      return;
+    }
+    const arrow = arrows.find((candidate) => candidate.key === pendingLook.flowId);
+    if (arrow === undefined) {
+      return;
+    }
+    setPanel({ item: itemId, value: { kind: "arrow", arrow } });
+    setPendingLook(null);
+  }, [pendingLook, itemId, arrows]);
+
+  const look = (workItem: string, flowId: string): void => {
+    if (workItem !== itemId) {
+      setPendingLook({ item: workItem, flowId });
+      props.onNavigate(paths.conversation(projectId, { workItem }));
+      return;
+    }
+    const arrow = arrows.find((candidate) => candidate.key === flowId);
+    if (arrow !== undefined) {
+      open({ kind: "arrow", arrow });
+    }
+  };
+
+  // 收件人一行读正在做的那件事项冻结的组织（换过形态以后仍按它）；没有在跑事项时用项目现在的组织。
+  // 图上选中的那件还在跑时就用它自己的那一份（选中事项冻结的组织），否则用最近在跑的一件。
+  const running = useMemo(() => runningItem(items), [items]);
+  const composerItem = item !== null && (item.status === "in_progress" || item.status === "awaiting_initial_prd")
+    ? item : running;
+  const composerFlow = useMemo(
+    () => records.filter((record) => record.work_item_id === composerItem?.work_item_id),
+    [records, composerItem],
+  );
+  const composerInput = useMemo<ComposerInput>(() => {
+    const organization = composerItem?.organization ?? null;
+    const roles = organization === null ? departmentChoices : organization.roles;
+    const routing = organization?.routing ?? props.organization?.organization?.routing ?? "direct";
+    const receiver = organization === null
+      ? props.organization?.organization?.sources?.user_input ?? departmentChoices[0]?.id ?? ""
+      : receiverOf(organization, composerFlow, current);
+    return {
+      frozen: organization, roles, routing, receiver, working: workingRoleOf(composerItem),
+      focus, active: composerItem !== null, labels,
+    };
+  }, [composerItem, composerFlow, departmentChoices, props.organization, current, focus, labels]);
+
   return (
     <div className="y10-cv-page y10-pp" data-testid="conversation-page">
       <Loading state={loop} />
@@ -103,43 +177,77 @@ export function ConversationPage(props: {
       {/* 时间条在对话上方，每种组织都有（项目的组织设计说明 4.15）：选中事项的已用时间与上限，
           在跑时旁边一个「停止」。没有事项时没有这一条 */}
       <ProjectTimeBar app={props.app} items={loop.data?.work_items ?? []} selected={itemId} />
-      {loop.data === null ? null : items.length === 0 ? (
-        <Empty text="这个项目还没有事项。提出问题以后，循环图按那件事项冻结的组织长出来。" />
-      ) : (
+      {loop.data === null ? null : (
         <>
-          <ItemPicker
-            items={items}
-            titles={titles}
-            selected={itemId}
-            onPick={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
-          />
-          {item === null ? null : item.organization == null ? (
-            <Empty text="这件事项冻结的组织不在这一版发布里，图上没有可画的节点。" />
+          {items.length === 0 ? (
+            <Empty text="这个项目还没有事项。在下面写一句，就开始做。" />
           ) : (
             <>
-              <LoopGraphView
-                graph={graph}
-                pick={pick}
-                onPickNode={(id) => open({ kind: "node", id })}
-                onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
+              <ItemPicker
+                items={items}
+                titles={titles}
+                selected={itemId}
+                onPick={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
               />
-              <LoopPanel
-                graph={graph}
-                arrows={arrows}
-                pick={pick}
-                onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
-                onClose={() => open(null)}
-              />
+              {item === null ? null : item.organization == null ? (
+                <Empty text="这件事项冻结的组织不在这一版发布里，图上没有可画的节点。" />
+              ) : (
+                <>
+                  <LoopGraphView
+                    graph={graph}
+                    pick={pick}
+                    onPickNode={(id) => {
+                      // 点节点：看这个职能，收件人跟着切到给它的指导（项目的组织设计说明 4.14）
+                      setFocus(id);
+                      open({ kind: "node", id });
+                    }}
+                    onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
+                  />
+                  <LoopPanel
+                    graph={graph}
+                    arrows={arrows}
+                    pick={pick}
+                    onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
+                    onClose={() => open(null)}
+                  />
+                </>
+              )}
+              {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}
+              {materials.error === null ? null : <Empty text={readFailureText(materials.error)} />}
             </>
           )}
-          {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}
-          {materials.error === null ? null : <Empty text={readFailureText(materials.error)} />}
-          {/* 线程的位置：这一页只留出位置，线程与时序图由后面的工单接上（窄屏时也不被图挤掉） */}
-          <section className="y10-cv-thread" aria-label="对话线程">
-            <p className="y10-note">
-              线程留在这里：你的输入、要你决定的话、交完成与放行，以及职能之间的往来折成的行，由后面的工单接上。
+          {provider === null ? null : (
+            <p className="y10-cv-model" role="status">
+              {provider.label}{provider.detail === "" ? "" : `：${provider.detail}`}。现在不能开始新事项。
+              <button type="button" className="y10-link" onClick={() => props.onNavigate(paths.sys("models"))}>
+                去模型管理
+              </button>
             </p>
-          </section>
+          )}
+          <ThreadView
+            app={props.app}
+            items={items}
+            titles={titles}
+            flow={records}
+            decisions={decisionList}
+            labels={labels}
+            selected={itemId}
+            opened={opened}
+            onToggleItem={(workItem) => setOpened((previous) => ({ ...previous, [workItem]: !previous[workItem] }))}
+            onSelectItem={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
+            onLook={look}
+            onNavigate={props.onNavigate}
+            scrollSignal={scrollSignal}
+          />
+          <Composer
+            app={props.app}
+            projectId={projectId}
+            input={composerInput}
+            activeItemId={composerItem?.work_item_id ?? null}
+            activeTitle={composerItem === null ? "" : titles[composerItem.work_item_id] ?? "这件事项"}
+            dataKey={`${items.length}:${records.length}`}
+            onSent={() => setScrollSignal((value) => value + 1)}
+          />
         </>
       )}
     </div>
