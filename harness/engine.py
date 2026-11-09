@@ -1,6 +1,6 @@
 # 步骤驱动：一次激活内的步骤循环，以异步方式执行。每一步先在安全节点得到继续或停止，经上下文装配（P）取得请求，
 # 经 Provider 的异步接口调用模型，失败时按重试参数安排重试并在安全节点等待；回答中的工具调用逐个取得工具许可（U）
-# 以后执行：主机工具（提交）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
+# 以后执行：主机工具（提交与记录）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
 # 提交提案时结束。所有记录经过记录接口；需要核对运行状态的记录在写入口的一个事务中读取运行状态、判断并写入，
 # 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：这一轮写下的事件范围与停止原因）；
@@ -60,6 +60,13 @@ from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_c
 from .validation import AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
+# 更新计划是记录类的主机工具（工作过程的任务与动作标题设计说明「任务」「接口」，工单 #1660）：
+# 角色把一件事分几部分时自己写下来，页面据此显示任务。每次整份替换，每条一句话加状态；
+# 不交给执行环境，也不写新的事件种类——结果就是这一次工具调用的记录。
+# 计划不拦任何工作：格式错误（空条目、未知状态）作为工具结果返回，其余情况都接受，
+# 不检查条目数量，也不拒绝多条进行中。
+PLAN_TOOL = "update_plan"
+PLAN_STATUSES = ("pending", "in_progress", "completed")
 # 试用用例的两个主机工具（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）：质检用 trial_case_begin
 # 打开一个用例、按计划在浏览器里操作，用 trial_case_end 给出结论。用例打开到结束之间本部门在同一会话中的
 # 浏览器与屏幕动作由运行状态投影记为它的步骤（按动作身份）；会话结束或中断时打开的用例结束为中断。
@@ -706,6 +713,9 @@ class StepDriver:
                         outcome = self._trial_case_call(name, args)
                         ok, output, error = outcome.ok, outcome.output, outcome.error
                         trial_case_draft = self._trial_case_draft(outcome)
+                    elif name == PLAN_TOOL:
+                        # 记录类主机工具（工单 #1660）：不交给执行环境，格式错误作为工具结果返回
+                        ok, output, error = plan_result(args)
                     elif tool_kind(name, definitions=self._definitions) == "host":
                         ok, output, error = True, _run_host_tool(name, args, self._definitions), None
                     else:
@@ -875,6 +885,9 @@ class StepDriver:
                 outcome = self._trial_case_call(name, args)
                 ok, output, error = outcome.ok, outcome.output, outcome.error
                 trial_case_draft = self._trial_case_draft(outcome)
+            elif name == PLAN_TOOL:
+                # 恢复后重新执行与正常路径同一个分支：记录类主机工具不交给执行环境（工单 #1660）
+                ok, output, error = plan_result(args)
             elif tool_kind(name, definitions=self._definitions) == "host":
                 ok, output, error = True, _run_host_tool(name, args, self._definitions), None
             else:
@@ -1341,11 +1354,36 @@ def tool_result_item(identity: str, ok: bool, output: Any, error: str | None, *,
 
 def _run_host_tool(name: str, args: dict[str, Any],
                    definitions: Definitions | None = None) -> dict[str, Any]:
-    # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据
+    # 主机工具由控制核心执行。走到这里的现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据。
+    # 更新计划另走一支（plan_result）：它是记录，不提交提案
     payload = dict(args)
     payload["kind"] = proposal_kind(name, definitions=definitions)
     payload.pop("exit_code", None)
     return payload
+
+
+def plan_result(args: dict[str, Any]) -> tuple[bool, dict[str, Any] | None, str | None]:
+    """一次更新计划调用的工具结果（工作过程的任务与动作标题设计说明「任务」，工单 #1660）。
+
+    每次整份替换：plan 是一串条目，每条一句话（content）加状态（status，取待做、进行中、完成）。
+    只有空条目与未知状态算格式错误，作为工具结果交回模型；其余情况都接受——条目数量不检查，
+    多条进行中不拒绝。计划不是提案，也不拦任何工作。
+    """
+    entries = args.get("plan")
+    if not isinstance(entries, list):
+        return False, None, "plan must be a list of entries, each with content and status"
+    checked: list[dict[str, Any]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            return False, None, f"plan[{index}] must be an object with content and status"
+        content = entry.get("content")
+        if not isinstance(content, str) or not content.strip():
+            return False, None, f"plan[{index}].content must be a non-empty sentence"
+        status = entry.get("status")
+        if status not in PLAN_STATUSES:
+            return False, None, (f"plan[{index}].status must be one of pending, in_progress, completed")
+        checked.append({"content": content, "status": status})
+    return True, {"plan": checked}, None
 
 
 @dataclass(frozen=True)

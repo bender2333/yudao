@@ -182,8 +182,9 @@ class WatchedOutputsTightening:
             chain_allowed, _ = ask_chain_decision(projection.ask_position(request.session_id), ask_chain_max_depth())
             nested = ["ask"] if chain_allowed else []
             if "product_spec" in proposal_kinds_for(department, projection.kind, definitions):
-                # 能交要求的部门在分支里只能回答（修订要求随回答交上，不走提交类工具）
-                return ["answer"] + nested
+                # 能交要求的部门在分支里只能回答（修订要求随回答交上，不走提交类工具）。
+                # 更新计划是记录类主机工具（工单 #1660）：不是提案、也不写工作区，分支里照样能写下来
+                return ["answer", "update_plan"] + nested
             allowed = [name for name in available
                        if name != "ask" and not _is_write(name, definitions)
                        and proposal_kind(name, definitions=definitions) is None]
@@ -238,6 +239,9 @@ class WatchedOutputsTightening:
                 return None
             allowed, reason = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
             return None if allowed else Tightened(reason=reason)
+        if name == "update_plan":
+            # 更新计划是记录类主机工具（工单 #1660）：不提交提案、不写工作区，分支里照样能写下来
+            return None
         if "product_spec" in proposal_kinds_for(department, projection.kind, definitions):
             return Tightened(reason=_branch_answer_only(department))
         if _is_write(name, definitions):

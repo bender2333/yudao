@@ -14,7 +14,8 @@
       "run_check",
       "submit_product_spec",
       "submit_product_decision",
-      "ask"
+      "ask",
+      "update_plan"
     ],
     "visibility": [
       "qa_defects",
@@ -70,7 +71,8 @@
       "browser_generate_locator",
       "browser_take_screenshot",
       "ask",
-      "submit_delivery"
+      "submit_delivery",
+      "update_plan"
     ],
     "visibility": [
       "current_delivery_spec",
@@ -131,7 +133,8 @@
       "browser_take_screenshot",
       "ask",
       "submit_review",
-      "submit_independent_judgement"
+      "submit_independent_judgement",
+      "update_plan"
     ],
     "visibility": [
       "delivery_facts",
