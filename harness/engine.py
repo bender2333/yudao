@@ -54,6 +54,7 @@ from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
 from .recording import StepRecorder
+from .redact import call_arguments
 from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_cancellable, tool_kind,
                     tool_verification, writes_check_materials)
 from .validation import AdjudicationView, Tightening, evaluate_proposal
@@ -709,12 +710,14 @@ class StepDriver:
                         ok, output, error = True, _run_host_tool(name, args, self._definitions), None
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要；
-                        # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行
+                        # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行。
+                        # 动作的输入去掉只被记录的那一项（运行命令的一句话，工单 #1659）：它留在工具调用记录里，
+                        # 不交给执行环境
                         try:
                             receipt = await self._perform(Action(
                                 action_id=f"{request.activation_id}:{step_id}:{identity}",
                                 kind=tool_action(name, definitions=self._definitions),
-                                tool=name, department=request.department, input=args,
+                                tool=name, department=request.department, input=call_arguments(args),
                                 verification=tool_verification(name, definitions=self._definitions),
                                 cancellable=tool_cancellable(name, definitions=self._definitions),
                                 preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
@@ -875,10 +878,11 @@ class StepDriver:
             elif tool_kind(name, definitions=self._definitions) == "host":
                 ok, output, error = True, _run_host_tool(name, args, self._definitions), None
             else:
+                # 恢复后重新执行：与正常路径同一份动作输入——去掉只被记录的那一项（工单 #1659）
                 receipt = await self._perform(Action(
                     action_id=f"{request.activation_id}:recovered:{identity}",
                     kind=tool_action(name, definitions=self._definitions),
-                    tool=name, department=request.department, input=args,
+                    tool=name, department=request.department, input=call_arguments(args),
                     verification=tool_verification(name, definitions=self._definitions),
                     cancellable=tool_cancellable(name, definitions=self._definitions),
                     preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
