@@ -3158,6 +3158,10 @@ export type FlowRecord = {
      */
     direction_to: string | null;
     /**
+     * Round
+     */
+    round: number;
+    /**
      * Run Id
      */
     run_id: string | null;

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -14,7 +15,7 @@ from typing import Any, Literal
 from ..artifacts import ArtifactStore
 from ..definitions import DEFINITIONS
 from ..event_store import EventStore
-from ..models import Event, EventType, ProjectEvent, json_dumps
+from ..models import Event, EventType, ProjectEvent, ProjectEventType, json_dumps
 from ..observability import AttemptFold, search_text
 from ..projects import REWORK_VERDICTS
 
@@ -29,16 +30,21 @@ ATTEMPT_TYPES = frozenset({
     EventType.MODEL_REQUEST_SERIALIZED, EventType.MODEL_MESSAGE, EventType.MODEL_ATTEMPT_FINISHED,
     EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_RETRY_SCHEDULED, EventType.MODEL_STREAM_PROGRESS,
 })
-# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回、PRD 被接纳
+# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回、PRD 被接纳，
+# 以及你的输入（收到用户输入）与指导（发给某个职能）。主线激活只用来推第几轮，自己不产生记录（工单 #1636）
 FLOW_TYPES = frozenset({
     EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
-    EventType.SPEC_ACCEPTED,
+    EventType.SPEC_ACCEPTED, EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+    EventType.DEPARTMENT_ACTIVATED,
 })
+# 项目流里进流转记录的事件种类：事项的创建就是你给它的第一句输入（工单 #1636）
+PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
 # 读取模型的推导版本：改了调用尝试表或流转记录的推导方式就把它加一。
 # 服务打开读取模型时，保存的版本与这个不同（含旧文件里没有这一行）就从事件重放重建一次——
 # 读模型是增量投影，修了算法不会让旧行跟着变（工单 #684）。
 # 第 2 版：流转记录开始吸收 PRD 被接纳（工单 #882）。
-DERIVATION_VERSION = 2
+# 第 3 版：流转记录带第几轮，并增加你的输入、指导与放行（工单 #1636）。
+DERIVATION_VERSION = 3
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
 
@@ -102,10 +108,15 @@ CREATE TABLE IF NOT EXISTS app_flows (
     direction_to TEXT,
     status TEXT NOT NULL,
     content TEXT NOT NULL,
+    round INTEGER NOT NULL DEFAULT 0,
     event_id TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_app_flows_scope ON app_flows(project_id, work_item_id, position);
+CREATE TABLE IF NOT EXISTS app_flow_state (
+    run_id TEXT PRIMARY KEY,
+    state TEXT NOT NULL
+);
 """
 
 _ASK_STATUS = {
@@ -127,11 +138,18 @@ class ReadModels:
         if self.path is not None:
             self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.executescript(SCHEMA)
+        self._add_missing_columns()
         self._dirty = True
         self._unsubscribe = store.subscribe(lambda _events: self._mark_dirty())
         if self.path is not None:
             # 可写打开时按推导版本决定要不要重建：改了推导方式以后旧行不会自己跟着变（工单 #684）
             self._rebuild_if_derivation_changed()
+
+    def _add_missing_columns(self) -> None:
+        # 旧文件里的表没有后加的列（工单 #1636 加了流转记录的 round）：补上，旧行的内容由推导版本的重建填好
+        columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(app_flows)")}
+        if "round" not in columns:
+            self._connection.execute("ALTER TABLE app_flows ADD COLUMN round INTEGER NOT NULL DEFAULT 0")
 
     def _rebuild_if_derivation_changed(self) -> None:
         # 推导方式变了就重建一次：读模型是增量投影，算法修好以后已有的行仍然是旧的（工单 #684）。
@@ -157,7 +175,8 @@ class ReadModels:
     def rebuild(self) -> None:
         # 删除调用尝试表与流转记录以后从事件重放重建；不调用模型与工具
         with self._transaction() as connection:
-            for table in ("app_attempt_state", "app_attempts", "app_flows", "app_read_positions"):
+            for table in ("app_attempt_state", "app_attempts", "app_flows", "app_flow_state",
+                          "app_read_positions"):
                 connection.execute(f"DELETE FROM {table}")
         self._dirty = True
         self._catch_up()
@@ -238,14 +257,35 @@ class ReadModels:
         cursor = events[-1].position
         with self._transaction() as connection:
             self._absorb_attempts(connection, attempt_events)
-            for event in flow_events:
-                for row in flow_rows(event):
-                    _upsert_flow(connection, row)
+            self._absorb_flows(connection, flow_events)
             for model in (ATTEMPTS, FLOWS):
                 connection.execute(
                     "INSERT INTO app_read_positions (model, position) VALUES (?, ?) "
                     "ON CONFLICT(model) DO UPDATE SET position = excluded.position", (model, cursor),
                 )
+
+    def _absorb_flows(self, connection: sqlite3.Connection, events: Iterable[Event | ProjectEvent]) -> None:
+        # 逐条吸收：第几轮与放行写的那一版按事件顺序从同一个 run 的先前事件累出来（工单 #1636）。
+        # 累出来的状态与行一起存进读取模型自己的一张表，服务重启以后增量吸收仍然从原来的轮次接着数
+        states: dict[str, dict[str, Any]] = {}
+        for event in events:
+            run_id = _flow_run_id(event)
+            state = None
+            if run_id is not None:
+                if run_id not in states:
+                    saved = connection.execute("SELECT state FROM app_flow_state WHERE run_id = ?",
+                                               (run_id,)).fetchone()
+                    states[run_id] = _empty_flow_state() if saved is None else json.loads(saved["state"])
+                state = states[run_id]
+                _advance_flow_state(state, event)
+            for row in flow_rows(event, work_round=_flow_round(state, event),
+                                 deliveries=None if state is None else state["deliveries"]):
+                _upsert_flow(connection, row)
+        for run_id, state in states.items():
+            connection.execute(
+                "INSERT INTO app_flow_state (run_id, state) VALUES (?, ?) "
+                "ON CONFLICT(run_id) DO UPDATE SET state = excluded.state", (run_id, json_dumps(state)),
+            )
 
     def _absorb_attempts(self, connection: sqlite3.Connection, events: Iterable[Event]) -> None:
         by_run: dict[str, list[Event]] = defaultdict(list)
@@ -329,6 +369,8 @@ def _attempt_clauses(*, project_id: str | None, run_id: str | None, work_item_id
 
 
 def _is_flow_event(event: Event | ProjectEvent) -> bool:
+    if isinstance(event, ProjectEvent):
+        return event.type in PROJECT_FLOW_TYPES
     return isinstance(event, Event) and event.type in FLOW_TYPES
 
 
@@ -368,31 +410,103 @@ def public_status(record: dict[str, Any]) -> str:
 
 
 def _upsert_flow(connection: sqlite3.Connection, row: dict[str, Any]) -> None:
+    # 第几轮只在第一次写入时定下：询问的回答更新同一条记录，不改它所在的轮次（工单 #1636）
     connection.execute(
         "INSERT INTO app_flows (flow_id, project_id, work_item_id, run_id, position, seq, kind, direction_from, "
-        "direction_to, status, content, event_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "direction_to, status, content, round, event_id, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(flow_id) DO UPDATE SET status = excluded.status, content = excluded.content, "
         "direction_from = COALESCE(app_flows.direction_from, excluded.direction_from), "
         "direction_to = COALESCE(app_flows.direction_to, excluded.direction_to)",
         (row["flow_id"], row["project_id"], row["work_item_id"], row["run_id"], row["position"], row["seq"],
-         row["kind"], row["direction_from"], row["direction_to"], row["status"], row["content"], row["event_id"],
-         row["created_at"]),
+         row["kind"], row["direction_from"], row["direction_to"], row["status"], row["content"], row["round"],
+         row["event_id"], row["created_at"]),
     )
 
 
-def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
+def _empty_flow_state() -> dict[str, Any]:
+    # 一个 run 的流转记录推导状态：当前轮次、每个会话在它那次激活里的轮次、询问分支的会话、已接纳的交付版本
+    return {"round": 0, "sessions": {}, "branches": [], "deliveries": {}}
+
+
+def _flow_run_id(event: Event | ProjectEvent) -> str | None:
+    # 这条事件属于哪个 run：项目流的事件把 run 编号放在载荷里（事项创建）
+    if isinstance(event, ProjectEvent):
+        return event.run_id or event.payload.get("run_id")
+    return event.run_id
+
+
+def _advance_flow_state(state: dict[str, Any], event: Event | ProjectEvent) -> None:
+    # 按事件顺序累出轮次（工单 #1636）：主线激活推进一轮，激活事件自己记下的 cycle 就是这一轮的编号；
+    # 询问分支的激活沿用当时的轮次，不推进（循环结构 docs/design/department-loop.md「询问分支」）
+    if not isinstance(event, Event):
+        return
+    payload = event.payload or {}
+    if event.type == EventType.DEPARTMENT_ACTIVATED:
+        session = event.session_id
+        cycle = payload.get("cycle")
+        if isinstance(cycle, int) and cycle > 0:
+            state["round"] = max(state["round"], cycle)
+        elif session not in state["branches"]:
+            # 旧事件没有写 cycle：主线会话的激活照样算一轮，询问分支的会话已经由 ASK_STARTED 记下
+            state["round"] += 1
+        if session is not None:
+            state["sessions"][session] = state["round"]
+        return
+    if event.type == EventType.ASK_STARTED:
+        branch = payload.get("branch_session_id")
+        if isinstance(branch, str) and branch not in state["branches"]:
+            state["branches"].append(branch)
+        return
+    if event.type == EventType.DELIVERY_ACCEPTED:
+        # 放行的记录写明核验的是哪一版交付：交付的摘要对应它的版本号
+        revision, content_hash = payload.get("revision"), payload.get("content_hash")
+        if isinstance(revision, int) and isinstance(content_hash, str):
+            state["deliveries"][content_hash] = revision
+
+
+def _flow_round(state: dict[str, Any] | None, event: Event | ProjectEvent) -> int:
+    # 这条记录的第几轮：产生它的那次会话的激活的轮次；没有会话（你的输入、指导）时是当时正在进行的那一轮，
+    # 还没有任何激活（事项创建）时是第 0 轮
+    if state is None:
+        return 0
+    session = getattr(event, "session_id", None)
+    if session is not None and session in state["sessions"]:
+        return int(state["sessions"][session])
+    return int(state["round"])
+
+
+def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
+              deliveries: dict[str, int] | None = None) -> list[dict[str, Any]]:
     # 一条事件产生的流转记录：迁移与退回产生新记录，部门之间的回答与关闭更新同一条咨询记录。
     # 记录的去向按定义推出（工单 #1391）：PRD 的新版本送到关注它的部门，「交付送到谁」「返工回到谁」
-    # 由核验声明给出，来源是写这条事件的部门；代码里不写部门名
-    if not isinstance(event, Event):
-        return []
+    # 由核验声明给出，来源是写这条事件的部门；代码里不写部门名。
+    # work_round 是这条记录的第几轮，deliveries 是这一版交付的摘要 → 版本（放行的记录写它，工单 #1636）
     payload = event.payload or {}
     source = event.department or ""
     base = {
-        "project_id": event.project_id, "work_item_id": event.work_item_id, "run_id": event.run_id,
+        "project_id": event.project_id,
+        "work_item_id": event.work_item_id or payload.get("work_item_id"),
+        "run_id": event.run_id or payload.get("run_id"),
         "position": event.position, "seq": event.stream_version, "event_id": event.event_id,
-        "created_at": event.created_at,
+        "created_at": event.created_at, "round": work_round,
     }
+    if isinstance(event, ProjectEvent):
+        if event.type == ProjectEventType.WORK_ITEM_CREATED:
+            # 你的输入（新事项）：你给这个事项的第一句输入，交给收用户输入的那个职能；来源不是某个部门
+            return [{**base, "flow_id": event.event_id, "kind": "你的输入", "direction_from": None,
+                     "direction_to": DEFINITIONS.input_department(),
+                     "status": "已收到", "content": payload.get("text", "")}]
+        return []
+    if event.type == EventType.USER_INPUT_RECEIVED:
+        # 你的输入（追加输入）：来源不是某个部门，交给收用户输入的那个职能
+        return [{**base, "flow_id": event.event_id, "kind": "你的输入", "direction_from": None,
+                 "direction_to": DEFINITIONS.input_department(), "status": "已收到",
+                 "content": payload.get("text", "")}]
+    if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
+        # 指导：发给收这段指导的那个职能
+        return [{**base, "flow_id": event.event_id, "kind": "指导", "direction_from": None,
+                 "direction_to": event.department, "status": "已收到", "content": payload.get("text", "")}]
     if event.type == EventType.SPEC_ACCEPTED:
         # PRD 被接纳（工单 #882）：关注 PRD 新版本的每个部门一条，来源是写这份 PRD 的部门。
         # 几条的编号不同（事件编号加接收部门），否则后一条会盖掉前一条
@@ -427,6 +541,19 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{target}",
                  "kind": "问题反馈", "direction_from": source, "direction_to": target,
                  "status": "已退回", "content": payload.get("rationale", "")}
+                for target in targets]
+    if event.type == EventType.QA_SUBMITTED and payload.get("verdict") == "release":
+        # 放行（工单 #1636）：核验角色核验过那一版交付以后放行，回到交这一版的那个职能；内容是核验的是哪一版
+        targets = _verified_departments(source, "delivery_spec") or [None]
+        revision = (deliveries or {}).get(payload.get("delivery_spec_hash"))
+        content = f"核验了交付第 {revision} 版" if revision is not None else "核验了当前交付"
+        rationale = str(payload.get("rationale") or "").strip()
+        if rationale:
+            content = f"{content}：{rationale}"
+        return [{**base,
+                 "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{target}",
+                 "kind": "放行", "direction_from": source, "direction_to": target,
+                 "status": "已放行", "content": content}
                 for target in targets]
     return []
 

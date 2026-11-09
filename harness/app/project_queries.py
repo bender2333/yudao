@@ -904,6 +904,8 @@ class FlowRecord(Contract):
     content: str
     direction_from: str | None
     direction_to: str | None
+    # 第几轮（工单 #1636）：产生这条记录的那次主线激活；询问分支的激活不算一轮，事项创建时是第 0 轮
+    round: int
     run_id: str | None
     work_item_id: str | None
     position: int
@@ -927,7 +929,8 @@ def _project_flow(application: Application, request: ProjectFlow) -> Snapshot[Pr
         data=ProjectFlowResult(records=[
             FlowRecord(
                 flow_id=row["flow_id"], kind=row["kind"], status=row["status"], content=row["content"],
-                direction_from=row["direction_from"], direction_to=row["direction_to"], run_id=row["run_id"],
+                direction_from=row["direction_from"], direction_to=row["direction_to"], round=row["round"],
+                run_id=row["run_id"],
                 work_item_id=row["work_item_id"], position=row["position"], seq=row["seq"],
                 event_id=row["event_id"], created_at=row["created_at"],
             )
@@ -3573,10 +3576,13 @@ PROJECT_LOOP = QueryDefinition(
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
-    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达与质检结论都进流转记录
+    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达与质检的退回和放行都进流转记录；
+    # 你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636）
     changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED,
-                EventType.QA_SUBMITTED),
+                EventType.QA_SUBMITTED,
+                EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+                ProjectEventType.WORK_ITEM_CREATED),
 )
 
 WORK_ITEM_INPUTS = QueryDefinition(

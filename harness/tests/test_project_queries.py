@@ -485,7 +485,8 @@ def test_flow_records_cover_delivery_problem_and_rework(data_dir):
 
 def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(data_dir):
     # 工单 #415 的场景：质检在工程退回事项的结论之前向工程提出询问并得到回答，
-    # engineering 一侧与 quality 一侧因此在 quality→engineering 上留下「咨询」「问题反馈」与「返工」。
+    # engineering 一侧与 quality 一侧因此在 quality→engineering 上留下「咨询」「问题反馈」与「返工」；
+    # 工单 #1636 起，同一对部门上还有一条放行（质检放行返工后那一版交付）。
     # 期望直接写出应有的记录条数与种类，不复用画面侧的分组公式：分组若改变，这段断言照样成立
     system = _system(data_dir, {
         "product": [product_spec()],
@@ -523,11 +524,13 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
 
     rows = [record for record in flow.data.records
             if record.direction_from == "quality" and record.direction_to == "engineering"]
-    assert len(rows) == 2
-    assert sorted(record.kind for record in rows) == ["询问", "问题反馈"]
+    # 工单 #1636 加了放行：同一条 quality→engineering 上现在还有质检放行返工后那一版交付的记录
+    assert len(rows) == 3
+    assert sorted(record.kind for record in rows) == ["放行", "询问", "问题反馈"]
     by_kind = {record.kind: record for record in rows}
     assert by_kind["询问"].status == "已回答"
     assert by_kind["问题反馈"].status == "已退回"
+    assert by_kind["放行"].status == "已放行"
 
 
 def _prd_revision_script():
