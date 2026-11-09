@@ -1,9 +1,11 @@
-// 对话页（工单 #1638、#1639、#1641，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
+// 对话页（工单 #1638、#1639、#1641、#1643，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
 //
 // 页面上半是循环图：按所选事项冻结的组织画节点、成果箭头与结论。图上方的行选事项（默认最近在跑的），
 // 点节点、点箭头打开同一个面板。最上面是时间条（工单 #1653）：所选事项的已用时间与上限，在跑时另有「停止」。
 // 图右上角的「看经过」展开时序图（工单 #1641）：按轮折起来的经过，展开在循环图下面，不盖住线程。
+// 点时序图上的一行打开同一个面板（工单 #1643）：成果是那一版与差异，问答与你的话是全文。
 // 下面是线程与输入框（工单 #1639）：一条线程跨多个事项，已结束的事项默认收起；输入框上方一行收件人。
+// 线程的折叠行展开以后末尾有「在时序图里看」：只看这两个职能的时序图（工单 #1643）。
 //
 // 读的事实：project.loop（冻结的组织、职能状态、轮次与 run）、project.overview（事项标题）、
 // project.flow（箭头，以及线程里你的输入、指导、交完成与放行）、work_item.materials（版本与改了的文件）、
@@ -11,7 +13,7 @@
 // system.status（模型可不可用）。页面不另存一份，也不按形态名判断。
 // 一切「事实推出图与线程」的判断在 loop-graph-model.ts、sequence-model.ts 与 thread-model.ts 里，三处都有单元测试。
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   DecisionList, DecisionView, ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
@@ -27,10 +29,10 @@ import { workItemStatusText } from "./labels";
 import type { DepartmentView } from "./organization";
 import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } from "./loop-graph-model";
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
-import { LoopPanel } from "./loop-panel";
+import { LoopPanel, type LoopPanelTarget } from "./loop-panel";
 import { ProjectTimeBar } from "./project-head";
 import { SequenceView } from "./sequence";
-import { hasSequence, sequenceOf } from "./sequence-model";
+import { hasSequence, sequenceOf, type SequenceRow } from "./sequence-model";
 import { ThreadView } from "./thread";
 import {
   receiverOf, runningItem, workingRoleOf, type ComposerInput,
@@ -38,7 +40,7 @@ import {
 import { useSnapshot } from "./use-snapshot";
 
 /** 面板打开的那一个，连同它在哪件事项上打开：换了事项就收起，不在新图上留着旧的一版。 */
-type PanelState = { item: string | null; value: LoopPanelPick };
+type PanelState = { item: string | null; value: LoopPanelTarget };
 
 export function ConversationPage(props: {
   app: ClientApp;
@@ -122,13 +124,22 @@ export function ConversationPage(props: {
     ...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows),
   ], [graph]);
   const [panel, setPanel] = useState<PanelState>({ item: null, value: null });
-  const pick: LoopPanelPick = panel.item === itemId ? panel.value : null;
-  const open = (value: LoopPanelPick): void => setPanel({ item: itemId, value });
+  const pick: LoopPanelTarget = panel.item === itemId ? panel.value : null;
+  // 图上标出选中的节点或箭头：时序图上那一行在图上打开的是箭头，两处标的是同一样
+  const graphPick: LoopPanelPick = pick !== null && (pick.kind === "node" || pick.kind === "arrow") ? pick : null;
+  const open = (value: LoopPanelTarget): void => setPanel({ item: itemId, value });
   // 时序图（工单 #1641）：图右上角的「看经过」展开它；展开以后才读询问（决定请求线程里一直在读）
   const [sequenceOpen, setSequenceOpen] = useState(false);
   // 展开的是哪几轮：没有点过时按模型给的默认（只展开最新一轮）；挂了哪一件事项一起记，换了事项就不留着旧选择
   const [roundPick, setRoundPick] = useState<{ item: string; rounds: readonly number[] } | null>(null);
   const openRounds = roundPick?.item === itemId ? roundPick.rounds : null;
+  // 只看这两个职能（线程折叠行的「在时序图里看」）：挂在哪件事项上一块记，换了事项就不留着
+  const [pair, setPair] = useState<{ item: string; roles: readonly string[] } | null>(null);
+  // 点的折叠行在别的事项上：切过去以后（数据到了才）展开只看这两个职能的时序图
+  const [pendingSequence, setPendingSequence] = useState<{ item: string; roles: readonly string[] } | null>(null);
+  // 时序图展开在循环图下面：从线程里点过来时把它带到眼前；面板在时序图下面，点一行时也把它带到眼前
+  const sequenceRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const runId = useMemo(
     () => loop.data?.work_items.find((card) => card.work_item_id === itemId)?.run_id ?? "",
     [loop.data, itemId],
@@ -147,10 +158,12 @@ export function ConversationPage(props: {
     asks: asks.data?.asks ?? [],
     decisions: itemDecisions,
     materials: materials.data,
+    verifiers: item?.organization?.verifiers ?? [],
+    pair: pair !== null && pair.item === itemId ? pair.roles : null,
     // 「现在」：还没等到的色条画到这里。按这一份事实算一次，不跟着每次重算而抖
     now: new Date().toISOString(),
     openRounds,
-  }), [roles, itemFlow, asks.data, itemDecisions, materials.data, openRounds]);
+  }), [roles, itemFlow, asks.data, itemDecisions, materials.data, item, pair, itemId, openRounds]);
   const toggleRound = (round: number): void => {
     const shown = openRounds ?? sequence.rounds.filter((entry) => entry.open).map((entry) => entry.round);
     setRoundPick({
@@ -158,6 +171,48 @@ export function ConversationPage(props: {
       rounds: shown.includes(round) ? shown.filter((value) => value !== round) : [...shown, round],
     });
   };
+  // 点时序图的一行：成果那一行用图上那条箭头（那一版与差异），其余打开全文
+  const openRow = (row: SequenceRow): void => {
+    const detail = row.detail;
+    const arrow = detail.kind === "outcome"
+      ? arrows.find((candidate) => detail.flowIds.includes(candidate.key))
+      : undefined;
+    open(arrow === undefined ? { kind: "row", row } : { kind: "arrow", arrow });
+  };
+  // 面板上标出来的那一行：成果那一行按它找到的箭头认
+  const pickedKey = pick === null
+    ? null
+    : pick.kind === "row" ? pick.row.key : pick.kind === "arrow" ? pick.arrow.key : null;
+  // 只看这两个职能的时序图（线程折叠行末尾的「在时序图里看」）：折叠行在别的事项上时先切过去
+  const showPair = (workItem: string, pairRoles: readonly string[]): void => {
+    if (workItem !== itemId) {
+      setPendingSequence({ item: workItem, roles: pairRoles });
+      props.onNavigate(paths.conversation(projectId, { workItem }));
+      return;
+    }
+    setPair({ item: workItem, roles: pairRoles });
+    setSequenceOpen(true);
+  };
+  useEffect(() => {
+    if (pendingSequence === null || pendingSequence.item !== itemId) {
+      return;
+    }
+    setPair(pendingSequence);
+    setSequenceOpen(true);
+    setPendingSequence(null);
+  }, [pendingSequence, itemId]);
+  useEffect(() => {
+    if (!sequenceOpen) {
+      return;
+    }
+    sequenceRef.current?.scrollIntoView({ block: "nearest" });
+  }, [sequenceOpen, pair, itemId]);
+  useEffect(() => {
+    if (pick === null) {
+      return;
+    }
+    panelRef.current?.scrollIntoView({ block: "nearest" });
+  }, [pick]);
 
   // 线程（工单 #1639）：展开过的结束事项、点过的节点（收件人跟着切到给它的指导）、发送以后滚到最新一条
   const [opened, setOpened] = useState<Record<string, boolean>>({});
@@ -238,14 +293,22 @@ export function ConversationPage(props: {
                   {hasSequence(roles) ? (
                     <div className="y10-cv-tools">
                       <button type="button" className="y10-btn small" aria-pressed={sequenceOpen}
-                              data-testid="show-sequence" onClick={() => setSequenceOpen(!sequenceOpen)}>
+                              data-testid="show-sequence" onClick={() => {
+                                // 「看经过」看整件事：只看过两个职能时点它回到整件事，已经看整件事时收起
+                                if (sequenceOpen && (pair === null || pair.item !== itemId)) {
+                                  setSequenceOpen(false);
+                                } else {
+                                  setPair(null);
+                                  setSequenceOpen(true);
+                                }
+                              }}>
                         看经过
                       </button>
                     </div>
                   ) : null}
                   <LoopGraphView
                     graph={graph}
-                    pick={pick}
+                    pick={graphPick}
                     onPickNode={(id) => {
                       // 点节点：看这个职能，收件人跟着切到给它的指导（项目的组织设计说明 4.14）
                       setFocus(id);
@@ -253,20 +316,32 @@ export function ConversationPage(props: {
                     }}
                     onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
                   />
-                  <LoopPanel
-                    graph={graph}
-                    arrows={arrows}
-                    pick={pick}
-                    onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
-                    onClose={() => open(null)}
-                  />
                   {/* 时序图展开在循环图下面，不是单独的页，也不盖住线程 */}
                   {sequenceOpen && hasSequence(roles) ? (
-                    <>
+                    <div ref={sequenceRef}>
                       {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
-                      <SequenceView view={sequence} onClose={() => setSequenceOpen(false)} onToggleRound={toggleRound} />
-                    </>
+                      <SequenceView
+                        view={sequence}
+                        pickedKey={pickedKey}
+                        onPickRow={openRow}
+                        onShowAll={() => setPair(null)}
+                        onClose={() => setSequenceOpen(false)}
+                        onToggleRound={toggleRound}
+                      />
+                    </div>
                   ) : null}
+                  {/* 面板在图的下面（时序图展开时在它下面）：点节点、点箭头与点时序图的一行都是这一个 */}
+                  {pick === null ? null : (
+                    <div ref={panelRef}>
+                      <LoopPanel
+                        graph={graph}
+                        arrows={arrows}
+                        pick={pick}
+                        onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
+                        onClose={() => open(null)}
+                      />
+                    </div>
+                  )}
                 </>
               )}
               {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}
@@ -294,6 +369,7 @@ export function ConversationPage(props: {
               onToggleItem={(workItem) => setOpened((previous) => ({ ...previous, [workItem]: !previous[workItem] }))}
               onSelectItem={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
               onLook={look}
+              onSequence={showPair}
               onNavigate={props.onNavigate}
               scrollSignal={scrollSignal}
             />

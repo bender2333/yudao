@@ -528,6 +528,10 @@
 .y10-cv-verdict-line.is-reject { color: var(--red); }
 .y10-cv-verdict-line.is-release { color: var(--green); }
 .y10-cv-panel-text { overflow-wrap: anywhere; }
+.y10-cv-full { overflow-wrap: anywhere; white-space: pre-wrap; }
+.y10-cv-note { font-size: 12px; color: var(--muted); }
+.y10-cv-block { display: grid; gap: 3px; }
+.y10-cv-block b { font-size: 12.5px; }
 .y10-cv-files b { font-size: 12.5px; }
 .y10-cv-facts { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
 
@@ -574,6 +578,8 @@
 .y10-th-why { border-left-style: dashed; }
 .y10-th-facts small, .y10-th-why small { color: var(--muted); font-size: 11px; }
 .y10-th-facts p, .y10-th-why p { white-space: pre-wrap; }
+/* 折叠行展开以后末尾的「在时序图里看」：只看这两个职能的时序图 */
+.y10-th-fold-more { padding-top: 2px; }
 
 .y10-th-notice { justify-self: center; margin: 0; font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 12px; text-align: center; }
 .y10-th-note { margin: 0; font-size: 12px; color: var(--muted); }
@@ -643,6 +649,13 @@
 .y10-sq-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); width: 100%; min-height: 34px; }
 .y10-sq-row.is-cols { min-height: 22px; }
 .y10-sq-row.is-now { min-height: 14px; }
+/* 点一行看原文：整行是按钮，样子仍是一行；选中的那一行把标题的底色换成绿色的一层 */
+button.y10-sq-row {
+  border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+button.y10-sq-row:hover .y10-sq-text > span,
+button.y10-sq-row.is-on .y10-sq-text > span { background: var(--tint); }
+button.y10-sq-row.is-on .y10-sq-text > span { outline: 1px solid var(--green); border-radius: 3px; }
 .y10-sq-time { font-size: 11px; color: var(--faint); padding-top: 3px; white-space: nowrap; overflow: hidden; }
 .y10-sq-track { position: relative; display: block; }
 .y10-sq-track > b { position: absolute; top: 0; transform: translateX(-50%); font-size: 12px; white-space: nowrap; }
@@ -674,7 +687,7 @@
 }
 .y10-sq-round:hover { color: var(--text); }
 
-/* 窄屏那一条：按时间排的列表，每行写谁到谁与那句标题（800px 以下换上来） */
+/* 窄屏那一条：按时间排的列表，每行写谁到谁与那句标题（800px 以下换上来）；点一行也看原文 */
 .y10-sq-list { display: none; margin: 0; padding: 0; list-style: none; gap: 4px; }
 .y10-sq-list ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 .y10-sq-item {
@@ -683,6 +696,12 @@
 }
 .y10-sq-item.is-dash { border-left: 2px dashed var(--blue); }
 .y10-sq-item small { color: var(--muted); font-size: 11px; }
+button.y10-sq-item {
+  border-top: 0; border-right: 0; border-bottom: 0; background: none; font-family: inherit; color: inherit;
+  text-align: left; cursor: pointer;
+}
+button.y10-sq-item.is-dash { border-left: 2px dashed var(--blue); }
+button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
 
 /* ---------------------------------------------------------------- 项目头部一行与时间条（工单 #1653） */
 
