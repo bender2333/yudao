@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/trial/method/probes.md",
-"hash":"85698fffc1639d8f",
+"hash":"a6058c4c44c00bcd",
 "nodes":[
-{"hash":"85698fffc1639d8f","id":".claude/skills/trial/method/probes.md","kind":"file","title":".claude/skills/trial/method/probes.md"},
+{"hash":"a6058c4c44c00bcd","id":".claude/skills/trial/method/probes.md","kind":"file","title":".claude/skills/trial/method/probes.md"},
 {"hash":"68f6bf86e52e3a0f","id":".claude/skills/trial/method/probes.md#补测与探索","kind":"section","parent":".claude/skills/trial/method/probes.md","title":"补测与探索"},
 {"hash":"c2b8eb8619625a16","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 承诺缺口","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"承诺缺口"},
 {"hash":"57cd80543dab6e38","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 信息顺序","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"信息顺序"},
@@ -11,7 +11,7 @@
 {"hash":"4a7ce29c8742b715","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 空状态","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"空状态"},
 {"hash":"fd445dcf1ceddab7","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 时长与代价","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"时长与代价"},
 {"hash":"fd942f611e43a70c","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 用户可纠正","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"用户可纠正"},
-{"hash":"fbb85dccdd540ca6","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 撤销与回看","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"撤销与回看"},
+{"hash":"77248070b5fb061e","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 撤销与回看","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"撤销与回看"},
 {"hash":"ba9b539bdaef67e1","id":".claude/skills/trial/method/probes.md#补测与探索 > 表1 > 其他路径","kind":"row","parent":".claude/skills/trial/method/probes.md#补测与探索","title":"其他路径"}
 ],
 "edges":[
