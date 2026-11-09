@@ -61,7 +61,11 @@ def _imported_modules(relative: str) -> list[tuple[int, str]]:
                 parts = package.split(".")
                 up = node.level - 1
                 base = ".".join(parts[:len(parts) - up]) if up else parts[0]
-                found.append((node.lineno, f"{base}.{node.module}" if node.module else base))
+                if node.module:
+                    found.append((node.lineno, f"{base}.{node.module}"))
+                else:
+                    # from . import x：导入的是同一个包里的模块 x
+                    found.extend((node.lineno, f"{base}.{alias.name}") for alias in node.names)
             else:
                 found.append((node.lineno, node.module or ""))
     return found
