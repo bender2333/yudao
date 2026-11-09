@@ -75,6 +75,10 @@ ITEM_FORM_UNAVAILABLE_MESSAGE = (
 # 事项创建时冻结的整份合成结果（工单 #1517，项目的组织设计说明「冻结与升级」）：按内容摘要落盘的工件，
 # 种类写在这里。事项创建事件与 run 的创建事件都记下它的引用，之后写入核对、路由、装配、执行与重放都读这一份
 ITEM_DEFINITIONS_KIND = "item_definitions"
+# 进程里按内容摘要记住读回来的合成结果（工单 #1517）：工件按内容寻址、写进去不再改，同一份内容读回来的
+# 定义不变；上限只防止进程里留下太多份，旧的先丢
+_DEFINITIONS_CACHE: dict[str, Definitions] = {}
+_DEFINITIONS_CACHE_LIMIT = 8
 
 
 class OrganizationRejectedError(ValueError):
@@ -94,10 +98,20 @@ def definitions_from_ref(artifacts: ArtifactStore, ref: Any) -> Definitions | No
 
     没有引用（旧事项只记了形态名）时为空，调用方按形态名在这一版发布里取。存的是合成结果的那几份定义文件
     的内容（按定义文件的次序写），读回来逐文件相同，版本（内容摘要）也相同：发布后来改了形态不影响它。
+    工件按内容寻址、写进去就不再改，所以同一份合成结果按内容摘要记在进程里，页面查询不必每次重新解析
+    （工单 #1517 的审查：`project.loop` 一次查询要把这份 2MB 的内容读出来解析一次）。
     """
     if not isinstance(ref, dict) or not ref.get("path"):
         return None
-    return definitions_from_contents(json.loads(artifacts.get(ArtifactRef(**ref)).decode("utf-8")))
+    key = str(ref.get("content_hash") or ref.get("path"))
+    cached = _DEFINITIONS_CACHE.get(key)
+    if cached is not None:
+        return cached
+    definitions = definitions_from_contents(json.loads(artifacts.get(ArtifactRef(**ref)).decode("utf-8")))
+    if len(_DEFINITIONS_CACHE) >= _DEFINITIONS_CACHE_LIMIT:
+        _DEFINITIONS_CACHE.pop(next(iter(_DEFINITIONS_CACHE)))
+    _DEFINITIONS_CACHE[key] = definitions
+    return definitions
 
 
 def frozen_definitions_ref(store: EventStore, project_id: str, work_item_id: str) -> dict[str, Any] | None:

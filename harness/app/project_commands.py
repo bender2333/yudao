@@ -136,6 +136,9 @@ async def _restart_onboarding(application: Application, command: Command, reques
         raise Rejection("not_allowed", "项目正在建档，结束或取消以后才能重新开始") from busy
     except OnboardingNotAllowedError as invalid:
         raise Rejection("not_allowed", str(invalid)) from invalid
+    except OrganizationRejectedError as rejected:
+        # 发布与本项目的改动合不到一起（项目的组织设计说明「冻结与升级」）：建档事项建不了，写明是哪一项
+        raise Rejection("not_allowed", rejected.message) from rejected
     except TreeError as invalid:
         raise Rejection("source_invalid", str(invalid)) from invalid
     system.orchestrator.start_work_item(run_id)

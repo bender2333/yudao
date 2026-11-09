@@ -34,7 +34,7 @@ from harness.app.contracts import Accepted, Rejected
 from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import ProjectOrganization
 from harness.app.project_and_work_item_commands import WorkItemCreate
-from harness.app.project_commands import ProjectCreate, ProjectOnboard
+from harness.app.project_commands import OnboardingRestart, ProjectCreate, ProjectOnboard
 from harness.app.project_queries import ProjectLoop
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, Definitions, definitions_from_contents
 from harness.event_store import Command, project_stream, run_stream
@@ -625,6 +625,59 @@ def test_an_onboarding_revision_run_keeps_the_frozen_organization(tmp_path):
     assert system.orchestrator.item_form(revision_run).definitions.version == frozen
     assert system.orchestrator.item_form(revision_run).definitions.department_labels["quality"] == RENAMED_LABEL
     system.close()
+
+
+def test_same_as_project_compares_the_organization_not_the_whole_definition(tmp_path):
+    # 审查发现：设计说明「冻结与升级」说「和项目现在的组织相同或不同」比的是职能、角色、成果、核验与轮转；
+    # 发布只改了别的东西（这里改一条规则登记的取值）时组织没变，事项详情要写「相同」，
+    # 与「高级」里那处逐项差异（`previous_item.differences` 为空）说得一致
+    data_dir = tmp_path / "loop"
+    script = _three_departments_script()
+    first = _system(data_dir, script, resume_on_startup=False)
+    application = _application(first)
+    project_id = first.projects.register("只改了规则的项目", GOAL)
+    item_id, run_id = first.projects.start_work_item(project_id, "规则变了以后看组织")
+    assert first.activate_once(run_id).status == "running"
+    assert _item_organization(application, project_id, item_id).same_as_project is True
+    first.close()
+
+    def bump_rule(contents: dict[str, Any]) -> None:
+        contents["rules.json"]["provider.model_test_max_concurrent"]["value"] = 2
+
+    second = _system(data_dir, script, release=_release_with(bump_rule), resume_on_startup=False)
+    application = _application(second)
+    row = _item_organization(application, project_id, item_id)
+    assert row is not None
+    assert row.same_as_project is True                       # 五项都没有变
+    assert _project_organization(application, project_id).previous_item.differences == []
+    assert row.version != _project_organization(application, project_id).version   # 整份内容的摘要不同
+    second.close()
+
+
+def test_restarting_onboarding_is_refused_when_the_release_no_longer_has_a_tool_the_project_added(tmp_path):
+    # 审查发现：`onboarding.restart` 也会建事项，发布与本项目的改动合不到一起时要以 not_allowed 拒绝，
+    # 不是未处理的错误
+    data_dir = tmp_path / "loop"
+    system = _system(data_dir, _onboarding_script(), resume_on_startup=False)
+    application = _application(system)
+    project_id = system.projects.register("再开始建档", ONBOARDING_GOAL, source="existing")
+    system.projects.configure_source_directory(project_id, "src",
+                                               str(onboarding_source(tmp_path / "source")), base_version=0)
+    adopted = _adopt(application, project_id,
+                     {"departments": {"engineering": {"tools": {"add": [ADDED_TOOL]}}}})
+    assert isinstance(adopted, Accepted), adopted
+    system.close()
+
+    second = _system(data_dir, _onboarding_script(), release=_release_without(ADDED_TOOL),
+                     resume_on_startup=False)
+    application = _application(second)
+    rejected = asyncio.run(application.command("onboarding.restart", OnboardingRestart(
+        command_id=str(uuid.uuid4()), project_id=project_id, source_name="src"), actor="user:local"))
+    assert isinstance(rejected, Rejected), rejected
+    assert rejected.reason == "not_allowed"
+    assert ADDED_TOOL in rejected.message
+    assert second.projects.projection(project_id).work_items == []
+    second.close()
 
 
 def test_the_frozen_organization_reads_back_as_the_same_definition(tmp_path):
