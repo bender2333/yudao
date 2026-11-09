@@ -1,6 +1,6 @@
 /* 项目页面样式：概览、恢复与动作核实、资料。颜色全部来自 base.css 的变量；事项颜色来自像素画面的事项色板，与画面中的小旗一致。
    类名前缀：y10-pp- 三个页面共用，y10-ov- 概览，y10-rc- 恢复与动作核实，y10-mt- 资料，y10-msem- 资料中的语义记录，
-   y10-cv- 对话页与它上面的循环图（工单 #1638）。 */
+   y10-cv- 对话页与它上面的循环图（工单 #1638），y10-phead 项目头部一行标签（工单 #1653）。 */
 
 /* ---------------------------------------------------------------- 共用 */
 
@@ -535,6 +535,34 @@
 .y10-cv-thread {
   min-height: 120px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
   background: var(--surface-2);
+}
+
+/* ---------------------------------------------------------------- 项目头部一行与时间条（工单 #1653） */
+
+/* 项目头部一行标签（项目的组织设计说明 4.15 的「其余规矩」）：形态名（改过几处）、轮转方式、有核验或开环。
+   贴在页签上方，左右与页签同一行宽；标签读项目现在的组织，不随选中的事项变 */
+.y10-phead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 32px 0; }
+.y10-phead-tag {
+  font-size: 12px; line-height: 18px; padding: 0 8px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--line-strong); color: var(--muted); background: var(--surface);
+}
+/* 第一个是形态名：比另两项醒目一档，一眼看出这份组织是哪几个职能 */
+.y10-phead-tag.is-form { font-size: 12.5px; font-weight: 600; color: var(--text); border-color: var(--green); }
+
+/* 时间条：对话上方，选中事项的已用时间与上限；在跑时旁边一个「停止」 */
+.y10-cv-time { display: grid; gap: 4px; }
+.y10-cv-time-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.y10-cv-time-text { font-size: 13px; color: var(--muted); }
+.y10-cv-time .y10-meter { margin-top: 0; max-width: 420px; }
+.y10-cv-time .y10-btn.danger { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
+.y10-cv-time .error, .y10-cv-time .hint { margin: 0; font-size: 12.5px; }
+
+@media (max-width: 1100px) {
+  .y10-phead { padding-left: 22px; padding-right: 22px; }
+}
+
+@media (max-width: 900px) {
+  .y10-phead { padding-left: 12px; padding-right: 12px; }
 }
 
 @media (max-width: 800px) {
