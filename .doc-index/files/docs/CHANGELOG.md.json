@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"893b4fe8ff68f5c2",
+"hash":"87a9f4a3d204642c",
 "nodes":[
-{"hash":"893b4fe8ff68f5c2","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"87a9f4a3d204642c","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"8d29b5d8f5b383fd","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"4a7896a24b07f65a","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -36,7 +36,7 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"d077332456bb8349","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"d077332456bb8349","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"d1a84cdab4d30989","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"2d5c79a1149ca9b4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"d43aebc668d2e5a8","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/README.md","kind":"code-path","raws":["client/README.md"],"seen":"65ba0f28c0354bd6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/adr/0040-design-implementation-separation.md","kind":"code-path","raws":["docs/adr/0040-design-implementation-separation.md"],"seen":"e13e2bc72a154c3b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/adr/0045-project-organization-form-plus-changes.md","kind":"code-path","raws":["adr/0045-project-organization-form-plus-changes.md"],"seen":"35577a59515a54b7","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -67,8 +67,8 @@
 {"dst":"docs/decision.md#决策记录 > 2026-11-04 - 事项冻结的形态不在发布里：事项停在原处，不回退默认形态；#1182 的分层问题另开单挪进 U","kind":"section-ref","raws":["decision.md"],"seen":"cb1bed045223785f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-07 - 组织设定：项目页是循环图加对话，形态按部门列，外包是部门里的选项","kind":"section-ref","raws":["decision.md"],"seen":"b7c05cd1012c414c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/README.md","kind":"code-path","raws":["design/README.md","docs/design/README.md"],"seen":"c19c1711c0a6d497","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"30a9944c6d3aee10","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["design/app-and-interface.md"],"seen":"30a9944c6d3aee10","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"7882970e6f0e9c97","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["design/app-and-interface.md"],"seen":"7882970e6f0e9c97","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","kind":"section-ref","raws":["docs/design/app-and-interface.md"],"seen":"76e2b152bf5a7095","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"95a266f3d164e82c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"code-path","raws":["design/architecture/overall-architecture.md","docs/design/architecture/overall-architecture.md"],"seen":"a0a2b1711ed44ed1","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -169,7 +169,7 @@
 {"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md","research/doc-consistency-concept-model.md"],"seen":"aee6360e04742851","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["research/doc-consistency-rule-facts.md"],"seen":"19aee6681c333a13","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/uncle-bob-ub-mode.md","kind":"code-path","raws":["docs/research/uncle-bob-ub-mode.md","research/uncle-bob-ub-mode.md"],"seen":"2507f5137b9b3647","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"305b7e8cddddfe59","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"a5444790c6ddfbdb","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/trial/tasks.md","kind":"code-path","raws":["docs/trial/tasks.md"],"seen":"80f417d87d1bd0a5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"evals/README.md","kind":"code-path","raws":["evals/README.md"],"seen":"b491be7bb749b652","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"evals/context/README.md","kind":"code-path","raws":["evals/context/README.md"],"seen":"01da78836425b0e1","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},

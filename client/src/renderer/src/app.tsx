@@ -26,6 +26,7 @@ import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
 import { ObserveDetailPage, ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
+import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
 import { departmentTabs, projectDepartments, type DepartmentView } from "./views/project/organization";
@@ -335,6 +336,9 @@ export function App() {
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
           onNavigate={navigate}
         />
+        {/* 项目头部一行标签（工单 #1653）：形态名（改过几处）、轮转方式、有核验或开环。对话与设置都在，
+            读项目现在的组织（project.organization），不读选中事项冻结的那一份 */}
+        {route.projectId === null ? null : <ProjectHead organization={organization.data} />}
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="y10-content content">
           {route.name === "home" ? (
