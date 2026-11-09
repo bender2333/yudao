@@ -8,6 +8,9 @@
 # 标题的写法按设计说明「动作标题」的那张表；表里没有的工具写工具名（与「不认识的工具」同一条），
 # 页面因此不会因为一个没见过的工具报错。浏览器动作的写法留给页面的翻译层（试用记录页已有中文写法），
 # 这里同样写工具名，不另抄一份。
+#
+# 只有运行命令由角色写一句（设计说明「动作标题」的运行命令一行，工单 #1659）：有这一句时标题是它、
+# 来源记作者；这一项只被记录，不交给执行环境，也不进收敛判定（harness/redact.py 的 call_arguments）。
 
 from __future__ import annotations
 
@@ -17,7 +20,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 from ..definitions import DEFINITIONS, DEFINITIONS_DIR, Definitions, load_definitions
-from ..redact import redact_text
+from ..redact import INTENT_ARGUMENT, redact_text
 
 # 标题的显示上限（设计说明「本说明的常量」）：60 字符，含超出时加的省略号——一行放得下标记、标题与用时，
 # 原文在原始数据里
@@ -40,7 +43,7 @@ FACT_REFUSED = "被拒绝"
 FACT_FILES_CHANGED = "改了文件"
 Fact = Literal["失败", "超时", "结果未知", "被拒绝", "改了文件"]
 
-# 标题的来源（设计说明「动作标题」）：系统算的，或者角色写的（运行命令那一句，工单 #1659 接上）
+# 标题的来源（设计说明「动作标题」）：系统算的，或者角色写的（只有运行命令那一句，工单 #1659）
 SOURCE_SYSTEM = "系统"
 SOURCE_AUTHOR = "作者"
 Source = Literal["系统", "作者"]
@@ -219,8 +222,7 @@ def _known_title(tool: ToolDefinition, args: Mapping[str, Any]) -> str | None:
         reason = _text(args, "reason")
         return f"移动 {source} 到 {destination}" + ("" if reason is None else f"：{reason}")
     if name == "bash":
-        # 这一张单里运行命令一律由系统写「运行命令：<命令开头>」；角色写的那一句由 #1659 接上，
-        # 接手时只改这里：有那句话时标题是那句话、来源记作者
+        # 没有角色写的那一句话时由系统写「运行命令：<命令开头>」（有那一句时标题是它，见 _title）
         command = _text(args, "command")
         return None if command is None else f"运行命令：{redact_text(one_line(command))}"
     if name == "run_check":
@@ -264,21 +266,38 @@ def _known_title(tool: ToolDefinition, args: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _title(tool: ToolDefinition | None, name: str, args: Mapping[str, Any]) -> str:
-    # 一行标题：工具不在定义里、参数不是合法 JSON（执行层记成 {"invalid_arguments": 原文}）时写工具名
+def _intent(args: Mapping[str, Any]) -> str | None:
+    """运行命令的一句话（设计说明「动作标题」的运行命令一行，工单 #1659）。
+
+    角色写的文字：换行与连续的空白合成一个空格，空白的算缺失；和命令原文一样去掉凭据。
+    """
+    value = args.get(INTENT_ARGUMENT)
+    if not isinstance(value, str):
+        return None
+    sentence = redact_text(one_line(value))
+    return sentence or None
+
+
+def _title(tool: ToolDefinition | None, name: str, args: Mapping[str, Any]) -> tuple[str, Source]:
+    # 一行标题与它的来源：工具不在定义里、参数不是合法 JSON（执行层记成 {"invalid_arguments": 原文}）时写工具名。
+    # 只有运行命令有作者写的那一句（设计说明「动作标题」）：有它时标题是它、来源记作者，其余都由系统算
     if tool is None:
         parts = mcp_tool_parts(name)
         if parts is not None:
-            return limit_title(f"调用 {parts[0]} 的 {parts[1]}")
-        return limit_title(name)
+            return limit_title(f"调用 {parts[0]} 的 {parts[1]}"), SOURCE_SYSTEM
+        return limit_title(name), SOURCE_SYSTEM
     if "invalid_arguments" in args:
-        return limit_title(name)
+        return limit_title(name), SOURCE_SYSTEM
+    if tool.name == "bash":
+        sentence = _intent(args)
+        if sentence is not None:
+            return limit_title(sentence), SOURCE_AUTHOR
     known = _known_title(tool, args)
     if known is not None:
-        return limit_title(known)
+        return limit_title(known), SOURCE_SYSTEM
     if tool.proposal is not None:
-        return limit_title(f"提交{tool.outcome or tool.proposal}")
-    return limit_title(name)
+        return limit_title(f"提交{tool.outcome or tool.proposal}"), SOURCE_SYSTEM
+    return limit_title(name), SOURCE_SYSTEM
 
 
 def _mark(tool: ToolDefinition | None, name: str) -> Mark | None:
@@ -324,8 +343,8 @@ def action_line(tool: ToolDefinition | None, name: str, args: Any, receipt: Rece
     """
     arguments: Mapping[str, Any] = args if isinstance(args, Mapping) else {}
     text = "" if name is None else str(name)
-    return ActionLine(mark=_mark(tool, text), title=_title(tool, text, arguments),
-                      source=SOURCE_SYSTEM, facts=_facts(receipt))
+    title, source = _title(tool, text, arguments)
+    return ActionLine(mark=_mark(tool, text), title=title, source=source, facts=_facts(receipt))
 
 
 def action_title(name: Any, args: Any) -> str:
