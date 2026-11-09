@@ -140,6 +140,7 @@ def _entries(args: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
         if not isinstance(content, str) or not content.strip():
             continue
         status = item.get("status")
-        entries.append((content, PLAN_STATUS.get(status, TASK_PENDING) if isinstance(status, str)
-                        else TASK_PENDING))
+        label = PLAN_STATUS.get(status, TASK_PENDING) if isinstance(status, str) else TASK_PENDING
+        # 首尾空白不改变这句话：同一句话带不带首尾空白都是同一条任务，显示去掉首尾空白以后的那句
+        entries.append((content.strip(), label))
     return tuple(entries)

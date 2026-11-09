@@ -204,3 +204,15 @@ def test_tasks_carry_the_sentence_exactly_as_the_role_wrote_it():
     assert [task.number for task in grouping.tasks] == [1, 2]
     assert [task.content for task in grouping.tasks] == ["把 orders 的分页改掉", "补一条回归用例"]
     assert grouping.tasks[0] == Task(number=1, content="把 orders 的分页改掉", status=TASK_COMPLETED)
+
+def test_leading_and_trailing_spaces_do_not_make_a_new_task():
+    # R3（自定的边界）：同一句话带首尾空白仍是同一条任务；任务里给的是去掉首尾空白以后的那句话
+    records = [
+        _plan(10, ("写代码", "in_progress")),
+        _action(11, "a-1"),
+        _plan(20, ("  写代码  ", "in_progress"), action_id="plan-2"),
+        _action(21, "a-2"),
+    ]
+    grouping = group_tasks(records)
+    assert _tasks(grouping) == [(1, "写代码", TASK_IN_PROGRESS)]
+    assert grouping.owners == {"a-1": 1, "a-2": 1}
