@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/decision.md",
-"hash":"cd093acbf43c997e",
+"hash":"c4d78dd972845181",
 "nodes":[
-{"hash":"cd093acbf43c997e","id":"docs/decision.md","kind":"file","title":"docs/decision.md"},
+{"hash":"c4d78dd972845181","id":"docs/decision.md","kind":"file","title":"docs/decision.md"},
 {"hash":"c2a7f437ae1d1ae6","id":"docs/decision.md#决策记录","kind":"section","parent":"docs/decision.md","title":"决策记录"},
 {"hash":"cad38f6ac3bcdde9","id":"docs/decision.md#决策记录 > 2026-10-30 - 模型管理：填写地址与 Key，选择模型即可使用","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-10-30 - 模型管理：填写地址与 Key，选择模型即可使用"},
 {"hash":"fc4b759f2e346dcd","id":"docs/decision.md#决策记录 > 2026-10-30 - 模型能力表：按接入包登记协议，不排除记录；协议预填改回能力表优先","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-10-30 - 模型能力表：按接入包登记协议，不排除记录；协议预填改回能力表优先"},
@@ -69,7 +69,8 @@
 {"hash":"821d4dcb6a5e5b98","id":"docs/decision.md#决策记录 > 2026-11-08 - 循环图里的询问：开着时画一条虚线","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-08 - 循环图里的询问：开着时画一条虚线"},
 {"hash":"6c541d5b4cde84f4","id":"docs/decision.md#决策记录 > 2026-11-08 - 项目页的信息分层：默认显示现在，经过点开才有","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-08 - 项目页的信息分层：默认显示现在，经过点开才有"},
 {"hash":"524de41b4817952e","id":"docs/decision.md#决策记录 > 2026-11-08 - 薄片 ① 的发布与试用等新的项目页","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-08 - 薄片 ① 的发布与试用等新的项目页"},
-{"hash":"1ed391208deee296","id":"docs/decision.md#决策记录 > 2026-11-08 - 工作过程的任务与动作标题从哪里来","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-08 - 工作过程的任务与动作标题从哪里来"}
+{"hash":"1ed391208deee296","id":"docs/decision.md#决策记录 > 2026-11-08 - 工作过程的任务与动作标题从哪里来","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-08 - 工作过程的任务与动作标题从哪里来"},
+{"hash":"1c859171e6c4deda","id":"docs/decision.md#决策记录 > 2026-11-09 - v20 定型：其余界面的工单怎么拆，回放归画面","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-09 - v20 定型：其余界面的工单怎么拆，回放归画面"}
 ],
 "edges":[
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"docs/decision.md#决策记录 > 2026-10-30 - 核验是角色的性质，固定结构只剩循环、边界、裁决"},
@@ -165,6 +166,7 @@
 {"dst":"docs/agents/autopilot-runtime.md","kind":"code-path","raws":["docs/agents/autopilot-runtime.md"],"seen":"d170a56610a49816","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"ea7fd54934d91b46","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"f17acc22d854c5ae","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"dst":"harness/thin_driver.py","kind":"code-path","raws":["harness/thin_driver.py"],"seen":"a824b56d703f4a08","src":"docs/decision.md#决策记录 > 2026-11-04 - 阶段二第二轮补工单：薄驱动只搬连接，组织后端不等页面"},
 {"dst":".claude/skills/next/SKILL.md","kind":"code-path","raws":[".claude/skills/next/SKILL.md"],"seen":"5f29ed1d51ddb148","src":"docs/decision.md#决策记录 > 2026-11-07 - 架构师循环是单独的状态转换，由定时任务唤醒"},
 {"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"1a35dd1ec919323f","src":"docs/decision.md#决策记录 > 2026-11-07 - 架构师循环是单独的状态转换，由定时任务唤醒"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b289acfa0697386f","src":"docs/decision.md#决策记录 > 2026-11-07 - 架构师循环是单独的状态转换，由定时任务唤醒"},
@@ -172,6 +174,7 @@
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"246c9a8fec80aed2","src":"docs/decision.md#决策记录 > 2026-11-07 - 架构师循环是单独的状态转换，由定时任务唤醒"},
 {"dst":".claude/skills/architect-loop/SKILL.md#架构师循环 > 三层","kind":"section-ref","raws":[".claude/skills/architect-loop/SKILL.md"],"seen":"d97f980a9080aa99","src":"docs/decision.md#决策记录 > 2026-11-07 - 端到端在前端稳定以前不跑，真实页面交给薄片试用"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b2aa537674e85242","src":"docs/decision.md#决策记录 > 2026-11-07 - 阶段二工单整理：交接点没人接是卡住的主因"},
+{"dst":"docs/design/work-process-titles.md","kind":"code-path","raws":["docs/design/work-process-titles.md"],"seen":"76ab766041290382","src":"docs/decision.md#决策记录 > 2026-11-08 - 工作过程的任务与动作标题从哪里来"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"docs/decision.md#决策记录 > 2026-11-08 - 组织命名：结构词是职能，形态名列出它有哪几个职能"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b7470f5d65460f72","src":"docs/decision.md#决策记录 > 2026-11-08 - 组织命名：结构词是职能，形态名列出它有哪几个职能"}
 ]

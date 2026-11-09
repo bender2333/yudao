@@ -1,6 +1,6 @@
 # V19 页面结构设计提案
 
-总图位置：第一节「轮转方式」「下一个部门」「运维」「独立的证据」，第二节「定义」与四层，第三节「子组织」「增量与整份」。依据：[项目的组织设计说明](../../design/project-organization.md)、[形态与核验角色设计说明](../../design/forms-and-verifier-role.md)、[部门内多角色设计说明](../../design/department-roles.md)、[术语表](../../../CONTEXT.md)。
+总图位置：第一节「轮转方式」「下一个部门」「运维」「独立的证据」，第二节「定义」与四层，第三节「子组织」「增量与整份」。依据：[项目的组织设计说明](../../../design/project-organization.md)、[形态与核验角色设计说明](../../../design/forms-and-verifier-role.md)、[部门内多角色设计说明](../../../design/department-roles.md)、[术语表](../../../../CONTEXT.md)。
 
 ## 设计目标
 
