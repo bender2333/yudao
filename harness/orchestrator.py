@@ -1,6 +1,7 @@
-# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、作为任务开始）、激活的准备与收尾、
-# 新输入的分派、提案接纳以后的流转、发出决定请求与运行结束时撤销它们、暂停与失败。
-# 薄驱动在 `thin_driver.py`（工单 #1512）：循环、调度、计时与安全节点已经搬过去，这里经它的钩子协议接上；
+# 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、作为任务开始）、一轮工作的准备（选模型与提示词）、
+# 询问分支、提案的取舍、新输入的分派、发出决定请求、MCP 与试用会话，以及事项用的定义。
+# 薄驱动在 `thin_driver.py`（工单 #1512、#1513）：循环、调度、计时、安全节点、开始一轮工作与取派发编号、
+# 把一轮的结果经写入口写回、事项结束时写停止原因与核对流版本都在那里，这里经它的钩子协议接上；
 # 回答决定请求与建档的流转在应用层（`decision_flow.py`，工单 #827）：薄驱动只转交。
 # 运行工作区与会话的检查工作区在执行环境（`environment.py` 的 `Workspaces`，工单 #863）；
 # 恢复的零件在 `recovery.py` 的 `RunRecovery`（工单 #863）：薄驱动只把继续一个 run 转交过去。
@@ -31,7 +32,7 @@ from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
 from . import assembly_contract, execution_contract, mcp_session, routing_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, pending_guidance
-from .bounds import TIME_BOUND, activation_bound, time_limit_message, time_used_up
+from .bounds import TIME_BOUND, round_bound, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import artifact_hash
@@ -77,13 +78,13 @@ from .recovery import RunRecovery
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter, asks_cannot_verify
-from .thin_driver import ThinDriver
+from .thin_driver import RoundDependencies, RoundFailure, RoundPreparation, RoundWork, ThinDriver
 from .tools import in_force
 from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .watched_outputs import waiting_departments
 from .workspace import WorkspaceSnapshot
 
-# 由用户提出的事件：输入与部门指导（提出者为 user:local）
+# 由用户提出的事件：输入与部门指导（提出者为 user:local）。薄驱动的停止判断核对流版本时读这两个种类
 _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
 
 
@@ -122,32 +123,8 @@ def _round_applied_guidance(events: list[Any], projection: RunProjection,
     return [guidance_id for guidance_id in ids if guidance_id in entered]
 
 
-@dataclass
-class _Activation:
-    # 流程编排持有的一次激活：身份、采用的版本与工作依据（scope），提示词与适配器，
-    # 这个会话自己的停止开关，激活开始时 run 流的版本，步骤驱动，以及在安全节点等待重试时的唤醒。
-    # 停止开关是每个会话自己的（工单 #856）：停下一个会话只停这个会话，不改变事项的状态；
-    # 事项自己的开关（self._abort）是用户取消用的，它打开时全部会话停下，事项以取消结束
-    scope: ActivationScope
-    prompt: DepartmentPrompt
-    stop_flag: Event
-    adapter: ModelAdapter
-    version: int
-    # 步骤驱动由执行实现交出（执行契约）：薄驱动只经契约调 start、cancel 与 result，不认它的类
-    driver: Any = None
-    wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
-    deadline: float | None = None
-    # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：开始一轮工作时与请求一起交给执行实现，
-    # 安全节点上不再有这两个方法
-    settings: Any = None
-
-    @property
-    def run_id(self) -> str:
-        return self.scope.run_id
-
-    @property
-    def department(self) -> str:
-        return self.scope.department
+# 旧名留一版（工单 #1513）：一轮工作改叫 `RoundWork`（在 `thin_driver.py` 里），新的代码用新名
+_Activation = RoundWork
 
 
 @dataclass(frozen=True)
@@ -363,10 +340,6 @@ class Orchestrator:
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
         self._cancellers_changed = Condition()
-        # 正在激活的 run：_running 在准备激活之前以 setdefault 占用（同一 run 的同一部门只能有一次激活，
-        # 工单 #557 以后一个 run 里不同部门可以同时激活），_active 是这些激活本身
-        self._running: dict[tuple[str, str], object] = {}
-        self._active: dict[str, dict[str, _Activation]] = {}
         # 会话结束（事务 on_commit）执行后留下的清理错误：Windows 句柄长期占用时会出现，
         # 留给运维或下一次启动扫描处理，不阻塞 run 的正常退出
         self._close_errors: dict[str, list[Exception]] = {}
@@ -380,8 +353,9 @@ class Orchestrator:
         self._test_context_windows: dict[str, int] = {}
         # 项目服务在装配以后回填，用于结算与判断执行槽位（busy）
         self.projects: Any = None
-        # 薄驱动（工单 #1512）：循环、调度、计时与安全节点在 `thin_driver.py`，这里把应用一侧的流程编排
-        # 作为它写在那个模块里的钩子协议交给它；run_clock 是运行时间读的时钟（工单 #1520），原样交过去
+        # 薄驱动（工单 #1512、#1513）：循环、调度、计时、安全节点、开始一轮工作与取派发编号、结果写回
+        # 与事项结束都在 `thin_driver.py`，这里把应用一侧的流程编排作为它写在那个模块里的钩子协议交给它；
+        # run_clock 是运行时间读的时钟（工单 #1520），原样交过去。正在进行的轮次也由它记，取消、唤醒与计时都问它
         self._thin_driver = ThinDriver(self.writes, self, run_clock=run_clock)
 
     def _transact(self, stream: str, decide: Callable[[Transaction], Any], **options: Any) -> Any:
@@ -392,8 +366,8 @@ class Orchestrator:
             options["definitions"] = self.item_definitions(stream.split(":", 1)[1])
         return self.writes.transact(stream, decide, **options)
 
-    # 薄驱动的钩子协议（`thin_driver.DriverHooks`，工单 #1512）：应用一侧的流程编排做这些事，薄驱动经它们
-    # 读运行视图与路由、开始一轮工作、结算与结束事项。薄驱动不导入这里，构造时把自己交进来的是它
+    # 薄驱动的钩子协议（`thin_driver.DriverHooks`，工单 #1512、#1513）：应用一侧的流程编排做这些事，薄驱动经它们
+    # 读运行视图与路由、准备一轮工作、开始执行、结算与结束事项。薄驱动不导入这里，构造时把自己交进来的是它
     def read_run(self, run_id: str) -> Snapshot:
         # 这个 run 的只读快照：运行视图与还没回答的决定请求；run 不存在时按应用的错误抛出
         snapshot = self.writes.read(run_stream(run_id))
@@ -415,15 +389,53 @@ class Orchestrator:
     def settled(self, run_id: str) -> RunProjection:
         return self._settled(run_id)
 
-    def activations(self, run_id: str) -> dict[str, _Activation]:
-        return self._active.get(run_id, {})
+    def definitions(self, run_id: str) -> Any:
+        # 这个事项冻结的那份定义：停止原因与部门按它核对（MCP 设置带来的工具不改这两样）
+        return self.item_definitions(run_id)
 
-    def cancel_activation(self, activation: _Activation) -> None:
-        self._cancel_driver(activation)
+    def guidance_version(self, projection: RunProjection, department: str) -> int:
+        return guidance_version(projection, department)
 
-    async def activate_department(self, run_id: str, department: str,
-                                  connections: Any) -> RunProjection:
-        return await self._activate_department(run_id, department, connections)
+    def user_events(self) -> frozenset[str]:
+        # 用户提出的事件种类：薄驱动的停止判断核对流版本时用它（工单 #964、#1513）
+        return _USER_EVENTS
+
+    def await_cancellers(self, run_id: str) -> None:
+        self._await_cancellers(run_id)
+
+    def close_run(self, run_id: str) -> None:
+        self._on_close_run(run_id)
+
+    def session_idle(self, run_id: str, department: str) -> None:
+        # 这一轮结束了：这个部门的会话回到等待工作，别的会话可以接着开始
+        self.sessions.get(run_id, department).idle()
+
+    def prepare_round(self, run_id: str, transaction: Transaction, connections: ProviderConnections,
+                      department: str) -> RoundPreparation | None:
+        # 一轮工作的准备（选模型与提示词也在其中）：薄驱动据此在同一个事务里取派发编号、写这一轮的开始事件
+        return self._prepare_activation(run_id, transaction, connections, department)
+
+    def round_environment(self, round_work: RoundWork) -> tuple[Any | None, RoundFailure | None]:
+        return self._round_environment(round_work)
+
+    def round_dependencies(self, round_work: RoundWork,
+                           environment: Any) -> RoundDependencies:
+        return self._round_dependencies(round_work, environment)
+
+    def round_failure(self, exc: Exception) -> RoundFailure | None:
+        return self._describe_failure(exc)
+
+    def apply_round_result(self, round_work: RoundWork, result: Any, current: RunProjection) -> None:
+        self._apply_round_result(round_work, result, current)
+
+    def after_round_finished(self, transaction: Transaction, round_work: RoundWork,
+                             happened: list[Any]) -> None:
+        self._after_round_finished(transaction, round_work, happened)
+
+    async def _invoke_activation(self, round_work: RoundWork) -> None:
+        # 这一轮工作的连接在薄驱动（`ThinDriver.invoke_round`，工单 #1513）：这里保留同名转交，
+        # 应用与测试在这一轮结束的时刻做收尾（例如 `test_concurrent_commands` 在这里等收尾次序）
+        await self._thin_driver.invoke_round(round_work)
 
     def new_connections(self) -> ProviderConnections:
         return ProviderConnections()
@@ -434,21 +446,35 @@ class Orchestrator:
     async def close_mcp_sessions(self, run_id: str) -> None:
         await self._close_mcp_sessions(run_id)
 
-    def transact_run(self, run_id: str, decide: Callable[[Transaction], Any]) -> Any:
-        return self._transact(run_stream(run_id), decide)
+    def await_model(self, transaction: Transaction, round_work: RoundWork, reason: str, message: str,
+                    *, target: dict[str, Any] | None = None) -> None:
+        # 待恢复：run 停在这次请求之前，发出待恢复的决定请求（说明与选项在应用这一侧）
+        scope = round_work.scope
+        self._await_model(transaction, scope.department, target, reason, message,
+                          facts=self._failed_attempts(transaction, scope.activation_id))
+
+    def resume_after_pause(self, transaction: Transaction, reason: str, department: str,
+                           message: str | None, facts: list[str]) -> None:
+        # 暂停以后可以继续的那几种原因：发出继续或停止的决定请求（哪些原因可以继续在这一层决定）
+        kind = RESUMABLE_PAUSE_KINDS.get(reason)
+        if kind is not None:
+            self._request_pause_resume(transaction, kind, department, reason, message, facts)
+
+    def record_lesson_candidate(self, transaction: Transaction, reason: str, source_event: Any,
+                                projection: RunProjection) -> None:
+        # 运行失败时记下教训候选（取消不算）
+        if reason != "cancelled":
+            self.submissions.record_lesson_candidate(transaction, source_event, projection)
+
+    def transact_run(self, run_id: str, decide: Callable[[Transaction], Any], **options: Any) -> Any:
+        return self._transact(run_stream(run_id), decide, **options)
 
     def assign_new_inputs(self, transaction: Transaction) -> RunProjection:
         return self._assign_new_inputs(transaction)
 
-    def fail(self, transaction: Transaction, reason: str, message: str) -> None:
-        self._fail(transaction, reason, message)
-
-    def end(self, transaction: Transaction, reason: str, message: str) -> None:
-        self._end(transaction, reason, message)
-
-    async def execute_ask(self, activation: _Activation, scope: ActivationScope,
+    async def execute_ask(self, round_work: RoundWork, scope: ActivationScope,
                           call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
-        return await self._execute_ask(activation, scope, call)
+        return await self._execute_ask(round_work, scope, call)
 
     def blocks_run(self, decisions: Iterable[DecisionRequest]) -> bool:
         return blocks_run(decisions)
@@ -685,9 +711,9 @@ class Orchestrator:
         return self._input_department_of(self._definitions)
 
     @staticmethod
-    def _round_workspace(activation: _Activation) -> RoundWorkspace:
+    def _round_workspace(round_work: RoundWork) -> RoundWorkspace:
         # 这一轮工作用哪份工作区（S4c 工单 #863）：身份取自已开始的一轮，检查工作区在交付到达时换新的
-        scope = activation.scope
+        scope = round_work.scope
         return RoundWorkspace(
             run_id=scope.run_id, department=scope.department, session_id=scope.session_id,
             activation_id=scope.activation_id,
@@ -737,7 +763,7 @@ class Orchestrator:
         message = "This run has ended; create a new task for this input."
         with self._cancelling(run_id):
             self._require_open(run_id, self.project(run_id), message)
-            _activation, cancel_error = self._abort_run(run_id)
+            _round_work, cancel_error = self._abort_run(run_id)
             stop_error = cancel_error
 
             def receive(transaction: Transaction) -> None:
@@ -782,19 +808,19 @@ class Orchestrator:
         flag = self._abort.get(run_id)
         return flag is not None and flag.is_set()
 
-    def _abort_run(self, run_id: str) -> tuple[_Activation | None, Exception | None]:
+    def _abort_run(self, run_id: str) -> tuple[RoundWork | None, Exception | None]:
         # 中止运行（用户取消）：事项的开关打开，之后的核对都得到停止，正在进行的步骤立即取消；
         # 交回正在进行的激活与取消它时的错误。
         # 同时运行（工单 #557）：取消与暂停作用于事项的全部会话，这里取消这个 run 的每一个会话
         self._abort.setdefault(run_id, Event()).set()
-        activations = list(self._active.get(run_id, {}).values())
-        first: _Activation | None = None
+        activations = list(self._thin_driver.activations(run_id).values())
+        first: RoundWork | None = None
         error: Exception | None = None
-        for activation in activations:
+        for round_work in activations:
             if first is None:
-                first = activation
+                first = round_work
             try:
-                self._cancel_driver(activation)
+                self._cancel_driver(round_work)
             except Exception as exc:
                 error = error or exc
         return first, error
@@ -929,7 +955,7 @@ class Orchestrator:
                 self._transact(run_stream(run_id), lambda transaction: self._fail(
                     transaction, "cancelled", "run cancelled"), command=command)
             finally:
-                _activation, cancel_error = self._abort_run(run_id)
+                _round_work, cancel_error = self._abort_run(run_id)
                 if cancel_error is not None:
                     self._abort_run(run_id)
         if cancel_error is not None:
@@ -956,16 +982,10 @@ class Orchestrator:
             return None
         return self._recovery.resume(run_id)
 
-    def _cancel_driver(self, activation: _Activation) -> None:
-        # 停下这个会话：打开它自己的停止开关，正在进行的步骤立即取消；
-        # 在安全节点等待重试的激活立即醒来；取消调用尝试出错时同样唤醒。
-        # 只停这个会话，不改变事项的状态（工单 #856）
-        activation.stop_flag.set()
-        try:
-            if activation.driver is not None:
-                activation.driver.cancel()
-        finally:
-            self._wake(activation.run_id, restart=True)
+    def _cancel_driver(self, round_work: RoundWork) -> None:
+        # 停下这个会话：打开它自己的停止开关，取消正在进行的步骤；在安全节点等待重试的激活立即醒来。
+        # 只停这个会话，不改变事项的状态（工单 #856）。实现在薄驱动（工单 #1513），这里保留同名转交
+        self._thin_driver.cancel_round(round_work)
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
         # 运行到停止的循环在薄驱动（工单 #1512）：等待工作的部门各开始一轮工作，等全部会话结束或事项到终态。
@@ -1219,106 +1239,18 @@ class Orchestrator:
         department = self._item_routing(run_id).next_department(projection, waiting=self._waiting_departments(run_id))
         if department is None:
             return await self._no_new_work(run_id)
-        return await self._activate_department(run_id, department, connections)
+        return await self.activate_department(run_id, department, connections)
 
-    async def _activate_department(self, run_id: str, department: str,
-                                   connections: ProviderConnections) -> RunProjection:
-        # 这个部门的一轮工作：准备激活、跑步骤驱动、收尾。
-        # 同时运行（工单 #557）：一个 run 里不同部门的会话各自一个任务，同一个部门同时只有一轮
-        claim = object()
-        key = (run_id, department)
-        if self._running.setdefault(key, claim) is not claim:
-            raise RuntimeError("department already has an active department invocation")
-        try:
-            activation = self._transact(
-                run_stream(run_id), lambda transaction: self._prepare_activation(
-                    run_id, transaction, connections, department))
-            if activation is None:
-                # 没有开始新的激活（等待用户回答、已经结束、达到上限或这个部门已经别人的工作）：
-                # 这段不计入运行时间，累计保留在内存里，下次激活从事件恢复时继续
-                self._pause_run_clock(run_id)
-                return await asyncio.to_thread(self._settled, run_id)
-            self._active.setdefault(run_id, {})[department] = activation
-            started = time.monotonic()
-            try:
-                await self._invoke_activation(activation)
-            finally:
-                scope = activation.scope
-
-                def finish(transaction: Transaction) -> None:
-                    current = transaction.projection
-                    elapsed_ms = self._settle_run_segment(run_id, scope.department)
-                    happened = transaction.events()
-                    # 这一轮结束时的已用量读最小投影（S1e 工单 #1015）：事项一级与会话一级的激活次数与
-                    # 模型步数都由投影折出来，不在这里从事件数一遍。会话的已用时间含当前这一段，
-                    # 投影要等这条事件写进去才结算，所以由驱动算好写进事件
-                    measured = transaction.minimal()
-                    session = measured.sessions.get(scope.session_id, SessionState())
-                    session_elapsed_ms = self._settle_session_segment(run_id, scope.session_id, elapsed_ms)
-                    transaction.append(NewEvent(
-                        EventType.ACTIVATION_FINISHED,
-                        actor="system",
-                        department=scope.department,
-                        parent_event_id=scope.parent_event_id,
-                        state_before=current.status,
-                        state_after=current.status,
-                        session_id=scope.session_id,
-                        payload={
-                            "activation_id": scope.activation_id,
-                            **scope.versions(),
-                            "latency_ms": int((time.monotonic() - started) * 1000),
-                            "elapsed_ms": elapsed_ms,
-                            "activations": measured.used.activations,
-                            "model_steps": measured.used.model_steps,
-                            "session_elapsed_ms": session_elapsed_ms,
-                            "session_activations": session.activations,
-                            "session_model_steps": session.model_steps,
-                            "stop_reason": current.stop_reason,
-                        },
-                    ))
-                    # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导 docs/design/department-guidance.md「处理结果与来源」，工单 #1039）：
-                    # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
-                    # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入。
-                    # 一轮以什么结束由路由判断（工单 #825）：不是正常结束的一轮没有结果，也照旧不写已回答
-                    ended = self._item_routing(scope.run_id).round_end(
-                        current, happened, department=scope.department, session_id=scope.session_id,
-                        activation_id=scope.activation_id)
-                    if ended is None:
-                        return
-                    answered = _round_applied_guidance(happened, current, scope)
-                    if not answered:
-                        return
-                    for guidance_id in answered:
-                        transaction.append(NewEvent(
-                            EventType.DEPARTMENT_GUIDANCE_RESPONDED,
-                            actor="system",
-                            department=scope.department,
-                            parent_event_id=scope.parent_event_id,
-                            state_before=current.status,
-                            state_after=current.status,
-                            session_id=scope.session_id,
-                            payload={"guidance_id": guidance_id,
-                                     "activation_id": scope.activation_id,
-                                     "outcome": ended.outcome},
-                        ))
-
-                # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
-                await asyncio.to_thread(self._await_cancellers, run_id)
-                self._transact(run_stream(run_id), finish, dispatch_number=scope.dispatch_number or None)
-                # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
-                self._rebase_run_clock(run_id)
-                self.sessions.get(run_id, scope.department).idle()
-                active = self._active.get(run_id)
-                if active is not None:
-                    active.pop(scope.department, None)
-                    if not active:
-                        self._active.pop(run_id, None)
-            return await asyncio.to_thread(self._settled, run_id)
-        finally:
-            self._running.pop(key, None)
+    async def activate_department(self, run_id: str, department: str,
+                                  connections: ProviderConnections) -> RunProjection:
+        # 这个部门的一轮工作由薄驱动跑完（工单 #1513）：准备（选模型与提示词在应用一侧）、取派发编号、
+        # 开始执行、把结果经写入口写回与收尾都在那里；这里保留同名入口给调用方与钩子
+        return await self._thin_driver.activate_department(run_id, department, connections)
 
     def _prepare_activation(self, run_id: str, transaction: Transaction,
-                            connections: ProviderConnections, department: str) -> _Activation | None:
+                            connections: ProviderConnections, department: str) -> RoundPreparation | None:
+        # 一轮工作的准备（薄驱动的 `prepare_round` 钩子）：检查能不能开始、取模型与提示词、准备会话；
+        # 开始这一轮的派发编号与开始事件由薄驱动在同一个事务里写（工单 #1513）
         projection = transaction.projection
         if not projection.run_id:
             raise RunNotFoundError(run_id)
@@ -1333,7 +1265,7 @@ class Orchestrator:
         if projection.status in TERMINAL_STATUSES:
             return None
         minimal = transaction.minimal()
-        bound = activation_bound(minimal, self._elapsed_sec(run_id))
+        bound = round_bound(minimal, self._elapsed_sec(run_id))
         if bound is not None:
             if bound == TIME_BOUND:
                 self._fail(transaction, bound, time_limit_message(minimal, self._elapsed_sec(run_id)))
@@ -1390,40 +1322,133 @@ class Orchestrator:
         prompt = settings.department_prompt(department)
         basis = work_basis(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
-        provider_name = self._activation_provider(adapter)
-        # 派发编号（工单 #1397，总图第三节「重派与迟到的结果」）：开始一轮工作时写一条事件取得编号，这一轮写入的
-        # 事件都带它；重派先写事件、编号加一，旧编号交回的结果只记录、不改变事项的状态
-        transaction.claim_dispatch_number(session.session_id)
-        acquired = NewEvent(
-            EventType.DISPATCH_NUMBER_ACQUIRED, actor="system", department=department,
-            state_before=projection.status, state_after=projection.status, session_id=session.session_id,
-            payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1},
+        # 这一轮的身份与依据交给薄驱动：派发编号与开始事件由它写（工单 #1513）
+        return RoundPreparation(
+            session_id=session.session_id, activation_id=activation_id, prompt=prompt, adapter=adapter,
+            settings=settings, basis=basis, guidance_ids=guidance_ids,
+            provider=self._activation_provider(adapter),
         )
-        parent = transaction.append(acquired, NewEvent(
-            EventType.DEPARTMENT_ACTIVATED,
-            actor="system",
-            department=department,
-            state_before=projection.status,
-            state_after=projection.status,
-            session_id=session.session_id,
-            provider=provider_name,
-            payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1,
-                     "effective_contract_hash": basis.effective_contract_hash,
-                     "guidance_ids": list(guidance_ids),
-                     "guidance_version": basis.guidance_version,
-                     "input_version": basis.input_version, "prompt_version": prompt.version,
-                     "prompt_hash": prompt.prompt_ref.content_hash},
-        ))[1]
-        scope = ActivationScope(
-            run_id, department, session.session_id, activation_id, parent.event_id,
-            prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
-            basis=basis, provider=provider_name, dispatch_number=parent.dispatch_number or 0,
+
+    def _round_environment(self, round_work: RoundWork) -> tuple[Any | None, RoundFailure | None]:
+        # 这一轮用哪份工作区（S4c 工单 #863）：检查工作区从运行工作区建立，建立源里的无法表示条目、
+        # 不可判定的忽略规则与读不出的封存交付各自有停止原因；绑定之后的读取错误由执行实现照常记下
+        scope = round_work.scope
+        run_id, department = scope.run_id, scope.department
+        projection = self.project(run_id)
+        try:
+            environment = self._workspaces.environment_for(run_id, department, refresh=True)
+        except UnrepresentableWorkspace as exc:
+            # 非质检会话的检查工作区从运行工作区建立，建立源里的无法表示条目与激活开始后发现的同类：
+            # 以 workspace_unrepresentable 暂停，而不是当作存储故障终止
+            return None, RoundFailure("workspace_unrepresentable", str(exc), list(exc.paths))
+        except IgnoreRulesUndecidable as exc:
+            # 建立检查工作区时主机判断不了忽略规则：与装配请求、工具执行等位置同一个结局，
+            # 以 host_commit_error 停止，说明带诊断原文（docs/design/local-tools.md「工具边界」，工单 #604）
+            return None, RoundFailure("host_commit_error", str(exc))
+        except (ValueError, OSError) as exc:
+            # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
+            # （ADR-0038 与 docs/design/local-tools.md「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
+            # 以 host_commit_error 正式终止并报告真实原因，与提交判断对同一缺陷的报告方式一致
+            return None, RoundFailure(
+                "host_commit_error",
+                f"the persisted delivery tree cannot be read for the {department} "
+                f"inspection workspace: {exc}")
+        try:
+            self._workspaces.bind(environment, projection, activation_id=scope.activation_id,
+                                  effective_contract_hash=scope.basis.effective_contract_hash)
+        except UnrepresentableWorkspace as exc:
+            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停，
+            # 条目在工作区内的相对路径写进决定请求的事实引用
+            return None, RoundFailure("workspace_unrepresentable", str(exc), list(exc.paths))
+        except IgnoreRulesUndecidable as exc:
+            # 激活开始前主机判断不了忽略规则：同一个结局，以 host_commit_error 停止（工单 #604）
+            return None, RoundFailure("host_commit_error", str(exc))
+        except Exception as exc:
+            # 工作区打不开：依据是轮次开始时的运行状态
+            return None, RoundFailure("provider_error", f"{type(exc).__name__}: {exc}")
+        return environment, None
+
+    def _round_dependencies(self, round_work: RoundWork, environment: Any) -> RoundDependencies:
+        # 开始一轮工作交给执行实现的依赖（执行契约的 dependencies）：装配、工件、模型访问、定义与工作区
+        # 都在这里取一次；这一轮的上限按会话剩余的步数，工作引用来自路由（工单 #861、#862）
+        scope = round_work.scope
+        run_id = scope.run_id
+        return RoundDependencies(
+            execution=self._execution,
+            assembly=self.assembly,
+            artifacts=self.artifacts,
+            facade=self.facade,
+            deltas=self.deltas,
+            tightening=self._item_tightening(run_id),
+            definitions=self.item_definitions(run_id),
+            mcp_sessions=self.mcp_sessions(run_id),
+            environment=environment,
+            limits=self._session_limits(run_id, scope.session_id),
+            work_ref=self._item_routing(run_id).work_reference(self.project(run_id), department=scope.department),
+            refresh_workspace=self._workspaces.refresh_for(self._round_workspace(round_work)),
         )
-        # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
-        self._start_session_segment(run_id, session.session_id)
-        # 这个会话自己的停止开关（工单 #856）：停这个会话只停这个会话，不改变事项的状态
-        return _Activation(scope, prompt, Event(), adapter,
-                           transaction.projection.stream_version, settings=settings)
+
+    @staticmethod
+    def _describe_failure(exc: Exception) -> RoundFailure | None:
+        # 应用自己的异常翻成停止原因（执行实现开始时与提交提案时都可能抛出）；其余由薄驱动按阶段结束
+        if isinstance(exc, UnrepresentableWorkspace):
+            return RoundFailure("workspace_unrepresentable", str(exc), list(exc.paths))
+        if isinstance(exc, IgnoreRulesUndecidable):
+            return RoundFailure("host_commit_error", str(exc))
+        return None
+
+    def _apply_round_result(self, round_work: RoundWork, result: Any, current: RunProjection) -> None:
+        # 一轮正常结束以后由应用问路由这一轮以什么结束，再经写入口提交提案（工单 #861）：
+        # 路由说这一轮不是正常结束时不提交；提案的取舍在 `_apply_proposal`
+        scope = round_work.scope
+        ended = self._item_routing(scope.run_id).round_end(
+            current, list(result.events), department=scope.department,
+            session_id=scope.session_id, activation_id=scope.activation_id)
+        if ended is None:
+            return
+        submission = result
+        transcript_ref = None
+        if submission.transcript:
+            ref = self.artifacts.put(scope.run_id, "transcript", submission.transcript, media_type="text/plain")
+            transcript_ref = ref.__dict__
+        self._apply_proposal(
+            scope.run_id, department=scope.department, projection=current, proposal=submission.submission,
+            transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
+            session_id=scope.session_id,
+            provider=submission.response.provider or self._activation_provider(round_work.adapter),
+            model=submission.response.model,
+        )
+
+    def _after_round_finished(self, transaction: Transaction, round_work: RoundWork,
+                              happened: list[Any]) -> None:
+        # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导 docs/design/department-guidance.md「处理结果与来源」，工单 #1039）：
+        # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
+        # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入。
+        # 一轮以什么结束由路由判断（工单 #825）：不是正常结束的一轮没有结果，也照旧不写已回答
+        scope = round_work.scope
+        current = transaction.projection
+        ended = self._item_routing(scope.run_id).round_end(
+            current, happened, department=scope.department, session_id=scope.session_id,
+            activation_id=scope.activation_id)
+        if ended is None:
+            return
+        answered = _round_applied_guidance(happened, current, scope)
+        if not answered:
+            return
+        for guidance_id in answered:
+            transaction.append(NewEvent(
+                EventType.DEPARTMENT_GUIDANCE_RESPONDED,
+                actor="system",
+                department=scope.department,
+                parent_event_id=scope.parent_event_id,
+                state_before=current.status,
+                state_after=current.status,
+                session_id=scope.session_id,
+                payload={"guidance_id": guidance_id,
+                         "activation_id": scope.activation_id,
+                         "outcome": ended.outcome},
+            ))
+
 
     def _department_settings(self, projection: RunProjection) -> _DepartmentSettings:
         # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：事项所用定义与项目层在开始一轮工作时取一次，
@@ -1431,10 +1456,10 @@ class Orchestrator:
         return _DepartmentSettings(projection.run_id, projection.project_id, self.projects,
                                    self.artifacts, self.item_definitions(projection.run_id))
 
-    def _safe_node(self, activation: _Activation, declared: int) -> execution_contract.SafeNode:
+    def _safe_node(self, round_work: RoundWork, declared: int) -> execution_contract.SafeNode:
         # 安全节点接口由薄驱动实现（工单 #1512）：按执行实现声明的契约版本给，当前版拿到设计说明写的五样；
         # 声明上一版（第二版）的实现还会问按部门取模型与提示词，那一版留一版
-        return self._thin_driver.safe_node(activation, declared)
+        return self._thin_driver.safe_node(round_work, declared)
 
     def _activation_provider(self, adapter: ModelAdapter) -> str:
         # 激活事件上的提供方名称：确定性测试适配器用它的名称；目录驱动的运行在每次请求解析出连接
@@ -1497,124 +1522,9 @@ class Orchestrator:
             compaction_stalled_limit=int(frozen["compaction.stalled_limit"]),
         )
 
-    async def _invoke_activation(self, activation: _Activation) -> None:
-        scope = activation.scope
-        run_id, department = scope.run_id, scope.department
-        projection = self.project(run_id)
-        try:
-            environment = self._workspaces.environment_for(run_id, department, refresh=True)
-        except UnrepresentableWorkspace as exc:
-            # 非质检会话的检查工作区从运行工作区建立，建立源里的无法表示条目与激活开始后发现的同类：
-            # 以 workspace_unrepresentable 暂停，而不是当作存储故障终止
-            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version,
-                          facts=list(exc.paths))
-            return
-        except IgnoreRulesUndecidable as exc:
-            # 建立检查工作区时主机判断不了忽略规则：与装配请求、工具执行等位置同一个结局，
-            # 以 host_commit_error 停止，说明带诊断原文（docs/design/local-tools.md「工具边界」，工单 #604）
-            self._end_run(activation, "host_commit_error", str(exc), activation.version)
-            return
-        except (ValueError, OSError) as exc:
-            # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
-            # （ADR-0038 与 docs/design/local-tools.md「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
-            # 以 host_commit_error 正式终止并报告真实原因，与提交判断对同一缺陷的报告方式一致
-            self._end_run(activation, "host_commit_error",
-                          f"the persisted delivery tree cannot be read for the {department} "
-                          f"inspection workspace: {exc}",
-                          activation.version)
-            return
-        try:
-            self._workspaces.bind(environment, projection, activation_id=scope.activation_id,
-                                  effective_contract_hash=scope.basis.effective_contract_hash)
-            # 薄驱动只经执行契约与装配契约调用实现：先核对两个实现声明的版本（构造时已核对过，
-            # 这里再看一眼这一轮开始时的引用没有被换掉），版本不合时在开始这一轮之前失败，
-            # 说明里写明实现的声明与薄驱动接受的版本
-            declared = execution_contract.accept(self._execution)
-            assembly_contract.accept(self.assembly)
-            # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
-            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」），
-            # 成果驱动不用它时为空（工单 #861）；按部门取模型与提示词的来源随请求交给执行实现
-            # （第三版，工单 #1511），不再由安全节点回答
-            request = execution_contract.RoundRequest(
-                scope=scope, prompt=activation.prompt,
-                limits=self._session_limits(run_id, scope.session_id),
-                work_ref=self._item_routing(run_id).work_reference(projection, department=department),
-                department_settings=activation.settings,
-            )
-            activation.driver = self._execution.start(
-                request, writes=self.writes, artifacts=self.artifacts,
-                assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
-                environment=environment,
-                nodes=self._safe_node(activation, declared), cancelled=activation.stop_flag,
-                deltas=self.deltas, tightening=self._item_tightening(run_id),
-                refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
-                definitions=self.item_definitions(activation.scope.run_id),
-                mcp_sessions=self.mcp_sessions(activation.scope.run_id),
-            )
-            result = await activation.driver.result()
-        except UnrepresentableWorkspace as exc:
-            # 打开工作区或驱动开始前发现无法表示的条目：以 workspace_unrepresentable 暂停，
-            # 条目在工作区内的相对路径写进决定请求的事实引用
-            self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version,
-                          facts=list(exc.paths))
-            return
-        except IgnoreRulesUndecidable as exc:
-            # 激活开始前主机判断不了忽略规则：同一个结局，以 host_commit_error 停止（工单 #604）
-            self._end_run(activation, "host_commit_error", str(exc), activation.version)
-            return
-        except Exception as exc:
-            # 步骤驱动没有开始：依据是激活开始时的运行状态
-            self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
-            return
-        # 一轮工作的结果只剩这一轮写下的事件范围与停止原因（docs/design/skeleton-and-application.md「执行契约」，#861）：
-        # 有停止原因的是这个会话停下或失败，按原因暂停或结束运行
-        if result.stop_reason is not None:
-            self._end_run(activation, result.stop_reason, result.message, result.version,
-                          target=result.target, facts=list(result.facts) or None,
-                          stalled_compaction=result.stalled_compaction)
-            return
-
-        current = self.project(run_id)
-        if current.status in TERMINAL_STATUSES:
-            return
-        if result.submission is None:
-            # 这一轮没有经提议方式交上东西（在安全节点停下，或只有文字回答）：按当时的运行状态收尾
-            elapsed = self._elapsed_sec(run_id)
-            minimal = self.writes.minimal(run_stream(run_id))
-            if time_used_up(minimal, elapsed):
-                self._end_run(activation, TIME_BOUND, time_limit_message(minimal, elapsed), result.version)
-            return
-        # 薄驱动拿到一轮结果以后问路由这一轮以什么结束，再按回答经写入口提交（docs/design/skeleton-and-application.md「执行契约」输出、
-        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」；工单 #861）：路由说这一轮不是正常结束时不提交
-        ended = self._item_routing(run_id).round_end(current, list(result.events), department=department,
-                                                     session_id=scope.session_id, activation_id=scope.activation_id)
-        if ended is None:
-            return
-        submission = result
-
-        try:
-            transcript_ref = None
-            if submission.transcript:
-                ref = self.artifacts.put(run_id, "transcript", submission.transcript, media_type="text/plain")
-                transcript_ref = ref.__dict__
-            self._apply_proposal(
-                run_id, department=department, projection=current, proposal=submission.submission,
-                transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
-                session_id=scope.session_id,
-                provider=submission.response.provider or self._activation_provider(activation.adapter),
-                model=submission.response.model,
-            )
-        except UnrepresentableWorkspace as exc:
-            # 提案提交（提交判断读取工作区事实、交付封存取得公开树）发现无法表示的条目：暂停，错误不再归入提交错误
-            self._end_run(activation, "workspace_unrepresentable", str(exc), None, facts=list(exc.paths))
-        except IgnoreRulesUndecidable as exc:
-            # 提案提交时主机判断不了忽略规则：同一个结局，停止说明只写诊断原文（工单 #604）
-            self._end_run(activation, "host_commit_error", str(exc), None)
-        except Exception as exc:
-            self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
     async def _execute_ask(
         self,
-        activation: _Activation,
+        round_work: RoundWork,
         scope: ActivationScope,
         call: dict[str, Any],
     ) -> tuple[bool, Any, str | None, str | None, int]:
@@ -1667,7 +1577,7 @@ class Orchestrator:
         used_time = self._session_elapsed_sec(scope.run_id, branch.session_id)
         deadline = time.monotonic() + max(0.0, branch.max_time_sec - used_time)
         if branch_limits.max_model_steps > 0:
-            result = await self._run_ask_branch(activation, scope, branch, limits=branch_limits,
+            result = await self._run_ask_branch(round_work, scope, branch, limits=branch_limits,
                                                 deadline=deadline)
             submission, stop_reason, message = result.submission, result.stop_reason, result.message
             response = result.response
@@ -1693,7 +1603,7 @@ class Orchestrator:
             # 这一回答同时交上了正式成果（产品回答询问时修订 PRD）：成果的内容由路由组装，
             # 薄驱动照常经裁决入口核对、经写入口提交
             revision, new_contract_hash = self._commit_answer_revision(
-                activation, scope, branch, outcome.revises, response)
+                round_work, scope, branch, outcome.revises, response)
         with_spec_revision = outcome.revises is not None
 
         def record_ask_answered(transaction: Transaction) -> None:
@@ -1725,7 +1635,7 @@ class Orchestrator:
             return True, outcome.answer, None, new_contract_hash, steps
         return False, None, outcome.reason, None, steps
 
-    def _commit_answer_revision(self, activation: _Activation, scope: ActivationScope,
+    def _commit_answer_revision(self, round_work: RoundWork, scope: ActivationScope,
                                 branch: routing_contract.AskBranch, proposal: dict[str, Any],
                                 response: Any) -> tuple[int, str]:
         # 回答同时交上的正式成果（循环结构 docs/design/department-loop.md「回答能做什么」）：提案与提出它的部门都由路由组装（`issuer`），
@@ -1756,15 +1666,15 @@ class Orchestrator:
                 ends_run=decision.ends_run,
                 parent_event_id=scope.parent_event_id,
                 session_id=branch.session_id,
-                provider=response.provider or self._activation_provider(activation.adapter),
+                provider=response.provider or self._activation_provider(round_work.adapter),
                 model=response.model,
             )
             curr = transaction.projection
             return decision.artifact["revision"], artifact_hash(curr.effective_contract)
 
         revision, new_contract_hash = self._transact(run_stream(scope.run_id), commit_prd_revision)
-        activation.scope = replace(activation.scope, basis=replace(
-            activation.scope.basis, effective_contract_hash=new_contract_hash))
+        round_work.scope = replace(round_work.scope, basis=replace(
+            round_work.scope.basis, effective_contract_hash=new_contract_hash))
         return revision, new_contract_hash
 
 
@@ -1789,7 +1699,7 @@ class Orchestrator:
 
     async def _run_ask_branch(
         self,
-        activation: _Activation,
+        round_work: RoundWork,
         scope: ActivationScope,
         branch: routing_contract.AskBranch,
         *,
@@ -1845,7 +1755,7 @@ class Orchestrator:
             run_id, department, session_id, activation_id, act_event.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash,
             guidance_ids=[], basis=basis,
-            provider=self._activation_provider(activation.adapter),
+            provider=self._activation_provider(round_work.adapter),
             dispatch_number=act_event.dispatch_number or 0,
         )
 
@@ -1853,31 +1763,29 @@ class Orchestrator:
         self._workspaces.bind(environment, projection, activation_id=activation_id,
                               effective_contract_hash=basis.effective_contract_hash)
 
-        branch_activation = _Activation(
+        branch_activation = RoundWork(
             # 询问分支属于提问方的那个会话：它的停止开关就是那个会话的（工单 #856），
             # 那个会话停下时分支一起停下
-            branch_scope, prompt, activation.stop_flag, activation.adapter, None, projection.stream_version,
+            branch_scope, prompt, round_work.stop_flag, round_work.adapter, None, projection.stream_version,
             deadline=deadline, settings=settings,
         )
-        # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本（构造时已核对过），
-        # 版本不合时这一轮不开始
-        declared = execution_contract.accept(self._execution)
-        assembly_contract.accept(self.assembly)
         # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
         # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
-        # （工单 #861、#862）
-        driver = self._execution.start(
+        # （工单 #861、#862）。开始执行经薄驱动（工单 #1513）：它核对两个实现声明的版本（构造时已核对过）
+        dependencies = RoundDependencies(
+            execution=self._execution, assembly=self.assembly, artifacts=self.artifacts,
+            facade=self.facade, deltas=self.deltas, tightening=self._item_tightening(run_id),
+            definitions=self.item_definitions(run_id), environment=environment, limits=limits,
+            work_ref=branch.work_ref,
+            refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
+        )
+        driver = self._thin_driver.start_execution(
+            branch_activation,
             execution_contract.RoundRequest(
                 scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,
                 department_settings=settings,
             ),
-            writes=self.writes, artifacts=self.artifacts,
-            assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
-            environment=environment,
-            nodes=self._safe_node(branch_activation, declared), cancelled=branch_activation.stop_flag,
-            deltas=self.deltas, tightening=self._item_tightening(branch_activation.scope.run_id),
-            refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
-            definitions=self.item_definitions(branch_activation.scope.run_id),
+            dependencies,
         )
         started = time.monotonic()
         try:
@@ -2107,29 +2015,6 @@ class Orchestrator:
         ))
         transaction.on_commit(lambda: self._wake(projection.run_id))
 
-    def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None,
-                 *, target: dict[str, Any] | None = None, facts: list[str] | None = None,
-                 stalled_compaction: bool = False) -> None:
-        # 在一个事务中按停止原因暂停或结束运行；模型引用无法使用（provider_unavailable）与整理连续没有推进
-        # 达到上限（compaction_failed，工单 #1238）时 run 进入待恢复。
-        # version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有用户的命令或输入写入；有写入、并且写入
-        # 改变了这次激活的依据（输入或指导）时，停止判断已经过期，按安全节点停止处理，运行继续，由下一次激活处理
-        # 新的输入或指导。运行时间用完不因此改变；已经结束（例如已经取消）的运行不再写入。
-        # target 是这次失败对应的调用目标公开部分，写进待恢复的请求
-        def end(transaction: Transaction) -> None:
-            if version is not None and reason != TIME_BOUND and self._superseded(transaction, activation, version):
-                return
-            if reason == "provider_unavailable" or (reason == "compaction_failed" and stalled_compaction):
-                # 整理连续没有推进（模型管理 docs/design/model-management.md「失败处理」最后一条）：停在这次整理之前，等用户决定换模型
-                # 继续还是停止事项；已收下的交付与已完成的工作都留在投影里
-                scope = activation.scope
-                self._await_model(transaction, scope.department, target, reason, message,
-                                  facts=self._failed_attempts(transaction, scope.activation_id))
-                return
-            self._end(transaction, reason, message, facts=facts)
-
-        self._transact(run_stream(activation.run_id), end)
-
     @staticmethod
     def _failed_attempts(transaction: Transaction, activation_id: str) -> list[str]:
         # 这次激活中最后一次失败的调用尝试（这次请求无法发送或被拒绝的记录）
@@ -2191,78 +2076,23 @@ class Orchestrator:
         # 应用层的流转要结束一次运行时经这里记成失败（工单 #827）：撤销待回答的决定请求、写停止原因
         self._fail(transaction, reason, message)
 
-    def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
-        # 停止判断过期：这次激活的工作期间有新的用户输入到达（输入版本变了），
-        # 停止判断不再适用：这一轮按安全节点结束，运行继续，由下一次激活处理新的输入
-        # （工单 #964，循环结构 docs/design/department-loop.md「工作中途要求变化」与 docs/design/department-loop.md「指导」）。输入到达不再结束部门当前这一轮：
-        # 它作为通知在这个会话的下一步送达，部门接着工作。
-        projection = transaction.projection
-        basis = activation.scope.basis
-        if projection.input_version != basis.input_version:
-            return True
-        # 新的指导在停止判断以后到达：同样过期，由下一次激活处理
-        if not any(event.type in _USER_EVENTS for event in transaction.events_after(version)):
-            return False
-        return guidance_version(projection, activation.department) > basis.guidance_version
-
     def _stop_reason(self, transaction: Transaction, reason: str):
         # 停止原因按这个事项冻结的形态的那份定义核对（工单 #1392）：路由自己的结束原因也在它那份清单里
         return self.item_definitions(transaction.projection.run_id).stop_reason(reason)
 
+    def _withdraw_decisions(self, transaction: Transaction, reason: str) -> None:
+        # 撤销未回答的决定请求：写入由薄驱动提供（工单 #1513），完成路径（接纳写入 RUN_DONE）也用它
+        self._thin_driver.withdraw_decisions(transaction, reason)
+
     def _end(self, transaction: Transaction, reason: str, message: str,
              *, facts: list[str] | None = None) -> None:
-        # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。完成（放行或基线核验）只由接纳写入。
-        # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径。
-        # facts 是暂停决定请求要带的事实引用（workspace_unrepresentable 为条目在工作区内的相对路径）
-        outcome = self._stop_reason(transaction, reason).outcome
-        if outcome == "paused":
-            self._pause(transaction, reason, message, facts=facts)
-        elif outcome == "failed":
-            self._fail(transaction, reason, message)
-        else:
-            raise ValueError(f"stop reason {reason} ends a run as completed, which only an accepted final proposal records")
-
-    def _withdraw_decisions(self, transaction: Transaction, reason: str) -> None:
-        # 运行结束：撤销未回答的决定请求，reason 是结束运行的停止原因
-        projection = transaction.projection
-        for decision in list(transaction.decisions.values()):
-            if decision.status != "open":
-                continue
-            transaction.append(NewEvent(
-                EventType.DECISION_WITHDRAWN, actor="system", department=decision.request["department"],
-                parent_event_id=decision.decision_id, state_before=projection.status, state_after=projection.status,
-                payload={"decision_id": decision.decision_id, "reason": reason},
-            ))
+        # 按定义中停止原因规定的方式暂停或结束运行在薄驱动（工单 #1513）：这里保留同名转交
+        self._thin_driver.end(transaction, reason, message, facts=facts)
 
     def _pause(self, transaction: Transaction, reason: str, message: str | None = None,
                *, facts: list[str] | None = None) -> None:
-        projection = transaction.projection
-        if projection.status in TERMINAL_STATUSES:
-            return
-        department = projection.active_department
-        self._withdraw_decisions(transaction, reason)
-        transaction.append(NewEvent(
-            EventType.RUN_PAUSED, actor="system", department=department,
-            state_before=projection.status, state_after="paused", stop_reason=reason,
-            error=message,
-            provider=projection.provider, model=projection.model,
-            payload={
-                "stop_reason": reason,
-                "human_action": self._stop_reason(transaction, reason).human_action,
-                **({"message": message} if message else {}),
-                "cycle_count": projection.cycle_count,
-                "max_cycles": projection.max_cycles,
-                "token_used": projection.token_used,
-            },
-        ))
-        # 因不调用工具或工作区无法表示而暂停时发出决定请求（D09，工单 #204）：阻塞整个 run，
-        # 选项为「处理以后继续执行」与「停止事项」，说明写明停止原因与人工处理说明；
-        # workspace_unrepresentable 的 facts 是条目在工作区内的相对路径。
-        # max_cycles 与 model_steps_exhausted 不发出这个请求，仍按原样暂停
-        kind = RESUMABLE_PAUSE_KINDS.get(reason)
-        if kind is not None:
-            self._request_pause_resume(transaction, kind, department, reason, message, facts or [])
-        transaction.on_commit(lambda: self._on_close_run(projection.run_id))
+        # 暂停的写入（停止原因、撤销决定请求、继续的决定请求）在薄驱动（工单 #1513）：这里保留同名转交
+        self._thin_driver.pause(transaction, reason, message, facts=facts)
 
     def _request_pause_resume(self, transaction: Transaction, kind: DecisionKind, department: str,
                               reason: str, message: str | None,
@@ -2286,19 +2116,5 @@ class Orchestrator:
 
     def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:
-        human = self._stop_reason(transaction, reason).human_action
-        projection = transaction.projection
-        if projection.status in TERMINAL_STATUSES:
-            return
-        department = projection.active_department
-        self._withdraw_decisions(transaction, reason)
-        source_event = transaction.append(NewEvent(
-            EventType.RUN_FAILED, actor="system", department=department,
-            state_before=projection.status, state_after="failed", stop_reason=reason, error=message,
-            provider=projection.provider, model=projection.model,
-            payload={"stop_reason": reason, "human_action": human, "message": message,
-                     **({"input_save_failure": input_save_failure} if input_save_failure is not None else {})},
-        ))[0]
-        transaction.on_commit(lambda: self._on_close_run(projection.run_id))
-        if reason != "cancelled":
-            self.submissions.record_lesson_candidate(transaction, source_event, projection)
+        # 失败的写入（停止原因、撤销决定请求、教训候选）在薄驱动与它的钩子（工单 #1513）：这里保留同名转交
+        self._thin_driver.fail(transaction, reason, message, input_save_failure=input_save_failure)
