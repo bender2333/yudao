@@ -31,6 +31,7 @@
 "test_baseline_validity.py" = "module"
 "test_access_tokens.py" = "integration"
 "test_action_contract.py" = "module"
+"test_action_titles.py" = "unit"
 "test_activation_accounting.py" = "integration"
 "test_activation_responses.py" = "integration"
 "test_adjudication.py" = "module"
