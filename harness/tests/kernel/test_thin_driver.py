@@ -109,11 +109,10 @@ class _Hooks:
         return self.superseded
 
     def stop_event_fields(self, transaction) -> StopEventFields:
-        # 暂停与失败事件要写的应用字段：从事务里的运行视图读，与真实的应用钩子同一读法
-        projection = transaction.projection
+        # 暂停与失败事件要写的应用字段：故意给与运行视图不同的值，事件里出现它们才说明值来自钩子（工单 #1678）
         return StopEventFields(
-            department=projection.active_department, provider=projection.provider, model=projection.model,
-            cycle_count=projection.cycle_count, max_cycles=projection.max_cycles, token_used=projection.token_used,
+            department=DEPARTMENT, provider="hook-provider", model="hook-model",
+            cycle_count=7, max_cycles=99, token_used=42,
         )
 
     def run_view(self, transaction):
@@ -251,7 +250,8 @@ def test_the_bound_stops_the_round_and_the_stop_reason_comes_from_the_closed_lis
         assert "exceeded limit of 1s" in failed.error
         # 暂停或失败事件的应用字段由应用经钩子给出（工单 #1678）：部门与模型引用照旧写进事件；
         # 运行时间用完不核对停止判断是否过期，应用不被问这一项
-        assert (failed.department, failed.provider, failed.model) == (DEPARTMENT, "fake", None)
+        assert (failed.department, failed.provider, failed.model) == (
+            DEPARTMENT, "hook-provider", "hook-model")
         assert rig.hooks.superseded_asks == 0
         # 这是薄驱动的安全节点给的停止，记下教训候选（应用一侧的钩子）也带着同一个原因
         assert rig.hooks.lessons == ["time_limit"]
@@ -259,17 +259,18 @@ def test_the_bound_stops_the_round_and_the_stop_reason_comes_from_the_closed_lis
 
 def test_a_pause_writes_the_application_fields_from_the_hook(tmp_path):
     # 暂停事件的应用字段由应用经钩子给出（工单 #1678）：部门、模型引用与累计用量原样写进事件；
-    # 暂停以后按定义发出可以继续的决定请求，运行进入暂停
+    # 钩子给的值与运行视图不同，事件里出现这些值才说明薄驱动没有去读运行视图
     with _Rig(tmp_path, run_time_limit_sec=10) as rig:
         round_work = rig.begin()
         rig.driver.end_run(round_work, "no_tool_call", "the model kept answering without a tool call",
                            round_work.version)
         [paused] = rig.events(SkeletonEventType.RUN_PAUSED)
-        assert (paused.department, paused.provider, paused.model) == (DEPARTMENT, "fake", None)
+        assert (paused.department, paused.provider, paused.model) == (
+            DEPARTMENT, "hook-provider", "hook-model")
         assert paused.stop_reason == paused.payload["stop_reason"] == "no_tool_call"
-        assert paused.payload["cycle_count"] == 1
-        assert paused.payload["max_cycles"] == rig.system.project(rig.run_id).max_cycles
-        assert paused.payload["token_used"] == 0
+        assert paused.payload["cycle_count"] == 7
+        assert paused.payload["max_cycles"] == 99
+        assert paused.payload["token_used"] == 42
         assert rig.system.project(rig.run_id).status == "paused"
 
 

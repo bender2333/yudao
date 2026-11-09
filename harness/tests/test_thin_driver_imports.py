@@ -176,21 +176,36 @@ PROJECTION_FIELDS = frozenset(item.name for item in dataclasses.fields(RunProjec
 DEFAULT_VIEW_NAMES = frozenset({"projection", "current", "view", "run_view"})
 
 
+# 交回运行视图的钩子：project、run_view、settled、assign_new_inputs 直接交回运行视图；
+# read_run 交回的是写入口的快照，快照上的 `.projection` 另有一条检查。
+# settled 实际经 `asyncio.to_thread` 调用，方法本身作为值传出去，不写成一次直接调用
+VIEW_HOOKS = frozenset({"project", "read_run", "run_view", "settled", "assign_new_inputs"})
+
+
+def _hook_reference(node: ast.AST) -> bool:
+    # 钩子方法本身作为值传出去（`asyncio.to_thread(self._hooks.settled, run_id)` 这样调用）
+    return isinstance(node, ast.Attribute) and node.attr in VIEW_HOOKS
+
+
 def _hook_returns_a_view(node: ast.AST) -> bool:
-    # 钩子交回运行视图的方法：project、run_view、settled、assign_new_inputs 直接交回运行视图；
-    # read_run 交回的是写入口的快照，快照上的 `.projection` 另有一条检查
-    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"project", "read_run", "run_view", "settled", "assign_new_inputs"})
+    if isinstance(node, ast.Await):
+        return _hook_returns_a_view(node.value)
+    if not isinstance(node, ast.Call):
+        return False
+    if isinstance(node.func, ast.Attribute) and node.func.attr in VIEW_HOOKS:
+        return True
+    # 经 asyncio.to_thread 之类转调的钩子：返回值仍是运行视图
+    return any(_hook_reference(argument) for argument in node.args)
 
 
 def _is_view_expression(node: ast.AST | None, names: set[str]) -> bool:
-    # 这个表达式是运行视图：按名字认的变量、`.projection`，或钩子的返回值
+    # 这个表达式是运行视图：按名字认的变量、`.projection`、钩子的返回值，或钩子方法本身
     if node is None:
         return False
     if isinstance(node, ast.Name):
         return node.id in names
     if isinstance(node, ast.Attribute):
-        return node.attr == "projection"
+        return node.attr == "projection" or _hook_reference(node)
     return _hook_returns_a_view(node)
 
 
@@ -296,6 +311,17 @@ def test_every_hook_that_answers_with_the_run_view_is_tracked():
         "harness/thin_driver.py:5: self._hooks.settled(run_id).provider",
         "harness/thin_driver.py:6: self._hooks.assign_new_inputs(transaction).stop_reason",
     ]
+
+
+def test_a_view_hook_run_in_a_thread_is_tracked_too():
+    # settled 实际写成 `asyncio.to_thread(self._hooks.settled, run_id)`：方法作为值传出去，
+    # 交回的值仍是运行视图，改名以后取字段照样报（独立审查指出这条写法，工单 #1678）
+    probe = (
+        "async def end(self, run_id):\n"
+        "    settled = await asyncio.to_thread(self._hooks.settled, run_id)\n"
+        "    return settled.status\n"
+    )
+    assert projection_reads(probe, THIN_DRIVER) == ["harness/thin_driver.py:3: settled.status"]
 
 
 def test_passing_the_run_view_to_a_hook_or_the_routing_is_allowed():
