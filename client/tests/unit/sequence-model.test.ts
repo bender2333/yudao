@@ -133,6 +133,21 @@ test("打回与放行标在那一版那一行上，不单独占一行", () => {
   assert.deepEqual(keys.filter((key) => key.includes("e-rej") || key.includes("e-rel")), []);
 });
 
+test("同一版交给两个核验角色：仍是一行，结论按各自的来往标在同一版上", () => {
+  const view = sequenceOf({
+    roles: [...ROLES, { id: "audit", label: "审计" }],
+    flow: [
+      flow({ flow_id: "f-del:q", event_id: "e-del", kind: "版本交付", position: 6, direction_from: "engineering", direction_to: "quality", content: "第 1 版交付", round: 1, created_at: "2026-11-01T09:20:00Z" }),
+      flow({ flow_id: "f-del:a", event_id: "e-del", kind: "版本交付", position: 6, direction_from: "engineering", direction_to: "audit", content: "第 1 版交付", round: 1, created_at: "2026-11-01T09:20:00Z" }),
+      flow({ flow_id: "f-rel", event_id: "e-rel", kind: "放行", position: 14, direction_from: "audit", direction_to: "engineering", content: "核验了交付第 1 版", round: 1, created_at: "2026-11-01T09:40:00Z" }),
+    ],
+    materials: { deliveries: [{ event_id: "e-del", revision: 1 }] },
+  });
+  const delivery = rowOf(view, "flow:e-del");
+  assert.deepEqual(delivery.to, ["quality", "audit"]);
+  assert.deepEqual(delivery.verdict, { tone: "release", text: "审计放行" });
+});
+
 test("询问与回答是虚线，其余（成果、你的输入、决定）是实线", () => {
   const view = fullRun();
   assert.equal(rowOf(view, "ask:a1").dashed, true);

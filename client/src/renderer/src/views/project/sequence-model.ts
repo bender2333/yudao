@@ -278,6 +278,7 @@ export function sequenceOf(input: SequenceInput): SequenceView {
 
   // 一、成果、你的输入与指导：一条事件一行；同一版同时给几个职能（PRD 给工程与质检）合成一行
   const deliveries: { row: BuiltRow; position: number; from: string; to: string[] }[] = [];
+  const deliveryAt = new Map<string, { row: BuiltRow; position: number; from: string; to: string[] }>();
   const merged = new Map<string, BuiltRow>();
   for (const record of records) {
     if (record.kind === DEFECT_KIND || record.kind === RELEASE_KIND || record.kind === ASK_KIND
@@ -289,6 +290,11 @@ export function sequenceOf(input: SequenceInput): SequenceView {
     if (existing !== undefined) {
       if (!existing.to.includes(record.direction_to)) {
         existing.to.push(record.direction_to);
+      }
+      // 这一版还给别的核验角色：打回与放行按两端找那一版时也要找得到
+      const delivery = deliveryAt.get(key);
+      if (delivery !== undefined && !delivery.to.includes(record.direction_to)) {
+        delivery.to.push(record.direction_to);
       }
       continue;
     }
@@ -307,7 +313,9 @@ export function sequenceOf(input: SequenceInput): SequenceView {
     });
     merged.set(key, row);
     if (record.kind === DELIVERY_KIND) {
-      deliveries.push({ row, position: record.position, from, to: [record.direction_to] });
+      const delivery = { row, position: record.position, from, to: [record.direction_to] };
+      deliveries.push(delivery);
+      deliveryAt.set(key, delivery);
     }
   }
 
