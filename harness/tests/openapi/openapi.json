@@ -5136,6 +5136,17 @@
             },
             "type": "array",
             "title": "Facts"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
           }
         },
         "additionalProperties": false,
@@ -15393,6 +15404,13 @@
             },
             "type": "array",
             "title": "Background Commands"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskView"
+            },
+            "type": "array",
+            "title": "Tasks"
           }
         },
         "additionalProperties": false,
@@ -16488,6 +16506,36 @@
           "home"
         ],
         "title": "SystemStatus"
+      },
+      "TaskView": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "待做",
+              "进行中",
+              "完成",
+              "已从计划里去掉"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "number",
+          "content",
+          "status"
+        ],
+        "title": "TaskView"
       },
       "ToolServerProbe": {
         "properties": {
