@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { EventDetailResult, RunStepsResult, StepText } from "../../api/generated/types.gen";
+import type { ActivationView, EventDetailResult, RunStepsResult, StepText } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import { paths } from "../../shell/routing";
 import { actionRow, toolOutput, type ExternalSourceRefView } from "./action-table.ts";
@@ -89,44 +89,82 @@ export function WorkProcess(props: {
         {open ? "收起工作过程" : "看工作过程"}
       </button>
       {open ? (
-        <div className="y10-wp-body" data-testid="work-process">
-          <p className="y10-wp-head">
-            工作过程
-            <small> {props.departmentLabel === "" ? "" : `${props.departmentLabel} · `}{targetText(props.target)}</small>
-          </p>
-          {error === null ? null : <Empty text={readFailureText(error)} />}
-          {ready && data === null && error === null ? (
-            <p className="y10-note note">正在读取这一轮的工作过程</p>
-          ) : null}
-          {ready && list.data !== null && matches.length === 0 ? <Empty text={noActivationText(props.target)} /> : null}
-          {matches.length > 1 ? (
-            <div className="y10-wp-activations" role="tablist" aria-label="这一轮的几次工作">
-              {matches.map((activation, index) => (
-                <button
-                  key={activation.activation_id}
-                  type="button"
-                  role="tab"
-                  aria-selected={picked !== null && activation.activation_id === picked.activation_id}
-                  className={`y10-wp-activation${picked !== null && activation.activation_id === picked.activation_id ? " is-active" : ""}`}
-                  onClick={() => setChosen(activation.activation_id)}
-                >
-                  {activationLabel(activation, index)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {data === null ? null : (
-            <WorkLineList
-              app={props.app}
-              projectId={props.projectId}
-              workItemId={props.workItemId}
-              runId={props.runId}
-              department={department}
-              groups={workGroups(workLines(data))}
-            />
-          )}
+        <WorkProcessBody
+          app={props.app}
+          projectId={props.projectId}
+          workItemId={props.workItemId}
+          runId={props.runId}
+          target={props.target}
+          departmentLabel={props.departmentLabel}
+          matches={matches}
+          picked={picked}
+          data={data}
+          loading={ready && data === null && error === null}
+          error={error}
+          onPick={setChosen}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * 展开以后的那一块：抬头写这是谁的第几轮（或这次回答）、同一轮几次工作时的那一排、
+ * 以及这一次的全部行。取数与展开状态在 WorkProcess 里，这里只按给的事实画。
+ */
+export function WorkProcessBody(props: {
+  app: ClientApp;
+  projectId: string;
+  workItemId: string;
+  runId: string;
+  target: WorkTarget;
+  departmentLabel: string;
+  /** 与这一行对得上的那几次激活（按开始时间升序）：多于一次时列出来，默认最后一次 */
+  matches: ActivationView[];
+  picked: ActivationView | null;
+  /** 正在看的那一次的步骤；还没读到时为空 */
+  data: RunStepsResult | null;
+  loading: boolean;
+  error: string | null;
+  onPick: (activationId: string) => void;
+}): React.JSX.Element {
+  return (
+    <div className="y10-wp-body" data-testid="work-process">
+      <p className="y10-wp-head">
+        工作过程
+        <small> {props.departmentLabel === "" ? "" : `${props.departmentLabel} · `}{targetText(props.target)}</small>
+      </p>
+      {props.error === null ? null : <Empty text={readFailureText(props.error)} />}
+      {props.loading ? <p className="y10-note note">正在读取这一轮的工作过程</p> : null}
+      {props.matches.length === 0 && props.error === null && !props.loading ? (
+        <Empty text={noActivationText(props.target)} />
+      ) : null}
+      {props.matches.length > 1 ? (
+        <div className="y10-wp-activations" role="tablist" aria-label="这一轮的几次工作">
+          {props.matches.map((activation, index) => (
+            <button
+              key={activation.activation_id}
+              type="button"
+              role="tab"
+              aria-selected={props.picked !== null && activation.activation_id === props.picked.activation_id}
+              className={`y10-wp-activation${props.picked !== null && activation.activation_id === props.picked.activation_id ? " is-active" : ""}`}
+              onClick={() => props.onPick(activation.activation_id)}
+            >
+              {activationLabel(activation, index)}
+            </button>
+          ))}
         </div>
       ) : null}
+      {props.data === null ? null : (
+        <WorkLineList
+          app={props.app}
+          projectId={props.projectId}
+          workItemId={props.workItemId}
+          runId={props.runId}
+          department={props.target.department}
+          groups={workGroups(workLines(props.data))}
+        />
+      )}
     </div>
   );
 }
@@ -187,8 +225,10 @@ function WorkLineList(props: {
 /**
  * 一行：标记、标题、系统量到的事实与标题来源。点这一行展开原始数据：
  * 命令、参数、退出状态、输出、这一步的推理与模型文字、外部来源，以及进请求详情页的那几个入口。
+ *
+ * 展开与否由调用处给（`open` 与 `onToggle`）：一次激活的每一行、折起来以后展开的每一行都用它。
  */
-function WorkLineItem(props: {
+export function WorkLineItem(props: {
   app: ClientApp;
   projectId: string;
   workItemId: string;
