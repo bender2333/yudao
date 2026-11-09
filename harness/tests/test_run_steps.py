@@ -129,18 +129,46 @@ def _snapshot_ref(seed: str) -> dict:
     return {"kind": "tree", "content_hash": "sha256:" + seed * 64, "path": "snapshots/tree.json"}
 
 
+def _plan_call(system, run_id, *, department=PRODUCT, activation=ACTIVATION, action_id="plan-1",
+               step_id=1, entries, ok=True):
+    # 更新计划的调用（工单 #1660）：一条普通的工具调用记录，工具开始与工具结果两条；
+    # 格式错误时工具结果里 ok 为假（工单 #1661 按这一项判断它算不算计划）
+    started_payload = {"id": action_id, "name": "update_plan", "args": {"plan": entries},
+                       "purpose": "work", "activation_id": activation, "step_id": step_id,
+                       "input_version": 1}
+    called_payload = {**started_payload, "ok": ok,
+                      "error": None if ok else "plan[0].status must be one of pending, in_progress, completed"}
+    started = _append(system, run_id, EventType.TOOL_STARTED, department=department,
+                      payload=started_payload)
+    called = _append(system, run_id, EventType.TOOL_CALLED, department=department,
+                     payload=called_payload)
+    return started, called
+
+
+PLAN_ONE = [{"content": "先看一遍现有实现", "status": "in_progress"},
+            {"content": "跑检查", "status": "pending"}]
+PLAN_TWO = [{"content": "先看一遍现有实现", "status": "completed"},
+            {"content": "跑检查", "status": "in_progress"},
+            {"content": "写交付说明", "status": "pending"}]
+PLAN_THREE = [{"content": "先看一遍现有实现", "status": "completed"},
+              {"content": "跑检查", "status": "in_progress"}]
+PLAN_EARLIER = [{"content": "更早那次的做法", "status": "in_progress"}]
+
+
 def steps_fixture(data_dir):
     """一个部门两次激活、另一个部门一次激活的运行：覆盖本工单验收里的全部形状。
 
     产品部门的后一次激活（`act-1`）有五个逻辑步：第一步有推理、一条文字条目、一条工具调用条目与
     两个动作；第二步只有动作；第三步第一次尝试失败、第二次成功；第五步是 Responses 的推理与只有
     加密内容的一条。另外有一条没有归到步骤的动作与一条后台命令。
+    这一轮里更新三次计划（第一步、第二步、第五步各一次，工单 #1661）；更早那次激活自己有一份计划。
     """
     system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
     project_id = system.projects.register("逐步记录", "核对 run.steps")
     work_item_id, run_id = system.projects.start_work_item(project_id, "看部门每一步")
+    steps = {}
 
-    # 更早的一次激活：问它时要返回这一次的步骤
+    # 更早的一次激活：问它时要返回这一次的步骤；它自己的计划与动作不进入后一次激活的分组
     _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
             payload={"activation_id": EARLIER_ACTIVATION, "cycle": 1})
     _request(system, run_id, activation=EARLIER_ACTIVATION, step_id=1, root_step_id=1, attempt=1,
@@ -149,13 +177,19 @@ def steps_fixture(data_dir):
                item=_chat_reasoning("更早这次激活的推理"))
     _message(system, run_id, activation=EARLIER_ACTIVATION, step_id=1, attempt_id="att-0",
              item=_text_message("更早这次激活说的话"))
+    _plan_call(system, run_id, activation=EARLIER_ACTIVATION, action_id="plan-earlier",
+               entries=PLAN_EARLIER)
+    steps["earlier_action"] = _tool(system, run_id, activation=EARLIER_ACTIVATION,
+                                    action_id="call-earlier", name="read_file", step_id=1,
+                                    args={"path": "src/earlier.py"})
     _append(system, run_id, EventType.ACTIVATION_FINISHED, payload={"activation_id": EARLIER_ACTIVATION})
 
     # 后一次激活（默认看这一次）
     _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
             payload={"activation_id": ACTIVATION, "cycle": 2})
-    steps = {}
     _request(system, run_id, step_id=1, root_step_id=1, attempt=1, attempt_id="att-1")
+    # 第一步里先发更新计划、后发动作：这一步的动作归新计划的第一条进行中任务
+    _plan_call(system, run_id, action_id="plan-1", step_id=1, entries=PLAN_ONE)
     steps["reasoning"] = _reasoning(system, run_id, step_id=1, attempt_id="att-1",
                                     item=_chat_reasoning(LONG_REASONING))
     steps["text"] = _message(system, run_id, step_id=1, attempt_id="att-1",
@@ -167,6 +201,7 @@ def steps_fixture(data_dir):
                                args={"path": "src/a.py"})
 
     _request(system, run_id, step_id=2, root_step_id=2, attempt=1, attempt_id="att-2")
+    _plan_call(system, run_id, action_id="plan-2", step_id=2, entries=PLAN_TWO)
     _tool(system, run_id, action_id="call-c", name="list_files", step_id=2)
     # 命令的失败与超时看退出状态，不看 ok：这两条的回执里 ok 都是真（工单 #1657）
     _tool(system, run_id, action_id="call-fail", name="bash", step_id=2,
@@ -194,8 +229,9 @@ def steps_fixture(data_dir):
     _append(system, run_id, EventType.MODEL_ATTEMPT_FINISHED, payload={
         "attempt_id": "att-3b", "activation_id": ACTIVATION, "step_id": 4, "status": "completed"})
 
-    # 第五步：Responses 的推理（摘要可读）与一条只有加密内容的推理
+    # 第五步：Responses 的推理（摘要可读）与一条只有加密内容的推理；这一步的计划去掉了「写交付说明」
     _request(system, run_id, step_id=5, root_step_id=5, attempt=1, attempt_id="att-5")
+    _plan_call(system, run_id, action_id="plan-3", step_id=5, entries=PLAN_THREE)
     _reasoning(system, run_id, step_id=5, attempt_id="att-5",
                item=_responses_reasoning("Responses 的推理摘要"))
     _reasoning(system, run_id, step_id=5, attempt_id="att-5", item=_encrypted_reasoning())
@@ -598,3 +634,157 @@ def test_a_long_activation_is_read_within_a_second(data_dir):
     finally:
         system.close()
 
+
+# ---------------------------------------------------------------------------
+# 工单 #1661：任务列表与每个动作的所属任务
+
+
+def _task_rows(result):
+    return [(task.number, task.content, task.status) for task in result.tasks]
+
+
+def test_a_round_carries_its_tasks_and_every_action_belongs_to_one(data_dir):
+    # R3（验收第 1、2 条）：一轮里更新三次计划，动作归到当时进行中的条目；同一句话的几段动作归同一条；
+    # 后来的计划里没有了的写「已从计划里去掉」；从没进行过的排在最后
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert _task_rows(result) == [(1, "先看一遍现有实现", "完成"),
+                                      (2, "跑检查", "进行中"),
+                                      (3, "写交付说明", "已从计划里去掉")]
+        # 第一步与第二步的动作各归当时进行中的那一条；第三、五步没有新计划，仍归第二步定下的「跑检查」
+        assert {action.action_id: action.task for step in result.steps
+                for action in step.actions} == {
+            "call-a": 1, "call-b": 1,
+            "call-c": 2, "call-fail": 2, "call-timeout": 2, "call-write": 2, "call-same": 2,
+            "call-bg": 2,
+        }
+        # 没有归到步骤的动作也带所属任务
+        assert [action.task for action in result.unassigned_actions] == [2]
+    finally:
+        system.close()
+
+
+def test_the_plan_update_is_not_a_row_and_its_call_is_still_in_the_events(data_dir):
+    # R3（验收第 5 条）：更新计划自己不单独成行，它的原始调用仍在事件里，事件详情读得到
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert all(action.tool != "update_plan" for step in result.steps for action in step.actions)
+        assert all(action.tool != "update_plan" for action in result.unassigned_actions)
+        planned = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.TOOL_CALLED
+                   and (event.payload or {}).get("name") == "update_plan"
+                   and (event.payload or {}).get("activation_id") == ACTIVATION]
+        assert len(planned) == 3
+        detail = application.query("event.detail", EventDetail(event_id=planned[0].event_id)).data
+        assert detail.event["payload"]["args"]["plan"][0]["content"] == "先看一遍现有实现"
+    finally:
+        system.close()
+
+
+def test_a_round_without_a_plan_has_no_tasks_and_no_action_owners(data_dir):
+    # R3（验收第 5 条）：没有计划的轮次任务列表为空、动作不带所属任务（页面平铺）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        engineering = _query(application, RunSteps(run_id=run_id, department=ENGINEERING))
+        assert engineering.tasks == []
+        assert [action.task for step in engineering.steps for action in step.actions] == [None]
+    finally:
+        system.close()
+
+
+def test_a_plan_only_groups_the_round_it_was_written_in(data_dir):
+    # R3（验收第 4 条）：上一轮的计划不影响这一轮；问上一轮时看到的是它自己的任务
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        earlier = _query(application, RunSteps(run_id=run_id, department=PRODUCT,
+                                               activation_id=EARLIER_ACTIVATION))
+        assert _task_rows(earlier) == [(1, "更早那次的做法", "进行中")]
+        assert [action.task for step in earlier.steps for action in step.actions] == [1]
+        current = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert "更早那次的做法" not in [task.content for task in current.tasks]
+    finally:
+        system.close()
+
+
+def test_an_action_without_an_in_progress_entry_is_unnumbered(data_dir):
+    # R3（验收第 3 条）：没有进行中条目时的动作不编号，任务列表照旧给出那几条任务
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("没有进行中", "核对不编号的动作")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "一条")
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
+            payload={"activation_id": ACTIVATION, "cycle": 1})
+    _request(system, run_id, step_id=1, root_step_id=1, attempt=1, attempt_id="att-1")
+    _plan_call(system, run_id, action_id="plan-1", step_id=1,
+               entries=[{"content": "写代码", "status": "completed"}])
+    _tool(system, run_id, action_id="call-a", name="read_file", step_id=1)
+    _append(system, run_id, EventType.ACTIVATION_FINISHED, payload={"activation_id": ACTIVATION})
+    application = Application(system)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert _task_rows(result) == [(1, "写代码", "完成")]
+        assert [action.task for action in result.steps[0].actions] == [None]
+    finally:
+        system.close()
+
+
+def test_a_rejected_plan_is_not_a_plan_and_not_a_row(data_dir):
+    # R3（自定的边界）：格式错误的更新计划是工具结果里的错误，不当成计划，分组仍按上一份已接受的计划；
+    # 它自己也不单独成行
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("格式错误", "核对被拒绝的计划")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "一条")
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
+            payload={"activation_id": ACTIVATION, "cycle": 1})
+    _request(system, run_id, step_id=1, root_step_id=1, attempt=1, attempt_id="att-1")
+    _plan_call(system, run_id, action_id="plan-1", step_id=1,
+               entries=[{"content": "写代码", "status": "in_progress"}])
+    _tool(system, run_id, action_id="call-a", name="read_file", step_id=1)
+    _request(system, run_id, step_id=2, root_step_id=2, attempt=1, attempt_id="att-2")
+    _plan_call(system, run_id, action_id="plan-2", step_id=2, ok=False,
+               entries=[{"content": "写代码", "status": "doing"}])
+    _tool(system, run_id, action_id="call-b", name="read_file", step_id=2)
+    _append(system, run_id, EventType.ACTIVATION_FINISHED, payload={"activation_id": ACTIVATION})
+    application = Application(system)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert _task_rows(result) == [(1, "写代码", "进行中")]
+        assert [action.task for step in result.steps for action in step.actions] == [1, 1]
+    finally:
+        system.close()
+
+def test_a_plan_in_an_ask_branch_groups_only_that_branch(data_dir):
+    # R3（验收第 4 条）：询问分支的计划只作用于这个分支；主线那一轮的计划不影响它
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("询问分支的计划", "核对分组的范围")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "分支")
+    _append(system, run_id, EventType.ASK_STARTED, payload={
+        "requester": PRODUCT, "recipient": QUALITY, "question": "能放行吗", "branch_session_id": "ask-1"})
+    # 主线这一轮：工程的一次激活，写了一份自己的计划
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, department=ENGINEERING, session_id=SESSION,
+            payload={"activation_id": ENGINEERING_ACTIVATION, "cycle": 1})
+    _plan_call(system, run_id, department=ENGINEERING, activation=ENGINEERING_ACTIVATION,
+               action_id="plan-main", step_id=1,
+               entries=[{"content": "主线那一轮的事", "status": "in_progress"}])
+    _append(system, run_id, EventType.ACTIVATION_FINISHED, department=ENGINEERING,
+            payload={"activation_id": ENGINEERING_ACTIVATION})
+    # 询问分支是质检的一次激活：计划与动作都写在这个分支里
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, department=QUALITY, session_id="ask-1",
+            payload={"activation_id": "act-ask"})
+    _plan_call(system, run_id, department=QUALITY, activation="act-ask", action_id="plan-ask",
+               step_id=1, entries=[{"content": "回答这个询问", "status": "in_progress"}])
+    _tool(system, run_id, department=QUALITY, activation="act-ask", action_id="call-ask",
+          name="answer", step_id=1, args={"answer": "可以"})
+    _append(system, run_id, EventType.ACTIVATION_FINISHED, department=QUALITY,
+            payload={"activation_id": "act-ask"})
+    application = Application(system)
+    try:
+        branch = _query(application, RunSteps(run_id=run_id, department=QUALITY,
+                                              activation_id="act-ask"))
+        assert [task.content for task in branch.tasks] == ["回答这个询问"]
+        assert [action.task for action in branch.unassigned_actions] == [1]
+        main = _query(application, RunSteps(run_id=run_id, department=ENGINEERING))
+        assert [task.content for task in main.tasks] == ["主线那一轮的事"]
+    finally:
+        system.close()
