@@ -1,9 +1,9 @@
-// 原文面板里的「看工作过程」（工单 #1658，项目的组织设计说明 4.14「项目页是循环图加对话」第 4 层、
-// 工作过程的任务与动作标题设计说明「动作标记」「动作标题」「任务分组」的最后一条、
+// 原文面板里的「看工作过程」（工单 #1658、#1662，项目的组织设计说明 4.14「项目页是循环图加对话」第 4 层、
+// 工作过程的任务与动作标题设计说明「动作标记」「动作标题」「任务分组」、
 // 应用层与接口层设计说明 4.4「项目页四层读哪个查询」的 run.steps 一行）。
 //
-// 这里只做整理、折叠与时序图一行到激活的对应，不碰界面与网络：视图按这里给出的行、折起来的行、
-// 原始数据的几格与每一步的调用尝试编号照画，单元测试直接核对。
+// 这里只做整理、折叠、按任务分组、节点面板的一句话与时序图一行到激活的对应，不碰界面与网络：
+// 视图按这里给出的行、折起来的行、任务块、原始数据的几格与每一步的调用尝试编号照画，单元测试直接核对。
 //
 // 读的事实只有 run.steps 一处：
 //   - 每个动作的种类标记（读、写、运行、询问、提交）、一行标题与标题来源由服务端按同一份工具定义算出
@@ -11,7 +11,9 @@
 //   - 只有文字、没有动作的一步由这段文字的开头作一行，没有种类标记，来源记作者；
 //   - 原始数据取动作的回执（命令、参数）、event.detail 的输出工件（退出状态、输出）与这一步的推理与
 //     模型文字；每一步的调用尝试编号（含被丢弃的）带着进请求详情页；
-//   - 一轮没有计划时动作平铺，连续同一种类的动作由页面折成一行（如「读了 12 次」），点开看每一行。
+//   - 任务列表与每个动作的所属任务也由服务端算好（工单 #1661），页面只按它分组：有计划时最上面一层是
+//     任务 1、2、3，没有编号的动作按时间留在两段任务之间；一轮没有计划时动作平铺，连续同一种类的动作
+//     由页面折成一行（如「读了 12 次」），点开看每一行。折叠规则也用在任务内部。
 //
 // 一条时序图的行或图上的箭头看哪一次激活：成果看产生这一版的职能那一轮（project.flow 的第几轮对
 // run.steps 激活的第几轮）；询问与回答看被询问职能那次回答（询问编号对激活的会话编号）。两条各按各的
@@ -23,6 +25,7 @@ import type {
   RunStepView,
   RunStepsResult,
   StepText,
+  TaskView,
 } from "../../api/generated/types.gen";
 import { END, SOURCE, type LoopArrow } from "./loop-graph-model.ts";
 import { YOU, type SequenceRow } from "./sequence-model.ts";
@@ -307,6 +310,143 @@ export function workGroups(lines: readonly WorkLine[]): WorkGroup[] {
   }
   flush();
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// 任务分组：最上面一层是任务 1、2、3，动作归到它的所属任务
+
+/** 一轮工作的一条任务：编号、角色写的那句话与状态（run.steps 的 tasks 一项）。 */
+export type WorkTask = TaskView;
+
+/**
+ * 工作过程最上面一层的一块：一条编了号的任务，或者一段没有编号的动作。
+ *
+ * 没有编号的动作是「没有进行中条目时」发生的那几步：它们不编号，按时间留在两段任务之间。
+ * 块里的行同样按连续同一种类折成一行（`groups`）。
+ */
+export type WorkBlock =
+  | { kind: "task"; key: string; task: WorkTask; groups: WorkGroup[] }
+  | { kind: "loose"; key: string; groups: WorkGroup[] };
+
+/**
+ * 把行按任务分组。
+ *
+ * 任务与归属由服务端算好（工单 #1661），这里只按每个动作的所属任务归拢，不重算一份：
+ *   - 有动作的任务按第一次出现的先后排；一个任务有几段动作时归到同一个任务块里；
+ *   - 没有动作归到它的任务排在最后（从没进行过的任务本来就排在最后），任务之间按查询给的顺序；
+ *   - 没有所属任务的行（没有进行中条目时的动作、只有文字的一步、没有归到某一步的动作）按时间
+ *     留在两段任务之间：连续的一段一块；
+ *   - 一轮没有计划时所有行平铺，仍然按连续同一种类折成一行（与工单 #1658 的样子一样）。
+ *
+ * 自定的边界：没有动作归到它的任务一律排在最后，不按状态插在两段有动作的任务之间——
+ * 「从没进行过的排在最后」只说了从没进行过的，已完成的空任务没有可读的先后，放在最后不误导。
+ */
+export function workBlocks(lines: readonly WorkLine[], tasks: readonly WorkTask[]): WorkBlock[] {
+  if (lines.length === 0) {
+    return [];
+  }
+  if (tasks.length === 0) {
+    return [{ kind: "loose", key: "loose:0", groups: workGroups(lines) }];
+  }
+  const known = new Set(tasks.map((task) => task.number));
+  const ownerOf = (line: WorkLine): number | null => {
+    const number = line.action?.task;
+    return number !== undefined && number !== null && known.has(number) ? number : null;
+  };
+  const own = new Map<number, WorkLine[]>();
+  const firstAt = new Map<number, number>();
+  lines.forEach((line, index) => {
+    const owner = ownerOf(line);
+    if (owner === null) {
+      return;
+    }
+    const bucket = own.get(owner);
+    if (bucket === undefined) {
+      own.set(owner, [line]);
+      firstAt.set(owner, index);
+    } else {
+      bucket.push(line);
+    }
+  });
+  const placed: { at: number; order: number; block: WorkBlock }[] = [];
+  tasks.forEach((task, index) => {
+    const linesOfTask = own.get(task.number) ?? [];
+    placed.push({
+      at: firstAt.get(task.number) ?? Number.POSITIVE_INFINITY,
+      order: index,
+      block: { kind: "task", key: `task:${task.number}`, task, groups: workGroups(linesOfTask) },
+    });
+  });
+  // 没有编号的动作：连续的一段一块，位置是这一段的第一个行
+  let start = -1;
+  for (let index = 0; index <= lines.length; index += 1) {
+    const loose = index < lines.length && ownerOf(lines[index]) === null;
+    if (loose && start < 0) {
+      start = index;
+    }
+    if (!loose && start >= 0) {
+      placed.push({
+        at: start,
+        order: tasks.length + start,
+        block: { kind: "loose", key: `loose:${start}`, groups: workGroups(lines.slice(start, index)) },
+      });
+      start = -1;
+    }
+  }
+  placed.sort((left, right) => {
+    if (left.at !== right.at) {
+      return left.at < right.at ? -1 : 1;
+    }
+    return left.order - right.order;
+  });
+  return placed.map((entry) => entry.block);
+}
+
+// ---------------------------------------------------------------------------
+// 节点面板的「在做什么」：当前任务加最近一个动作的标题
+
+/**
+ * 节点面板「在做什么」写的两样：当前任务（没有计划或没有进行中的任务时为空）与最近一个动作的标题。
+ *
+ * `action` 为空串表示这一轮还没有动作：只有文字、没有动作的一步不算「最近一个动作」。
+ */
+export interface WorkDoing {
+  task: WorkTask | null;
+  action: string;
+}
+
+/**
+ * 这个职能正在做什么：读同一个 run.steps，不另算一份。
+ *
+ * 不在工作时不写（返回 null）；还没有读到步骤时也不写。当前任务是角色最后写下的进行中那一条；
+ * 计划里没有进行中的条目时用最近一个动作的所属任务。没有计划时只写最近一个动作的标题。
+ */
+export function nodeDoing(result: RunStepsResult | null, working: boolean): WorkDoing | null {
+  if (!working || result === null) {
+    return null;
+  }
+  const lines = workLines(result);
+  const latestAction = [...lines].reverse().find((line) => line.kind === "action" && line.title.trim() !== "") ?? null;
+  const tasks = result.tasks ?? [];
+  const inProgress = tasks.filter((task) => task.status === "进行中");
+  const owner = latestAction?.action?.task ?? null;
+  const current = inProgress.find((task) => task.number === owner)
+    ?? inProgress[0]
+    ?? (owner === null ? null : tasks.find((task) => task.number === owner) ?? null);
+  const action = latestAction?.title ?? "";
+  if (current === null && action === "") {
+    return null;
+  }
+  return { task: current, action };
+}
+
+/** 节点面板「在做什么」的那一句：有当前任务时写任务与编号，再写最近一个动作。 */
+export function doingText(doing: WorkDoing): string {
+  if (doing.task === null) {
+    return doing.action;
+  }
+  const task = `当前任务 ${doing.task.number}：${doing.task.content}`;
+  return doing.action === "" ? task : `${task} · 最近一个动作：${doing.action}`;
 }
 
 // ---------------------------------------------------------------------------
