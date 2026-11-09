@@ -358,9 +358,10 @@ export function sequenceOf(input: SequenceInput): SequenceView {
       continue;
     }
     const answered = ask.status === "已回答";
+    // 工程回答质检时回答分成事实与解释两段（run.asks 的 answer_facts），那一段也是这一行的那句话
     const text = answered
-      ? `答：${firstLine(ask.answer ?? ask.answer_facts ?? "")}`
-      : `没能回答：${firstLine(ask.reason ?? "")}`;
+      ? `答：${firstLine(ask.answer) || firstLine(ask.answer_facts) || "已回答"}`
+      : `没能回答：${firstLine(ask.reason) || "没有写原因"}`;
     const at = ask.ended_at ?? ask.started_at;
     push({
       key: `${key}:answer`, kind: "answer", dashed: true, from: ask.recipient, to: [ask.requester], who: "",
