@@ -10179,6 +10179,10 @@
             ],
             "title": "Direction To"
           },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
           "run_id": {
             "anyOf": [
               {
@@ -10227,6 +10231,7 @@
           "content",
           "direction_from",
           "direction_to",
+          "round",
           "run_id",
           "work_item_id",
           "position",
