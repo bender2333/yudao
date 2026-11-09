@@ -47,6 +47,10 @@ FACT_CHECK = "check"
 FACT_WRITE = "write"
 FACT_ANSWER = "answer"
 
+# 更新计划是记录类主机工具（工作过程的任务与动作标题设计说明「任务」，工单 #1660）：反复写同一份计划
+# 不是震荡，调用标识里排除它。名字与步骤驱动里的 PLAN_TOOL 是同一个工具，控制核心这一侧不另导入它
+PLAN_TOOL = "update_plan"
+
 # 成果接纳事件（设计：「成果被接纳」）：通用成果与现有的几种成果各一条，只增
 ACCEPTANCE_EVENTS = (
     EventType.ARTIFACT_ACCEPTED, EventType.SPEC_ACCEPTED, EventType.CONTRACT_ACCEPTED,
@@ -428,6 +432,9 @@ def _call_identity(event: Event) -> str | None:
     # 只被记录的那一项（运行命令的一句话，工单 #1659）不算参数：同一条命令写了不同的一句话仍算同一次调用
     payload = event.payload
     if "name" not in payload or "args" not in payload:
+        return None
+    if payload["name"] == PLAN_TOOL:
+        # 更新计划是记录：同一份计划写几次都不是重复的动作，不计入震荡判定（工单 #1660）
         return None
     arguments = call_arguments(payload.get("args"))
     return f"{payload['name']}:{hashlib.sha256(json_dumps(arguments).encode('utf-8')).hexdigest()[:16]}"

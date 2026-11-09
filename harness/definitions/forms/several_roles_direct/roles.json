@@ -12,7 +12,8 @@
       "read_output",
       "stop_job",
       "run_check",
-      "ask"
+      "ask",
+      "update_plan"
     ],
     "visibility": [
       "qa_defects",
@@ -68,7 +69,8 @@
       "browser_generate_locator",
       "browser_take_screenshot",
       "ask",
-      "submit_completion"
+      "submit_completion",
+      "update_plan"
     ],
     "visibility": [
       "current_delivery_spec",

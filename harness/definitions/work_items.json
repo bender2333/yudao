@@ -21,7 +21,8 @@
             "run_check",
             "submit_product_spec",
             "submit_product_decision",
-            "ask"
+            "ask",
+            "update_plan"
           ],
           "notes": [
             "不带 PRD 修订的回答不更新PRD；产品决定和需求正文经正常接纳后才生效。",
@@ -79,7 +80,8 @@
             "browser_generate_locator",
             "browser_take_screenshot",
             "ask",
-            "submit_delivery"
+            "submit_delivery",
+            "update_plan"
           ],
           "notes": [
             "直接写文件并用 run_check 检查，最后 submit_delivery。",
@@ -138,7 +140,8 @@
             "browser_take_screenshot",
             "ask",
             "submit_review",
-            "submit_independent_judgement"
+            "submit_independent_judgement",
+            "update_plan"
           ],
           "notes": [
             "先判断后看解释：交付到达以后，先用 submit_independent_judgement 提交独立判断，再用 submit_review 下结论；没有独立判断的结论被拒绝。",
@@ -174,7 +177,8 @@
             "stop_job",
             "run_check",
             "submit_product_spec",
-            "ask"
+            "ask",
+            "update_plan"
           ]
         },
         "engineering": {
@@ -190,7 +194,8 @@
             "fetch_url",
             "run_check",
             "submit_structure",
-            "ask"
+            "ask",
+            "update_plan"
           ]
         },
         "quality": {
@@ -208,7 +213,8 @@
             "stop_job",
             "run_check",
             "submit_baseline_review",
-            "ask"
+            "ask",
+            "update_plan"
           ]
         }
       }

@@ -1024,6 +1024,46 @@
       "required": []
     }
   },
+  "update_plan": {
+    "kind": "host",
+    "description": "Record the plan for this round of work, replacing the plan you wrote before: each call carries the whole plan, one entry per part of the work, each entry one sentence plus its status. Use it only when the work has several parts; a small job needs no plan. Send it in the same step as your next action when you can, so it does not take a step of its own. Keep at most one entry in progress. Write the sentences in the same language as the other narration for the user. The plan is only a record: it does not gate any work.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "array",
+          "description": "The whole plan, in order; an empty list clears the plan",
+          "items": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "One sentence about this part of the work"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "in_progress",
+                  "completed"
+                ],
+                "description": "pending, in_progress or completed"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content",
+              "status"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "plan"
+      ]
+    }
+  },
   "submit_delivery": {
     "kind": "host",
     "proposal": "delivery_spec",

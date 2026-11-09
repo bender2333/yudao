@@ -47,7 +47,8 @@
       "browser_verify_value",
       "browser_generate_locator",
       "browser_take_screenshot",
-      "submit_completion"
+      "submit_completion",
+      "update_plan"
     ],
     "visibility": [
       "current_delivery_spec",

@@ -25,10 +25,11 @@ TOOLS = DEFINITIONS.tools
 
 def test_tools_are_host_tools_or_environment_actions():
     # 主机工具由控制核心处理（提交类工具与询问/回答工具）；试用用例的两个工具也由控制核心处理，
-    # 它们写事件、不交给执行环境（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）
+    # 它们写事件、不交给执行环境（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）；
+    # 更新计划是记录类主机工具，不是提案、不交给执行环境（工作过程的任务与动作标题设计说明「任务」，工单 #1660）
     assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
         *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer",
-        "trial_case_begin", "trial_case_end"}
+        "trial_case_begin", "trial_case_end", "update_plan"}
     environment = {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"}
     by_action = {action: {name for name, value in environment.items() if value == action}
                  for action in set(environment.values())}
