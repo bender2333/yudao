@@ -287,3 +287,16 @@ def test_an_outcome_kind_written_into_a_temporary_text_fails_with_file_line_and_
     assert len(found) == 1, found
     assert found[0].startswith("harness/adjudication.py:2:")
     assert "product_spec" in found[0]
+
+
+def test_the_round_work_and_its_bound_keep_their_old_names_for_one_version():
+    # 代码名随总图的词改（工单 #1513）：一轮工作叫 `RoundWork`，界叫 `round_bound`；
+    # 旧名（`_Activation`、`activation_id`、`activation_bound`）留一版，别处还在按旧名读
+    driver = _read(REPO_ROOT / "harness" / "thin_driver.py")
+    assert "class RoundWork" in driver
+    assert "def round_id" in driver and "def activation_id" in driver
+    bounds = _read(REPO_ROOT / "harness" / "bounds.py")
+    assert "def round_bound(" in bounds
+    assert "activation_bound = round_bound" in bounds
+    application = _read(REPO_ROOT / "harness" / "orchestrator.py")
+    assert "_Activation = RoundWork" in application
