@@ -1,7 +1,8 @@
 // 对话页（工单 #1638，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
 //
 // 页面上半是循环图：按所选事项冻结的组织画节点、成果箭头与结论。图上方的行选事项（默认最近在跑的），
-// 点节点、点箭头打开同一个面板。线程与循环图下面的时序图留出位置，由后面的工单接上。
+// 点节点、点箭头打开同一个面板。最上面是时间条（工单 #1653）：所选事项的已用时间与上限，在跑时另有「停止」。
+// 线程与循环图下面的时序图留出位置，由后面的工单接上。
 //
 // 读的事实：project.loop（冻结的组织、职能状态、轮次）、project.overview（事项标题）、
 // project.flow（箭头）、work_item.materials（版本与改了的文件）；页面不另存一份，也不按形态名判断。
@@ -22,6 +23,7 @@ import type { DepartmentView } from "./organization";
 import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } from "./loop-graph-model";
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
 import { LoopPanel } from "./loop-panel";
+import { ProjectTimeBar } from "./project-head";
 import { useSnapshot } from "./use-snapshot";
 
 /** 面板打开的那一个，连同它在哪件事项上打开：换了事项就收起，不在新图上留着旧的一版。 */
@@ -98,6 +100,9 @@ export function ConversationPage(props: {
     <div className="y10-cv-page y10-pp" data-testid="conversation-page">
       <Loading state={loop} />
       {loop.error === null ? null : <Empty text={readFailureText(loop.error)} />}
+      {/* 时间条在对话上方，每种组织都有（项目的组织设计说明 4.15）：选中事项的已用时间与上限，
+          在跑时旁边一个「停止」。没有事项时没有这一条 */}
+      <ProjectTimeBar app={props.app} items={loop.data?.work_items ?? []} selected={itemId} />
       {loop.data === null ? null : items.length === 0 ? (
         <Empty text="这个项目还没有事项。提出问题以后，循环图按那件事项冻结的组织长出来。" />
       ) : (
