@@ -19,6 +19,7 @@ from .definitions import DEFINITIONS
 from .minimal_projection import MinimalProjection, fold_events
 from .models import Event, EventType, json_dumps
 from .parameters import frozen_values
+from .redact import call_arguments
 
 # 三项可登记、可在创建循环实例时冻结的运行参数（docs/design/loops-and-convergence.md「判定参数」）
 CONVERGENCE_ROUNDS = "convergence.rounds"
@@ -423,8 +424,10 @@ def _tool_action(name: str) -> str | None:
 
 
 def _call_identity(event: Event) -> str | None:
-    # 调用标识：工具名与参数的摘要相同即相同（震荡判定用）；记账事件没有工具名，不算调用
+    # 调用标识：工具名与参数的摘要相同即相同（震荡判定用）；记账事件没有工具名，不算调用。
+    # 只被记录的那一项（运行命令的一句话，工单 #1659）不算参数：同一条命令写了不同的一句话仍算同一次调用
     payload = event.payload
     if "name" not in payload or "args" not in payload:
         return None
-    return f"{payload['name']}:{hashlib.sha256(json_dumps(payload.get('args')).encode('utf-8')).hexdigest()[:16]}"
+    arguments = call_arguments(payload.get("args"))
+    return f"{payload['name']}:{hashlib.sha256(json_dumps(arguments).encode('utf-8')).hexdigest()[:16]}"

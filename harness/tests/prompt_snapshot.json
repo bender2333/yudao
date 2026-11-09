@@ -324,6 +324,10 @@
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
       },
+      "intent": {
+       "description": "Optional one sentence saying what this command does, e.g. \"check that the unit tests still pass\". It is the title of this action on the page and is recorded only: it is not handed to the environment that runs the command. Say what the command is for, not what its result was, and use the same language as the other text you write for the user. Blank counts as missing.",
+       "type": "string"
+      },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
        "type": [
@@ -1712,6 +1716,10 @@
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
       },
+      "intent": {
+       "description": "Optional one sentence saying what this command does, e.g. \"check that the unit tests still pass\". It is the title of this action on the page and is recorded only: it is not handed to the environment that runs the command. Say what the command is for, not what its result was, and use the same language as the other text you write for the user. Blank counts as missing.",
+       "type": "string"
+      },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
        "type": [
@@ -2967,6 +2975,10 @@
        "description": "Command string, e.g. uv run pytest tests",
        "type": "string"
       },
+      "intent": {
+       "description": "Optional one sentence saying what this command does, e.g. \"check that the unit tests still pass\". It is the title of this action on the page and is recorded only: it is not handed to the environment that runs the command. Say what the command is for, not what its result was, and use the same language as the other text you write for the user. Blank counts as missing.",
+       "type": "string"
+      },
       "timeout_sec": {
        "description": "Optional seconds; default and maximum are rule-registered",
        "type": [
@@ -3736,6 +3748,10 @@
       },
       "command": {
        "description": "Command string, e.g. uv run pytest tests",
+       "type": "string"
+      },
+      "intent": {
+       "description": "Optional one sentence saying what this command does, e.g. \"check that the unit tests still pass\". It is the title of this action on the page and is recorded only: it is not handed to the environment that runs the command. Say what the command is for, not what its result was, and use the same language as the other text you write for the user. Blank counts as missing.",
        "type": "string"
       },
       "timeout_sec": {

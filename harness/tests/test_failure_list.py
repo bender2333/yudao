@@ -198,6 +198,18 @@ def test_a_different_proposal_kind_or_a_different_tool_call_does_not_resolve_the
     assert [failure.resolved for failure in listing.failures] == [False, False, False]
 
 
+def test_the_one_sentence_of_a_run_command_does_not_change_the_arguments_compared():
+    """运行命令的一句话不进「同样的参数」比较（工单 #1659 验收第 3 条）：同一条命令写了不同的一句话，
+    后来的成功仍算同一个调用后来做成。"""
+    failed = _tool_event(2, name="bash", args={"command": "uv run pytest", "intent": "先跑一次测试"},
+                         ok=False, error="exit code 1")
+    succeeded = _tool_event(3, name="bash", args={"command": "uv run pytest", "intent": "再跑一次测试"},
+                            ok=True, output={"exit_code": 0})
+
+    listing = _listing([_event(1, EventType.DEPARTMENT_INPUT), failed, succeeded])
+    assert [failure.resolved for failure in listing.failures] == [True]
+
+
 def test_only_this_role_sees_its_own_failures():
     """只给这个角色自己：核验角色的清单里没有被核验方的失败。"""
     engineering_failure = _failed_read(2)
