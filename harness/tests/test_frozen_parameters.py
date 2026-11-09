@@ -28,7 +28,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import frozen_visibility
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.event_store import run_stream
-from harness.models import EventType, RunProjection
+from harness.models import EventType, ProjectEventType, RunProjection
 from harness.parameters import FROZEN_PARAMETERS, ParameterOutOfBoundsError, frozen_run_parameters
 from harness.projection import project_run
 from harness.proposals import product_spec
@@ -389,8 +389,10 @@ def test_a_missing_run_is_rebuilt_with_recovery_time_values_only_for_unresolved_
     reopened.close()
 
 
-def test_a_missing_run_is_not_rebuilt_after_the_item_definition_version_changes(tmp_path, monkeypatch):
-    # 升级以后事项记录的定义版本与当前不同：启动不写使用新定义的 run_created，事项记录与原始起点保留
+def test_a_missing_run_is_rebuilt_from_the_frozen_organization_after_the_release_changes(tmp_path, monkeypatch):
+    # 事项创建时冻结了整份合成结果（工单 #1517）：发布里这一份形态的内容后来变了，补建这个 run 时仍按事项
+    # 冻结的那一份（版本与工件引用都记在这一版的定义里），不读发布里换过内容的那一份。
+    # 补建与「定义版本不同」的决定请求是两件事：这条看的是补建
     from harness.projects import ProjectService
 
     system = _system(tmp_path)
@@ -405,6 +407,10 @@ def test_a_missing_run_is_not_rebuilt_after_the_item_definition_version_changes(
         system.projects.start_work_item(project_id, GOAL)
     system.orchestrator.create_run = real_create_run
     item = system.projects.projection(project_id).work_items[0]
+    # 事项创建时冻结的整份合成结果与它的版本（工单 #1517）：补建时按这一份，不按发布现在的内容
+    [work_item_created] = [event for event in system.store.list_project_events(project_id)
+                           if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    item_created_version = work_item_created.payload["definitions_version"]
     system.close()
 
     startup_rebuild = ProjectService.create_missing_work_item_runs_on_startup
@@ -418,11 +424,14 @@ def test_a_missing_run_is_not_rebuilt_after_the_item_definition_version_changes(
         def __getattr__(self, name: str):
             return getattr(DEFINITIONS, name)
 
-    # 这一份形态的当前定义版本与事项记录的不同（工单 #1392：版本按事项冻结的形态取，也就是组装处加载的
-    # 那一份，不读模块里的常量）：启动时不补建使用新定义的 run
+    # 这一份形态在发布里换了内容（版本不同）：事项有它冻结的那一份，补建照常进行，run 记下的是冻结的版本
     monkeypatch.setitem(reopened.orchestrator._forms, DEFAULT_FORM,
                         replace(reopened.orchestrator._forms[DEFAULT_FORM], definitions=_OtherDefinitions()))
-    assert startup_rebuild(reopened.projects) == []
-    assert reopened.store.stream_events(run_stream(item.run_id), after_version=0) == []
+    assert startup_rebuild(reopened.projects) == [item.run_id]
+    [created] = reopened.store.stream_events(run_stream(item.run_id), after_version=0)
+    assert created.type == EventType.RUN_CREATED
+    assert created.payload["definitions_version"] == item_created_version
+    assert created.payload["definitions_version"] == DEFINITIONS.version != _OtherDefinitions.version
+    assert created.payload["definitions_ref"]["kind"] == "item_definitions"
     assert reopened.projects.projection(project_id).work_item(item.work_item_id) is not None
     reopened.close()

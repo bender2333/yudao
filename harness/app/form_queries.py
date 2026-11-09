@@ -17,14 +17,14 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import AwareDatetime, Field
 
 from ..definitions import (
-    ITEM_SOURCES, Definitions, parse_organization_changes, submitted_outcomes,
+    DEFAULT_FORM, ITEM_SOURCES, Definitions, parse_organization_changes, submitted_outcomes,
 )
 from ..models import ProjectEventType
 from ..organization_compose import (
     change_diff, compose_checked, current_organization, dropped_changes, finish_statement, reminders,
     verifier_changes, write_scopes,
 )
-from ..projects import ProjectNotFoundError, project_projection
+from ..projects import ProjectNotFoundError, definitions_difference, definitions_from_ref, project_projection
 from ..runtime import FORM_REGISTRY
 from .contracts import Contract, Snapshot
 from .project_queries import NotFound, QueryInputInvalid
@@ -32,6 +32,11 @@ from .registry import QueryDefinition
 
 if TYPE_CHECKING:
     from .application import Application
+
+
+# 还在跑的事项（工单 #1517，项目的组织设计说明「冻结与升级」补充条 7）：排队还没开始的、正在跑的、
+# 等用户确认初始 PRD 的。它们各自的部门也算在项目的部门清单里，标出来源是还在跑的事项
+RUNNING_ITEM_STATUSES = frozenset({"not_started", "running", "in_progress", "awaiting_initial_prd"})
 
 
 # ---------------------------------------------------------------------------
@@ -137,11 +142,14 @@ class FormChoice(Contract):
 
 class OrganizationDepartment(Contract):
     # 项目现在用的组织里的一个部门：标识、显示名、是不是核验角色，与它的来源（跟随发布、本项目改过、
-    # 本项目加的；设计说明「组织页」部门表的来源一列）。页面的部门页签、看板列与默认部门按这一项排
+    # 本项目加的；设计说明「组织页」部门表的来源一列）。页面的部门页签、看板列与默认部门按这一项排。
+    # 工单 #1517 只增两项：running_items 是还在按这一份组织跑的事项个数（用它标出冻结着旧组织的事项）；
+    # 只在还在跑的事项冻结的组织里有的部门也进这一列，来源写 running_item
     id: str
     label: str
     verifier: bool = False
-    origin: Literal["release", "changed", "added"] = "release"
+    origin: Literal["release", "changed", "added", "running_item"] = "release"
+    running_items: int = 0
 
 
 class FormDifference(Contract):
@@ -167,6 +175,17 @@ class FormChange(Contract):
     diff: list[FormDifference] = Field(default_factory=list)
 
 
+class ItemOrganization(Contract):
+    # 上一个事项用的组织（工单 #1517，项目的组织设计说明「冻结与升级」）：那个事项、它的形态名与组织版本，
+    # 以及与项目现在这份组织之间的差异（比较两份合成结果，不另存状态）。
+    # 「高级」里写明：发布升级以后，跟随发布的项下一个事项会自动用上新内容，这里看得到不同在哪
+    work_item_id: str
+    title: str
+    form: str
+    version: str
+    differences: list[FormDifference] = Field(default_factory=list)
+
+
 class ProjectOrganizationResult(Contract):
     # 项目现在的组织：现在用哪一份、它的形态名（它有哪几个职能，从这一份定义推出；这一份不在发布里时
     # 为空）、合成结果（现在这一份不在发布里、或改动合不到一起时为空，并给出拒绝项）、组织版本
@@ -185,6 +204,9 @@ class ProjectOrganizationResult(Contract):
     rejections: list[DraftIssue] = Field(default_factory=list)
     add_verifier: dict[str, Any] | None = None
     remove_verifier: dict[str, Any] | None = None
+    # 和这个项目上一个事项用的组织相比有什么不同（工单 #1517）：下一个事项会自动用上现在这份，
+    # 差异随这一项给出；没有事项、或者上一个事项是只记了形态名的旧事项时为空
+    previous_item: ItemOrganization | None = None
 
 
 def release_forms(system: Any) -> dict[str, Definitions]:
@@ -255,6 +277,86 @@ def _history(events: list[Any], forms: dict[str, Definitions]) -> list[FormChang
     return records
 
 
+def _running_items(store: Any, artifacts: Any, project_id: str,
+                   work_items: list[Any]) -> list[tuple[str, Definitions]]:
+    # 还在跑的事项与它冻结的组织（工单 #1517，设计说明「冻结与升级」）：同一个事项取最后一条创建事件里的
+    # 那份合成结果；同一份合成结果只读一次（按内容摘要去重），页面的部门清单与上一个事项的比较都按它看
+    creation = [event for event in store.list_project_events(project_id)
+                if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    refs: dict[str, Any] = {}
+    for event in creation:
+        refs[str(event.payload.get("work_item_id", ""))] = event.payload.get("definitions_ref")
+    loaded: dict[str, Definitions | None] = {}
+    rows: list[tuple[str, Definitions]] = []
+    for item in work_items:
+        if item.status not in RUNNING_ITEM_STATUSES:
+            continue
+        ref = refs.get(item.work_item_id)
+        key = "" if not isinstance(ref, dict) else str(ref.get("content_hash") or "")
+        if key not in loaded:
+            loaded[key] = definitions_from_ref(artifacts, ref)
+        definitions = loaded[key]
+        if definitions is not None:
+            rows.append((item.work_item_id, definitions))
+    return rows
+
+
+def _departments_of_current(definitions: Definitions, changes: dict[str, Any],
+                            running: dict[str, int]) -> list[OrganizationDepartment]:
+    # 项目现在这份组织的部门，带上还在按它跑的事项个数（工单 #1517）
+    return [OrganizationDepartment(
+        id=department.id, label=department.label,
+        verifier=definitions.is_verifier(department.id),
+        origin=_origin(department.id, changes),
+        running_items=running.get(department.id, 0))
+        for department in definitions.organization.departments]
+
+
+def _departments_of_running_items(definitions: Definitions | None,
+                                  rows: list[tuple[str, Definitions]]) -> list[OrganizationDepartment]:
+    # 只在还在跑的事项冻结的组织里有的部门（工单 #1517，设计说明「冻结与升级」与补充条 7）：项目现在这份
+    # 组织里已经没有它（例如后来去掉了这个部门），名单仍然包含它并标出来源是还在跑的事项，个数是几个事项在用
+    current = set() if definitions is None else set(definitions.departments)
+    counts: dict[str, list[Definitions]] = {}
+    for _work_item_id, frozen in rows:
+        for department in frozen.organization.departments:
+            if department.id in current:
+                continue
+            counts.setdefault(department.id, [])
+            if all(item.version != frozen.version for item in counts[department.id]):
+                counts[department.id].append(frozen)
+    extra: list[OrganizationDepartment] = []
+    for department_id in sorted(counts):
+        versions = counts[department_id]
+        label = next(frozen.department_labels.get(department_id, department_id) for frozen in versions)
+        extra.append(OrganizationDepartment(
+            id=department_id, label=label, verifier=versions[0].is_verifier(department_id),
+            origin="running_item", running_items=len(versions)))
+    return extra
+
+
+def _previous_item(store: Any, artifacts: Any, project_id: str,
+                   definitions: Definitions | None) -> ItemOrganization | None:
+    # 这个项目上一个事项用的组织（工单 #1517，设计说明「冻结与升级」）：取项目流上最后一条事项创建事件，
+    # 按它冻结的整份合成结果与现在的这一份比较。现在这份组织取不到、项目还没有事项、或者上一个事项是只记了
+    # 形态名的旧事项（没有它当时那份合成结果）时为空
+    if definitions is None:
+        return None
+    created = [event for event in store.list_project_events(project_id)
+               if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    if not created:
+        return None
+    last = created[-1]
+    frozen = definitions_from_ref(artifacts, last.payload.get("definitions_ref"))
+    if frozen is None:
+        return None
+    return ItemOrganization(
+        work_item_id=str(last.payload.get("work_item_id", "")), title=str(last.payload.get("title", "")),
+        form=str(last.payload.get("form") or DEFAULT_FORM), version=frozen.version,
+        differences=[FormDifference(item=item, before=before, after=after)
+                     for item, before, after in definitions_difference(frozen, definitions)])
+
+
 def _project_organization(application: Application,
                           request: ProjectOrganization) -> Snapshot[ProjectOrganizationResult]:
     store = application.system.store
@@ -270,6 +372,17 @@ def _project_organization(application: Application,
     events = [event for event in store.list_project_events(request.project_id)
               if event.type == ProjectEventType.PROJECT_FORM_SET]
     added, removed = verifier_changes(forms, current, changes, definitions, store=store)
+    # 还在跑的事项冻结着旧组织时（工单 #1517）：按它们各自的部门计数，并补上现在这份组织里已经没有了、
+    # 但还在跑的事项仍在用的部门
+    running = _running_items(store, application.system.artifacts, request.project_id, state.work_items)
+    counts: dict[str, int] = {}
+    for _work_item_id, frozen in running:
+        for department in frozen.organization.departments:
+            counts[department.id] = counts.get(department.id, 0) + 1
+    departments: list[OrganizationDepartment] = []
+    if definitions is not None:
+        departments = _departments_of_current(definitions, changes, counts)
+    departments.extend(_departments_of_running_items(definitions, running))
     return Snapshot[ProjectOrganizationResult](
         position=store.end_position(),
         data=ProjectOrganizationResult(
@@ -277,18 +390,14 @@ def _project_organization(application: Application,
             label=None if definitions is None else _label(definitions),
             version=None if definitions is None else definitions.version,
             form_in_release=current in forms,
-            departments=[] if definitions is None else [
-                OrganizationDepartment(
-                    id=department.id, label=department.label,
-                    verifier=definitions.is_verifier(department.id),
-                    origin=_origin(department.id, changes))
-                for department in definitions.organization.departments],
+            departments=departments,
             forms=[_choice(name, definitions) for name, definitions in forms.items()],
             history=_history(events, forms),
             changes=changes,
             organization=None if definitions is None else _organization_of(current, definitions),
             rejections=[DraftIssue(item=_item(file, field), message=message) for file, field, message in issues],
             add_verifier=added, remove_verifier=removed,
+            previous_item=_previous_item(store, application.system.artifacts, request.project_id, definitions),
         ))
 
 

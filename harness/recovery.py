@@ -335,7 +335,8 @@ class RunRecovery:
 
     def __init__(self, *, writes: Any, store: Any, view: Callable[[str], Any], artifacts: Any,
                  run_environment: Callable[[str], Any], wake: Callable[[str], None],
-                 definitions_of: Callable[[str], Definitions] | None = None) -> None:
+                 definitions_of: Callable[[str], Definitions] | None = None,
+                 release_version_of: Callable[[str], str | None] | None = None) -> None:
         self._writes = writes
         self._store = store
         self._view = view
@@ -344,6 +345,10 @@ class RunRecovery:
         self._wake = wake
         # 事项所用的那份定义（工单 #1392）：版本核对与写入的部门按事项冻结的形态取；不给时是加载的那一份
         self._definitions_of = (lambda _run_id: DEFINITIONS) if definitions_of is None else definitions_of
+        # 这一版发布里这个事项的形态现在的定义版本（工单 #1517）：事项冻结的合成结果不因发布变化而改变，
+        # 但「定义版本不同时继续或停止」的决定请求照旧按发布现在的这一份判。不给时按事项所用的那份
+        self._release_version_of = ((lambda run_id: self._definitions_of(run_id).version)
+                                    if release_version_of is None else release_version_of)
 
     def resume(self, run_id: str) -> tuple[int, Any] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（ADR-0018、恢复契约 docs/design/recovery-contract-and-fault-matrix.md「角色任务的恢复」）：
@@ -351,25 +356,30 @@ class RunRecovery:
         # 定义版本，与当前不同就发出 definitions_changed 决定请求交给用户（总体架构 docs/design/architecture/overall-architecture.md「用户决定」），
         # 用户选择「按新版本继续」以前不取得执行权；核对通过以后原子取得这个 run 的执行权，
         # 记下中断位置与继续的依据，再从已提交的状态继续运行到终态。
-        # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答
+        # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答。
+        # 工单 #1517：比的是这一版发布里这个形态现在的版本；请求只发一次，回答以后照常在冻结的那份定义下继续
         projection = self._view(run_id)
         if projection.status in TERMINAL_STATUSES:
             return None
         decisions = self._writes.read(run_stream(run_id)).decisions.values()
         if blocks_run(decisions):
             return None
-        if projection.definitions_version != self._definitions_of(run_id).version:
-            self.await_definitions(run_id)
+        release = self._release_version_of(run_id)
+        if release is not None and projection.definitions_version != release \
+                and self.await_definitions(run_id):
             return None
         # 工单 #17：检查是否有未确认的动作，为结果未知的动作写核实记录
         self.await_unknown_actions(run_id)
         return self.claim_and_resume(run_id)
 
-    def await_definitions(self, run_id: str) -> None:
+    def await_definitions(self, run_id: str) -> bool:
         # 事项记录的定义版本与当前加载的版本不同（总体架构 docs/design/architecture/overall-architecture.md「用户决定」，#48 登记的架构问题的处理）：
         # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止事项」；选择写入事件。
         # 选择「按新版本继续」以后，这个 run 照常取得执行权并继续运行，后续事件记录新版本；
-        # 请求只发一次：已经有过一个定义版本不同的请求时不重复
+        # 请求只发一次：已经有过一个定义版本不同的请求时不重复（工单 #1517：回答以后不再拦着继续）。
+        # 交回这一次有没有发出请求
+        written: list[bool] = []
+
         def request(transaction: Transaction) -> None:
             current = transaction.projection
             if current.status in TERMINAL_STATUSES or blocks_run(transaction.decisions.values()):
@@ -386,16 +396,20 @@ class RunRecovery:
                     "facts": [], "department": current.active_department,
                     "reason": "definitions_version_changed",
                     "recorded_definitions_version": current.definitions_version,
-                    "current_definitions_version": self._definitions_of(run_id).version,
+                    "current_definitions_version": self._release_version_of(run_id)
+                    or self._definitions_of(run_id).version,
                     "description": (
                         f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
-                        f"{self._definitions_of(run_id).version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
+                        f"{self._release_version_of(run_id) or self._definitions_of(run_id).version} 不同。"
+                        "按新版本继续以后，后续的模型请求与裁决记录新版本；"
                         "选择停止事项则运行结束。"),
                 },
             ))
+            written.append(True)
             transaction.on_commit(lambda: self._wake(run_id))
 
         self._writes.transact(run_stream(run_id), request, definitions=self._definitions_of(run_id))
+        return bool(written)
 
     def await_unknown_actions(self, run_id: str) -> None:
         # 工单 #581（ADR-0038，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：恢复时找出结果未知的动作。

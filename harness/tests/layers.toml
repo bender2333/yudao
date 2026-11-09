@@ -173,6 +173,7 @@
 "test_openapi_snapshot.py" = "module"
 "test_organization_adopt.py" = "module"
 "test_organization_compose.py" = "module"
+"test_organization_freeze.py" = "integration"
 "test_orchestrator.py" = "integration"
 "test_parameter_set.py" = "integration"
 "test_project_and_work_item_commands.py" = "integration"

@@ -16,12 +16,13 @@ from ..projection import RunNotFoundError
 from ..providers.errors import CatalogValidationError
 from ..providers.selection import ModelSelection
 from ..projects import (
-    DepartmentSettingConflict, ProjectArchivedError, ProjectNotFoundError,
+    DepartmentSettingConflict, OrganizationRejectedError, ProjectArchivedError, ProjectNotFoundError,
     SourceDirectoryConflict, WorkItemInProgressError,
 )
 from ..writeback import WritebackOutcomeUnknown, WritebackTargetUnavailable
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
+from .form_queries import release_forms
 from .registry import CommandDefinition
 
 if TYPE_CHECKING:
@@ -159,10 +160,13 @@ async def _record_material(application: "Application", command: Command, request
 # 事项（新建与控制）
 
 class WorkItemCreate(CommandRequest):
+    # form 是新建事项时临时选的一份形态（工单 #1517，项目的组织设计说明「新建的入口」）：只影响这个事项，
+    # 项目的组织不变；不给时按项目现在的组织。选那一份形态时本项目的改动不带上
     base_version: None = None
     project_id: str
     text: Text
     title: Text | None = None
+    form: Text | None = None
 
 
 class WorkItemRefs(Contract):
@@ -191,8 +195,17 @@ async def _create_work_item(application: "Application", command: Command, reques
             raise Rejection("work_item_in_progress", "项目正在建档，结束以后才能新建事项")
         raise Rejection("not_allowed", "项目还没有完成建档，请重新开始建档")
     # 排空期间（3.1，ADR-0019）：Yudao 停止开始新事项，新建的事项排队不开始
+    if request.form is not None:
+        forms = release_forms(system)
+        if request.form not in forms:
+            raise Rejection("not_allowed",
+                            f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
     if system.drain.state != "idle":
-        system.projects.queue_work_item(request.project_id, request.text, title=request.title, command=command)
+        try:
+            system.projects.queue_work_item(request.project_id, request.text, title=request.title,
+                                            form=request.form, command=command)
+        except OrganizationRejectedError as rejected:
+            raise Rejection("not_allowed", rejected.message) from rejected
         return
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝
     if system.orchestrator.busy():
@@ -207,13 +220,16 @@ async def _create_work_item(application: "Application", command: Command, reques
         raise Rejection("provider_unavailable", f"部门 {department} 的{item}无法解析：{message}")
     try:
         work_item_id, run_id = system.projects.start_work_item(
-            request.project_id, request.text, title=request.title, command=command)
+            request.project_id, request.text, title=request.title, form=request.form, command=command)
     except ProjectNotFoundError as missing:
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     except ProjectArchivedError as archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能新建事项") from archived
     except WorkItemInProgressError as busy:
         raise Rejection("busy", "已有事项正在执行，等它结束以后才能新建") from busy
+    except OrganizationRejectedError as rejected:
+        # 发布与本项目的改动合不到一起（项目的组织设计说明「冻结与升级」）：新建事项被拒绝并写明是哪一项
+        raise Rejection("not_allowed", rejected.message) from rejected
     # 事项已经登记、run 已经创建；由流程编排在接口进程的事件循环中作为任务运行
     system.orchestrator.start_work_item(run_id)
 

@@ -372,6 +372,10 @@ class RunCreatedPayload(Payload):
     onboarding_basis: OnboardingBasis | None = None
     # 建档的轮次（工单 #136）：第一轮为 1；普通事项与旧事件没有这个字段，读取时按 0 处理
     round: int = 0
+    # 事项创建时冻结的整份合成结果（工单 #1517，项目的组织设计说明「冻结与升级」）：形态加本项目的改动
+    # 合成结果按内容摘要落盘的工件引用。读这个 run 的定义时按它取，发布后来改了形态也不影响它；
+    # 旧事件与直接建 run 的调用没有这个字段，按形态名在这一版发布里取
+    definitions_ref: ArtifactRef | None = None
 
 
 class UserInputReceivedPayload(InputRecord):
@@ -1431,6 +1435,10 @@ class WorkItemCreatedPayload(Payload):
     # 事项创建时冻结的形态名（工单 #1392）：之后这个事项的写入核对、路由、装配与执行都按它的那份定义；
     # 旧事件没有这个字段时按默认形态（三部门）读取
     form: str = ""
+    # 事项创建时冻结的整份合成结果（工单 #1517，项目的组织设计说明「冻结与升级」）：形态加本项目的改动
+    # 合成结果按内容摘要落盘的工件引用，与 run_created 里那一份相同。之后这个事项的写入核对、路由、装配、
+    # 执行与重放都读这一份；旧事件没有这个字段时按形态名在这一版发布里取
+    definitions_ref: ArtifactRef | None = None
 
 
 class McpServersConfiguredPayload(Payload):

@@ -190,9 +190,10 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         capabilities = client.get("/api/capabilities").json()
         document = client.get("/openapi.json").json()
     assert capabilities["commands"] == [
-        {"name": "project.create", "reasons": ["source_invalid", "command_id_reused"]},
+        # 新建项目与接入已有项目可以选一张形态卡（工单 #1517）：发布带里没有那一份时以 not_allowed 拒绝
+        {"name": "project.create", "reasons": ["source_invalid", "not_allowed", "command_id_reused"]},
         {"name": "project.onboard",
-         "reasons": ["source_invalid", "busy", "provider_unavailable", "command_id_reused"]},
+         "reasons": ["source_invalid", "busy", "provider_unavailable", "not_allowed", "command_id_reused"]},
         {"name": "onboarding.restart",
          "reasons": ["not_found", "project_archived", "not_allowed", "source_invalid", "busy",
                      "provider_unavailable", "command_id_reused"]},

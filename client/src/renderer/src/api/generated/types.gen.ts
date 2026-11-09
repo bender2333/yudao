@@ -3646,6 +3646,32 @@ export type InstanceUpgradeRequested = {
 };
 
 /**
+ * ItemOrganization
+ */
+export type ItemOrganization = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Differences
+     */
+    differences?: Array<FormDifference>;
+};
+
+/**
  * KeptDelivery
  *
  * 已收下的交付（工单 #1239）：事项停止时，这个 run 里已经收下的那一版交付与收下的时间。
@@ -4509,7 +4535,11 @@ export type OrganizationDepartment = {
     /**
      * Origin
      */
-    origin?: 'release' | 'changed' | 'added';
+    origin?: 'release' | 'changed' | 'added' | 'running_item';
+    /**
+     * Running Items
+     */
+    running_items?: number;
 };
 
 /**
@@ -4801,6 +4831,10 @@ export type ProjectCreate = {
      * Initial Directory
      */
     initial_directory?: string | null;
+    /**
+     * Form
+     */
+    form?: string | null;
 };
 
 /**
@@ -4895,6 +4929,10 @@ export type ProjectOnboard = {
      * Source Path
      */
     source_path: string;
+    /**
+     * Form
+     */
+    form?: string | null;
 };
 
 /**
@@ -4956,6 +4994,7 @@ export type ProjectOrganizationResult = {
     remove_verifier?: {
         [key: string]: unknown;
     } | null;
+    previous_item?: ItemOrganization | null;
 };
 
 /**
@@ -7886,6 +7925,10 @@ export type WorkItemCreate = {
      * Title
      */
     title?: string | null;
+    /**
+     * Form
+     */
+    form?: string | null;
 };
 
 /**
@@ -8082,6 +8125,14 @@ export type WorkItemOrganization = {
      * Rejections
      */
     rejections: Array<RejectionRelation>;
+    /**
+     * Version
+     */
+    version?: string;
+    /**
+     * Same As Project
+     */
+    same_as_project?: boolean | null;
 };
 
 /**
@@ -17428,6 +17479,7 @@ export type RunCreatedPayload = {
      * Round
      */
     round?: number;
+    definitions_ref?: ArtifactRef | null;
 };
 
 /**
@@ -20396,6 +20448,7 @@ export type WorkItemCreatedPayload = {
      * Form
      */
     form?: string;
+    definitions_ref?: ArtifactRef | null;
 };
 
 /**
@@ -21327,7 +21380,7 @@ export type CommandProjectCreateData = {
 
 export type CommandProjectCreateErrors = {
     /**
-     * 命令被拒绝，可能的原因：source_invalid, command_id_reused
+     * 命令被拒绝，可能的原因：source_invalid, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -21356,7 +21409,7 @@ export type CommandProjectOnboardData = {
 
 export type CommandProjectOnboardErrors = {
     /**
-     * 命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, command_id_reused
+     * 命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
