@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from .models import EventType, canonical_hash, estimate_tokens, json_dumps
+from .redact import call_arguments
 
 # 这一段在历史里的样子：[failure_list] 加一行 JSON，与检查点摘要（[department_memory]）同一写法
 FAILURE_LIST = "failure_list"
@@ -276,12 +277,14 @@ def _check_passed_later(other: Any, name: str, snapshot: Any) -> bool:
 
 
 def _call_succeeded_later(event: Any, other: Any) -> bool:
-    # 同一工具以同样的参数后来成功
+    # 同一工具以同样的参数后来成功。只被记录的那一项（运行命令的一句话，工单 #1659）不算参数：
+    # 同一条命令写了不同的一句话，后来的成功仍算同一个调用
     if other.type != EventType.TOOL_CALLED:
         return False
     if (other.payload or {}).get("name") != (event.payload or {}).get("name"):
         return False
-    if canonical_hash((other.payload or {}).get("args")) != canonical_hash((event.payload or {}).get("args")):
+    if (canonical_hash(call_arguments((other.payload or {}).get("args")))
+            != canonical_hash(call_arguments((event.payload or {}).get("args")))):
         return False
     result = tool_result(other)
     return result is not None and result.get("ok") is True

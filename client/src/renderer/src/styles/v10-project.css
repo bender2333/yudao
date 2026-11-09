@@ -1,5 +1,6 @@
 /* 项目页面样式：概览、恢复与动作核实、资料。颜色全部来自 base.css 的变量；事项颜色来自像素画面的事项色板，与画面中的小旗一致。
-   类名前缀：y10-pp- 三个页面共用，y10-ov- 概览，y10-rc- 恢复与动作核实，y10-mt- 资料，y10-msem- 资料中的语义记录。 */
+   类名前缀：y10-pp- 三个页面共用，y10-ov- 概览，y10-rc- 恢复与动作核实，y10-mt- 资料，y10-msem- 资料中的语义记录，
+   y10-cv- 对话页与它上面的循环图（工单 #1638），y10-phead 项目头部一行标签（工单 #1653）。 */
 
 /* ---------------------------------------------------------------- 共用 */
 
@@ -426,3 +427,397 @@
 .y10-shot-modal img { display: block; max-width: 100%; height: auto; border-radius: 8px; }
 .y10-mt-oldevents, .y10-rc-events { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .y10-mt-oldevents li, .y10-rc-events li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; overflow-wrap: anywhere; }
+
+/* ---------------------------------------------------------------- 对话页与循环图（工单 #1638） */
+
+/* 对话页：上面是循环图，下面留出线程的位置。项目页先是对话（项目的组织设计说明 4.14）。 */
+.y10-cv-page { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.y10-cv-only { margin: 0; font-size: 13px; }
+.y10-cv-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.y10-cv-pick-btn {
+  display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 12px; text-align: left;
+}
+.y10-cv-pick-btn small { color: var(--muted); }
+.y10-cv-pick-btn:hover { border-color: var(--green); }
+.y10-cv-pick-btn.is-on { border-color: var(--green); background: var(--tint); color: var(--green); font-weight: 600; }
+
+/* 图：主线一行，旁边的职能在它上方，跨节点的箭头另起一行 */
+.y10-cv-graph { display: grid; gap: 8px; }
+.y10-cv-wrap {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 14px 12px; overflow-x: auto;
+}
+.y10-cv-grid { display: grid; align-items: center; column-gap: 0; row-gap: 6px; min-width: min-content; }
+.y10-cv-cell { display: grid; justify-items: center; align-content: center; gap: 4px; min-width: 0; }
+
+.y10-cv-pill {
+  border-radius: 999px; padding: 4px 10px; font-size: 12px; white-space: nowrap;
+  border: 1px dashed var(--line-strong); color: var(--muted); background: var(--bg); justify-self: center;
+}
+.y10-cv-pill.is-end.is-ok { border: 1px solid var(--green); color: var(--green); font-weight: 600; }
+.y10-cv-pill.is-end.is-open, .y10-cv-pill.is-end.is-plain { border-style: solid; color: var(--text); }
+
+.y10-cv-node {
+  position: relative; display: grid; gap: 3px; justify-items: start; min-width: 96px; max-width: 190px;
+  padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); text-align: left;
+}
+.y10-cv-node:hover, .y10-cv-node:focus-visible { border-color: var(--green); outline: none; }
+.y10-cv-node.is-on { box-shadow: 0 0 0 2px var(--green); }
+.y10-cv-node.is-working { border-color: var(--green); }
+.y10-cv-node.is-working::after {
+  content: "在做"; position: absolute; top: -9px; right: 8px; font-size: 10px; padding: 0 6px;
+  border-radius: 999px; background: var(--green); color: var(--on-accent);
+}
+.y10-cv-node b { font-size: 14px; white-space: nowrap; }
+.y10-cv-marks { display: flex; flex-wrap: wrap; gap: 4px; }
+.y10-cv-marks:empty { display: none; }
+.y10-cv-badge { font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+.y10-cv-badge.is-ver { border-color: var(--green); color: var(--green); font-weight: 600; }
+.y10-cv-badge.is-ver::before { content: "✓ "; }
+.y10-cv-state { color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+.y10-cv-chip {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 6px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: inherit; font-size: 12px; text-align: left; white-space: nowrap;
+}
+.y10-cv-chip:hover { border-color: var(--green); }
+.y10-cv-chip.is-on { box-shadow: 0 0 0 2px var(--green); }
+.y10-cv-chip small { color: var(--faint); font-size: 11px; }
+.y10-cv-dir { color: var(--faint); }
+.y10-cv-kind { font-weight: 600; }
+.y10-cv-verdict { font-size: 11px; padding: 0 5px; border-radius: 4px; font-weight: 600; }
+.y10-cv-verdict.is-reject { background: var(--red-bg); color: var(--red); }
+.y10-cv-verdict.is-release { background: var(--tint); color: var(--green); }
+/* 成果箭头都是实线；箭头朝左的是回头的成果（缺陷记录） */
+.y10-cv-line { display: block; border-top: 1px solid var(--line-strong); min-width: 24px; justify-self: stretch; position: relative; }
+.y10-cv-line::after { content: "›"; position: absolute; right: -2px; top: -10px; color: var(--faint); }
+
+.y10-cv-side { display: flex; gap: 6px; justify-content: center; }
+.y10-cv-side .y10-cv-node { border-style: dashed; }
+.y10-cv-vlink { display: grid; justify-items: center; gap: 2px; }
+.y10-cv-vlink::before { content: ""; display: block; width: 0; height: 14px; border-left: 1px solid var(--line-strong); }
+.y10-cv-vlink small { color: var(--muted); font-size: 11px; line-height: 1.3; text-align: center; max-width: 130px; }
+
+.y10-cv-skip { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+.y10-cv-skip .y10-cv-line { flex: 1; min-width: 12px; }
+.y10-cv-skip-to { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* 开着的询问：写「询问」的虚线，不带版本；成果箭头都是实线（项目的组织设计说明 4.14、术语表「循环图」） */
+.y10-cv-ask {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 6px; border: 1px dashed var(--blue);
+  border-radius: 6px; background: var(--bg); color: var(--blue); font-size: 12px; white-space: nowrap;
+}
+.y10-cv-ask .y10-cv-dir { color: var(--blue); }
+.y10-cv-ask-state { margin-left: 6px; font-size: 11px; color: var(--muted); }
+.y10-cv-ask-state.is-open { color: var(--blue); }
+/* 隔着职能的询问另起一行：两边的线与箭头一样用虚线 */
+.y10-cv-skip.is-q .y10-cv-line { border-top-style: dashed; border-top-color: var(--blue); }
+.y10-cv-skip.is-q .y10-cv-line::after { color: var(--blue); }
+/* 旁边的职能与主线之间的竖线：开着询问时换成这一条虚线 */
+.y10-cv-vasks { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; }
+/* 询问线点得开：只看这两个职能的时序图（工单 #1642）。累计往来写的是次数，字数多时折行 */
+button.y10-cv-ask { font: inherit; cursor: pointer; text-align: left; }
+button.y10-cv-ask:hover { border-color: var(--blue); background: var(--tint); }
+.y10-cv-ask.is-accum { white-space: normal; max-width: 220px; }
+
+/* 窄屏：图收成一行（节点名与当前箭头），线程不被挤 */
+.y10-cv-oneline {
+  display: none; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; padding: 6px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.y10-cv-oneline-cur { color: var(--muted); }
+.y10-cv-oneline-cur::before { content: " · 当前："; }
+.y10-cv-oneline .y10-link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+/* 窄屏不画线：节点名旁写「在等待某某的回答」（设计说明 4.14） */
+.y10-cv-qstate { color: var(--text); font-size: 12px; }
+
+/* 点节点、点箭头打开的面板：同一个位置、同一种画法 */
+.y10-cv-panel {
+  position: relative; display: grid; gap: 6px; padding: 10px 14px; background: var(--surface);
+  border: 1px solid var(--green); border-radius: var(--radius);
+}
+.y10-cv-panel h3 { margin: 0; padding-right: 30px; font-size: 15px; }
+.y10-cv-panel h3 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.y10-cv-panel p { margin: 0; }
+.y10-cv-close { position: absolute; top: 6px; right: 6px; }
+.y10-cv-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; }
+.y10-cv-nav .y10-link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; }
+.y10-cv-verdict-line { font-weight: 600; font-size: 13px; }
+.y10-cv-verdict-line.is-reject { color: var(--red); }
+.y10-cv-verdict-line.is-release { color: var(--green); }
+.y10-cv-panel-text { overflow-wrap: anywhere; }
+.y10-cv-full { overflow-wrap: anywhere; white-space: pre-wrap; }
+.y10-cv-note { font-size: 12px; color: var(--muted); }
+.y10-cv-block { display: grid; gap: 3px; }
+.y10-cv-block b { font-size: 12.5px; }
+.y10-cv-files b { font-size: 12.5px; }
+.y10-cv-facts { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
+/* 节点面板的往来：开着的询问在前，标「还没回答」 */
+.y10-cv-exchanges { display: grid; gap: 4px; }
+.y10-cv-exchanges b { font-size: 12.5px; }
+.y10-cv-exchanges .y10-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- 对话线程与输入框（工单 #1639） */
+
+/* 线程：一条线程跨多个事项，事项之间一条细线写标题与结果；已结束的事项默认收起。
+   线程自己滚动，发送一条以后滚到最新一条；其余更新不动滚动位置。 */
+.y10-th {
+  display: grid; gap: 10px; align-content: start; min-height: 180px; max-height: 52vh; overflow-y: auto;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2);
+}
+.y10-th-item { display: grid; gap: 8px; }
+.y10-th-sep { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 2px; color: var(--muted); font-size: 12px; }
+.y10-th-sep::before, .y10-th-sep::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.y10-th-sep-btn { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.y10-th-sep-btn:hover { color: var(--green); }
+.y10-th-sep.is-sel .y10-th-sep-btn { color: var(--green); font-weight: 600; }
+
+/* 你写的话靠右，角色的话与折叠行靠左 */
+.y10-th-msg { display: grid; gap: 3px; max-width: 86%; justify-self: start; }
+.y10-th-msg.is-you { justify-self: end; }
+.y10-th-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 12px; color: var(--faint); }
+.y10-th-msg.is-you .y10-th-meta { justify-content: flex-end; }
+.y10-th-tag { font-size: 11px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 0 8px; }
+.y10-th-bubble { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; overflow-wrap: anywhere; }
+.y10-th-msg.is-you .y10-th-bubble { background: var(--tint); border-color: transparent; }
+.y10-th-msg.is-done .y10-th-bubble { border-color: var(--green); }
+.y10-th-msg.is-release .y10-th-bubble { border-color: var(--green); background: color-mix(in srgb, var(--green) 8%, var(--surface)); }
+.y10-th-bubble .y10-link { margin-left: 8px; }
+
+/* 折叠行：角色之间的往来折成一行，点开才展开；问答里工程回答质检的分事实与解释 */
+.y10-th-fold { justify-self: start; max-width: 86%; }
+.y10-th-fold-head { background: none; border: 0; padding: 2px 0; color: var(--muted); font-size: 13px; cursor: pointer; }
+.y10-th-fold-head::before { content: "▸ "; }
+.y10-th-fold-head[aria-expanded="true"]::before { content: "▾ "; }
+.y10-th-fold-head:hover { color: var(--green); }
+.y10-th-fold-body {
+  margin: 4px 0; padding: 6px 12px; list-style: none; display: grid; gap: 6px;
+  border-left: 2px solid var(--line-strong); font-size: 13px; color: var(--muted);
+}
+.y10-th-fold-body b { color: var(--text); font-weight: 600; }
+.y10-th-fold-body p { margin: 0; overflow-wrap: anywhere; }
+.y10-th-facts, .y10-th-why { display: grid; gap: 2px; margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--line); }
+.y10-th-why { border-left-style: dashed; }
+.y10-th-facts small, .y10-th-why small { color: var(--muted); font-size: 11px; }
+.y10-th-facts p, .y10-th-why p { white-space: pre-wrap; }
+/* 折叠行展开以后末尾的「在时序图里看」：只看这两个职能的时序图 */
+.y10-th-fold-more { padding-top: 2px; }
+
+.y10-th-notice { justify-self: center; margin: 0; font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 2px 12px; text-align: center; }
+.y10-th-note { margin: 0; font-size: 12px; color: var(--muted); }
+.y10-th-project { display: grid; gap: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+
+/* 要你决定的气泡：按钮在气泡里，回答以后变成已回答 */
+.y10-th-decide {
+  display: grid; gap: 6px; justify-self: start; max-width: 92%; padding: 10px 12px;
+  border: 1px solid var(--amber); border-radius: var(--radius); background: var(--surface);
+}
+.y10-th-decide.is-answered { border-color: var(--line); }
+.y10-th-ask { margin: 0; overflow-wrap: anywhere; }
+.y10-th-answered { margin: 0; color: var(--green); font-size: 13px; }
+.y10-th-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.y10-th-links { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; }
+.y10-th-decide .y10-textarea { min-height: 52px; }
+
+/* 输入框在底部，上方一行收件人；收件人的说明写在新事项排在哪件后面 */
+.y10-cv-composer { display: grid; gap: 6px; padding-top: 4px; }
+.y10-cv-to { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.y10-cv-to-label { font-size: 12px; color: var(--muted); }
+.y10-cv-pill { border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.y10-cv-pill:hover { border-color: var(--green); }
+.y10-cv-pill.is-on { border-color: var(--green); background: var(--tint); color: var(--green); font-weight: 600; }
+.y10-cv-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.y10-cv-input { display: flex; gap: 8px; align-items: flex-end; }
+.y10-cv-input .y10-textarea { flex: 1; min-height: 56px; }
+.y10-cv-input .y10-btn { min-height: 34px; }
+.y10-cv-composer .error, .y10-cv-composer .hint, .y10-cv-composer .y10-note { margin: 0; font-size: 12.5px; }
+
+/* 模型不可用：对话里一句话提示并链到模型管理，写明不能开始 */
+.y10-cv-model {
+  margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 13px;
+  padding: 6px 10px; border: 1px solid var(--amber); border-radius: var(--radius); background: var(--amber-bg); color: var(--text);
+}
+.y10-cv-model .y10-link { color: var(--green); }
+
+/* ---------------------------------------------------------------- 时序图（工单 #1641） */
+
+/* 图右上角的入口「看经过」：只有一个职能时没有这个按钮，也没有时序图 */
+.y10-cv-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 4px; }
+.y10-cv-tools .y10-btn[aria-pressed="true"] { background: var(--tint); border-color: var(--green); color: var(--green); font-weight: 600; }
+
+/* 时序图：每个职能和你一列，一行一条消息；展开在循环图下面，不是单独的页，也不盖住线程 */
+.y10-sq {
+  display: grid; gap: 4px; padding: 10px 14px 12px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.y10-sq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.y10-sq-scope { font-size: 12px; color: var(--muted); }
+.y10-sq-legend {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-left: auto;
+  font-size: 11px; color: var(--muted);
+}
+.y10-sq-key { display: inline-block; margin-left: 8px; }
+.y10-sq-key.is-dash { width: 18px; border-top: 1px dashed var(--blue); }
+.y10-sq-key.is-ask, .y10-sq-key.is-user { width: 6px; height: 12px; border-radius: 2px; }
+.y10-sq-key.is-ask, .y10-sq-bar.is-ask { background: color-mix(in srgb, var(--blue) 45%, transparent); }
+.y10-sq-key.is-user, .y10-sq-bar.is-user { background: color-mix(in srgb, var(--amber) 55%, transparent); }
+.y10-sq-close {
+  border: 0; background: none; color: var(--muted); font: inherit; font-size: 18px; line-height: 1;
+  padding: 0 4px; cursor: pointer;
+}
+.y10-sq-close:hover { color: var(--text); }
+
+.y10-sq-wide { display: grid; }
+.y10-sq-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); width: 100%; min-height: 34px; }
+.y10-sq-row.is-cols { min-height: 22px; }
+.y10-sq-row.is-now { min-height: 14px; }
+/* 点一行看原文：整行是按钮，样子仍是一行；选中的那一行把标题的底色换成绿色的一层 */
+button.y10-sq-row {
+  border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+button.y10-sq-row:hover .y10-sq-text > span,
+button.y10-sq-row.is-on .y10-sq-text > span { background: var(--tint); }
+button.y10-sq-row.is-on .y10-sq-text > span { outline: 1px solid var(--green); border-radius: 3px; }
+.y10-sq-time { font-size: 11px; color: var(--faint); padding-top: 3px; white-space: nowrap; overflow: hidden; }
+.y10-sq-track { position: relative; display: block; }
+.y10-sq-track > b { position: absolute; top: 0; transform: translateX(-50%); font-size: 12px; white-space: nowrap; }
+.y10-sq-life { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.y10-sq-bar { position: absolute; top: 0; bottom: 0; width: 6px; margin-left: -3px; }
+/* 一行的那一句标题：压在线上，底下一层底色让它读得清 */
+.y10-sq-text {
+  position: absolute; top: 2px; font-size: 12px; line-height: 16px; padding: 0 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.y10-sq-text > span { background: color-mix(in srgb, var(--surface) 85%, transparent); }
+/* 询问与回答是虚线，其余是实线；箭头指向收的那一方 */
+.y10-sq-line { position: absolute; bottom: 7px; border-top: 1px solid var(--muted); }
+.y10-sq-line.is-dash { border-top: 1px dashed var(--blue); }
+.y10-sq-line::after { content: ""; position: absolute; top: -4px; border: 3.5px solid transparent; }
+.y10-sq-line.is-r::after { right: -1px; border-left: 6px solid var(--muted); border-right-width: 0; }
+.y10-sq-line.is-l::after { left: -1px; border-right: 6px solid var(--muted); border-left-width: 0; }
+.y10-sq-line.is-dash.is-r::after { border-left-color: var(--blue); }
+.y10-sq-line.is-dash.is-l::after { border-right-color: var(--blue); }
+.y10-sq-dot { position: absolute; bottom: 5px; width: 5px; height: 5px; margin-left: -2px; border-radius: 50%; background: var(--muted); }
+.y10-sq-verdict { font-size: 11px; font-weight: 600; padding: 0 5px; border-radius: 4px; }
+.y10-sq-verdict.is-reject { background: var(--red-bg); color: var(--red); }
+.y10-sq-verdict.is-release { background: var(--tint); color: var(--green); }
+
+/* 按轮折起来的那一行：展开时写「第 N 轮」，折起来时后面接这一轮的摘要 */
+.y10-sq-round {
+  width: 100%; margin-top: 2px; padding: 2px 8px; border: 0; border-radius: 4px; background: var(--soft);
+  color: var(--muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.y10-sq-round:hover { color: var(--text); }
+
+/* 窄屏那一条：按时间排的列表，每行写谁到谁与那句标题（800px 以下换上来）；点一行也看原文 */
+.y10-sq-list { display: none; margin: 0; padding: 0; list-style: none; gap: 4px; }
+.y10-sq-list ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.y10-sq-item {
+  display: grid; gap: 1px; width: 100%; border-left: 2px solid var(--line-strong);
+  font-size: 13px; padding: 3px 8px;
+}
+.y10-sq-item.is-dash { border-left: 2px dashed var(--blue); }
+.y10-sq-item small { color: var(--muted); font-size: 11px; }
+button.y10-sq-item {
+  border-top: 0; border-right: 0; border-bottom: 0; background: none; font-family: inherit; color: inherit;
+  text-align: left; cursor: pointer;
+}
+button.y10-sq-item.is-dash { border-left: 2px dashed var(--blue); }
+button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
+
+/* ---------------------------------------------------------------- 项目头部一行与时间条（工单 #1653） */
+
+/* 项目头部一行标签（项目的组织设计说明 4.15 的「其余规矩」）：形态名（改过几处）、轮转方式、有核验或开环。
+   贴在页签上方，左右与页签同一行宽；标签读项目现在的组织，不随选中的事项变 */
+.y10-phead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 32px 0; }
+.y10-phead-tag {
+  font-size: 12px; line-height: 18px; padding: 0 8px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--line-strong); color: var(--muted); background: var(--surface);
+}
+/* 第一个是形态名：比另两项醒目一档，一眼看出这份组织是哪几个职能 */
+.y10-phead-tag.is-form { font-size: 12.5px; font-weight: 600; color: var(--text); border-color: var(--green); }
+
+/* 时间条：对话上方，选中事项的已用时间与上限；在跑时旁边一个「停止」 */
+.y10-cv-time { display: grid; gap: 4px; }
+.y10-cv-time-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.y10-cv-time-text { font-size: 13px; color: var(--muted); }
+.y10-cv-time .y10-meter { margin-top: 0; max-width: 420px; }
+.y10-cv-time .y10-btn.danger { min-height: 28px; padding: 3px 12px; font-size: 12.5px; }
+.y10-cv-time .error, .y10-cv-time .hint { margin: 0; font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- 原文面板里的「看工作过程」（工单 #1658） */
+
+/* 入口在原文面板里，点开就地展开在下面；再点一次收起（按钮写「收起工作过程」） */
+.y10-wp { display: grid; gap: 6px; }
+.y10-wp-toggle { justify-self: start; font-size: 12.5px; }
+.y10-wp-body { display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.y10-wp-head { font-size: 12.5px; font-weight: 600; }
+.y10-wp-head small { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+/* 同一轮有几次激活时的那一排：与部门工作间的激活选择同一个样子 */
+.y10-wp-activations { display: flex; flex-wrap: wrap; gap: 6px; }
+.y10-wp-activation {
+  text-align: left; font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); cursor: pointer;
+  min-width: 0; overflow-wrap: anywhere;
+}
+.y10-wp-activation:hover { border-color: var(--green); color: var(--text); }
+.y10-wp-activation.is-active { border-color: var(--green); background: var(--tint); color: var(--text); font-weight: 600; }
+
+/* 行：每个动作一行标记加标题；连续同一种类的动作折成一行，写数量，点开看每一行 */
+.y10-wp-lines, .y10-wp-sublines { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.y10-wp-sublines { margin-top: 2px; padding-left: 18px; }
+.y10-wp-item { display: grid; min-width: 0; }
+.y10-wp-line {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; width: 100%;
+  padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: none;
+  font: inherit; font-size: 13px; color: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.y10-wp-line:hover { background: var(--soft); border-color: var(--line); }
+.y10-wp-mark {
+  flex: none; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 4px;
+  border: 1px solid var(--line-strong); color: var(--green); font-weight: 600;
+}
+.y10-wp-title { min-width: 0; overflow-wrap: anywhere; }
+
+/* 原始数据：命令、参数、退出状态、输出、这一步的推理与模型文字，后面是请求详情 */
+.y10-wp-raw {
+  display: grid; gap: 6px; margin: 2px 0 6px 14px; padding: 8px 10px; min-width: 0;
+  border-left: 2px solid var(--line-strong); border-radius: 0 6px 6px 0; background: var(--surface-2);
+  font-size: 12.5px;
+}
+.y10-wp-fields { margin: 0; display: grid; gap: 6px; }
+.y10-wp-field { display: grid; gap: 2px; min-width: 0; }
+.y10-wp-field dt { font-size: 11.5px; color: var(--muted); }
+.y10-wp-field dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.y10-wp-raw-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; font-size: 12px; }
+.y10-wp-raw-row .y10-link { font-size: 12px; }
+.y10-wp-attempts { padding-top: 4px; border-top: 1px dashed var(--line); }
+.y10-wp-texts { display: grid; gap: 4px; min-width: 0; }
+.y10-wp-texts-title { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+
+@media (max-width: 1100px) {
+  .y10-phead { padding-left: 22px; padding-right: 22px; }
+}
+
+@media (max-width: 900px) {
+  .y10-phead { padding-left: 12px; padding-right: 12px; }
+}
+
+@media (max-width: 800px) {
+  .y10-cv-wrap { display: none; }
+  .y10-cv-oneline { display: flex; }
+  /* 窄屏没有「累计往来」（项目的组织设计说明 4.14）：图已经收成一行，没有地方画累计的线 */
+  .y10-cv-accum { display: none; }
+  /* 窄屏时线程不被图挤掉：占满宽度，输入框竖着放 */
+  .y10-th { min-height: 160px; max-height: none; }
+  .y10-cv-input { flex-direction: column; align-items: stretch; }
+  .y10-cv-input .y10-btn { width: 100%; }
+  /* 时序图退回按时间排的列表（窄屏时每行写谁到谁与那句标题） */
+  .y10-sq-wide { display: none; }
+  .y10-sq-list { display: grid; }
+  /* 原始数据在窄屏不再缩进：面板本身已经很窄，再缩就只剩几个字一行 */
+  .y10-wp-raw { margin-left: 0; }
+}

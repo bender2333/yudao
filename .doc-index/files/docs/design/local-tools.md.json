@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/design/local-tools.md",
-"hash":"97f55a9ecc8b0990",
+"hash":"3f45960c28b4bbe3",
 "nodes":[
-{"hash":"97f55a9ecc8b0990","id":"docs/design/local-tools.md","kind":"file","title":"docs/design/local-tools.md"},
+{"hash":"3f45960c28b4bbe3","id":"docs/design/local-tools.md","kind":"file","title":"docs/design/local-tools.md"},
 {"hash":"8cc2e43d22f7351a","id":"docs/design/local-tools.md#本地通用工具设计说明","kind":"section","parent":"docs/design/local-tools.md","title":"本地通用工具设计说明"},
 {"hash":"5405f7e186dc5619","id":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"1. 使用过程"},
 {"hash":"8fd38c31310978cd","id":"docs/design/local-tools.md#本地通用工具设计说明 > 2. 工作区","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"2. 工作区"},
-{"hash":"ff4ca7ff14132da6","id":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"3. 工具边界"},
+{"hash":"2aedbe5320d652b0","id":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"3. 工具边界"},
 {"hash":"e843ef1291df1a80","id":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"4. 使用的依赖与成熟实现"},
 {"hash":"2fa996d9bc3103ed","id":"docs/design/local-tools.md#本地通用工具设计说明 > 5. 模块交互","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"5. 模块交互"}
 ],
@@ -27,6 +27,7 @@
 {"dst":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明","kind":"link","raws":["network-and-mcp.md"],"seen":"023e653719b5bbb9","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 4. 项目设置中的 MCP 服务器","kind":"link","raws":["network-and-mcp.md"],"seen":"186bb2627e553016","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 4. 动作分类与处置","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"d7551de2f1eb7109","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
+{"dst":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明","kind":"link","raws":["work-process-titles.md"],"seen":"020521dcc0127276","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"241863e89464a786","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.2 执行位置上的程序与依赖缓存","kind":"link","raws":["execution-environment.md"],"seen":"7f60cee3acb74498","src":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"link","raws":["model-management.md"],"seen":"17891a8b09694ac3","src":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现"}

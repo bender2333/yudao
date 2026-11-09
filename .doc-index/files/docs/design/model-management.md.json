@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/design/model-management.md",
-"hash":"f2264e65a3d7de26",
+"hash":"6277c47f32b3e3d7",
 "nodes":[
-{"hash":"f2264e65a3d7de26","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
-{"hash":"67994525c4ca087c","id":"docs/design/model-management.md#模型管理设计说明","kind":"section","parent":"docs/design/model-management.md","title":"模型管理设计说明"},
+{"hash":"6277c47f32b3e3d7","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
+{"hash":"146e0bdb48f843f1","id":"docs/design/model-management.md#模型管理设计说明","kind":"section","parent":"docs/design/model-management.md","title":"模型管理设计说明"},
 {"hash":"2fb1a4b47e6d852c","id":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"1. 参照对象与取舍"},
-{"hash":"d28f16a5cc6e66e6","id":"docs/design/model-management.md#模型管理设计说明 > 2. 分层","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"2. 分层"},
+{"hash":"5b1e20bd841bd464","id":"docs/design/model-management.md#模型管理设计说明 > 2. 分层","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"2. 分层"},
 {"hash":"b4f039b35c653bf7","id":"docs/design/model-management.md#模型管理设计说明 > 3. 数据与归属","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"3. 数据与归属"},
 {"hash":"3ed1bb503b6d25ad","id":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"4. 模型目录"},
 {"hash":"fbc96758cf21d124","id":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录 > 4.1 服务方案预置表与模型能力表","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录","title":"4.1 服务方案预置表与模型能力表"},
@@ -22,7 +22,7 @@
 {"hash":"87ea429fe74f770c","id":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.3 解析规则","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择","title":"5.3 解析规则"},
 {"hash":"1852f18c98c682fb","id":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.4 生效时机","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择","title":"5.4 生效时机"},
 {"hash":"f1043917e9036cc7","id":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.5 引用无法使用时","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择","title":"5.5 引用无法使用时"},
-{"hash":"030db06fb179b366","id":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.6 职能的建议能力","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择","title":"5.6 职能的建议能力"},
+{"hash":"3c38f0e68139b829","id":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.6 职能的建议能力","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择","title":"5.6 职能的建议能力"},
 {"hash":"bfb927bffe2ab247","id":"docs/design/model-management.md#模型管理设计说明 > 6. 每次模型请求","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"6. 每次模型请求"},
 {"hash":"3d5f22a793c510ae","id":"docs/design/model-management.md#模型管理设计说明 > 7. 推理档位","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"7. 推理档位"},
 {"hash":"f66cd2a29f0ca251","id":"docs/design/model-management.md#模型管理设计说明 > 7. 推理档位 > 7.1 档位与声明","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 7. 推理档位","title":"7.1 档位与声明"},
@@ -42,10 +42,10 @@
 {"hash":"6a0393db4f18e6a1","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"9. 界面"},
 {"hash":"f72e785410edfa24","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.1 模型管理页","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.1 模型管理页"},
 {"hash":"e53a39b042dd8132","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 职能详情里的模型与 Prompt","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.2 职能详情里的模型与 Prompt"},
-{"hash":"73fac2bf60ded108","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.3 职能工作间","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.3 职能工作间"},
+{"hash":"81b58ea78117638a","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.3 当前模型的显示","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.3 当前模型的显示"},
 {"hash":"827363b4d24f7911","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.4 不提供的元素","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.4 不提供的元素"},
 {"hash":"b4a52900311913a9","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.5 用词","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.5 用词"},
-{"hash":"eef20f2b2e643f8a","id":"docs/design/model-management.md#模型管理设计说明 > 10. 涉及的模块","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"10. 涉及的模块"},
+{"hash":"43c263cc09c96baf","id":"docs/design/model-management.md#模型管理设计说明 > 10. 涉及的模块","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"10. 涉及的模块"},
 {"hash":"ac9a9a383a5b49d7","id":"docs/design/model-management.md#模型管理设计说明 > 11. TODO","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"11. TODO"},
 {"hash":"17891a8b09694ac3","id":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"12. 统一调用、取消与观测"},
 {"hash":"74cd53ef98fe11f9","id":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测 > 12.1 模块边界","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","title":"12.1 模块边界"},
@@ -76,8 +76,8 @@
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制","kind":"link","raws":["semantic-system.md"],"seen":"ff9b18e17ff6a810","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩"},
 {"dst":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条）","kind":"link","raws":["context-assembly.md"],"seen":"b461989983f30483","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.1 工作上限与阈值","kind":"link","raws":["semantic-system.md"],"seen":"e72fa0994a8ad701","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值"},
-{"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","kind":"link","raws":["semantic-system.md"],"seen":"20b2c5d36ffde1dc","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性"},
+{"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","kind":"link","raws":["semantic-system.md"],"seen":"01eb7eb11f2107c8","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"241863e89464a786","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.1 模型管理页"},
-{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","kind":"link","raws":["project-organization.md"],"seen":"61d825b935f9abc9","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 职能详情里的模型与 Prompt"}
+{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","kind":"link","raws":["project-organization.md"],"seen":"2b973c97ad1587c2","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 职能详情里的模型与 Prompt"}
 ]
 }

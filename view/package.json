@@ -9,7 +9,8 @@
     "build": "vite build",
     "dev": "vite",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test tests/unit/*.test.js tests/unit/*.test.ts"
+    "test": "node --test tests/unit/*.test.js tests/unit/*.test.ts",
+    "test:e2e": "vite build && playwright test"
   },
   "dependencies": {
     "gsap": "3.13.0",

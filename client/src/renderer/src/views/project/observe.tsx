@@ -63,7 +63,7 @@ function writeDepartment(projectId: string, workItem: string | null, department:
 // 取值由 Provider 模块给出（department_default / project_department_setting），未知值原样显示
 function selectionSourceName(value: string | null): string {
   if (value === "department_default") {
-    return "部门默认";
+    return "职能默认";
   }
   if (value === "project_department_setting") {
     return "项目设置";
@@ -164,12 +164,12 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
       <Section
         id="obs-requests"
         title="请求记录与用量"
-        note={`范围：${workItem === null ? "整个项目" : scopeTitle === "" ? "顶栏选中的事项" : scopeTitle}${departmentNote === "" ? "" : `；${departmentNote}`}；按部门、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
+        note={`范围：${workItem === null ? "整个项目" : scopeTitle === "" ? "顶栏选中的事项" : scopeTitle}${departmentNote === "" ? "" : `；${departmentNote}`}；按职能、状态、Provider 与模型筛选；两个页签使用同一组筛选。`}
         className="y10-obs"
       >
         <div className="y10-obs-filters filters">
           <label className="y10-obs-filter field">
-            <span>部门</span>
+            <span>职能</span>
             <select className="y10-select" value={draft.department} onChange={(event) => setDraft({ ...draft, department: event.target.value })}>
               <option value="">全部</option>
               {Object.keys(DEPARTMENTS).map((key) => <option key={key} value={key}>{DEPARTMENTS[key].name}</option>)}
@@ -260,7 +260,7 @@ function RecordsPanel(props: {
       {props.rows.length === 0 && !props.loading ? <Empty text="这个范围没有请求记录" /> : null}
       {props.rows.length > 0 ? (
         <Table
-          head={["开始", "状态", "耗时", "部门", "请求", "返回", "请求类型", "用量", ""]}
+          head={["开始", "状态", "耗时", "职能", "请求", "返回", "请求类型", "用量", ""]}
           rows={props.rows.map((item) => {
             const usage = dict(item.usage);
             return [
@@ -327,7 +327,7 @@ function UsageSection(props: { usage: { data: UsageReport | null; loading: boole
           ["成本", totals.cost === null || totals.cost === undefined ? "未上报" : String(totals.cost)],
         ]}
       />
-      <UsageGroups title="按部门" groups={data.departments} />
+      <UsageGroups title="按职能" groups={data.departments} />
       <UsageGroups title="按模型" groups={data.models} />
     </div>
   );
@@ -461,7 +461,7 @@ function AttemptDetail(props: { app: ClientApp; data: RunAttemptResult; projectI
           ["选择来源", selectionSourceName(optionalText(callTarget.selection_source))],
           ["模型", `请求 ${show(optionalText(attempt.requested_model))}，实际 ${show(optionalText(attempt.actual_model))}`],
           ["协议与档位", `请求 ${show(optionalText(callTarget.requested_tier))}，实际发送 ${show(optionalText(callTarget.sent_tier))}`],
-          ["部门设置版本", attempt.prompt_version === null || attempt.prompt_version === undefined ? "未上报" : `第 ${String(attempt.prompt_version)} 版`],
+          ["职能设置版本", attempt.prompt_version === null || attempt.prompt_version === undefined ? "未上报" : `第 ${String(attempt.prompt_version)} 版`],
           ["第几步 / 第几次尝试", `${show(optionalText(attempt.step))} / ${show(optionalText(attempt.attempt))}`],
           ["开始与结束", `${formatTime(optionalText(attempt.started_at))} → ${formatTime(optionalText(attempt.finished_at))}（${formatNumberOr(numberValue(attempt.duration_ms), " 毫秒")}）`],
           ["用量", usageText(dict(attempt.usage))],

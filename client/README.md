@@ -5,7 +5,7 @@ React + TypeScript + Vite 构建的页面文件，由 Yudao 服务提供（[网�
 
 使用的技术：React 19、TypeScript、Vite、
 [`@hey-api/openapi-ts`](https://www.npmjs.com/package/@hey-api/openapi-ts) 生成接口类型、
-npm [`eventsource`](https://www.npmjs.com/package/eventsource)（传入自定义 fetch）、Playwright 跑浏览器端到端测试。
+npm [`eventsource`](https://www.npmjs.com/package/eventsource)（传入自定义 fetch）。
 
 ## 目录
 
@@ -17,7 +17,6 @@ src/renderer/    页面：外壳、连接设置、视图同步（React）
   src/views/     连接设置页，以及首页、项目、模型、决定、系统、时间线等页面
 scripts/         generate-api.mjs（生成接口类型）
 tests/unit/      不需要网络的单元测试（node --test）
-tests/e2e/       Playwright 启动 Chromium，连接真实后端（FakeAdapter 驱动的服务）
 ```
 
 ## 常用命令
@@ -28,11 +27,7 @@ npm run generate:api       # 由 harness/tests/openapi/openapi.json 生成接口
 npm run build:pages        # Vite 构建页面文件到 out/renderer（发布脚本调用）
 npm run typecheck          # tsc 类型检查
 npm test                   # 单元测试（node --test）
-npm run test:e2e           # 端到端测试（Playwright 启动 Chromium；需要仓库项目的 Python 环境）
 ```
-
-端到端测试用 `uv run python client/tests/e2e/backend.py` 启动真实后端；先在仓库根目录运行一次
-`uv sync --frozen`。
 
 ## 开发方式
 

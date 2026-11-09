@@ -24,14 +24,28 @@ from harness.app.application import Application
 from harness.app.contracts import Accepted, Rejected
 from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import OrganizationDraft, ProjectOrganization
-from harness.definitions import DEFAULT_FORM
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, Definitions
 from harness.event_store import project_stream
 from harness.models import ProjectEventType
 from harness.project_projection import replay_project, saved_project
 from harness.runtime import LoopSystem, SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT
+from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
+
+# 一份只改了职能显示名的定义（验收第 1 条）：编号、角色与核验声明照旧，三个显示名都换掉
+RENAMED_FORM = "three_departments_renamed_labels"
+RENAMED_LABELS = {"product": "需求", "engineering": "实现", "quality": "验收"}
+
+
+def _renamed_labels() -> Definitions:
+    return DEFINITIONS.model_copy(update={
+        "version": "sha256:three-departments-renamed-labels",
+        "organization": DEFINITIONS.organization.model_copy(update={
+            "departments": tuple(department.model_copy(update={"label": RENAMED_LABELS[department.id]})
+                                 for department in DEFINITIONS.organization.departments)}),
+    })
 
 
 def _system(data_dir: Path) -> LoopSystem:
@@ -378,3 +392,37 @@ def test_the_query_lists_the_release_the_composed_organization_and_each_items_or
         system.forms[DEFAULT_FORM].definitions.departments)
     assert {department.origin for department in organization.departments} == {"release"}
     system.close()
+
+
+def test_every_form_carries_a_name_made_of_its_departments(tmp_path):
+    # 验收第 1 条：发布带的每份形态带 label，由定义里的职能显示名按定义的顺序用「 · 」连起来；本项目当前
+    # 组织也带同一份名字。换一份改了职能显示名的定义，label 跟着变：期望值从那一份定义推出来，不写死三个
+    # 字符串（术语表「形态」：形态名列出它有哪几个职能，从定义推出，不另写一份）
+    system = _system(tmp_path / "loop")
+    application = _application(system)
+    project_id = system.projects.register("形态带名字", GOAL)
+    organization = _organization(application, project_id)
+    choices = {choice.form: choice for choice in organization.forms}
+    assert (choices[DEFAULT_FORM].label, choices[SINGLE_ROLE_DIRECT].label,
+            choices[SEVERAL_ROLES_DIRECT].label) == ("产品 · 工程 · 质检", "工程", "产品 · 工程")
+    assert organization.label == choices[DEFAULT_FORM].label
+    # 换成「工程」：当前组织的名字跟着现在这一份走
+    adopted = _adopt(application, project_id, SINGLE_ROLE_DIRECT, base_version=organization.version)
+    assert isinstance(adopted, Accepted), adopted
+    assert _organization(application, project_id).label == choices[SINGLE_ROLE_DIRECT].label
+    system.close()
+
+    # 换一份三个职能都改了显示名的定义：名字按那一份的显示名与顺序，说明照旧由同一份定义得出
+    renamed = _renamed_labels()
+    other = LoopSystem.for_testing(tmp_path / "renamed", None,
+                                   forms={DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+                                          RENAMED_FORM: (renamed, WATCHED_OUTPUTS)},
+                                   resume_on_startup=False)
+    other_project = other.projects.register("改了显示名", GOAL)
+    [renamed_choice] = [item for item in _organization(_application(other), other_project).forms
+                        if item.form == RENAMED_FORM]
+    expected = " · ".join(department.label for department in renamed.organization.departments)
+    assert renamed_choice.label == expected == "需求 · 实现 · 验收"
+    assert renamed_choice.label != choices[DEFAULT_FORM].label
+    assert renamed_choice.description == "需求、实现、验收；验收核验实现。"
+    other.close()

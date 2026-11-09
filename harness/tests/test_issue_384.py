@@ -110,14 +110,34 @@ def _catalog_events(store):
                                               if not key.startswith("_")])
 
 
-def _wait_for(store, predicate, *, description="catalog event"):
+def _wait_for(store, predicate, *, after=0, description="catalog event"):
+    # 等一条目录事件（工单 #1436）：订阅写入口的提交通知，由事件到达决定先后，不按轮询的时机赌。
+    # after 是这次命令登记的位置（命令被接受时返回的 position）：只有它之后追加的事件才算这次命令的结果，
+    # 保存引起的、在这次命令登记之前就落下的另一次收集因此不算在内。返回第一条符合的事件
     deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
-    while time.monotonic() < deadline:
-        matched = [event for event in _catalog_events(store) if predicate(event)]
-        if matched:
-            return matched
-        time.sleep(0.02)
-    raise AssertionError(f"timed out waiting for {description}")
+    found = []
+    signal = threading.Event()
+
+    def receive(events):
+        found.extend(event for event in events if event.position > after and predicate(event))
+        if found:
+            signal.set()
+
+    unsubscribe = store.subscribe(receive)
+    try:
+        while not found:
+            # 结果可能在订阅之前就写完了：先看已经写下的事件，再等下一次提交
+            receive(_catalog_events(store))
+            if found:
+                break
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AssertionError(f"timed out waiting for {description}")
+            signal.wait(remaining)
+            signal.clear()
+        return found[0]
+    finally:
+        unsubscribe()
 
 
 def _save(client, base_url, *, models_url=""):
@@ -127,16 +147,16 @@ def _save(client, base_url, *, models_url=""):
 
 
 def _collected(client, opened, models_url=None):
-    # 发一次获取模型列表命令，等它的结果事件，返回事件正文；
-    # 同一测试里会连续发多次，只认发出命令以后新追加的那一条
-    events = _catalog_events(opened.store)
-    seen = events[-1].position if events else 0
+    # 发一次获取模型列表命令，等这条命令自己的结果事件，返回事件正文。
+    # 判据是命令自己的编号：命令被接受时返回的 position 是它在目录流里登记的位置，结果事件写在它后面
+    # （原来按「上一次看到的位置」划范围再 [event] = 取出唯一一条；改动连接地址以后目录自己会再收集一次，
+    # 见 harness/app/application.py 的 _apply_source_change，两条结果都落在范围里时用例当场失败，工单 #1436）
     response = _command(client, "catalog.candidates.collect", base_version=_catalog(client)["revision"],
                         provider_id=PROVIDER_ID, models_url=models_url)
     assert response.status_code == 200, response.text
-    [event] = _wait_for(opened.store, lambda item: item.position > seen and item.type.endswith("candidates_collected")
-                        and item.payload.get("status") is not None,
-                        description="candidates collected")
+    event = _wait_for(opened.store, lambda item: item.type.endswith("candidates_collected")
+                      and item.payload.get("status") is not None,
+                      after=response.json()["position"], description="candidates collected")
     return event.payload
 
 
@@ -165,14 +185,11 @@ def test_connection_test_failure_names_the_requested_url(tmp_path):
     address = f"http://127.0.0.1:{_closed_port()}"
     opened = _Opened(tmp_path, _document(address))
     with running_api(opened) as client:
-        events = _catalog_events(opened.store)
-        seen = events[-1].position if events else 0
         response = _command(client, "catalog.connection.test", base_version=_catalog(client)["revision"],
                             provider_id=PROVIDER_ID)
         assert response.status_code == 200, response.text
-        [event] = _wait_for(opened.store, lambda item: item.position > seen
-                            and item.payload.get("kind") == "connection",
-                            description="connection test finished")
+        event = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
+                          after=response.json()["position"], description="connection test finished")
         assert event.payload["ok"] is False
         assert event.payload["source_url"] == f"{address}/models"
         assert f"{address}/models" in event.payload["error"]

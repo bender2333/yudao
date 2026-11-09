@@ -30,14 +30,14 @@
 {"hash":"5ed6460f3109f5ea","id":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 测试按三环留 > 12.2 新增测试怎么进来","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 测试按三环留","title":"12.2 新增测试怎么进来"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["第五节"],"seen":"cb9066af90b3b5a9","src":"docs/design/test-pyramid.md#测试分层设计说明"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["第五节"],"seen":"bff92efe9855956f","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 11. 真实用户场景验收","kind":"link","raws":["skeleton-and-application.md"],"seen":"a153f29785e21da3","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","kind":"link","raws":["visualization.md"],"seen":"b5c07471d328449c","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"harness/tests/event_sequence.py","kind":"code-path","raws":["harness/tests/event_sequence.py"],"seen":"1b57b18fac4ed506","src":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 事件序列基准的范围 > 10.1 做法"},
 {"dst":"harness/tests/prompt_snapshot.json","kind":"code-path","raws":["harness/tests/prompt_snapshot.json"],"seen":"b93c8ac576985961","src":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 事件序列基准的范围 > 10.1 做法"},
 {"dst":"harness/app/payloads.py","kind":"code-path","raws":["harness/app/payloads.py"],"seen":"00d816412befc46d","src":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 事件序列基准的范围 > 10.2 只为真实变化重写"},
-{"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 7. 骨架事件与应用事件","kind":"link","raws":["skeleton-and-application.md"],"seen":"3322e096d9f4fcd8","src":"docs/design/test-pyramid.md#测试分层设计说明 > 11. 缝的合同检查"},
+{"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 7. 骨架事件与应用事件","kind":"link","raws":["skeleton-and-application.md"],"seen":"cc54784e84fe2560","src":"docs/design/test-pyramid.md#测试分层设计说明 > 11. 缝的合同检查"},
 {"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"7b2d40d78ea4b9cd","src":"docs/design/test-pyramid.md#测试分层设计说明 > 11. 缝的合同检查"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 测试按三环留 > 12.1 一个测试凭什么留"},
 {"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"2046ff5004c6050f","src":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义"},

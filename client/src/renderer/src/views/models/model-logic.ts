@@ -679,11 +679,11 @@ export const STALE_ADMISSION_LABEL = "无法使用：准入已作废";
 export function referrerLabel(location: string, labels: Record<string, string> = {}): string {
   const binding = /^bindings\.([a-z_]+)$/.exec(location);
   if (binding) {
-    return `部门默认：${labels[binding[1]] ?? departmentName(binding[1])}`;
+    return `职能默认：${labels[binding[1]] ?? departmentName(binding[1])}`;
   }
   const project = /^projects\.([^.]+)\.department_settings\.([a-z_]+)$/.exec(location);
   if (project) {
-    return `项目部门设置：${labels[project[2]] ?? departmentName(project[2])}`;
+    return `项目职能设置：${labels[project[2]] ?? departmentName(project[2])}`;
   }
   return location;
 }
@@ -701,6 +701,68 @@ export function removalRejectionText(message: string, labels: Record<string, str
     return message;
   }
   return head + locations.map((location) => referrerLabel(location, labels)).join("、");
+}
+
+// ---------------------------------------------------------------------------
+// 移除模型访问定义（取消选用）的确认（工单 #737）
+// ---------------------------------------------------------------------------
+
+// 取消选用就是移除这个访问定义，不可逆：移除以后这个模型在这个连接下不可用、准入记录作废，
+// 依赖它的职能绑定要重新选用。与其他不可逆的操作（开始排空、强制升级、取消事项）同一套做法：
+// 点下去只换来一次确认，命令要到确认以后才交给服务端；确认按钮用 danger 样式。
+
+/** 点下去以后待确认的那一行：已选模型清单里的这一条定义，确认以后照它提交 */
+export type RemovalRequest = {
+  /** 已选模型清单里那一行的键：结果回来时按它写在那一行旁边 */
+  key: string;
+  provider_id: string;
+  /** 目录里的访问定义 id */
+  model_id: string;
+  upstream_model: string;
+  provider_address: string;
+  /** 这一行已经通过验证（准入记录有效）：确认框里的说法按它分 */
+  admitted: boolean;
+};
+
+/** 确认框的标题 */
+export const REMOVE_CONFIRM_TITLE = "移除这个模型的访问定义？";
+
+/** 确认框里逐条写的后果与出路 */
+export function removeConfirmLines(input: {
+  upstream_model: string;
+  provider_address: string;
+  admitted: boolean;
+}): string[] {
+  const lines = [
+    `这条定义会从「${input.provider_address}」下移除：之后这个服务下没有 ${input.upstream_model}。`,
+    "准入记录作废：这个模型已有的准入结果不再有效。",
+    "依赖它的职能绑定会失效：职能默认或项目职能设置里的引用要重新选用、重新验证。",
+    "被职能默认或项目职能设置引用时，服务端会拒绝移除，并在这个模型那一行旁边列出引用方。",
+  ];
+  if (!input.admitted) {
+    lines.push("这一次还没有通过验证：进行中的验证与它的结果一起作废。");
+  }
+  return lines;
+}
+
+/** 确认框里那个真的做下去的按钮 */
+export const REMOVE_CONFIRM_CONFIRM = "确认移除";
+
+/** 确认框里那个不做的按钮 */
+export const REMOVE_CONFIRM_CANCEL = "先不移除";
+
+/**
+ * 移除访问定义的命令参数：只有用户在确认框里点过「确认移除」以后才给出（工单 #737）。
+ * 点「取消选用」本身只换来一次确认，不产生命令；没有待确认的那一行时也不产生。
+ */
+export function removalCommand(
+  pending: RemovalRequest | null,
+  confirmed: boolean,
+): { provider_id: string; model_id: string } | null {
+  if (pending === null || !confirmed) {
+    return null;
+  }
+  return { provider_id: pending.provider_id, model_id: pending.model_id };
 }
 
 // ---------------------------------------------------------------------------
@@ -830,7 +892,7 @@ export function tierOptions(supported: string[], saved: string | null | undefine
 
 // 跟随部门的选项文本：待保存的选择为空时写明当前生效的模型（来源与模型名）
 export function followDepartmentLabel(current: string): string {
-  return current === "" ? "跟随部门默认" : `跟随部门默认（当前：${current}）`;
+  return current === "" ? "跟随职能默认" : `跟随职能默认（当前：${current}）`;
 }
 
 // 当前生效模型的说明：取出生效状态与来源，供跟随选项展示。
@@ -877,7 +939,7 @@ export function modelById(models: CatalogModel[], modelId: string): CatalogModel
 }
 
 // 一次保存以后要提示的生效说明
-export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生效";
+export const DEPARTMENT_SAVE_NOTICE = "从本职能下一次模型请求起生效";
 
 // ---------------------------------------------------------------------------
 // 目录文档（高级部分的编辑 JSON）

@@ -1,10 +1,10 @@
 # 建 run 时冻结参数（工单 #1189；规则登记与参数 docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」；总图第二节「定义」、第四节「定义」缝）：
-# 10 个参数与 3 条可见范围在建 run 时取样，写进 run_created 的一个字典字段，这个 run 全程读那份取值。
+# 一组运行参数与 3 条可见范围在建 run 时取样，写进 run_created 的一个字典字段，这个 run 全程读那份取值。
 # 这个文件查六件事：
 # 1. run_created 里的冻结字典、全局参数版本、项目覆盖来源、事项已解析限额与定义版本对得上同一份快照；
 # 2. 建 run 之后改参数只作用于之后创建的 run；已有 run 的事件重放与重新启动都读冻结值，不取现值；
 # 3. 旧事件没有冻结字典时按定义初值解释，不取现值；
-# 4. 10 个参数各自有一条行为用例：参数改了，新 run 的行为跟着变，旧 run 不变；
+# 4. 每个冻结的运行参数各有一条行为用例：参数改了，新 run 的行为跟着变，旧 run 不变；
 # 5. 每个角色一条可见范围在建 run 时冻结（工单 #1401：名字跟着角色编号走），词表以外的取值在参数校验处被拒绝；
 #    三个部门都改名的定义下，每个角色的可见范围参数照常冻结、照常生效；
 # 6. 中断（事项已提交、run 未创建）与定义版本差异两条恢复路径。
@@ -82,7 +82,7 @@ def _set(system: LoopSystem, name: str, value: object) -> None:
     system.set_parameter(name, value, reason="核对冻结", modified_by="user:test")
 
 
-def test_run_created_freezes_the_thirteen_values_and_their_sources(tmp_path):
+def test_run_created_freezes_the_run_parameters_and_their_sources(tmp_path):
     system = _system(tmp_path)
     project_id = system.projects.register("冻结", GOAL)
     _item, run_id = system.projects.start_work_item(project_id, GOAL)

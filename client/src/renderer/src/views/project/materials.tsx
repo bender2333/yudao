@@ -89,7 +89,7 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
       {data ? (
         <>
           <IntendBlock rows={data.inputs} />
-          <VersionBlock app={props.app} id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
+          <VersionBlock app={props.app} id="mt-prd" title="PRD" note="产品提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品还没有提交 PRD" />
           <OnboardingBlock rounds={data.onboarding_rounds} />
           <DeliveryBlock app={props.app} rows={data.deliveries} />
           <ReviewBlock app={props.app} runId={data.run_id} rows={data.reviews} />
@@ -397,7 +397,7 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
 
   return (
     <Section id="mt-delivery" title="交付" note="各版本的封存快照：文件清单、摘要与文件下载；文件清单由主机从交付快照得出，不取自交付说明" className="y10-mt">
-      {props.rows.length === 0 ? <Empty text="工程部门还没有封存交付" /> : (
+      {props.rows.length === 0 ? <Empty text="工程还没有封存交付" /> : (
         <ol className="y10-mt-list">
           {props.rows.map((entry, index) => (
             <li className={`y10-mt-doc delivery-block${index === props.rows.length - 1 ? " is-current" : " is-old"}`} key={entry.event_id}>
@@ -476,7 +476,7 @@ function ReviewBlock(props: { app: ClientApp; runId: string; rows: WorkItemMater
   );
   return (
     <Section id="mt-qa" title="质检" note="结论、理由、逐条检验结果与检查回执；截图是试用用例里的证据，绑定到交付快照" className="y10-mt">
-      {props.rows.length === 0 ? <Empty text="质检部门还没有给出结论" /> : (
+      {props.rows.length === 0 ? <Empty text="质检还没有给出结论" /> : (
         <>
           {coverage.error === null ? null : <CoverageUnreadable />}
           <ol className="y10-mt-list">
@@ -531,7 +531,7 @@ function NotesBlock(props: { rows: WorkItemMaterialsResult["materials"]; scoped:
           {props.rows.map((material) => (
             <li key={material.material_id}>
               <header className="y10-mt-doc-head">
-                <strong>{material.department === null ? "项目材料" : `${departmentName(material.department)}部门记录`}</strong>
+                <strong>{material.department === null ? "项目材料" : `${departmentName(material.department)}记录`}</strong>
                 <span className="y10-muted">{formatTime(material.recorded_at)} 记录</span>
               </header>
               <blockquote className="y10-mt-quote">{material.text}</blockquote>

@@ -249,11 +249,11 @@ test("所在部门一行写三个部门各自的状态与原因，按查询给�
   );
 });
 
-test("没有 departments 时照旧写所在部门，没有部门时写大厅", () => {
-  assert.equal(departmentLine(null, "engineering"), "所在部门：工程");
-  assert.equal(departmentLine(undefined, null), "所在部门：大厅");
+test("没有 departments 时照旧写所在职能，没有职能时写大厅", () => {
+  assert.equal(departmentLine(null, "engineering"), "所在职能：工程");
+  assert.equal(departmentLine(undefined, null), "所在职能：大厅");
   assert.equal(departmentsText(null), null);
-  assert.equal(departmentLine({}, "product"), "所在部门：产品");
+  assert.equal(departmentLine({}, "product"), "所在职能：产品");
 });
 
 test("部门状态的中文名用总图外环的五个词，只写这一处", () => {

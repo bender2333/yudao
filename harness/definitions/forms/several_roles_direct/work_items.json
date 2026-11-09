@@ -1,7 +1,7 @@
 {
   "kinds": {
     "change": {
-      "label": "普通事项（一个角色直做）",
+      "label": "普通事项（「产品 · 工程」）",
       "stop_reason": "released",
       "departments": {
         "engineering": {
@@ -53,7 +53,8 @@
             "browser_generate_locator",
             "browser_take_screenshot",
             "ask",
-            "submit_completion"
+            "submit_completion",
+            "update_plan"
           ],
           "current_work": "按用户的原文完成这件事，需要时问产品，然后交完成。",
           "notes": [
@@ -65,7 +66,7 @@
       }
     },
     "onboarding": {
-      "label": "建档事项（一个角色直做）",
+      "label": "建档事项（「产品 · 工程」）",
       "stop_reason": "open_loop",
       "departments": {
         "engineering": {
@@ -84,7 +85,8 @@
             "submit_product_spec",
             "submit_structure",
             "ask",
-            "submit_completion"
+            "submit_completion",
+            "update_plan"
           ],
           "current_work": "读取现有代码与文档，提交描述现有行为的初始 PRD 与绑定当前快照的现有结构说明，然后交完成；需要时问产品。",
           "notes": [

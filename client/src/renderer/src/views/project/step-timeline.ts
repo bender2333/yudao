@@ -16,7 +16,7 @@ import { formatTime } from "./labels.ts";
 export const ENCRYPTED_REASONING = "上游只返回了加密的推理，看不到内容";
 
 // 这个部门在这次运行里还没有工作记录（没有激活）
-export const NO_ACTIVATION = "这个部门在这次运行里还没有工作记录";
+export const NO_ACTIVATION = "这个职能在这次运行里还没有工作记录";
 
 // 没有运行时的空状态，沿用原来这一页的说法
 export const NO_RUN = "这个范围没有运行，动作列表为空";

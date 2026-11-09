@@ -31,14 +31,18 @@ import { paths } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import type { Route } from "../../shell/routing";
 import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
-import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, StopNote, SubmitButton, Table, TextArea,
-  TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
+import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, StopNote, SubmitButton, Table,
+  TextArea, TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { scopeAtTick, ticksOf } from "../timeline/logic";
 import { INPUT_KIND, STOP_REASON, departmentName, departmentLine, formatTime, label,
   progressLabel, stoppedCardLine, workItemStatusText, workingDepartmentsText } from "./labels";
 import { askIndent, askLine } from "./asks-text";
+import {
+  CANCEL_CONFIRM_CANCEL, CANCEL_CONFIRM_CONFIRM, cancelConfirmLines, cancelConfirmTitle, cancelItemCommand,
+  cancelItemLabel, type CancelRequest,
+} from "./cancel-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
 import { boardGroups } from "./board";
@@ -167,7 +171,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
           <Section
             id="ov-loop"
             title="循环画面"
-            note="三部门循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实"
+            note="产品 · 工程 · 质检循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实"
           >
             {at !== null ? (
               <p className="replay-banner" role="status">
@@ -176,7 +180,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
             ) : null}
             {at !== null ? (
               <p className="y10-note note replay-scope" role="status">
-                回放中：此刻、部门、中断与待恢复、事实与来源、循环画面按所选位置显示；项目摘要、当前事项、看板与流转记录显示的是现在的事实
+                回放中：此刻、职能、中断与待恢复、事实与来源、循环画面按所选位置显示；项目摘要、当前事项、看板与流转记录显示的是现在的事实
                 （这几条查询不带回放位置）。
               </p>
             ) : null}
@@ -369,12 +373,12 @@ function DepartmentFacts(props: {
   return (
     <Section
       id="ov-departments"
-      title="部门"
-      note="状态、原因、在等什么、等了多久；点部门名进入部门页。等待的时长按进行中的询问或等待回答的决定请求的发出时间算，其余状态没有等待的起点，写「—」"
+      title="职能"
+      note="状态、原因、在等什么、等了多久；点职能名进入职能页。等待的时长按进行中的询问或等待回答的决定请求的发出时间算，其余状态没有等待的起点，写「—」"
     >
-      {rows.length === 0 ? <Empty text="项目现在没有进行中的事项，没有部门在等" /> : (
+      {rows.length === 0 ? <Empty text="项目现在没有进行中的事项，没有职能在等" /> : (
         <Table
-          head={["事项", "部门", "状态", "在等什么", "等了多久", "本事项已用 / 上限"]}
+          head={["事项", "职能", "状态", "在等什么", "等了多久", "本事项已用 / 上限"]}
           rows={rows.map((row) => [
             row.itemTitle,
             <button
@@ -415,7 +419,7 @@ function Interruptions(props: {
     >
       {rows.length === 0 ? <Empty text="没有中断，也没有待恢复的工作" /> : (
         <Table
-          head={["事项", "部门", "现在", "本事项已用 / 上限", ""]}
+          head={["事项", "职能", "现在", "本事项已用 / 上限", ""]}
           rows={rows.map((row) => [
             row.itemTitle,
             row.department,
@@ -582,6 +586,8 @@ function CurrentItem(props: {
     work_item: item?.work_item_id ?? "",
   }, item === null);
   const [appendText, setAppendText] = useDraft(`input/${props.projectId}/${item?.work_item_id ?? "none"}/append`);
+  // 取消事项／放弃本次建档不可逆（工单 #737）：点下去先记下这一份，确认以后才提交命令
+  const [pendingCancel, setPendingCancel] = useState<CancelRequest | null>(null);
 
   if (item === null) {
     return (
@@ -624,7 +630,7 @@ function CurrentItem(props: {
           ["处理进度", processing],
         ]}
       />
-      {/* 三个部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #904）：没有 departments 时照旧写所在部门 */}
+      {/* 各职能的状态与原因（产品 · 工程 · 质检的循环结构 docs/design/department-loop.md「职能的状态」，工单 #904）：没有 departments 时照旧写所在职能 */}
       <p className="y10-note note department-line">{departmentLine(item.departments, item.department)}</p>
       {/* 恢复与动作核实的入口（工单 #181）：恢复页按事项打开，没有运行记录的事项不给这个入口 */}
       {item.run_id === null ? null : (
@@ -655,17 +661,53 @@ function CurrentItem(props: {
         </div>
       ) : null}
       {/* 建档事项等用户确认初始 PRD 时事项本身没有在执行，取消撤销那条决定请求（工单 #136），
-          用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节） */}
+          用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节）。
+          取消事项不可逆（工单 #737）：点下去先确认、写明取消以后不能恢复，确认以后才提交命令；
+          与其他不可逆的操作同一套做法，按钮用 danger 样式 */}
       {(item.status === "in_progress" || item.status === "awaiting_initial_prd")
         && hasCommand(props.app, "work_item.cancel") ? (
         <div className="y10-ov-composer composer">
-          <SubmitButton
-            label={item.status === "awaiting_initial_prd" ? "放弃本次建档" : "取消事项"}
-            busy={props.command.busy}
-            onClick={() => {
-              void props.command.submit("work_item.cancel", { work_item_id: item.work_item_id, base_version: item.version });
-            }}
-          />
+          <button
+            type="button"
+            className="y10-btn danger"
+            data-testid="cancel-item"
+            disabled={props.command.busy}
+            onClick={() => setPendingCancel({
+              work_item_id: item.work_item_id,
+              base_version: item.version,
+              status: item.status,
+            })}
+          >
+            {cancelItemLabel(item.status)}
+          </button>
+          {pendingCancel !== null ? (
+            <Modal title={cancelConfirmTitle(pendingCancel.status)} onClose={() => setPendingCancel(null)}>
+              {cancelConfirmLines(pendingCancel.status).map((line) => (
+                <p key={line} className="y10-note note">{line}</p>
+              ))}
+              <p className="y10-row">
+                <button
+                  type="button"
+                  className="y10-btn danger"
+                  data-testid="cancel-item-confirm"
+                  disabled={props.command.busy}
+                  onClick={() => {
+                    const command = cancelItemCommand(pendingCancel, true);
+                    setPendingCancel(null);
+                    if (command !== null) {
+                      void props.command.submit("work_item.cancel", command);
+                    }
+                  }}
+                >
+                  {CANCEL_CONFIRM_CONFIRM}
+                </button>
+                <button type="button" className="y10-btn" data-testid="cancel-item-dismiss"
+                        onClick={() => setPendingCancel(null)}>
+                  {CANCEL_CONFIRM_CANCEL}
+                </button>
+              </p>
+            </Modal>
+          ) : null}
           <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
         </div>
       ) : null}
@@ -743,7 +785,7 @@ export function NewItemComposer(props: {
       {startPointText(props.startPoint) === "" ? null : (
         <p className="y10-note note">新事项从{startPointText(props.startPoint)}开始</p>
       )}
-      <p className="y10-note note">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品部门</p>
+      <p className="y10-note note">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品</p>
       <div className="y10-row row-actions">
         {props.canRecord ? (
           <SubmitButton
@@ -856,7 +898,7 @@ export function Board(props: { items: WorkItemCard[]; departments?: DepartmentVi
     <Section
       id="ov-board"
       title="事项看板"
-      note="卡片显示标题、状态、正在工作的部门与轮次；部门列放的是这个部门手上有的事项，几个部门同时工作时同一事项会出现在几列里；排队中的顺序就是执行顺序"
+      note="卡片显示标题、状态、正在工作的职能与轮次；职能列放的是这个职能手上有的事项，几个职能同时工作时同一事项会出现在几列里；排队中的顺序就是执行顺序"
     >
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="y10-ov-board board">
@@ -868,7 +910,7 @@ export function Board(props: { items: WorkItemCard[]; departments?: DepartmentVi
                   <strong>{item.title}</strong>
                   <div className="y10-ov-card-meta card-meta">
                     <span>{itemStatus(item)}</span>
-                    {/* 正在工作的部门（工单 #904）：一轮工作中或询问中的部门；没有时不写这一格（工单 #842 的旧数据显示所在部门） */}
+                    {/* 正在工作的职能（工单 #904）：一轮工作中或询问中的职能；没有时不写这一格（工单 #842 的旧数据显示所在职能） */}
                     {workingDepartmentsText(item) === "" ? null : <span>{workingDepartmentsText(item)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>

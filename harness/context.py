@@ -315,7 +315,7 @@ def _notification_text(item: dict[str, Any]) -> str:
         # 用户追加的输入（工单 #964）：通知写明新到的这一版输入；输入由产品部门处理成新的产品要求，
         # 部门接着当前工作，不因为输入到达而结束这一轮。
         return (f"用户追加了输入（第 {item.get('version')} 版）：{item.get('text') or ''}。"
-                "这份输入分派给产品部门处理成新的产品要求；这一轮不因此结束，"
+                "这份输入分派给产品处理成新的产品要求；这一轮不因此结束，"
                 "已有的工作还算不算数由你自己判断，接着当前工作。")
     if item["kind"] == "product_spec_revised":
         record = item.get("change_record") or {}
@@ -831,7 +831,7 @@ def _current_work(projection: RunProjection, department: str,
     pending_guidance = [item for item in projection.department_guidance
                         if item.department == department and item.status in {"received", "in_input"}]
     if pending_guidance:
-        work += (f" 当前有 {len(pending_guidance)} 条待处理部门指导。先阅读 department_guidance 中的原文。"
+        work += (f" 当前有 {len(pending_guidance)} 条待处理职能指导。先阅读 department_guidance 中的原文。"
                  "指导不能替代产品要求、交付说明或质检放行。"
                  "这一轮只有指导、没有要做的工作时，直接用文字回答即可。")
     for item in notifications or []:
@@ -839,7 +839,7 @@ def _current_work(projection: RunProjection, department: str,
     return {
         "department": department, "work": work,
         "current_goal": projection.product_spec.goal if projection.product_spec else None,
-        "precedence": "本次列出的当前有效要求和决定优先；后附部门历史保留过往信息，不会使已过时的要求重新生效。",
+        "precedence": "本次列出的当前有效要求和决定优先；后附职能历史保留过往信息，不会使已过时的要求重新生效。",
     }
 
 

@@ -1,6 +1,6 @@
 # 步骤驱动：一次激活内的步骤循环，以异步方式执行。每一步先在安全节点得到继续或停止，经上下文装配（P）取得请求，
 # 经 Provider 的异步接口调用模型，失败时按重试参数安排重试并在安全节点等待；回答中的工具调用逐个取得工具许可（U）
-# 以后执行：主机工具（提交）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
+# 以后执行：主机工具（提交与记录）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
 # 提交提案时结束。所有记录经过记录接口；需要核对运行状态的记录在写入口的一个事务中读取运行状态、判断并写入，
 # 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：这一轮写下的事件范围与停止原因）；
@@ -48,17 +48,25 @@ from .execution_contract import ActivationScope, Judgment, RoundRequest, RoundRe
 from .write_path import Transaction, WritePath
 from .models import (PRD_REVISION_FIELDS, TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType,
                      RunProjection, TrialCase, json_dumps, new_id)
-from .public_tree import UnrepresentableWorkspace
+from .public_tree import IgnoreRulesUndecidable, UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
 from .recording import StepRecorder
+from .redact import call_arguments
 from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_cancellable, tool_kind,
                     tool_verification, writes_check_materials)
 from .validation import AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
+# 更新计划是记录类的主机工具（工作过程的任务与动作标题设计说明「任务」「接口」，工单 #1660）：
+# 角色把一件事分几部分时自己写下来，页面据此显示任务。每次整份替换，每条一句话加状态；
+# 不交给执行环境，也不写新的事件种类——结果就是这一次工具调用的记录。
+# 计划不拦任何工作：格式错误（空条目、未知状态）作为工具结果返回，其余情况都接受，
+# 不检查条目数量，也不拒绝多条进行中。
+PLAN_TOOL = "update_plan"
+PLAN_STATUSES = ("pending", "in_progress", "completed")
 # 试用用例的两个主机工具（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）：质检用 trial_case_begin
 # 打开一个用例、按计划在浏览器里操作，用 trial_case_end 给出结论。用例打开到结束之间本部门在同一会话中的
 # 浏览器与屏幕动作由运行状态投影记为它的步骤（按动作身份）；会话结束或中断时打开的用例结束为中断。
@@ -98,7 +106,7 @@ def tool_call_required_text(count: int, limit: int | None = None) -> str:
     return (
         f"上一次回复没有调用工具（连续第 {count} 次，最多 {limit} 次）。"
         "只回复文字不会推进工作，也不会结束本次激活。"
-        "工作没有完成时，调用下一个需要的工具；工作已经完成时，用本部门的提交工具提交提案。"
+        "工作没有完成时，调用下一个需要的工具；工作已经完成时，用本职能的提交工具提交提案。"
         f"连续第 {limit + 1} 次仍然没有调用工具时，运行暂停，等待用户处理。"
     )
 
@@ -361,6 +369,10 @@ class StepDriver:
             # 工作区在记录或其他主机工作中出现无法表示的条目：以 workspace_unrepresentable 暂停
             result = RoundResult(stop_reason="workspace_unrepresentable", message=str(exc),
                                  facts=tuple(exc.paths))
+        except IgnoreRulesUndecidable as exc:
+            # 主机判断不了忽略规则：任何位置遇到它都以 host_commit_error 停止事项，说明带诊断原文，不再按
+            # 上下文超限或上游错误记（docs/design/local-tools.md「工具边界」，工单 #604）
+            result = RoundResult(stop_reason="host_commit_error", message=str(exc))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
             result = RoundResult(stop_reason="provider_error", message=f"{type(exc).__name__}: {exc}")
@@ -701,16 +713,21 @@ class StepDriver:
                         outcome = self._trial_case_call(name, args)
                         ok, output, error = outcome.ok, outcome.output, outcome.error
                         trial_case_draft = self._trial_case_draft(outcome)
+                    elif name == PLAN_TOOL:
+                        # 记录类主机工具（工单 #1660）：不交给执行环境，格式错误作为工具结果返回
+                        ok, output, error = plan_result(args)
                     elif tool_kind(name, definitions=self._definitions) == "host":
                         ok, output, error = True, _run_host_tool(name, args, self._definitions), None
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要；
-                        # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行
+                        # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行。
+                        # 动作的输入去掉只被记录的那一项（运行命令的一句话，工单 #1659）：它留在工具调用记录里，
+                        # 不交给执行环境
                         try:
                             receipt = await self._perform(Action(
                                 action_id=f"{request.activation_id}:{step_id}:{identity}",
                                 kind=tool_action(name, definitions=self._definitions),
-                                tool=name, department=request.department, input=args,
+                                tool=name, department=request.department, input=call_arguments(args),
                                 verification=tool_verification(name, definitions=self._definitions),
                                 cancellable=tool_cancellable(name, definitions=self._definitions),
                                 preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
@@ -868,13 +885,17 @@ class StepDriver:
                 outcome = self._trial_case_call(name, args)
                 ok, output, error = outcome.ok, outcome.output, outcome.error
                 trial_case_draft = self._trial_case_draft(outcome)
+            elif name == PLAN_TOOL:
+                # 恢复后重新执行与正常路径同一个分支：记录类主机工具不交给执行环境（工单 #1660）
+                ok, output, error = plan_result(args)
             elif tool_kind(name, definitions=self._definitions) == "host":
                 ok, output, error = True, _run_host_tool(name, args, self._definitions), None
             else:
+                # 恢复后重新执行：与正常路径同一份动作输入——去掉只被记录的那一项（工单 #1659）
                 receipt = await self._perform(Action(
                     action_id=f"{request.activation_id}:recovered:{identity}",
                     kind=tool_action(name, definitions=self._definitions),
-                    tool=name, department=request.department, input=args,
+                    tool=name, department=request.department, input=call_arguments(args),
                     verification=tool_verification(name, definitions=self._definitions),
                     cancellable=tool_cancellable(name, definitions=self._definitions),
                     preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
@@ -953,6 +974,9 @@ class StepDriver:
             except UnrepresentableWorkspace as exc:
                 # 请求装配时发现工作区有公开树无法表示的条目：以 workspace_unrepresentable 暂停
                 return _Unassembled("workspace_unrepresentable", exc)
+            except IgnoreRulesUndecidable as exc:
+                # 装配时读公开树，主机判断不了忽略规则：以 host_commit_error 结束（工单 #604）
+                return _Unassembled("host_commit_error", exc)
             except ValueError as exc:
                 return _Unassembled("context_overflow", exc)
             department_input = pinned.department_input
@@ -963,6 +987,9 @@ class StepDriver:
                 step = self._assembly.request(pinned, history, defer_compaction=deferred)
             except UnrepresentableWorkspace as exc:
                 return _Unassembled("workspace_unrepresentable", exc)
+            except IgnoreRulesUndecidable as exc:
+                # 同一类失败在装配工作请求的这一段也要先于 ValueError 认出（工单 #604）
+                return _Unassembled("host_commit_error", exc)
             except CompactionError as exc:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             except (ValueError, FileNotFoundError) as exc:
@@ -1327,11 +1354,36 @@ def tool_result_item(identity: str, ok: bool, output: Any, error: str | None, *,
 
 def _run_host_tool(name: str, args: dict[str, Any],
                    definitions: Definitions | None = None) -> dict[str, Any]:
-    # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据
+    # 主机工具由控制核心执行。走到这里的现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据。
+    # 更新计划另走一支（plan_result）：它是记录，不提交提案
     payload = dict(args)
     payload["kind"] = proposal_kind(name, definitions=definitions)
     payload.pop("exit_code", None)
     return payload
+
+
+def plan_result(args: dict[str, Any]) -> tuple[bool, dict[str, Any] | None, str | None]:
+    """一次更新计划调用的工具结果（工作过程的任务与动作标题设计说明「任务」，工单 #1660）。
+
+    每次整份替换：plan 是一串条目，每条一句话（content）加状态（status，取待做、进行中、完成）。
+    只有空条目与未知状态算格式错误，作为工具结果交回模型；其余情况都接受——条目数量不检查，
+    多条进行中不拒绝。计划不是提案，也不拦任何工作。
+    """
+    entries = args.get("plan")
+    if not isinstance(entries, list):
+        return False, None, "plan must be a list of entries, each with content and status"
+    checked: list[dict[str, Any]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            return False, None, f"plan[{index}] must be an object with content and status"
+        content = entry.get("content")
+        if not isinstance(content, str) or not content.strip():
+            return False, None, f"plan[{index}].content must be a non-empty sentence"
+        status = entry.get("status")
+        if status not in PLAN_STATUSES:
+            return False, None, (f"plan[{index}].status must be one of pending, in_progress, completed")
+        checked.append({"content": content, "status": status})
+    return True, {"plan": checked}, None
 
 
 @dataclass(frozen=True)

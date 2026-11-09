@@ -642,11 +642,15 @@ def work_item_title(text: str) -> str:
 
 class ProjectService:
     # 项目的命令：每一次「读取项目投影、判断、追加」是写入口在项目流上的一个事务
-    def __init__(self, store: EventStore, writes: WritePath, artifacts: ArtifactStore, orchestrator: Any) -> None:
+    def __init__(self, store: EventStore, writes: WritePath, artifacts: ArtifactStore, orchestrator: Any,
+                 credential_resolver: Any = None) -> None:
         self.store = store
         self.writes = writes
         self.artifacts = artifacts
         self.orchestrator = orchestrator
+        # 凭据引用的解析边界（控制主机上的 ProviderFacade.resolve_credential，工单 #980）：
+        # 宿主仓库的推送与合并请求按源目录登记的引用在这里取材料，值不进入事件、工件与日志
+        self.credential_resolver = credential_resolver
         # 每个项目正在开始的事项：事项已经登记、它的 run 还没有创建时，事项的状态看起来是没有开始，
         # 归档与记录材料按这里判断有事项进行中
         self._starting: dict[str, set[object]] = {}
@@ -1249,14 +1253,16 @@ class ProjectService:
         # 不在这里吞掉结果；异常表示写回没有产生事件，由用户重新发起
         # 写回目标不可用时（目标仓库不存在、那个路径不是 git 仓库、目标分支不存在），
         # 自动写回做不了，也不因此让这一次采纳失败：页面上这一次采纳仍是「还没有写回」，
-        # 用户在项目设置页改好设置以后按「写回成果」重新发起，那时命令给出中文的理由（工单 #709）
-        from .writeback import WritebackTargetUnavailable
+        # 用户在项目设置页改好设置以后按「写回成果」重新发起，那时命令给出中文的理由（工单 #709）。
+        # 宿主仓库的凭据缺失同样按这一条处理（工单 #980）；远端动作的结果未知时保持待核实，
+        # 不写完成事件，等下一次尝试先核实（恢复契约「采纳写回」）
+        from .writeback import WritebackOutcomeUnknown, WritebackTargetUnavailable
 
         project = self.projection(project_id)
         if any(d.writeback_enabled for d in project.source_directories.values()):
             try:
                 self.execute_writeback(project_id, adoption_id)
-            except WritebackTargetUnavailable:
+            except (WritebackTargetUnavailable, WritebackOutcomeUnknown):
                 return
 
     def execute_writeback(

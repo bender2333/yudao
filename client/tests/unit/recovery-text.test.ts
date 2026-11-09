@@ -99,7 +99,7 @@ test("各会话的用量表写部门、主线或分支与分支的编号", () =>
     session({ session_id: "ses_ask_1", department: "product", kind: "branch", elapsed_sec: 5, activations: 1, model_steps: 1 }),
     session({ session_id: "ses_ask_2", department: "product", kind: "branch", elapsed_sec: 7, activations: 1, model_steps: 1 }),
   ]);
-  assert.deepEqual(rows.map((row) => row.label), ["产品 · 部门主线", "工程 · 部门主线", "产品 · 询问分支 1", "产品 · 询问分支 2"]);
+  assert.deepEqual(rows.map((row) => row.label), ["产品 · 职能主线", "工程 · 职能主线", "产品 · 询问分支 1", "产品 · 询问分支 2"]);
   assert.deepEqual(
     rows.map((row) => [row.elapsedSec, row.activations, row.modelSteps]),
     [[30, 1, 2], [45, 2, 3], [5, 1, 1], [7, 1, 1]],
@@ -111,7 +111,7 @@ test("动作所在的会话按用量表解析名字，查不到时写未上报",
     session({ session_id: "ses_main_engineering", department: "engineering", kind: "main" }),
     session({ session_id: "ses_ask_1", department: "product", kind: "branch" }),
   ];
-  assert.equal(actionSessionText(sessions, "ses_main_engineering"), "工程 · 部门主线");
+  assert.equal(actionSessionText(sessions, "ses_main_engineering"), "工程 · 职能主线");
   assert.equal(actionSessionText(sessions, "ses_ask_1"), "产品 · 询问分支 1");
   assert.equal(actionSessionText(sessions, null), "未上报");
   assert.equal(actionSessionText(sessions, "ses_unknown"), "未上报");

@@ -83,11 +83,13 @@ def _commit_to_bare_repo(bare_path: Path, branch: str, files: dict[str, bytes], 
     return commit_oid
 
 
-def _setup_yudao_env(root: Path):
+def _setup_yudao_env(root: Path, credentials=None):
     store = EventStore(root / "events.db")
     writes = WritePath(store, handler_for)
     artifacts = ArtifactStore(root / "artifacts")
-    projects = ProjectService(store, writes, artifacts, None)
+    # 宿主仓库的推送与合并请求按凭据引用取材料：解析边界给的是真的凭据链（工单 #980）
+    projects = ProjectService(store, writes, artifacts, None,
+                              credential_resolver=None if credentials is None else credentials.resolve)
     return store, writes, artifacts, projects
 
 

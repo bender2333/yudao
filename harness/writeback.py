@@ -8,10 +8,12 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import asdict
+import urllib.parse
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
+import httpx
 import pygit2
 from pygit2.enums import FileMode, RepositoryInitFlag, RepositoryOpenFlag
 
@@ -40,12 +42,271 @@ def _ref_dict(ref: Any) -> dict[str, Any] | None:
 
 
 class WritebackTargetUnavailable(Exception):
-    # 写回的目标不可用：远端仓库路径不存在、那个路径不是 git 仓库，或目标分支不存在。
-    # 三种都是源目录登记里的配置问题，由命令层给出中文的拒绝说明（工单 #709）。
+    # 写回的目标不可用：远端仓库路径不存在、那个路径不是 git 仓库、目标分支不存在，或者远端是
+    # 宿主仓库地址时凭据引用解析不到、远端读不到、合并请求接口明确拒绝创建（工单 #980）。
+    # 都是源目录登记里的配置问题，由命令层给出中文的拒绝说明（工单 #709）。
     def __init__(self, reason: str, target: str) -> None:
         super().__init__(f"{reason}: {target}")
         self.reason = reason
         self.target = target
+
+
+class WritebackOutcomeUnknown(Exception):
+    # 外部动作的结果未知（ADR-0034、恢复契约「采纳写回」）：核实以后仍不能确认推送、分支或合并请求
+    # 的结果时交出这一种异常，写回不写完成事件，动作保持待核实；下一次尝试先核实再动作。
+    def __init__(self, action: str, detail: str) -> None:
+        super().__init__(f"{action}: {detail}")
+        self.action = action
+        self.detail = detail
+
+
+@dataclass(frozen=True)
+class WritebackRemote:
+    # 写回的目标（ADR-0034）：本地仓库，或宿主仓库地址（工单 #980）。
+    # hosted 的接口根按主机取：github.com 用 api.github.com，其他主机按 GitHub Enterprise 的形状
+    # 用同一个主机下的 /api/v3，本机 HTTP 服务照这一条；凭据不在地址里
+    kind: str
+    git_url: str = ""
+    api_base: str = ""
+    owner: str = ""
+    repo: str = ""
+
+
+# 合并请求创建的尝试次数：结果未知时先核实，核实确认没有创建才再试一次
+PULL_REQUEST_ATTEMPTS = 2
+PULL_REQUEST_TIMEOUT_SEC = 30.0
+
+GITHUB_HOSTS = frozenset({"github.com", "www.github.com"})
+GITHUB_API_BASE = "https://api.github.com"
+# 推送与读取分支用同一个凭据：GitHub 的令牌按用户名 x-access-token 走 Basic 认证
+GIT_CREDENTIAL_USERNAME = "x-access-token"
+REDACTED = "***"
+
+
+def resolve_writeback_remote(remote_setting: str) -> WritebackRemote:
+    """源目录登记的远端是 http(s) 地址时按宿主仓库解析，否则仍是本地仓库（工单 #902 的规则不变）。"""
+    setting = (remote_setting or "").strip()
+    scheme = urllib.parse.urlsplit(setting).scheme.lower()
+    if scheme not in {"http", "https"}:
+        return WritebackRemote(kind="local")
+    split = urllib.parse.urlsplit(setting)
+    path = split.path.strip("/")
+    if path.endswith(".git"):
+        path = path[: -len(".git")]
+    parts = [part for part in path.split("/") if part]
+    host = (split.hostname or "").lower()
+    if len(parts) < 2 or not host:
+        raise WritebackTargetUnavailable("remote_missing", setting)
+    netloc = split.netloc.rsplit("@", 1)[-1]
+    api_base = GITHUB_API_BASE if host in GITHUB_HOSTS else f"{split.scheme}://{netloc}/api/v3"
+    # 地址里即使写了用户名与口令也不带进推送地址与事件：凭据只从凭据引用取（工单 #980）
+    git_url = urllib.parse.urlunsplit((split.scheme, netloc, split.path or "", "", ""))
+    return WritebackRemote(kind="hosted", git_url=git_url, api_base=api_base,
+                           owner=parts[-2], repo=parts[-1])
+
+
+def _redact(text: str, secret: str | None) -> str:
+    # 凭据值不出现在事件、工件、日志与 HTTP 错误诊断里：写进说明之前先按值替换
+    if secret and secret in text:
+        return text.replace(secret, REDACTED)
+    return text
+
+
+def _writeback_credential(system: Any, source_dir: Any, remote: WritebackRemote) -> str | None:
+    # 凭据引用的解析边界（`harness/providers/facade.py` 的 resolve_credential）：材料只在控制主机上
+    # 使用，不写进事件、工件、日志与错误说明；缺凭据时按既有的拒绝边界交回（工单 #980）
+    if remote.kind != "hosted":
+        return None
+    ref = str(getattr(source_dir, "credential_ref", "") or "").strip()
+    if not ref:
+        raise WritebackTargetUnavailable("credential_missing", "源目录没有登记凭据引用")
+    resolver = getattr(system, "credential_resolver", None)
+    material = resolver(ref) if resolver is not None else None
+    if material is None:
+        raise WritebackTargetUnavailable("credential_missing", ref)
+    return material.secret
+
+
+def _git_callbacks(secret: str) -> pygit2.RemoteCallbacks:
+    return pygit2.RemoteCallbacks(credentials=pygit2.UserPass(GIT_CREDENTIAL_USERNAME, secret))
+
+
+def _fetch_hosted_heads(repo: pygit2.Repository, callbacks: pygit2.RemoteCallbacks,
+                        secret: str) -> None:
+    # 读远端分支：核实与读取目标分支都按这一份远端事实
+    try:
+        repo.remotes["origin"].fetch(["+refs/heads/*:refs/remotes/origin/*"], callbacks=callbacks)
+    except pygit2.GitError as error:
+        raise WritebackTargetUnavailable("remote_unreachable", _redact(str(error), secret)) from error
+
+
+def _hosted_target_commit(repo: pygit2.Repository, target_branch: str) -> pygit2.Commit | None:
+    name = f"refs/remotes/origin/{target_branch}"
+    if name not in repo.references:
+        return None
+    return repo.references[name].peel(pygit2.Commit)
+
+
+def _hosted_branch_commit(repo: pygit2.Repository, branch_name: str) -> pygit2.Commit | None:
+    name = f"refs/remotes/origin/{branch_name}"
+    if name not in repo.references:
+        return None
+    return repo.references[name].peel(pygit2.Commit)
+
+
+def _push_hosted_branch(repo: pygit2.Repository, branch_name: str, callbacks: pygit2.RemoteCallbacks,
+                        secret: str) -> str | None:
+    # 推送分支：成功时返回 None；失败时返回已经隐去凭据的说明，由调用方按远端事实核实（结果未知）
+    refspec = f"refs/heads/{branch_name}:refs/heads/{branch_name}"
+    try:
+        repo.remotes["origin"].push([refspec], callbacks=callbacks)
+    except pygit2.GitError as error:
+        return _redact(str(error), secret)
+    return None
+
+
+def _pull_request_headers(secret: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {secret}", "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28"}
+
+
+class _PullRequestUnknown(Exception):
+    # 创建合并请求的结果未知：传输错误、5xx，或 GitHub 用 422 回答「同一个 head 已有请求」
+    pass
+
+
+class _PullRequestRejected(Exception):
+    # 合并请求接口明确拒绝创建：地址、凭据或参数不对，重试同一请求也不会成功
+    pass
+
+
+def _pull_request_error_text(response: httpx.Response, secret: str) -> str:
+    message = ""
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if isinstance(body, dict):
+        message = str(body.get("message") or "")
+    text = message or response.text[:400]
+    return _redact(f"HTTP {response.status_code} {text}".strip(), secret)
+
+
+def _pull_request_title(item: Any, adoption: Any) -> str:
+    return f"[{item.title}] {adoption.summary}"
+
+
+def _pull_request_body(item: Any, adoption: Any, *, branch_name: str, target_branch: str,
+                       target_commit: str, final_tree_digest: str) -> str:
+    # 请求的说明携带采纳身份、事项与验收摘要（工单 #980）
+    files = "、".join(adoption.files) or "（没有改动文件）"
+    checks = "、".join(adoption.check_names) or "（没有检查命令）"
+    risks = "、".join(adoption.known_risks) or "（没有已知风险）"
+    return "\n".join([
+        f"采纳身份：{adoption.adoption_id}",
+        f"事项：{item.title}（{item.work_item_id}）",
+        f"运行：{adoption.run_id}",
+        f"写回分支：{branch_name} → {target_branch}",
+        f"目标提交：{target_commit}",
+        f"最终树摘要：{final_tree_digest}",
+        "",
+        "## 验收摘要",
+        f"- 采纳摘要：{adoption.summary}",
+        f"- 变更文件：{files}",
+        f"- 检查：{checks}",
+        f"- 已知风险：{risks}",
+    ])
+
+
+def _pull_request_record(data: dict[str, Any], remote: WritebackRemote, *, branch_name: str,
+                         target_branch: str, status: str,
+                         branch_commit: str | None = None) -> dict[str, Any]:
+    # 事件只记录请求身份、地址、分支与结果（工单 #980），不记录凭据值；
+    # branch_commit 是创建请求之前核实过的远端分支提交
+    repository = f"{remote.owner}/{remote.repo}"
+    return {
+        "identity": f"{repository}#{data.get('number')}",
+        "number": data.get("number"),
+        "url": data.get("html_url"),
+        "title": data.get("title"),
+        "repository": repository,
+        "branch": branch_name,
+        "target_branch": target_branch,
+        "branch_commit": branch_commit,
+        "status": status,
+    }
+
+
+def _create_pull_request(remote: WritebackRemote, secret: str, payload: dict[str, Any]) -> dict[str, Any]:
+    url = f"{remote.api_base}/repos/{remote.owner}/{remote.repo}/pulls"
+    try:
+        with httpx.Client(timeout=PULL_REQUEST_TIMEOUT_SEC) as client:
+            response = client.post(url, json=payload, headers=_pull_request_headers(secret))
+    except httpx.HTTPError as error:
+        raise _PullRequestUnknown(_redact(str(error), secret)) from error
+    if response.status_code in (200, 201):
+        try:
+            data = response.json()
+        except ValueError as error:
+            raise _PullRequestUnknown("创建合并请求的回应不是 JSON") from error
+        if isinstance(data, dict) and data.get("number") is not None:
+            return data
+        raise _PullRequestUnknown("创建合并请求的回应里没有请求身份")
+    if response.status_code == 422 or response.status_code >= 500:
+        # 422 是 GitHub 对「同一个 head 已有合并请求」的回答；与 5xx 一样先核实
+        raise _PullRequestUnknown(_pull_request_error_text(response, secret))
+    raise _PullRequestRejected(_pull_request_error_text(response, secret))
+
+
+def _find_pull_request(remote: WritebackRemote, secret: str, branch_name: str) -> dict[str, Any] | None:
+    # 核实请求身份：读接口返回的请求列表，同一个 head 分支持有的请求就是这次动作的结果
+    url = f"{remote.api_base}/repos/{remote.owner}/{remote.repo}/pulls"
+    params = {"state": "all", "head": f"{remote.owner}:{branch_name}"}
+    try:
+        with httpx.Client(timeout=PULL_REQUEST_TIMEOUT_SEC) as client:
+            response = client.get(url, params=params, headers=_pull_request_headers(secret))
+    except httpx.HTTPError as error:
+        raise WritebackOutcomeUnknown(
+            "pull_request", _redact(f"核实合并请求身份失败：{error}", secret)) from error
+    if response.status_code != 200:
+        raise WritebackOutcomeUnknown(
+            "pull_request", _redact(f"核实合并请求身份失败：{_pull_request_error_text(response, secret)}", secret))
+    try:
+        items = response.json()
+    except ValueError as error:
+        raise WritebackOutcomeUnknown("pull_request", "核实合并请求身份的回应不是 JSON") from error
+    if not isinstance(items, list):
+        raise WritebackOutcomeUnknown("pull_request", "核实合并请求身份的回应不是请求列表")
+    for entry in items:
+        if not isinstance(entry, dict):
+            continue
+        head = entry.get("head") or {}
+        if isinstance(head, dict) and head.get("ref") == branch_name:
+            return entry
+    return None
+
+
+def _append_verified(system: Any, project_id: str, item: Any, adoption: Any, *, action: str,
+                     branch_name: str, target_commit: str, verified_fact: dict[str, Any],
+                     command: Command | None) -> None:
+    # 核实了已经发生的远端动作：只记核实事实，不改写原来的观察（恢复契约「采纳写回」）
+    system.writes.transact(
+        project_stream(project_id),
+        lambda tx: tx.append(NewProjectEvent(
+            ProjectEventType.WRITEBACK_VERIFIED,
+            {
+                "work_item_id": item.work_item_id,
+                "run_id": adoption.run_id,
+                "adoption_id": adoption.adoption_id,
+                "action": action,
+                "branch": branch_name,
+                "target_commit": target_commit,
+                "verified_fact": verified_fact,
+            },
+            actor="system",
+        )),
+        command=command,
+    )
 
 
 def build_git_tree(
@@ -310,34 +571,55 @@ def perform_writeback(
         # 建档采纳不写回
         return None
 
-    # 3. 准备隔离的 Git 工作仓库（独立目录，不触碰源目录未提交修改）
-    remote_repo_path = _resolve_repo_path(source_dir.path, remote_name_or_url)
-    if not os.path.exists(remote_repo_path):
-        raise WritebackTargetUnavailable("remote_missing", str(remote_repo_path))
+    # 3. 写回的目标：源目录登记的远端可以是宿主仓库地址（工单 #980），否则按已有的规则解析成本地仓库。
+    # 宿主仓库地址的凭据从源目录的凭据引用解析，只在控制主机上使用；缺凭据在这里拒绝，不发起外部动作
+    remote_target = resolve_writeback_remote(remote_name_or_url)
+    remote_secret = _writeback_credential(system, source_dir, remote_target)
+    callbacks = _git_callbacks(remote_secret) if remote_secret is not None else None
 
-    # 先确认目标是 git 仓库再克隆：克隆一个不是仓库的目录抛出的 GitError 与「目标不可用」是
-    # 同一类配置问题，命令层照「不是 git 仓库」拒绝，接口层不再回 500（工单 #902）
+    remote_repo_path: Path | None = None
+    remote_target_commit: pygit2.Commit | None = None
+    target_is_bare = True
     target_ref_name = f"refs/heads/{target_branch}"
-    try:
-        remote_repo = pygit2.Repository(str(remote_repo_path))
-    except pygit2.GitError as error:
-        raise WritebackTargetUnavailable("not_a_repository", str(remote_repo_path)) from error
-    if target_ref_name not in remote_repo.references:
-        raise WritebackTargetUnavailable("target_branch_missing", target_branch)
-    remote_target_commit = remote_repo.references[target_ref_name].peel(pygit2.Commit)
-    target_is_bare = remote_repo.is_bare
-    del remote_repo
+    if remote_target.kind == "local":
+        # 准备隔离的 Git 工作仓库（独立目录，不触碰源目录未提交修改）
+        remote_repo_path = _resolve_repo_path(source_dir.path, remote_name_or_url)
+        if not os.path.exists(remote_repo_path):
+            raise WritebackTargetUnavailable("remote_missing", str(remote_repo_path))
+
+        # 先确认目标是 git 仓库再克隆：克隆一个不是仓库的目录抛出的 GitError 与「目标不可用」是
+        # 同一类配置问题，命令层照「不是 git 仓库」拒绝，接口层不再回 500（工单 #902）
+        try:
+            remote_repo = pygit2.Repository(str(remote_repo_path))
+        except pygit2.GitError as error:
+            raise WritebackTargetUnavailable("not_a_repository", str(remote_repo_path)) from error
+        if target_ref_name not in remote_repo.references:
+            raise WritebackTargetUnavailable("target_branch_missing", target_branch)
+        remote_target_commit = remote_repo.references[target_ref_name].peel(pygit2.Commit)
+        target_is_bare = remote_repo.is_bare
+        del remote_repo
 
     scratch_temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
     try:
         scratch_dir = Path(scratch_temp.name) / "scratch.git"
-        # 复制或打开仓库进行操作
-        repo = pygit2.clone_repository(str(remote_repo_path), str(scratch_dir), bare=False)
-
-        # 4. 读取目标提交与目标树
-        target_commit = repo[remote_target_commit.id]
-        if target_ref_name not in repo.references:
-            repo.create_reference(target_ref_name, target_commit.id, force=True)
+        if remote_target.kind == "local":
+            # 复制或打开仓库进行操作
+            repo = pygit2.clone_repository(str(remote_repo_path), str(scratch_dir), bare=False)
+            # 4. 读取目标提交与目标树
+            target_commit = repo[remote_target_commit.id]
+            if target_ref_name not in repo.references:
+                repo.create_reference(target_ref_name, target_commit.id, force=True)
+        else:
+            # 宿主仓库：按远端事实读目标分支（同一个远端用在推送与读取分支上）
+            repo = pygit2.init_repository(str(scratch_dir), bare=False)
+            repo.remotes.create("origin", remote_target.git_url)
+            _fetch_hosted_heads(repo, callbacks, remote_secret)
+            hosted_target = _hosted_target_commit(repo, target_branch)
+            if hosted_target is None:
+                raise WritebackTargetUnavailable("target_branch_missing", target_branch)
+            target_commit = hosted_target
+            if target_ref_name not in repo.references:
+                repo.create_reference(target_ref_name, target_commit.id, force=True)
 
         target_tree = target_commit.tree
         target_captured = git_tree_to_captured(repo, target_tree)
@@ -509,18 +791,24 @@ def perform_writeback(
                 new_target_commit=None, command=command,
             )
 
-        # 13. 推送前核对目标分支是否改变（target_changed 检测）
-        # 重新读取远端仓库目标分支 tip
-        remote_repo = pygit2.Repository(str(remote_repo_path))
-        latest_target_commit = remote_repo.references[target_ref_name].peel(pygit2.Commit)
-        if latest_target_commit.id != target_commit.id:
+        # 13. 推送前核对目标分支是否改变（target_changed 检测）：重新读取远端的目标分支 tip
+        local_target_repo: pygit2.Repository | None = None
+        if remote_target.kind == "local":
+            local_target_repo = pygit2.Repository(str(remote_repo_path))
+            latest_target_commit_id = local_target_repo.references[target_ref_name].target
+        else:
+            _fetch_hosted_heads(repo, callbacks, remote_secret)
+            hosted_latest = _hosted_target_commit(repo, target_branch)
+            latest_target_commit_id = None if hosted_latest is None else hosted_latest.id
+        if latest_target_commit_id is None or latest_target_commit_id != target_commit.id:
             return _stop(
                 system=system, project_id=project_id, item=item, adoption=adoption,
                 reason="target_changed", target_commit=target_commit,
                 source_tree_digest=base_tree_digest, adopted_tree_digest=adopted_tree_digest,
                 target_tree_digest=target_tree_digest, final_tree_digest=final_tree_digest,
                 conflict_ref=None, conflicts=[], check_receipts=receipts,
-                new_target_commit=str(latest_target_commit.id), command=command,
+                new_target_commit=None if latest_target_commit_id is None else str(latest_target_commit_id),
+                command=command,
             )
 
         # 14. 准备独立分支与提交
@@ -528,38 +816,37 @@ def perform_writeback(
         branch_ref_name = f"refs/heads/{branch_name}"
         verified_external = False
 
-        # 核实远端分支是否已存在（外部结果未知先核实）
-        if branch_ref_name in remote_repo.references:
-            existing_remote_commit = remote_repo.references[branch_ref_name].peel(pygit2.Commit)
-            if existing_remote_commit.tree.id == final_tree_oid and (
-                existing_remote_commit.parents and existing_remote_commit.parents[0].id == target_commit.id
-            ):
-                verified_external = True
-                # 追加核实事件
-                system.writes.transact(
-                    project_stream(project_id),
-                    lambda tx: tx.append(
-                        NewProjectEvent(
-                            ProjectEventType.WRITEBACK_VERIFIED,
-                            {
-                                "work_item_id": item.work_item_id,
-                                "run_id": adoption.run_id,
-                                "adoption_id": adoption.adoption_id,
-                                "action": "push",
-                                "branch": branch_name,
-                                "target_commit": str(target_commit.id),
-                                "verified_fact": {
-                                    "remote_branch": branch_name,
-                                    "commit": str(existing_remote_commit.id),
-                                    "verified": True,
-                                },
-                            },
-                            actor="system",
-                        )
-                    ),
-                    command=command,
-                )
+        # 核实远端分支是否已经存在（外部结果未知先核实，ADR-0034）
+        if remote_target.kind == "local":
+            existing_remote_commit = (
+                local_target_repo.references[branch_ref_name].peel(pygit2.Commit)
+                if branch_ref_name in local_target_repo.references else None
+            )
+        else:
+            existing_remote_commit = _hosted_branch_commit(repo, branch_name)
+        if existing_remote_commit is not None and (
+            existing_remote_commit.tree.id == final_tree_oid
+            and existing_remote_commit.parents
+            and existing_remote_commit.parents[0].id == target_commit.id
+        ):
+            verified_external = True
+            confirmed_branch_commit = str(existing_remote_commit.id)
+            _append_verified(
+                system, project_id, item, adoption, action="push", branch_name=branch_name,
+                target_commit=str(target_commit.id),
+                verified_fact={
+                    "remote_branch": branch_name,
+                    "commit": str(existing_remote_commit.id),
+                    "verified": True,
+                },
+                command=command,
+            )
+        elif remote_target.kind == "hosted" and existing_remote_commit is not None:
+            # 远端已有同名分支但内容不是这一次的结果：不覆盖、不强制推送，交给人重新发起（ADR-0034）
+            raise WritebackTargetUnavailable("branch_exists", branch_name)
 
+        writeback_commit_oid: pygit2.Oid | None = None
+        confirmed_branch_commit: str | None = None
         if not verified_external:
             sig = pygit2.Signature("Yudao", "host@yudao.invalid")
             commit_msg = (
@@ -572,7 +859,42 @@ def perform_writeback(
                 branch_ref_name, sig, sig, commit_msg, final_tree_oid, [target_commit.id]
             )
 
-            if target_is_bare:
+            if remote_target.kind == "hosted":
+                # 推送到宿主仓库：结果未知时先读远端分支（核实不了时保持待核实）；核实确认推送成功了
+                # 就记下核实事实，确认没有推送上去或者分支已是别的内容时按目标的配置问题交回
+                push_error = _push_hosted_branch(repo, branch_name, callbacks, remote_secret)
+                if push_error is not None:
+                    try:
+                        _fetch_hosted_heads(repo, callbacks, remote_secret)
+                    except WritebackTargetUnavailable as unreachable:
+                        raise WritebackOutcomeUnknown("push", unreachable.target) from unreachable
+                    pushed_commit = _hosted_branch_commit(repo, branch_name)
+                    if pushed_commit is None:
+                        raise WritebackTargetUnavailable("push_failed", push_error)
+                    if pushed_commit.id != writeback_commit_oid:
+                        raise WritebackTargetUnavailable("branch_exists", branch_name)
+                    verified_external = True
+                    confirmed_branch_commit = str(pushed_commit.id)
+                    _append_verified(
+                        system, project_id, item, adoption, action="push", branch_name=branch_name,
+                        target_commit=str(target_commit.id),
+                        verified_fact={
+                            "remote_branch": branch_name,
+                            "commit": str(pushed_commit.id),
+                            "verified": True,
+                            "unconfirmed_call": push_error,
+                        },
+                        command=command,
+                    )
+                else:
+                    # 推送的回应说成功了：创建请求之前按远端事实再核实一次分支提交（工单 #980 的验收：
+                    # 推送成功而创建请求结果未知时，核实远端分支提交和请求身份）
+                    _fetch_hosted_heads(repo, callbacks, remote_secret)
+                    confirmed_commit = _hosted_branch_commit(repo, branch_name)
+                    if confirmed_commit is None or confirmed_commit.id != writeback_commit_oid:
+                        raise WritebackTargetUnavailable("push_failed", branch_name)
+                    confirmed_branch_commit = str(confirmed_commit.id)
+            elif target_is_bare:
                 # 推送到远端裸仓库
                 remote_obj = repo.remotes["origin"]
                 remote_obj.push([f"{branch_ref_name}:{branch_ref_name}"])
@@ -585,15 +907,24 @@ def perform_writeback(
                 # 模拟推送已在远端完成但调用方收到未知结果中断
                 raise RuntimeError("simulated unknown push outcome")
 
-        # 15. 合并请求（本地测试保留明确未验收边界）
-        pull_request = {
-            "identity": f"pr-{adoption.adoption_id}",
-            "branch": branch_name,
-            "target_branch": target_branch,
-            "title": f"[{item.title}] {adoption.summary}",
-            "status": "local_test_boundary",
-            "boundary_note": "合并请求在自举试点以真实 GitHub 验收，本地测试保留明确的未验收边界",
-        }
+        # 15. 合并请求：远端是宿主仓库地址时经合并请求接口创建（工单 #980），
+        # 本地目标保留明确未验收的边界（ADR-0034）
+        if remote_target.kind == "hosted":
+            pull_request = _ensure_pull_request(
+                system, project_id, item, adoption, remote=remote_target, secret=remote_secret,
+                branch_name=branch_name, target_branch=target_branch, target_commit=target_commit,
+                final_tree_digest=final_tree_digest, branch_commit=confirmed_branch_commit,
+                command=command,
+            )
+        else:
+            pull_request = {
+                "identity": f"pr-{adoption.adoption_id}",
+                "branch": branch_name,
+                "target_branch": target_branch,
+                "title": f"[{item.title}] {adoption.summary}",
+                "status": "local_test_boundary",
+                "boundary_note": "合并请求在自举试点以真实 GitHub 验收，本地测试保留明确的未验收边界",
+            }
 
         # 16. 记录 writeback_completed 事件
         completed_event = system.writes.transact(
@@ -627,6 +958,10 @@ def perform_writeback(
 
     finally:
         try:
+            del local_target_repo
+        except Exception:
+            pass
+        try:
             del repo
         except Exception:
             pass
@@ -636,6 +971,85 @@ def perform_writeback(
             scratch_temp.cleanup()
         except Exception:
             pass
+
+
+def _ensure_pull_request(
+    system: Any,
+    project_id: str,
+    item: Any,
+    adoption: Any,
+    *,
+    remote: WritebackRemote,
+    secret: str,
+    branch_name: str,
+    target_branch: str,
+    target_commit: pygit2.Commit,
+    final_tree_digest: str,
+    branch_commit: str | None,
+    command: Command | None,
+) -> dict[str, Any]:
+    """经宿主仓库的合并请求接口创建请求；已存在时记下它的身份，不重复创建（工单 #980）。
+
+    结果未知时先核实接口返回的请求列表：找到了就记成核实事实；核实确认没有创建时按新尝试再创建一次；
+    核实本身做不了时保持待核实，不写完成事件。
+    """
+    existing = _find_pull_request(remote, secret, branch_name)
+    if existing is not None:
+        _append_verified(
+            system, project_id, item, adoption, action="pull_request", branch_name=branch_name,
+            target_commit=str(target_commit.id),
+            verified_fact={
+                "pull_request": _pull_request_record(existing, remote, branch_name=branch_name,
+                                                     target_branch=target_branch, status="existing",
+                                                     branch_commit=branch_commit),
+                "verified": True,
+            },
+            command=command,
+        )
+        return _pull_request_record(existing, remote, branch_name=branch_name,
+                                    target_branch=target_branch, status="existing",
+                                    branch_commit=branch_commit)
+
+    payload = {
+        "title": _pull_request_title(item, adoption),
+        "head": branch_name,
+        "base": target_branch,
+        "body": _pull_request_body(
+            item, adoption, branch_name=branch_name, target_branch=target_branch,
+            target_commit=str(target_commit.id), final_tree_digest=final_tree_digest),
+    }
+    last_unknown = "创建合并请求的结果未知"
+    for _attempt in range(PULL_REQUEST_ATTEMPTS):
+        try:
+            created = _create_pull_request(remote, secret, payload)
+        except _PullRequestUnknown as unknown:
+            last_unknown = str(unknown)
+            # 结果未知：先核实请求列表（做不了核实时 _find_pull_request 交回「保持待核实」）
+            found = _find_pull_request(remote, secret, branch_name)
+            if found is not None:
+                _append_verified(
+                    system, project_id, item, adoption, action="pull_request", branch_name=branch_name,
+                    target_commit=str(target_commit.id),
+                    verified_fact={
+                        "pull_request": _pull_request_record(found, remote, branch_name=branch_name,
+                                                             target_branch=target_branch, status="existing",
+                                                             branch_commit=branch_commit),
+                        "verified": True,
+                        "unconfirmed_call": last_unknown,
+                    },
+                    command=command,
+                )
+                return _pull_request_record(found, remote, branch_name=branch_name,
+                                            target_branch=target_branch, status="existing",
+                                            branch_commit=branch_commit)
+            # 核实确认没有创建：按新尝试再创建一次
+            continue
+        except _PullRequestRejected as rejected:
+            raise WritebackTargetUnavailable("pull_request_rejected", str(rejected)) from rejected
+        return _pull_request_record(created, remote, branch_name=branch_name,
+                                    target_branch=target_branch, status="created",
+                                    branch_commit=branch_commit)
+    raise WritebackOutcomeUnknown("pull_request", last_unknown)
 
 
 def _write_local_branch(

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 import uuid
 
 from harness.watched_outputs import has_new_work, is_waiting
@@ -17,6 +19,7 @@ from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import after_event, from_another_thread, guidance_reply, quality_turns
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 from harness.tools import offers_with_input, tools_for
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
@@ -402,15 +405,23 @@ def test_guidance_to_a_finished_item_is_rejected(data_dir):
 
 def test_product_guidance_revision_is_delivered_to_the_working_department_and_starts_the_waiting_one(tmp_path):
     # 验收第 3 条：发给产品的指导修订了 PRD，正在工作的部门在下一步收到通知，
-    # 在等待工作的工程开始一轮工作（循环结构 docs/design/department-loop.md「指导」，工单 #560）
+    # 在等待工作的工程开始一轮工作（循环结构 docs/design/department-loop.md「指导」，工单 #560）。
+    # 两件事谁先谁后由事件决定（工单 #1448，测试分层 docs/design/test-pyramid.md「测试的写法」第 7 条）：
+    # 工程等的是产品那一轮提交修订后的有效合同（contract_accepted 的 revision 2），不是「最多 200 步、
+    # 每步 0.01 秒」这样一段时长。上限只用来防止测试一直等，到了上限以一条写明在等什么的失败结束
+    # （口径见 harness/tests/wait_limits.py）
     holder = {}
     seen = {}
+    waiting = {"timed_out": False}
+    revised = threading.Event()
 
     def work_through_the_revision(request):
         # 工程一轮工作中收到产品指导：产品以这段指导开始一轮工作并修订 PRD
         holder["system"].add_guidance(request.run_id, "product", "请把输出改为大写并更新验收。")
-        for _ in range(200):
-            if len(holder["system"].project(request.run_id).effective_contracts) >= 2:
+        deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
+        while not revised.is_set():
+            if time.monotonic() >= deadline:
+                waiting["timed_out"] = True
                 break
             yield ModelStreamEvent(kind="stream_event", id="evt-wait")
         return FakeTurn(writes={"src/echo.py": ECHO})
@@ -436,9 +447,15 @@ def test_product_guidance_revision_is_delivered_to_the_working_department_and_st
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
     holder["system"] = system
+    # 修订后的有效合同提交时发出信号；第一次合同（revision 1）在第一次产品工作里提交，不算
+    after_event(system, EventType.CONTRACT_ACCEPTED,
+                lambda event: revised.set() if event.payload.get("revision") == 2 else None)
     run_id = system.create_run("echo")
     projection = system.run_until_stop(run_id)
 
+    assert not waiting["timed_out"], (
+        f"等了 {WAIT_FOR_HOST_WORK_SEC:g} 秒，产品的修订还没有提交（没有 contract_accepted 的 revision 2）："
+        f"{projection.status}/{projection.stop_reason}")
     notification = json.loads(seen["notification"])
     assert [item["kind"] for item in notification] == ["product_spec_revised"]
     assert notification[0]["revision"] == 2

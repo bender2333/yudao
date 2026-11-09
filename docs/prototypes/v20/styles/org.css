@@ -8,9 +8,6 @@
 .y20-pname:hover { text-decoration: underline; }
 .y20-ptags { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .y20-ptag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11.5px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
-.y20-ptab-select { align-self: stretch; margin: 0 0 -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-size: 13.5px; padding: 10px 6px 9px; cursor: pointer; max-width: 160px; }
-.y20-ptab-select.is-active { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
-.y20-ptab-select:hover { color: var(--text); }
 
 /* 左侧栏的新建入口 */
 .y20-side-new { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 12px 2px; }

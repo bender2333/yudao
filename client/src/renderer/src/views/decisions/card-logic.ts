@@ -154,7 +154,7 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
   };
   switch (decision.kind) {
     case "model_unavailable":
-      push("部门", dept(request.department));
+      push("职能", dept(request.department));
       push("模型", (request.target as Payload | null | undefined)?.model_id);
       push("具体问题", request.message);
       // 原因按中文写（工单 #181）：provider_unavailable 这样的机器标识不写进页面
@@ -163,7 +163,7 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
       break;
     case "no_tool_call":
     case "workspace_unrepresentable":
-      push("部门", dept(request.department));
+      push("职能", dept(request.department));
       push("停止原因", typeof request.stop_reason === "string" && request.stop_reason !== ""
         ? label(STOP_REASON, request.stop_reason) : "");
       break;
@@ -174,7 +174,7 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
     case "qa_cannot_verify":
       // 质检无法核验（浏览器与 computer use docs/design/browser-and-computer-use.md「无法核验」，工单 #1179）：逐条列出无法核验的
       // 验收条件与原因，再列出「重新核验」「停止事项」两个选项的说明
-      push("部门", dept(request.department));
+      push("职能", dept(request.department));
       for (const row of Array.isArray(request.criteria) ? request.criteria : []) {
         const entry = row as Payload;
         push(String(entry.criterion ?? ""), String(entry.note ?? "没有写原因"));
@@ -200,7 +200,7 @@ export function decisionLinks(decision: DecisionView): MaterialLink[] {
   if (decision.kind === "model_unavailable") {
     links.push({ label: "前往模型管理", href: "#/sys/models" });
     if (decision.project_id) {
-      links.push({ label: "前往本项目的部门设置", href: `#/p/${decision.project_id}/settings?section=departments` });
+      links.push({ label: "前往本项目的职能设置", href: `#/p/${decision.project_id}/settings?section=departments` });
     }
   }
   // 初始 PRD 的两个工件：PRD.md 与 STRUCTURE.md 指向资料页，资料页按轮展示的正是这两个工件的内容

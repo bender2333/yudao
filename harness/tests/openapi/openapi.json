@@ -5090,6 +5090,52 @@
               }
             ],
             "title": "After Snapshot Ref"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "读",
+                  "写",
+                  "运行",
+                  "询问",
+                  "提交"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "title_source": {
+            "type": "string",
+            "enum": [
+              "系统",
+              "作者"
+            ],
+            "title": "Title Source",
+            "default": "系统"
+          },
+          "facts": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "失败",
+                "超时",
+                "结果未知",
+                "被拒绝",
+                "改了文件"
+              ]
+            },
+            "type": "array",
+            "title": "Facts"
           }
         },
         "additionalProperties": false,
@@ -5132,6 +5178,28 @@
           "step_count": {
             "type": "integer",
             "title": "Step Count"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle"
           }
         },
         "additionalProperties": false,
@@ -5343,6 +5411,28 @@
             "type": "string",
             "title": "Question"
           },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -5362,6 +5452,28 @@
               }
             ],
             "title": "Answer"
+          },
+          "answer_facts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Facts"
+          },
+          "answer_explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Explanation"
           },
           "reason": {
             "anyOf": [
@@ -10135,6 +10247,10 @@
             ],
             "title": "Direction To"
           },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
           "run_id": {
             "anyOf": [
               {
@@ -10183,6 +10299,7 @@
           "content",
           "direction_from",
           "direction_to",
+          "round",
           "run_id",
           "work_item_id",
           "position",
@@ -10272,6 +10389,10 @@
             "type": "string",
             "title": "Form"
           },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -10296,6 +10417,7 @@
         "type": "object",
         "required": [
           "form",
+          "label",
           "description",
           "version",
           "verifier_roles",
@@ -12958,6 +13080,17 @@
             "type": "string",
             "title": "Form"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "version": {
             "anyOf": [
               {
@@ -13046,6 +13179,7 @@
         "required": [
           "project_id",
           "form",
+          "label",
           "version",
           "form_in_release",
           "departments",
@@ -15172,6 +15306,39 @@
             },
             "type": "array",
             "title": "Actions"
+          },
+          "attempt_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Attempt Ids"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "title_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "系统",
+                  "作者"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Source"
           }
         },
         "additionalProperties": false,

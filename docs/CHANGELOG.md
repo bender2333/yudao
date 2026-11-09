@@ -9,6 +9,22 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-09 00:55 / v20 定型：`docs/prototypes/v20/` 去掉残留的旧页面、路由与旧对话框，修草稿、折叠行、收件人与停止确认；`docs/prototypes/CHANGELOG.md` v20 两节写回设计说明，补原 v15 十三条的去向。`docs/design/project-organization.md` 4.5、4.8、4.13、4.14、4.15 写进试出来的摆法、用词与交互；`docs/design/app-and-interface.md`、`docs/design/visualization.md` 引用改成 v20，查询名改成 `organization.draft`；`docs/design/department-loop.md`、`docs/design/existing-project-onboarding.md` 与 `docs/requirements/web-game-frontend.md`、`request-observability.md`、`game-world-three-spaces.md` 的页面位置按内容去向表改 / 用户要趁 v20 定型把界面的任务清理干净，设计一次改完
+
+claude-opus-5-5（子架构师） / 2026-11-09 00:36 / `docs/prototypes/v20/` 补事项面板、全部事项、设置页「模型请求与用量」、首页关键事实，`walkthrough.md` 与 `docs/prototypes/CHANGELOG.md` 同步；`docs/design/app-and-interface.md` 写明只有一个职能的事项跳到循环图 / 内容去向表定的位置要能看到
+
+claude-opus-5-5（子架构师） / 2026-11-09 00:27 / `docs/design/project-organization.md`「项目页上的内容在哪里看」与 `docs/design/app-and-interface.md` 4.1、4.3：首页保留离开期间的报告与关键事实，点一条事实跳到那件事项的时序图，按位置读取只给画面；记录原文页面上不留入口 / 用户定了这两条
+
+claude-opus-5-5（子架构师） / 2026-11-09 00:20 / `docs/design/project-organization.md` 4.8、4.9、4.15 的设置页清单一致：成果写回、机器授权、执行位置、MCP 服务器收进「高级」，「模型请求与用量」和「高级」并列在设置页底部，内容去向表最后几行只写理由；`app-and-interface`、`browser-and-computer-use`、`execution-environment`、`existing-project-onboarding`、`model-management`、`network-and-mcp`、`skeleton-and-application`、`visualization` 14.1、`department-loop`、`project-initial-files` 的旧页面名改到内容去向表的位置；`semantic-system` 提到的语义记录与角色详情表里没有位置，未改 / 收成对话与设置两页，已有文档一次改完
+
+claude-opus-5-5（子架构师） / 2026-11-09 00:14 / `docs/design/project-organization.md` 4.14 加「项目页上的内容在哪里看」按内容列的表，并加事项面板与「全部事项」；`docs/design/app-and-interface.md` 4.1 的页面说法、4.3 的分组名与相邻的页面说法改到表里的位置，4.4 加 `run.steps` 每步带调用尝试编号 / 收成对话与设置两页之前要先知道每样内容在哪里看
+
+claude-opus-5-5（子架构师） / 2026-11-08 21:37 / `docs/design/project-organization.md` 4.14 第四层改成一句话说明每一步、按任务分组、点开才是原始数据；`docs/design/app-and-interface.md` 4.4 去掉用时一条；`docs/prototypes/v20/` 工作过程改成任务、步骤、原始数据三级，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户要工作过程像「读取文件」这样的说明，不直接显示一大串实际动作
+
+claude-opus-5-5（子架构师） / 2026-11-08 21:35 / `docs/design/project-organization.md` 4.14 写项目页四层与时序图，交互骨架第 3 条、4.15 与脚本三、四补上；`docs/design/app-and-interface.md` 加 4.4 四层读哪个查询与要补的内容；`docs/prototypes/v20/` 加累计往来、时序图、原文面板的询问内容与工作过程，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户看过示意后定「按这个做」：信息不丢失，也不觉得冗余
+
+claude-opus-5-5（子架构师） / 2026-11-08 21:14 / `docs/design/project-organization.md` 4.14 加「在做」角标的规矩；`docs/prototypes/v20/` 节点上的字、角标与节点详情从同一份职能状态推出，去掉兜底文字「在做」「等别的职能」，新增场景「活动报名小程序：工程在问产品」，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 总架构师复核发现角标按事项的所在职能挂，和节点上的字矛盾；「产品 · 工程」开着询问的画法没有人看过
+
 solo-deepseek-v4.1-flash / 2026-11-03 23:30 / `docs/design/test-pyramid.md` 第 10 节加第 8 条：检查命令与 bash 命令里要调用解释器时取跑测试的这个解释器（`harness/tests/helpers.py` 的 `python_command`、`python_snippet`），路径写成正斜杠并加引号，不写 PATH 上的 `python`；这一条只管交给执行环境去跑的命令与会被当作检查执行的 `CHECKS` 表，作为工件正文给人看的示例文字（`how_to_run`、`purpose`、PRD 里的 `build_and_test`）不换 / 工单 #1356：开发机上 PATH 的 `python` 可能是 Microsoft Store 的占位程序（执行即结束，bash 里看到退出码 49，即 9009 的低字节），CI 上是 `setup-python` 的真实解释器，同一批用例「本机红、CI 绿」，每个执行者都要重新判定一次是不是自己弄坏的；换成这个写法以后两种环境的结论相同，命令文本与解释器路径都不进事件序列基准与提示快照
 
 solo-deepseek-v4.1-flash / 2026-11-03 13:10 / `docs/design/app-and-interface.md`：`project.overview` 一行补 `stopped_at` 与 `stop_detail`（停止的时刻；停止原因是模型服务时取最后一次失败的调用尝试的部门、请求的模型、状态码与是否可重试）与页面上的写法；第 4.3 节「事项看板在页面上的显示」加一条「停止的卡片要能分辨」（事项标识与停止时间，停止说明下面写「上游失败：哪个部门请求的哪个模型、返回什么状态码、可不可重试」）/ 工单 #1373：试用 R1-01 与 R1-02——上游失败时页面的提示不指名模型与服务，同一项目里 6 张失败卡片一模一样；这些字段本来就在 `model_attempt_failed` 事件里，只是没有谁把它们带给页面
@@ -497,3 +513,16 @@ claude-opus-5-5（总架构师，用户指定） / 2026-11-08 11:10 / `.claude/s
 claude-opus-5-5（子架构师；原型由子代理画） / 2026-11-08 12:20 / 新增 `docs/prototypes/v20/`（从 v19 复制，命名空间 Y20）：七个示例项目都是循环图加对话；形态卡带轮转与结束两个标记、一句话和小循环图；orders 打回标在交付 v1、v2 上并写轮次，blog 一行，logclean 由 OpenCode 做，signup 产品在旁边接询问，firmware 子组织能点进去、出口写交回工程，运维预览的故障从图外进来开新事项；设置页「加独立核验」一键生效，头部变「工程 · 质检」；窄屏图收成一行。`docs/prototypes/CHANGELOG.md` 加 v20 一节。`project-organization.md` 4.15 一个职能那一行写成「你的输入 → 原文 → 工程 → 交付 → 开环完成」，和箭头只放成果一致 / 总架构师交接的 v20 清单
 
 claude-opus-5-5（子架构师） / 2026-11-08 13:10 / `project-organization.md` 4.12 加一段：形态名只说有哪几个职能，凡写出形态名的地方（项目头部、设置、卡片）都带轮转与结束两个标记；「产品 · 工程」加独立核验以后照规矩叫「产品 · 工程 · 质检」，靠标记与图和默认形态分开，它不是新建项目里的卡；任务池这类轮转写进标记不写进名字。v20：任务池预览的组织名改为「产品 · 工程 · 质检」，任务池在轮转标记里；按成果的图与默认形态卡的小图补上 PRD 给质检的那条（隔着职能的箭头另起一行，从产品跨到质检） / 总架构师对同名问题的决定与 v20 两处小改
+
+claude-opus-5-5（总架构师，用户指定） / 2026-11-08 15:30 / `CONTEXT.md`「循环图」词条加询问的画法：询问不是成果，不画成成果箭头；开着时提问方与被询问的职能之间一条虚线，写「询问」，两个节点分别写在等谁的回答、在回答谁的询问，同时开着几次就几条；答完虚线去掉，往来收进线程的折叠行与节点的往来；虚线只给询问，成果箭头都是实线，回答里修订的 PRD 照常画成箭头 / 用户问三个职能时职能之间的询问原型能不能看到；v20 的三个职能的图上没有询问，原因之一是术语表只写了成果箭头怎么画（决定记录同日一条）
+
+claude-opus-5-5（子架构师） / 2026-11-08 16:40 / `project-organization.md`：4.9 职能详情的「职责」加一行「可以询问谁」（默认写「其余职能」，只有一个职能时不出现）；4.14 加询问的画法（开着时提问方与被询问的职能之间一条写「询问」的虚线，两个节点写在等谁的回答、在回答谁的询问，答完收进线程的折叠行与节点的往来，回答里修订的 PRD 照常画成实线箭头，跨过中间节点的成果箭头另起一行仍是实线，定义上可以询问谁不画成常挂的线），点节点看到的往来包括开着与答完的询问，窄屏一行里节点名旁写在等谁；交互骨架第 3 条加工程与质检的问答展开后分事实与解释、解释旁写质检对哪一版下了结论以后才看到；4.15 两个职能与三个职能两行写上询问；脚本四第 4 步加询问在图上与线程里的样子。v20：询问记录放在项目的 `asks`，图上的虚线、节点上的字、节点详情与线程的折叠行都从它推出；订单系统重构补三次询问（工程问产品、质检问工程带事实与解释、质检问产品并修订 PRD v2），新场景「职能之间的询问都答完了」；成果箭头全改实线；「产品 · 工程」的图去掉常挂的询问计数；走查与原型变更记录同步。`app-and-interface.md` 4.3 查询清单已有 `run.asks` 与 `project.loop` 的进行中的询问，够图用，记确认 / 总架构师转来用户回「补上」：三个职能时询问在图上怎么画，以及 v20 要补的几处
+
+claude-opus-5-5（总架构师，用户指定） / 2026-11-08 21:25 / `CONTEXT.md`「循环图」词条加「累计往来」；新词条「时序图」：在循环图下面展开的事项经过，询问与回答画虚线、其余实线，按轮折叠，每行一句标题，点开看原文与工作过程，与循环图、线程读同一份事实 / 用户要信息既不丢失也不冗余，循环图点开看时序（决定记录同日一条）
+claude-opus-5-5（子架构师） / 2026-11-08 22:16 / 新设计说明 `docs/design/work-process-titles.md`：工作过程三层的来源、存放与读者（任务由角色用更新计划写，动作标题由系统按工具和参数算出，运行命令由角色写一句，动作标记只来自工具定义与回执），含任务分组、老事件、外部 agent 的对应与验收；`docs/design/README.md` 加索引；`CONTEXT.md` 加工作过程、动作标题、动作标记、计划条目；`app-and-interface.md` 的 `run.steps` 一行改为供时序图里的工作过程并加标记、标题、来源、任务，4.4 加第 5 条；`project-organization.md` 4.14、`outsourced-roles.md`「ACP 提供的控制手段」、`department-loop.md`「工程的计划」、`local-tools.md` 命令一行各加一句；`semantic-system.md`「五层」的计划条目改为角色与更新计划的工具调用 / 用户要工作过程像常见 agent 那样显示状态缩略式的说明，点开才是原始数据（决定记录同日一条）
+
+claude-sonnet-5-5 / 2026-11-09 00:10 / `.claude/skills/solo/SKILL.md` 与 `scripts/hook.mjs` 无人值守：`notify` 循环退出 Claude Code 的编排钩子，`hook` 循环的子代理提示、派活限制、工人记录与自动继续只认有效租约所有者，账本写保护继续覆盖同项目会话；补 `hook-output.test.mjs` / 共享项目设置使普通 Claude Code 子代理收到 solo 身份与并发提示，甚至写入活动循环的工人记录（这次改动先落在 codex/v19-collaboration-design 的 69bb8a7a，此处带到 main）
+claude-opus-5-5（总架构师，用户指定） / 2026-11-09 00:25 / `docs/program-roadmap.md` 阶段一一行与判据四、`.claude/skills/trial/method/expert.md`、`probes.md`：页面与回放的对账改成页面与按位置读出的事实比对，看回放归画面 / v20 定型，项目页不留回放，这几处的目的不变、手段随之改（决定记录同日一条）
+claude-opus-5-5（总架构师，用户指定） / 2026-11-09 01:11 / `design/semantic-system.md`、`requirements/semantic-system.md`、`requirements/web-game-frontend.md` 里的「职能工作间」改成页面；`design/project-organization.md` 4.14 写明恢复详情页上的决定就地回答 / v20 定型，这几处还写着不存在的页面；恢复详情页是专门处理中断的详情页，算拍板只在气泡的例外
+claude-opus-5-5（总架构师，用户指定） / 2026-11-09 07:21 / `docs/prototypes/v15` 到 `v19`（112 个文件）移到 `docs/archive/prototypes/`，`docs/prototypes/CHANGELOG.md` 的链接指到归档位置，移动的文件里指向设计说明、变更记录与术语表的相对链接改到新位置，重建文档索引 / v20 定型，页面原型只留当前这一版，用户确认归档
+claude-opus-5-5（总架构师，用户指定） / 2026-11-09 20:39 / `docs/design/app-and-interface.md` 命令清单「用户决定」的分组标题去掉元观察页，决定卡片一句的「楼」改成对话，「打开职能房间」改成打开节点面板；`docs/trial/stage-1-guide.md` 的问题改成页面与按位置读出的事实一致，「部门」改成「职能」；文档索引的 31 条待核对逐条看过，记确认 / 重建索引后显示出前几轮页面改名带来的待核对；下游都不用改，核对时发现这几处旧说法

@@ -320,6 +320,22 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Mark
+     */
+    mark?: '读' | '写' | '运行' | '询问' | '提交' | null;
+    /**
+     * Title
+     */
+    title?: string;
+    /**
+     * Title Source
+     */
+    title_source?: '系统' | '作者';
+    /**
+     * Facts
+     */
+    facts?: Array<'失败' | '超时' | '结果未知' | '被拒绝' | '改了文件'>;
 };
 
 /**
@@ -342,6 +358,14 @@ export type ActivationView = {
      * Step Count
      */
     step_count: number;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Cycle
+     */
+    cycle?: number | null;
 };
 
 /**
@@ -470,6 +494,14 @@ export type AskView = {
      */
     question: string;
     /**
+     * Background
+     */
+    background?: string | null;
+    /**
+     * Expected
+     */
+    expected?: string | null;
+    /**
      * Status
      */
     status: '进行中' | '已回答' | '没能回答';
@@ -477,6 +509,14 @@ export type AskView = {
      * Answer
      */
     answer?: string | null;
+    /**
+     * Answer Facts
+     */
+    answer_facts?: string | null;
+    /**
+     * Answer Explanation
+     */
+    answer_explanation?: string | null;
     /**
      * Reason
      */
@@ -3118,6 +3158,10 @@ export type FlowRecord = {
      */
     direction_to: string | null;
     /**
+     * Round
+     */
+    round: number;
+    /**
      * Run Id
      */
     run_id: string | null;
@@ -3199,6 +3243,10 @@ export type FormChoice = {
      * Form
      */
     form: string;
+    /**
+     * Label
+     */
+    label: string;
     /**
      * Description
      */
@@ -4862,6 +4910,10 @@ export type ProjectOrganizationResult = {
      */
     form: string;
     /**
+     * Label
+     */
+    label: string | null;
+    /**
      * Version
      */
     version: string | null;
@@ -6140,6 +6192,18 @@ export type RunStepView = {
      * Actions
      */
     actions: Array<ActionView>;
+    /**
+     * Attempt Ids
+     */
+    attempt_ids?: Array<string>;
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Title Source
+     */
+    title_source?: '系统' | '作者' | null;
 };
 
 /**

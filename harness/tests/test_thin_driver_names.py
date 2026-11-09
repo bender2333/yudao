@@ -7,7 +7,7 @@
 # 把结果交给写入口，部门的标识与成果的种类也一律从定义取。
 #
 # 检索的文件清单从两处合起来取：内核清单里 kind 为 module 的文件，加上写在下面 FIXED_NAMES 里的固定名单
-# （五个契约模块、薄驱动、运行层、执行与装配的几个文件、路由实现），就是对照表「四层」一行列的全部文件，
+# （五个契约模块、薄驱动与它搬进去以前的流程编排、运行层、执行与装配的几个文件、路由实现），就是对照表「四层」一行列的全部文件，
 # 工单 #1404 把部门名的检索从薄驱动扩到了这些文件；命中的三种名字逐条写出文件、行与名称。
 #
 # 成果种类的检索（工单 #1456）：内核只认「某种成果的某一版及其依据」，按定义里的提案合同核对；PRD、交付、
@@ -36,7 +36,8 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-THIN_DRIVER = "harness/orchestrator.py"
+# 薄驱动的两个文件（工单 #1512）：搬进 harness/thin_driver.py 以后，两边都不含部门名与成果种类
+THIN_DRIVERS = ("harness/thin_driver.py", "harness/orchestrator.py")
 ORGANIZATION = REPO_ROOT / "harness" / "definitions" / "organization.json"
 OUTCOME_KINDS = REPO_ROOT / "harness" / "definitions" / "outcome_kinds.json"
 MANIFEST = REPO_ROOT / "harness" / "definitions" / "kernel-manifest.json"
@@ -60,6 +61,7 @@ FIXED_NAMES = (
     "harness/assembly_contract.py",
     "harness/tightening_contract.py",
     "harness/routing_contract.py",
+    "harness/thin_driver.py",
     "harness/orchestrator.py",
     "harness/runtime.py",
     "harness/engine.py",
@@ -197,7 +199,8 @@ def test_the_guard_reads_every_file_of_the_two_upper_layers():
     assert set(FIXED_NAMES) <= set(files)
     # 对照表四层一行点到名的文件逐个核对：少了哪一个（不再被检索）都失败
     for name in ("harness/contract_versions.py", "harness/execution_contract.py", "harness/assembly_contract.py",
-                 "harness/tightening_contract.py", "harness/routing_contract.py", "harness/orchestrator.py",
+                 "harness/tightening_contract.py", "harness/routing_contract.py", "harness/thin_driver.py",
+                 "harness/orchestrator.py",
                  "harness/runtime.py", "harness/engine.py", "harness/assembly.py", "harness/context.py",
                  "harness/watched_outputs.py", "harness/tightening.py"):
         assert name in files, f"{name} 不在检索的文件清单里"
@@ -213,7 +216,9 @@ def test_the_two_upper_layers_name_no_department_from_the_definitions():
 
 
 def test_the_thin_driver_names_no_outcome_kind_from_the_definition():
-    found = hits(_read(REPO_ROOT / THIN_DRIVER), outcome_kinds(), file=THIN_DRIVER)
+    found: list[dict[str, object]] = []
+    for file in THIN_DRIVERS:
+        found.extend(hits(_read(REPO_ROOT / file), outcome_kinds(), file=file))
     assert found == [], (
         "薄驱动里出现了成果种类，这些种类应当从定义取（骨架与应用设计说明第 6 节）：\n"
         + "\n".join(describe(hit) for hit in found)
@@ -282,3 +287,16 @@ def test_an_outcome_kind_written_into_a_temporary_text_fails_with_file_line_and_
     assert len(found) == 1, found
     assert found[0].startswith("harness/adjudication.py:2:")
     assert "product_spec" in found[0]
+
+
+def test_the_round_work_and_its_bound_keep_their_old_names_for_one_version():
+    # 代码名随总图的词改（工单 #1513）：一轮工作叫 `RoundWork`，界叫 `round_bound`；
+    # 旧名（`_Activation`、`activation_id`、`activation_bound`）留一版，别处还在按旧名读
+    driver = _read(REPO_ROOT / "harness" / "thin_driver.py")
+    assert "class RoundWork" in driver
+    assert "def round_id" in driver and "def activation_id" in driver
+    bounds = _read(REPO_ROOT / "harness" / "bounds.py")
+    assert "def round_bound(" in bounds
+    assert "activation_bound = round_bound" in bounds
+    application = _read(REPO_ROOT / "harness" / "orchestrator.py")
+    assert "_Activation = RoundWork" in application

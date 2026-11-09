@@ -12,6 +12,7 @@ import type { FactRef, FlowRecord, ProjectLoopResult, ProjectRow, WorkItemLoop }
 import {
   EVENT_KIND_LABELS, factElementRows, flowPairRows, projectDoingText, projectItemsByDepartmentText, projectSlotText,
 } from "../../src/renderer/src/views/project/floor-text.ts";
+import { flowSegmentsOf } from "../../src/renderer/src/views/project/flow-segments.ts";
 
 function project(overrides: Partial<ProjectRow> & { project_id: string }): ProjectRow {
   return {
@@ -159,6 +160,25 @@ test("流转汇总：每对部门的次数、其中返工几次、都是些什�
     { from: "产品", to: "没有", count: 1, rework: 0, kinds: "PRD 新版本 1" },
   ]);
   assert.deepEqual(flowPairRows(null), []);
+});
+
+// 工单 #1636 给流转记录加了「你的输入」「指导」「放行」三种：流转表按种类原样写，不认识新种类也不报错；
+// 你的输入与指导没有来源部门（是你发的），按「没有」写；放行有方向，照样进按方向的汇总
+test("流转表遇到新的流转种类不报错：你的输入、指导与放行", () => {
+  const records = [
+    flow({ flow_id: "f1", kind: "你的输入", status: "已收到", direction_from: null, direction_to: "product" }),
+    flow({ flow_id: "f2", kind: "指导", status: "已收到", direction_from: null, direction_to: "engineering" }),
+    flow({ flow_id: "f3", kind: "放行", status: "已放行", direction_from: "quality", direction_to: "engineering" }),
+  ];
+  assert.deepEqual(flowPairRows(records), [
+    { from: "没有", to: "产品", count: 1, rework: 0, kinds: "你的输入 1" },
+    { from: "没有", to: "工程", count: 1, rework: 0, kinds: "指导 1" },
+    { from: "质检", to: "工程", count: 1, rework: 0, kinds: "放行 1" },
+  ]);
+  // 覆盖层的分段只收有方向的那一条：另外两条没有来源部门，不画成某两个部门之间的流转
+  assert.deepEqual(flowSegmentsOf(records).map((segment) => [segment.from, segment.to, segment.kind]), [
+    ["quality", "engineering", "放行"],
+  ]);
 });
 
 // ---------------------------------------------------------------------------

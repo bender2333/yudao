@@ -123,7 +123,7 @@ export function JsonDialog(props: JsonDialogProps) {
            onClick={(event) => event.stopPropagation()}>
         <h2>编辑 JSON</h2>
         <p className="y10-small y10-muted hint">
-          目录文档是 Provider 配置、模型访问定义与部门默认的完整文本，不含 API Key 与准入记录。
+          目录文档是 Provider 配置、模型访问定义与职能默认的完整文本，不含 API Key 与准入记录。
           校验通过时整份写入；任何一项不通过时整份拒绝，并指出字段位置。
         </p>
         {jsonDialogFailureText(props.error) !== null ? (

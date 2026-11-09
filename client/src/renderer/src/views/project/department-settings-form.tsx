@@ -176,7 +176,7 @@ export function DepartmentSettingsFields(props: {
         <p className="y10-note note">该模型未声明推理档位，请求不带推理参数。</p>
       ) : null}
       <TextArea
-        label="部门 Prompt"
+        label="职能 Prompt"
         value={props.draft.text}
         rows={10}
         onInput={(value) => props.onDraft(promptDraftOnInput(props.draft, value))}
@@ -185,7 +185,7 @@ export function DepartmentSettingsFields(props: {
       <p className="y10-note note" data-testid={`department-prompt-source-${props.department}`}>
         {props.draft.writePrompt
           ? "这一段由本项目写入，保存以后按这里的内容生效。"
-          : "这一段不写入本项目，部门使用内置默认 Prompt。"}
+          : "这一段不写入本项目，职能使用内置默认 Prompt。"}
       </p>
       <div className="y10-row row-actions">
         <button
@@ -242,7 +242,7 @@ export function DepartmentSettingsSave(props: {
   return (
     <div className="y10-form composer">
       <SubmitButton
-        label="保存部门设置"
+        label="保存职能设置"
         busy={props.command.busy}
         onClick={() => {
           void props.command.submit("department_settings.save", departmentSettingsPayload({

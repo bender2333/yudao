@@ -10,16 +10,6 @@
 .y20-list { margin: 6px 0; padding-left: 20px; display: grid; gap: 4px; }
 
 /* 资料 */
-.y20-mt-index { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.y20-mt-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface-2); }
-.y20-mt-card.is-current { border-color: var(--green); background: var(--tint); }
-.y20-mt-counts { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
-.y20-mt-counts span { padding: 0 6px; border-radius: 5px; background: var(--soft); }
-.y20-mt-counts .is-zero { color: var(--faint); }
-.y20-mt-list, .y20-mt-notes, .y20-mt-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.y20-mt-files { margin: 6px 0; gap: 4px; }
-.y20-mt-doc { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
-.y20-mt-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
 
 /* 观测 */
 .y20-obs-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin-bottom: 12px; }

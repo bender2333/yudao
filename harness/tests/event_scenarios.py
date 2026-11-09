@@ -160,10 +160,14 @@ def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse], *, ste
     # 窗口按本场景的需要设置：工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token（三个部门实测），
     # 工单 #1178 给两个提交工具加上 requirement_mapping 的说明以后产品的固定材料再实测多 283 个 token；
     # 工单 #1369 给产品提示加上「合同里的具体值要能指回用户原话」一段，产品的固定材料再实测多 144 个 token
-    # （pinned_input_tokens 读 5133 → 5277）；几笔都是固定材料的增长，窗口按各笔之和上调，
-    # 压缩发生在哪一步与事件序列基准保持一致
+    # （pinned_input_tokens 读 5133 → 5277）；工单 #1659 给 bash 加上一句话那一项参数（工具定义多一项），
+    # 三个部门的固定材料各实测多 104 个 token（pinned_input_tokens 读 5271 → 5375）；工单 #1660 加上更新计划
+    # 这个主机工具（工具定义与工具清单各多一项），三个部门的固定材料各实测多 277 个 token
+    # （pinned_input_tokens 读 5375 → 5652）。几笔都是固定材料的增长，窗口按各笔之和上调，
+    # 让第一次请求仍然读取大文件、压缩发生在读取以后；材料变大以后压缩的轮数取决于窗口与历史的大小关系，
+    # 本单重生成的基准里少了一轮压缩（有意的改变，工单 #1660）
     system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits,
-                                context_window=6000 + 346 + 283 + 144)
+                                context_window=6000 + 346 + 283 + 144 + 104 + 277)
     system.workspace(run_id).write_file("large.txt", "LARGE_TOOL_OUTPUT " * 2200)
     return system, run_id
 

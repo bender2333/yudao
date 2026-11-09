@@ -31,7 +31,7 @@
 "edges":[
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"14d726dbf2dad669","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},
 {"dst":"docs/architecture.html#s4 > 评价","kind":"map-position","raws":["「评价」"],"seen":"04a7541dd8413b36","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},
-{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「真实场景」"],"seen":"cb9066af90b3b5a9","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「真实场景」"],"seen":"bff92efe9855956f","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},
 {"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["rules-and-parameters.md"],"seen":"f10c003d551c1547","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},
 {"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["../requirements/comparison-experiment.md"],"seen":"cc5ed4519032f933","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"7238332bed3feff5","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照"},

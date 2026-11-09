@@ -39,6 +39,8 @@ const SYSTEM_PAGES: Record<string, string> = {
 // 顶栏的路径里的页名（设计说明第 3.4、9.1 节）：项目内页面写页名，系统页写它自己的页名。
 // 系统页的页名与页面里的标题一致，不写路由里的英文段名（工单 #702）
 const PAGE_LABELS: Record<string, string> = {
+  // 对话页是打开项目时的那一页（工单 #1638）：上面是循环图，线程与时序图由后面的工单接上
+  conversation: "对话",
   overview: "概览",
   materials: "资料",
   observe: "观测",
@@ -69,6 +71,10 @@ export function pathLabel(route: Route, projects: { project_id: string; name: st
   const name = project?.name ?? route.projectId ?? "";
   return `${name} / ${page}`;
 }
+
+// 打开一个项目时落在哪一页（工单 #1638，项目的组织设计说明 4.14）：项目页先是对话，
+// 循环图在对话上面；概览、资料这些页先留着，收成对话与设置两页另行处理
+export const DEFAULT_PROJECT_PAGE = "conversation";
 
 export function parseRoute(hash: string): Route {
   const text = (hash || "").replace(/^#/, "");
@@ -106,7 +112,7 @@ export function parseRoute(hash: string): Route {
       route.runId = query.get("r");
       return route;
     }
-    route.name = segments[2] ?? "overview";
+    route.name = segments[2] ?? DEFAULT_PROJECT_PAGE;
     return route;
   }
   route.name = "not-found";
@@ -162,6 +168,9 @@ function scopeQuery(workItem: string | null | undefined): string {
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
 export const paths = {
   home: () => "#/home",
+  // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；事项范围写在 ?w= 里
+  conversation: (projectId: string, options: { workItem?: string | null } = {}) =>
+    `#/p/${projectId}/conversation${scopeQuery(options.workItem)}`,
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
   overview: (projectId: string, options: { workItem?: string | null } = {}) =>
@@ -247,6 +256,8 @@ export const paths = {
 export function withScope(route: Route, workItemId: string | null, defaultDepartment = ""): string {
   const projectId = route.projectId ?? "";
   switch (route.name) {
+    case "conversation":
+      return paths.conversation(projectId, { workItem: workItemId });
     case "dept": {
       // 部门页没有写部门、项目现在组织里也没有部门时回概览：不拼一个空的部门路径
       const department = route.department ?? defaultDepartment;

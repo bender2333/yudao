@@ -146,6 +146,37 @@ def test_step_layer_state_oscillating_and_boundary():
     assert {layer.name: layer for layer in boundary.layers}["step"].state == loops.BOUNDARY
 
 
+def test_the_one_sentence_of_a_run_command_is_not_part_of_the_call_identity():
+    # 守 R2（工单 #1659 验收第 3 条）：同一条命令写了不同的一句话仍算同一次调用，震荡判定照旧；
+    # 只有命令不同才是另一次调用
+    events: list[Event] = [created(), activated(2, cycle=1)]
+    position = 3
+    for index in range(8):
+        events.append(requested(position, activation_id="act-2", root=index + 1, step=index + 1))
+        position += 1
+        if index == 0:
+            for sentence in ("先看配置", "再看一遍配置", "还是看配置"):
+                events.append(called(position, "bash", {"command": "cat config.json", "intent": sentence}))
+                position += 1
+    tree = loops.build_loop_tree(events)
+    assert {layer.name: layer for layer in tree.layers}["step"].state == loops.OSCILLATING
+
+    other_command: list[Event] = [created(), activated(2, cycle=1)]
+    position = 3
+    for index in range(8):
+        other_command.append(requested(position, activation_id="act-2", root=index + 1, step=index + 1))
+        position += 1
+        if index == 0:
+            for command in ("cat config.json", "cat config.yaml", "cat config.toml"):
+                other_command.append(called(position, "bash", {"command": command, "intent": "看配置"}))
+                position += 1
+        if index == 1:
+            other_command.append(called(position, "write_file", {"path": "config.json"}, ok=True))
+            position += 1
+    assert {layer.name: layer for layer in loops.build_loop_tree(other_command).layers}["step"].state \
+        == loops.CONVERGING
+
+
 def test_step_layer_is_undetermined_until_a_full_window():
     # 守 R3：步数还没满一个窗口时不判定，写明缺少的事实
     tree = loops.build_loop_tree(base_events())

@@ -57,7 +57,7 @@
       goal: '把订单模块重构成可导出、可分页、退款金额准确的版本',
       items: [
         { id: 'w0', door: 'A-1', title: '订单状态机', color: 4, dept: null, status: 'adopted', round: 5, round_limit: 8, used: 13200, limit: 14400, reason: Q + '放行后已采纳第 2 版', created: at('y', '18:50'), orgRef: 0 },
-        { id: 'w1', door: 'A-4', title: '导出订单为 CSV', color: 0, dept: 'engineering', status: 'working', round: 3, round_limit: 8, used: 4320, limit: 14400, reason: E + '在写第 1 版交付', created: at('t', '11:30'), orgRef: 0 },
+        { id: 'w1', door: 'A-4', title: '导出订单为 CSV', color: 0, dept: 'engineering', status: 'working', round: 3, round_limit: 8, used: 4320, limit: 14400, reason: E + '在写交付 v3：改成流式写出', created: at('t', '11:30'), orgRef: 0 },
         { id: 'w2', door: 'A-3', title: '订单列表分页', color: 2, dept: 'quality', status: 'working', round: 4, round_limit: 8, used: 7500, limit: 14400, reason: Q + '在核验交付第 2 版', created: at('t', '09:05'), orgRef: 0 },
         { id: 'w3', door: 'A-5', title: '退款金额取整', color: 1, dept: 'engineering', status: 'asking', round: 2, round_limit: 8, used: 1500, limit: 14400, reason: E + '向' + P + '提出询问，等' + P + '回答', since: at('t', '14:22'), created: at('t', '13:50'), orgRef: 0 },
         { id: 'w4', door: 'A-6', title: '支付回调重试', color: 3, dept: 'engineering', status: 'waiting_slot', round: 0, round_limit: 8, used: 0, limit: 14400, reason: '三个执行槽位都占满了，下一个空出来就开始', since: at('t', '14:05'), created: at('t', '14:00'), orgRef: 0 }
@@ -68,7 +68,32 @@
           waits: [{ item: 'w3', on: P + '对询问的回答', since: at('t', '14:22') }, { item: 'w4', on: '执行槽位', since: at('t', '14:05') }] },
         quality: { text: '核验订单列表分页（交付第 2 版）', state: 'running', reason: '一轮工作进行中，第 4 轮', waits: [], role: '质检员', model: 'glm-4.6v', items: ['w2'] }
       },
-      asks: [{ id: 'q1', item: 'w3', from: 'engineering', to: 'product', text: '退款金额取整：按分取整还是按元取整？银行侧按分记账。', at: at('t', '14:22'), key: 'o-ask1' }],
+      // 职能之间的询问：开着的在图上画虚线，答完的收进线程的折叠行；done 由场景「询问都答完了」改
+      asks: [
+        { id: 'q1', item: 'w3', from: 'engineering', to: 'product', text: '退款金额取整：按分取整还是按元取整？银行侧按分记账。', at: at('t', '14:22'), answered: at('t', '14:26'), key: 'o-ask1',
+          answer: '按分取整，四舍五入到分；页面显示两位小数。PRD v1 的退款规则不用改。' },
+        { id: 'q4', item: 'w2', round: 1, from: 'engineering', to: 'product', text: '每页 50 条，包含已取消的订单吗？', at: at('t', '09:14'), answered: at('t', '09:16'), answer: '包含，已取消的留在原来的位置。', done: true },
+        { id: 'q2b', item: 'w2', round: 2, parent: 'q2', from: 'engineering', to: 'product', text: '没有订单时页面上显示什么？', at: at('t', '14:18'), answered: at('t', '14:21'), answer: '显示「还没有订单」，不显示页码。', done: true },
+        { id: 'q2', item: 'w2', round: 2, from: 'quality', to: 'engineering', text: '没有订单时，分页返回什么？（在核验交付 v2）', at: at('t', '14:16'), answered: at('t', '14:24'),
+          work: [
+            { task: '弄清现在的总页数怎么算', steps: [
+              { kind: '读', text: '读取 orders/list.ts', raw: { cmd: 'cat', args: 'orders/list.ts', exit: 0, out: '（96 行）\nexport function pageCount(total) {\n  return Math.ceil(total / 50);\n}', model: '质检问的是没有订单的情况，pageCount(0) 要看一下。' } },
+              { kind: '运行', text: '检查空列表的用例能不能过', raw: { cmd: 'npm', args: 'test -- order-list', exit: 0, out: 'Tests: 9 passed, 9 total\n  ✓ 没有订单（第 7 条）' } }
+            ] },
+            { task: '确认页面上显示什么', steps: [
+              { kind: '询问', text: '问产品没有订单时页面上显示什么', raw: { cmd: 'ask', args: 'to=product', exit: 0, out: '显示「还没有订单」，不显示页码。' } }
+            ] },
+            { task: '回答质检', steps: [
+              { kind: '提交', text: '提交回答：事实 3 条，解释 1 段', last: true, raw: { cmd: 'answer', args: 'facts=3 explanation=1', exit: 0, out: '已送达质检；解释在质检对交付 v2 下结论以后才看到' } }
+            ] }
+          ],
+          answer: '返回空列表，总页数为 0。',
+          facts: ['接口：GET /orders?page=1 返回 { items: [], pages: 0 }', '怎么运行：npm test -- order-list，第 7 条用例「没有订单」', '文件位置：orders/list.ts 的 pageCount()'],
+          why: '总页数写 0 不写 1：前端把 0 当成「没有订单」显示空状态，免得出现「第 1 / 1 页」的空页；这和缺陷记录 v1 说的空页是同一个原因。', after: '交付 v2' },
+        { id: 'q5', item: 'w1', round: 1, from: 'engineering', to: 'product', text: '文件名与编码怎么定？', at: at('t', '11:36'), answered: at('t', '11:38'), answer: 'orders-日期.csv，UTF-8 带 BOM。', done: true },
+        { id: 'q3', item: 'w1', round: 3, answered: at('t', '14:14'), from: 'quality', to: 'product', text: 'PRD v1 的两条验收标准对不上：「一次导出全部订单」和「最多 5 万行」。订单超过 5 万行时按哪一条？', at: at('t', '14:10'),
+          answer: '两条都留：超过 5 万行时分成几个文件，每个最多 5 万行，打成一个压缩包。已修订成 PRD v2。', prd: 2 }
+      ],
       interruptions: [],
       elapsed: { used: 26400, limit: 86400, key: 'elapsed-orders' },
       slots: { used: 3, limit: 3, waiting: 1 },
@@ -205,14 +230,17 @@
       id: 'signup', name: '活动报名小程序',
       goal: '给社区活动做一个报名小程序：填表报名、人数上限、候补',
       items: [
-        { id: 'w17', door: 'G-1', title: '报名表单', color: 3, dept: 'engineering', status: 'working', round: 2, round_limit: 8, used: 2100, limit: 14400, reason: E + '在写报名表单；已向' + P + '询问候补，' + P + '已回答', created: at('t', '10:20'), orgRef: 0 },
+        { id: 'w17', door: 'G-1', title: '报名表单', color: 3, dept: 'engineering', status: 'working', round: 2, round_limit: 8, used: 2100, limit: 14400, reason: E + '在写报名表单；询问过' + P + '人数上限与候补，' + P + '都已回答', created: at('t', '10:20'), orgRef: 0 },
         { id: 'w18', door: 'G-2', title: '活动页文案', color: 1, dept: null, status: 'open_closed', round: 2, round_limit: 6, used: 2400, limit: 7200, reason: '定义里没有核验角色，工程交完成后直接采纳', created: at('y', '16:40'), orgRef: 0 }
       ],
       deptState: {
         product: { text: '空闲', state: 'idle', reason: '等工程的询问', waits: [], role: '产品经理', model: 'deepseek-v3.2', items: [] },
         engineering: { text: '写报名表单', state: 'running', reason: '一轮工作进行中，第 2 轮', waits: [], role: '工程师', model: 'qwen3-coder-plus', items: ['w17'] }
       },
-      asks: [], interruptions: [],
+      asks: [
+        { id: 'sa1', item: 'w17', from: 'engineering', to: 'product', text: '报名要不要限人数？', at: at('t', '13:56'), answered: at('t', '13:57'), answer: '每场 200 人。', done: true },
+        { id: 'sa2', item: 'w17', from: 'engineering', to: 'product', text: '报名人数到了上限以后，候补要不要开放？', at: at('t', '13:58'), answered: at('t', '14:00'), key: 'o-s5', answer: '开放候补，最多 20 人，先到先补；活动前一天关闭候补。', done: true }
+      ], interruptions: [],
       elapsed: { used: 4500, limit: 28800, key: 'elapsed-signup' },
       slots: { used: 1, limit: 3, waiting: 0 },
       provider_wait: [],
@@ -442,6 +470,24 @@
       return w;
     } },
     { id: 'orders_changed', label: '订单系统重构：改过 1 处，有事项按旧版本跑', go: '#/p/orders/org?advanced=1', build: ordersChanged },
+    { id: 'asks_done', label: '订单系统重构：职能之间的询问都答完了', go: '#/p/orders', build(w) {
+      const p = w.projects.find((x) => x.id === 'orders');
+      p.asks.forEach((a) => { a.done = true; });
+      mark(w, 'orders', 'w3', { status: 'working', reason: E + '按' + P + '的回答写取整：按分四舍五入', since: undefined });
+      mark(w, 'orders', 'w1', { reason: E + '按 PRD v2 返工：交付 v3 改成流式写出，超过 5 万行分文件' });
+      Object.assign(p.deptState.product, { text: '空闲', state: 'idle', reason: '手上没有在答的询问', items: [] });
+      p.deptState.engineering.waits = p.deptState.engineering.waits.filter((x) => x.item !== 'w3');
+      p.deptState.engineering.text = '按 PRD v2 返工（导出订单为 CSV）';
+      return w;
+    } },
+    { id: 'signup_asking', label: '活动报名小程序：工程在问产品', go: '#/p/signup', build(w) {
+      const p = w.projects.find((x) => x.id === 'signup'), since = at('t', '14:28');
+      p.asks.push({ id: 'sa3', item: 'w17', from: 'engineering', to: 'product', text: '手机号要不要验证是本人？要验证就得发验证码，短信按条收费。', at: since });
+      mark(w, 'signup', 'w17', { status: 'asking', reason: E + '向' + P + '提出询问，等' + P + '回答', since });
+      Object.assign(p.deptState.product, { text: '回答' + E + '的询问（报名表单）', state: 'running', reason: E + '在「报名表单」上提出询问，' + P + '正在回答', items: ['w17'] });
+      p.deptState.engineering.waits = [{ item: 'w17', on: P + '对询问的回答', since }];
+      return w;
+    } },
     { id: 'interrupted', label: '有中断待恢复', go: '#/p/orders', build(w) {
       const p = w.projects.find((x) => x.id === 'orders');
       mark(w, 'orders', 'w1', { status: 'waiting_resume', reason: '服务重启时这一轮工作被打断，等你决定是否从中断处继续' });

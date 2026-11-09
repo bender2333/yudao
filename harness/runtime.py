@@ -91,6 +91,9 @@ class LoopSystem:
         provider_config_path: str | Path | None = None,
         dotenv_path: str | Path | None = None,
         step_limits: StepLimits | None = None,
+        # 运行时间读的时钟（工单 #1520）：默认是单调时钟；测试交进受控的时钟，把「运行时间用完」
+        # 安排在它选定的时点，运行时间的判定不依赖真实时长
+        run_clock: Callable[[], float] | None = None,
         resume_on_startup: bool = True,
         assembly: Any | None = None,
         execution: Any | None = None,
@@ -149,6 +152,7 @@ class LoopSystem:
             test_adapter_name=(getattr(test_adapter, "name", "test") if test_adapter is not None else "test"),
             test_model=(getattr(test_adapter, "model", "fake-script") if test_adapter is not None else "fake-script"),
             step_limits=step_limits,
+            run_clock=run_clock,
             deltas=self.deltas,
             tightening=WATCHED_OUTPUTS,
             # 路由实现按组织定义里的名称接上（工单 #825）：watched_outputs 在模块加载时登记名称，
@@ -164,7 +168,10 @@ class LoopSystem:
             execution=execution_implementation,
         )
         self.git_versions = self.orchestrator.git_versions
-        self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
+        # 采纳写回的宿主仓库推送与合并请求按凭据引用取材料：解析边界在 ProviderFacade 上，
+        # 材料只在控制主机上使用（工单 #980）
+        self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator,
+                                       credential_resolver=self.facade.resolve_credential)
         # 流程编排的结算与执行槽位判断经项目服务完成（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」）
         self.orchestrator.projects = self.projects
         # 排空在服务下一次启动时结束（工单 #731）：启动时把还没结束的排空记成已结束，
@@ -473,6 +480,7 @@ class LoopSystem:
     @classmethod
     def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter, *,
                     step_limits: StepLimits | None = None,
+                    run_clock: Callable[[], float] | None = None,
                     resume_on_startup: bool = True,
                     assembly: Any | None = None,
                     execution: Any | None = None,
@@ -483,9 +491,11 @@ class LoopSystem:
         # 重开数据目录以后这一次运行按同一个调用目标继续，窗口不随进程消失（工单 #669）
         # assembly 与 execution 是装配实现与执行实现（工单 #979）：不给时由组装处接上默认的那一种，
         # 测试给第二种实现时走同一个构造参数，其余什么也不变。forms 是实例加载的具名形态（工单 #1392）：
-        # 不给时是发布带的形态，测试用别的几份（例如任务池）时交进来
+        # 不给时是发布带的形态，测试用别的几份（例如任务池）时交进来。
+        # run_clock 是运行时间读的时钟（工单 #1520）：不给时是单调时钟，测试交进受控的时钟时可以
+        # 把「运行时间用完」安排在它选定的时点（例如第一次模型调用之后）
         config = Path(data_dir).absolute().resolve() / "providers.json"
-        return cls(data_dir, test_adapter=adapter, step_limits=step_limits,
+        return cls(data_dir, test_adapter=adapter, step_limits=step_limits, run_clock=run_clock,
                    resume_on_startup=resume_on_startup, provider_config_path=config,
                    assembly=assembly, execution=execution, forms=forms)
 

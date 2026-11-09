@@ -96,8 +96,11 @@ class _StubBrowsers:
         self.starts: list[dict[str, Any]] = []
 
     async def start(self, *, run_id, department, copy_root, tree_digest, ready_url,
-                    output_dir=None) -> dict[str, Any]:
-        self.starts.append({"department": department, "ready_url": ready_url})
+                    output_dir=None, call_timeout_sec=None) -> dict[str, Any]:
+        # call_timeout_sec 是本 run 冻结的浏览器调用时限（工单 #1582）：执行环境按冻结值传入，
+        # 这里只记下启动，不启动真实的 Playwright MCP
+        self.starts.append({"department": department, "ready_url": ready_url,
+                            "call_timeout_sec": call_timeout_sec})
         return {"session": {"session_id": "browser_stub", "department": department, "status": "running",
                             "tree_digest": tree_digest, "copy": str(copy_root)},
                 "accessibility": "stub structure", "images": []}

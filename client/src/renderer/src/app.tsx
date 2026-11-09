@@ -21,10 +21,12 @@ import { ReservedPage } from "./views/system/reserved";
 import { RulesPage } from "./views/system/rules";
 import { RuntimePage } from "./views/system/runtime";
 import { ToolsPage } from "./views/system/tools";
+import { ConversationPage } from "./views/project/conversation";
 import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
 import { ObserveDetailPage, ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
+import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
 import { departmentTabs, projectDepartments, type DepartmentView } from "./views/project/organization";
@@ -334,6 +336,9 @@ export function App() {
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
           onNavigate={navigate}
         />
+        {/* 项目头部一行标签（工单 #1653）：形态名（改过几处）、轮转方式、有核验或开环。对话与设置都在，
+            读项目现在的组织（project.organization），不读选中事项冻结的那一份 */}
+        {route.projectId === null ? null : <ProjectHead organization={organization.data} />}
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="y10-content content">
           {route.name === "home" ? (
@@ -361,7 +366,7 @@ export function App() {
             <ReservedPage which={route.systemPage} />
           ) : (
             <ProjectRouter app={app} route={route} systemStatus={systemStatus} departments={departments}
-              onNavigate={navigate} />
+              organization={organization.data} onNavigate={navigate} />
           )}
         </main>
       </div>
@@ -412,12 +417,17 @@ function TokenGate(props: { onSubmit: (token: string) => void }) {
 // 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
 // 概览、部门工作间、资料、观测、设置与恢复由本工单实现；未实现的系统页显示占位，写明由哪个工单填入。
 function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null;
-  departments: DepartmentView[]; onNavigate: (hash: string) => void }) {
+  departments: DepartmentView[]; organization: ProjectOrganizationResult | null;
+  onNavigate: (hash: string) => void }) {
   const { route } = props;
   if (route.projectId === null) {
     return <PlaceholderPage route={route} systemStatus={props.systemStatus} />;
   }
   switch (route.name) {
+    case "conversation":
+      // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；概览等页先留着
+      return <ConversationPage app={props.app} route={props.route} departments={props.departments}
+        organization={props.organization} onNavigate={props.onNavigate} />;
     case "overview":
       return <OverviewPage app={props.app} route={route} departments={props.departments} onNavigate={props.onNavigate} />;
     case "dept":
@@ -449,6 +459,8 @@ function buildTabs(route: Route, capabilities: Capabilities, departments: Depart
   const projectId = route.projectId;
   const scope = { workItem: route.workItemId };
   const candidates: { label: string; hash: string; query: string }[] = [
+    // 对话页是打开项目时的那一页（工单 #1638）；概览、资料这些页先留着，收成对话与设置两页另行处理
+    { label: "对话", hash: paths.conversation(projectId, scope), query: "project.loop" },
     { label: "概览", hash: paths.overview(projectId, scope), query: "project.overview" },
     ...departmentTabs(projectId, departments, scope),
     { label: "资料", hash: paths.materials(projectId, scope), query: "work_item.materials" },

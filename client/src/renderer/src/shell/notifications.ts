@@ -53,7 +53,7 @@ export function noticeForEvent(event: EventObject, names: NoticeNames): SystemNo
     return {
       tag: event.event_id,
       title: "等待模型服务",
-      body: `${matter}：${departmentName(event.department)}部门的模型 ${event.payload.requested_model} 暂时不可用，${event.payload.delay_sec} 秒后重试`,
+      body: `${matter}：${departmentName(event.department)}职能的模型 ${event.payload.requested_model} 暂时不可用，${event.payload.delay_sec} 秒后重试`,
       decisionId: null,
       eventId: event.event_id,
     };

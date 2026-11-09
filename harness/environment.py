@@ -49,7 +49,9 @@ from .fetch import EXTERNAL_CONTENT_NOTICE, FetchCancelled, FetchRefused, fetch_
 from .launch_rules import resolve_trial_launch
 from .mcp_session import McpOutcome, McpRefused, UnknownToolAlias
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
-from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
+from .public_tree import (
+    CapturedTree, IgnoreRulesUndecidable, UnrepresentableWorkspace, capture_public_tree, materialize_tree,
+)
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import CHECK_MATERIALS_DIR, QA_TESTS_DIR, TreeError  # QA_TESTS_DIR 是旧名，demo.py 还从这里取
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
@@ -58,7 +60,8 @@ from .tools import BROWSER_TOOL_NAMES, tool_action
 from .tree_archive import artifact_run, load_tree, store_tree
 from .trial_sessions import TrialSessionTable, TrialStartFailed
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
-# 一次工具结果的输出上限，取规则登记中的现值
+# 一次工具结果的输出上限：运行中按本 run 建 run 时冻结的 tool_output_limit（_output_limit）；
+# 这里的初值只是没有冻结字典时的回退（旧 run 与直接构造环境，工单 #1189、#1582）
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
 # 单页默认命中数；单页输出同样受 _OUTPUT_LIMIT 约束
 SEARCH_DEFAULT_PAGE = 50
@@ -71,6 +74,9 @@ CANCELLED_EXIT_CODE = 130
 _BASH_TIMEOUT_DEFAULT = DEFINITIONS.rule_value("bash_timeout_default_sec")
 _BASH_TIMEOUT_MAX = DEFINITIONS.rule_value("bash_timeout_max_sec")
 _CHECK_TIMEOUT_MAX = DEFINITIONS.rule_value("check_timeout_max_sec")
+# 浏览器动作的调用时限：运行中按本 run 建 run 时冻结的 browser.call_timeout_sec 传给浏览器会话
+# （工单 #1582）；这里的初值只是没有冻结字典时的回退（旧 run 与直接构造环境）
+_BROWSER_CALL_TIMEOUT = DEFINITIONS.rule_value("browser.call_timeout_sec")
 
 _BASH_PATH: str | None = None
 _BASH_OUTPUT_SUBDIR = "tool-output"
@@ -1228,6 +1234,10 @@ class LocalEnvironment:
                 output, status = handler(action.input), "completed"
         except UnrepresentableWorkspace:
             raise
+        except IgnoreRulesUndecidable:
+            # 主机判断不了忽略规则：动作路径上遇到它不交失败回执，交给步骤驱动以 host_commit_error 停止事项
+            # （docs/design/local-tools.md「工具边界」，工单 #604）
+            raise
         except TrialStartFailed as exc:
             # 试用会话没有建立（缺少程序、就绪超时、进程提前退出、启动方式不可用）：
             # 失败回执带启动输出，会话不建立（浏览器与 computer use docs/design/browser-and-computer-use.md「试用工具」与故障矩阵）；
@@ -1836,6 +1846,10 @@ class LocalEnvironment:
                         snapshot_hash = observed_digest
                     if observed_digest != original_digest:
                         verification_errors.append(f"{label} changed")
+                except IgnoreRulesUndecidable:
+                    # 核对检查副本时主机判断不了忽略规则：不是「这一项没核对成」，而是整个事项没法继续读公开树，
+                    # 以 host_commit_error 停止（docs/design/local-tools.md「工具边界」，工单 #604）
+                    raise
                 except Exception as exc:
                     verification_errors.append(f"{label} could not be verified: {exc}")
             tree_changed = bool(verification_errors)
@@ -1958,6 +1972,9 @@ class LocalEnvironment:
                         snapshot_hash = observed_digest
                     if observed_digest != expected:
                         verification_errors.append(f"{label} changed")
+                except IgnoreRulesUndecidable:
+                    # 与 run_check 的核对同口径（工单 #604）
+                    raise
                 except Exception as exc:  # noqa: BLE001 - 与 run_check 的核对同口径
                     verification_errors.append(f"{label} could not be verified: {exc}")
             tree_changed = bool(verification_errors)
@@ -2061,6 +2078,8 @@ class LocalEnvironment:
             run_id=self._run_id, department=action.department, copy_root=copy_root,
             tree_digest=str(session["tree_digest"]), ready_url=str(session["ready_url"]),
             output_dir=copy_root.parent / BROWSER_OUTPUT_DIR / str(session["session_id"]),
+            # 浏览器动作的调用时限按本 run 建 run 时冻结的取值（工单 #1582）：参数事件只作用于之后创建的 run
+            call_timeout_sec=float(self._limit("browser.call_timeout_sec", _BROWSER_CALL_TIMEOUT)),
         )
 
     async def _trial_output(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
