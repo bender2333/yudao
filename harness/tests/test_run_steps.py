@@ -5,21 +5,27 @@
 # 查询只读事件与工件：不调用模型，不回写事实，不新增事件种类。
 
 import json
+import time
 from dataclasses import asdict
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.app.project_queries import EventDetail, NotFound, RunSteps
+from harness.app.labels import event_label
+from harness.app.project_queries import (EventDetail, NotFound, ProjectAttempts, RunAsks, RunAttempt, RunSteps)
 from harness.event_store import run_stream
 from harness.models import EventType
+from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
 
 PRODUCT = "product"
 ENGINEERING = "engineering"
+QUALITY = "quality"
 ACTIVATION = "act-1"
 EARLIER_ACTIVATION = "act-0"
 ENGINEERING_ACTIVATION = "act-e"
+# 主线会话的编号：激活事件的信封上带它，询问分支的激活这里是询问编号（工单 #1657）
+SESSION = "sess-main"
 LONG_REASONING = "先看代码，再动手。" * 32  # 224 字：超过前 200 字的预览
 TEXT_ENTRY = "我先看一下代码。"
 TOOL_CALL_ENTRY = "list_files"
@@ -92,14 +98,35 @@ def _request(system, run_id, *, department=PRODUCT, activation=ACTIVATION, step_
 
 
 def _tool(system, run_id, *, department=PRODUCT, activation=ACTIVATION, action_id, name, step_id,
-          ok=True, error=None, args=None):
-    started = _append(system, run_id, EventType.TOOL_STARTED, department=department, payload={
+          ok=True, error=None, args=None, exit_code=None, status=None, before_ref=None, after_ref=None,
+          refused=False):
+    started_payload = {
         "id": action_id, "name": name, "args": args or {}, "purpose": "work",
-        "activation_id": activation, "step_id": step_id, "input_version": 1})
-    called = _append(system, run_id, EventType.TOOL_CALLED, department=department, payload={
+        "activation_id": activation, "step_id": step_id, "input_version": 1}
+    if before_ref is not None:
+        started_payload["before_snapshot_ref"] = before_ref
+    called_payload = {
         "id": action_id, "name": name, "args": args or {}, "ok": ok, "error": error,
-        "activation_id": activation, "step_id": step_id, "input_version": 1})
+        "activation_id": activation, "step_id": step_id, "input_version": 1}
+    if exit_code is not None or status is not None:
+        # 工具结果进入部门历史的那一条：执行层把回执写成 {"ok", "output", "error"}，
+        # 退出状态与超时在 output.exit_code、output.status 里（与 harness/engine.py 的 tool_result_item 一致）
+        called_payload["input_item"] = {
+            "type": "function_call_output", "call_id": action_id,
+            "output": json.dumps({"ok": ok, "output": {"exit_code": exit_code, "status": status},
+                                  "error": error}, ensure_ascii=False)}
+    if after_ref is not None:
+        called_payload["after_snapshot_ref"] = after_ref
+    if refused:
+        called_payload["refused"] = True
+    started = _append(system, run_id, EventType.TOOL_STARTED, department=department, payload=started_payload)
+    called = _append(system, run_id, EventType.TOOL_CALLED, department=department, payload=called_payload)
     return started, called
+
+
+def _snapshot_ref(seed: str) -> dict:
+    # 动作前后的公开树快照引用：两个引用的 kind 不同，比较的只有 content_hash（工单 #1657）
+    return {"kind": "tree", "content_hash": "sha256:" + seed * 64, "path": "snapshots/tree.json"}
 
 
 def steps_fixture(data_dir):
@@ -114,7 +141,7 @@ def steps_fixture(data_dir):
     work_item_id, run_id = system.projects.start_work_item(project_id, "看部门每一步")
 
     # 更早的一次激活：问它时要返回这一次的步骤
-    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED,
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
             payload={"activation_id": EARLIER_ACTIVATION, "cycle": 1})
     _request(system, run_id, activation=EARLIER_ACTIVATION, step_id=1, root_step_id=1, attempt=1,
              attempt_id="att-0")
@@ -125,7 +152,8 @@ def steps_fixture(data_dir):
     _append(system, run_id, EventType.ACTIVATION_FINISHED, payload={"activation_id": EARLIER_ACTIVATION})
 
     # 后一次激活（默认看这一次）
-    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, payload={"activation_id": ACTIVATION, "cycle": 2})
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
+            payload={"activation_id": ACTIVATION, "cycle": 2})
     steps = {}
     _request(system, run_id, step_id=1, root_step_id=1, attempt=1, attempt_id="att-1")
     steps["reasoning"] = _reasoning(system, run_id, step_id=1, attempt_id="att-1",
@@ -134,11 +162,24 @@ def steps_fixture(data_dir):
                              item=_text_message(TEXT_ENTRY))
     steps["tool_entry"] = _message(system, run_id, step_id=1, attempt_id="att-1",
                                    item=_tool_call_message(TOOL_CALL_ENTRY), index=1)
-    _tool(system, run_id, action_id="call-a", name="list_files", step_id=1)
-    _tool(system, run_id, action_id="call-b", name="read_file", step_id=1)
+    steps["list_files"] = _tool(system, run_id, action_id="call-a", name="list_files", step_id=1)
+    steps["read_file"] = _tool(system, run_id, action_id="call-b", name="read_file", step_id=1,
+                               args={"path": "src/a.py"})
 
     _request(system, run_id, step_id=2, root_step_id=2, attempt=1, attempt_id="att-2")
     _tool(system, run_id, action_id="call-c", name="list_files", step_id=2)
+    # 命令的失败与超时看退出状态，不看 ok：这两条的回执里 ok 都是真（工单 #1657）
+    _tool(system, run_id, action_id="call-fail", name="bash", step_id=2,
+          args={"command": "false"}, ok=True, exit_code=3, status="failed")
+    _tool(system, run_id, action_id="call-timeout", name="bash", step_id=2,
+          args={"command": "sleep 999"}, ok=True, exit_code=124, status="timeout")
+    # 改了文件：动作前后的公开树摘要不同；摘要相同的一条不标
+    _tool(system, run_id, action_id="call-write", name="write_file", step_id=2,
+          args={"path": "a.txt", "content": "新的内容"},
+          before_ref=_snapshot_ref("a"), after_ref=_snapshot_ref("b"))
+    _tool(system, run_id, action_id="call-same", name="write_file", step_id=2,
+          args={"path": "b.txt", "content": "一样的内容"},
+          before_ref=_snapshot_ref("c"), after_ref=_snapshot_ref("c"))
 
     # 第三步：第一次尝试失败（它的推理与文字被丢弃），第二次尝试成功
     _request(system, run_id, step_id=3, root_step_id=3, attempt=1, attempt_id="att-3a")
@@ -211,7 +252,8 @@ def test_a_step_groups_its_reasoning_texts_and_actions(data_dir):
         assert first.discarded_attempts == 0
         second = _step(result.steps, 2)
         assert second.reasoning == [] and second.texts == []
-        assert [action.action_id for action in second.actions] == ["call-c"]
+        assert [action.action_id for action in second.actions] == [
+            "call-c", "call-fail", "call-timeout", "call-write", "call-same"]
     finally:
         system.close()
 
@@ -357,6 +399,202 @@ def test_event_detail_returns_reasoning_and_model_texts(data_dir):
         tool_entry = application.query("event.detail",
                                        EventDetail(event_id=steps["tool_entry"].event_id)).data
         assert tool_entry.artifacts["message_text"] == ""
+    finally:
+        system.close()
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1657：动作标记与标题、会话编号与第几轮、调用尝试编号
+
+
+def _actions(result, step_id):
+    return {action.action_id: action for action in _step(result.steps, step_id).actions}
+
+
+def test_every_action_carries_a_mark_a_title_and_its_source(data_dir):
+    # R3：每个动作一行，标记加标题；标题与来源由工具定义与参数重算，读、写、运行各写明对象（工单 #1657）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        first = _actions(result, 1)
+        assert (first["call-a"].mark, first["call-a"].title) == ("读", "列出文件")
+        assert (first["call-b"].mark, first["call-b"].title) == ("读", "读取 src/a.py")
+        second = _actions(result, 2)
+        assert (second["call-write"].mark, second["call-write"].title) == ("写", "写入 a.txt")
+        assert (second["call-fail"].mark, second["call-fail"].title) == ("运行", "运行命令：false")
+        # 来源是系统：这些标题不是角色写的
+        assert all(action.title_source == "系统" for step in result.steps for action in step.actions)
+        # 后台命令另有一张表（BackgroundCommandView），它发起的那次调用照样是一行动作行
+        assert [command.command for command in result.background_commands] == ["wait-for-release"]
+        fifth = _actions(result, 5)
+        assert (fifth["call-bg"].mark, fifth["call-bg"].title) == ("运行", "运行命令：wait-for-release")
+    finally:
+        system.close()
+
+
+def test_failure_and_timeout_come_from_the_exit_status_not_from_ok(data_dir):
+    # R3：失败（退出状态非零）与超时、改了文件都由事实得出；退出状态非零时 ok 仍为真，用 ok 判不出来（工单 #1657）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        second = _actions(result, 2)
+        assert second["call-fail"].receipt.ok is True
+        assert second["call-fail"].facts == ["失败"]
+        assert second["call-timeout"].facts == ["超时", "失败"]
+        assert second["call-write"].facts == ["改了文件"]
+        # 摘要相同、没有两个快照、成功的动作都不标
+        assert second["call-same"].facts == []
+        assert second["call-c"].facts == []
+        assert _actions(result, 1)["call-b"].facts == []
+    finally:
+        system.close()
+
+
+def test_the_event_text_and_the_step_title_are_the_same_words(data_dir):
+    # R2：工具开始与工具结果两种事件的文字，与 run.steps 的动作行标题逐字相同（同一个函数算，工单 #1657）
+    system, application, run_id, steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        actions = {action.action_id: action for step in result.steps for action in step.actions}
+        for key, action_id in (("list_files", "call-a"), ("read_file", "call-b")):
+            started, called = steps[key]
+            assert event_label(started.type, started.payload) == actions[action_id].title
+            assert event_label(called.type, called.payload) == actions[action_id].title
+        assert actions["call-a"].title == "列出文件"
+    finally:
+        system.close()
+
+
+def test_a_text_only_step_is_one_row_named_by_its_text(data_dir):
+    # R3：只有文字、没有动作的一步只有一行：这段文字的开头，来源记作者；有动作的一步不另给标题（工单 #1657）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        text_only = _step(result.steps, 3)
+        assert text_only.actions == []
+        assert (text_only.title, text_only.title_source) == ("重试以后的文字", "作者")
+        # 有动作的两步由动作行说，不再另给一行
+        assert (_step(result.steps, 1).title, _step(result.steps, 1).title_source) == (None, None)
+        assert (_step(result.steps, 2).title, _step(result.steps, 2).title_source) == (None, None)
+    finally:
+        system.close()
+
+
+def test_activations_carry_the_session_and_the_cycle(data_dir):
+    # R3：每一次激活带它所在的会话编号与第几轮（工单 #1657）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        earlier, current = result.activations
+        assert (earlier.session_id, earlier.cycle) == (SESSION, 1)
+        assert (current.session_id, current.cycle) == (SESSION, 2)
+    finally:
+        system.close()
+
+
+def test_an_ask_branch_activation_is_found_by_the_ask_id(data_dir):
+    # R3：询问分支的激活，会话编号就是 run.asks 的询问编号，由它找到那次激活；分支不算轮次（工单 #1657）
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("询问分支", "核对激活的会话编号")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "分支")
+    _append(system, run_id, EventType.ASK_STARTED, payload={
+        "requester": PRODUCT, "recipient": QUALITY, "question": "能放行吗", "branch_session_id": "ask-1"})
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, department=QUALITY, session_id="ask-1",
+            payload={"activation_id": "act-ask"})
+    _append(system, run_id, EventType.ACTIVATION_FINISHED, department=QUALITY,
+            payload={"activation_id": "act-ask"})
+    application = Application(system)
+    try:
+        asks = application.query("run.asks", RunAsks(run_id=run_id)).data.asks
+        assert [ask.id for ask in asks] == ["ask-1"]
+        result = _query(application, RunSteps(run_id=run_id, department=QUALITY))
+        assert [activation.session_id for activation in result.activations] == [asks[0].id]
+        assert result.activations[0].cycle is None
+    finally:
+        system.close()
+
+
+def test_every_step_carries_its_attempt_ids_including_the_discarded_one(data_dir):
+    # R3：每一步带它的调用尝试编号，含被丢弃的（工单 #1657）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert _step(result.steps, 1).attempt_ids == ["att-1"]
+        # 第三步的第一次尝试失败、被丢弃，编号照样在这一步里
+        assert _step(result.steps, 3).attempt_ids == ["att-3a", "att-3b"]
+        assert _step(result.steps, 3).discarded_attempts == 1
+        assert _step(result.steps, 5).attempt_ids == ["att-5"]
+    finally:
+        system.close()
+
+
+def test_a_step_attempt_id_opens_the_attempt(data_dir):
+    # R3：每一步的调用尝试编号能打开 run.attempt（工单 #1657）
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([FakeTurn(proposal=product_spec())]))
+    project_id = system.projects.register("尝试编号", "核对 run.steps 与 run.attempt 对得上")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "一次激活")
+    system.activate_once(run_id)
+    application = Application(system)
+    try:
+        steps = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        attempt_ids = [attempt_id for step in steps.steps for attempt_id in step.attempt_ids]
+        assert attempt_ids
+        recorded = application.query("project.attempts", ProjectAttempts(
+            project_id=project_id, work_item=work_item_id)).data.attempts
+        assert {row.attempt_id for row in recorded} <= set(attempt_ids)
+        for attempt_id in attempt_ids:
+            detail = application.query("run.attempt", RunAttempt(run_id=run_id, attempt_id=attempt_id)).data
+            assert detail.attempt["id"] == attempt_id
+        # 真实的一次激活：会话编号与第几轮从激活事件读出
+        activation = steps.activations[-1]
+        assert activation.session_id and activation.cycle == 1
+    finally:
+        system.close()
+
+
+def test_reading_old_events_gives_titles_and_leaves_the_events_alone(data_dir):
+    # R2：老事件（没有一句话、没有更新计划）照样给标题；查询不改事件，读两次结果一样（工单 #1657）
+    system, application, run_id, _steps = steps_fixture(data_dir)
+    try:
+        before = len(system.store.list_events(run_id))
+        first = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        second = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        assert first == second
+        assert len(system.store.list_events(run_id)) == before
+        # 运行命令那一句由系统写：老事件没有角色写的一句话时写「运行命令：<命令开头>」
+        assert _actions(first, 2)["call-fail"].title == "运行命令：false"
+    finally:
+        system.close()
+
+
+def test_a_long_activation_is_read_within_a_second(data_dir):
+    # 读数（验收第 8 条）：93 步、52 条推理、93 个动作的一次读取。超时说明本机负载或查询需要分页。
+    # 这一条同时守着动作标题与回执事实的代价：每个动作都要查一次工具定义、解析一条回执（工单 #1657）。
+    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
+    project_id = system.projects.register("长激活", "核对读取耗时")
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "93 步")
+    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, session_id=SESSION,
+            payload={"activation_id": ACTIVATION, "cycle": 1})
+    for step_id in range(1, 94):
+        _request(system, run_id, step_id=step_id, root_step_id=step_id, attempt=1,
+                 attempt_id="att-%d" % step_id)
+        if step_id <= 52:
+            _reasoning(system, run_id, step_id=step_id, attempt_id="att-%d" % step_id,
+                       item=_chat_reasoning("第 %d 步的推理：先看代码，再动手。" % step_id))
+        _tool(system, run_id, action_id="call-%d" % step_id, name="bash", step_id=step_id,
+              args={"command": "make check"}, ok=True, exit_code=0, status="ok")
+    _append(system, run_id, EventType.ACTIVATION_FINISHED, payload={"activation_id": ACTIVATION})
+    application = Application(system)
+    try:
+        started = time.monotonic()
+        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
+        elapsed = time.monotonic() - started
+        assert len(result.steps) == 93
+        assert sum(len(step.reasoning) for step in result.steps) == 52
+        assert sum(len(step.actions) for step in result.steps) == 93
+        # 读数写进交付说明；本机应远低于 1 秒，超过时这里失败并写明读数
+        print("run.steps 在 93 步、52 条推理、93 个动作上的读数：%.3f 秒" % elapsed)
+        assert elapsed < 1.0, "run.steps 用时 %.3f 秒" % elapsed
     finally:
         system.close()
 
