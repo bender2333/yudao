@@ -1,7 +1,7 @@
-// 时序图的事实推出（工单 #1641，项目的组织设计说明 4.14「项目页是循环图加对话」的「时序图（经过）」一节、
-// 4.15「循环图跟着组织长」的时序图一行；应用层与接口层设计说明 4.4「项目页四层读哪个查询」）。
+// 时序图的事实推出（工单 #1641、#1643，项目的组织设计说明 4.14「项目页是循环图加对话」的「时序图（经过）」
+// 一节、4.15「循环图跟着组织长」的时序图一行；应用层与接口层设计说明 4.4「项目页四层读哪个查询」）。
 //
-// 这里只做取值与判断，不碰界面与网络：视图按这里给出的列、行、轮、摘要与色条照画，单元测试直接核对。
+// 这里只做取值与判断，不碰界面与网络：视图按这里给出的列、行、轮、摘要、色条与原文照画，单元测试直接核对。
 // 读的三处事实，与接口设计说明 4.4 的表一致：
 //   - project.flow：成果、你的输入、指导、打回与放行（每条带第几轮）；询问不读它，见下一条；
 //   - run.asks：询问与回答、缩进（询问链的层数）、提问方的等待；
@@ -13,10 +13,14 @@
 //   - 同一版同时给几个职能是一行：流转记录按事件合成一条，去向合起来；
 //   - 放行与打回是对某一版的结论，标在那一版那一行上，不单独占一行；没有那条事实就不写结论；
 //   - 提问方等待的时段在它那一列上画一段色条，等你决定也一样，还没等到的画到「现在」；
-//   - 按轮折叠，只展开最新一轮，折起来的一行写这一轮的摘要。
+//   - 按轮折叠，只展开最新一轮，折起来的一行写这一轮的摘要；
+//   - 点一行看原文：成果是那一版与差异（同图上的箭头），问答与你的话是全文，询问里又问的写明是回答哪一次时问的；
+//   - 只看这两个职能时（线程折叠行的「在时序图里看」）列与行都只留它们，行里只写它们之间的往来。
 //
 // 版本号（PRD v1、交付 v2）按事件对到 work_item.materials 的那一版：project.flow 的记录里只有文字内容，
 // 版本号在成果材料里，循环图的箭头也这样读（loop-graph-model 的 arrowsOf），两处写出的版本因此一致。
+
+import { explanationNoteOf } from "./thread-model.ts";
 
 /** 「你」在列与行里的标识：不是任何一个职能。 */
 export const YOU = "you";
@@ -60,6 +64,7 @@ export interface AskLike {
   status: "进行中" | "已回答" | "没能回答";
   answer?: string | null;
   answer_facts?: string | null;
+  answer_explanation?: string | null;
   reason?: string | null;
   parent?: string | null;
   /** 询问链：从最外层起经过的职能；最外层只有它自己 */
@@ -108,6 +113,13 @@ export interface SequenceInput {
   asks?: readonly AskLike[];
   decisions?: readonly DecisionLike[];
   materials?: SequenceMaterials | null;
+  /** 核验关系（事项冻结的组织）：解释旁写明核验角色对哪一版下了结论以后才看到 */
+  verifiers?: readonly { role: string; verifies: readonly { role: string; outcomes: readonly string[] }[] }[] | null;
+  /**
+   * 只看这两个职能（线程折叠行的「在时序图里看」）：列只留它们，行只留它们之间的往来。
+   * 不是这份组织里的两个职能时按整件事画，不拿对不上的标识顶替。
+   */
+  pair?: readonly string[] | null;
   /** 「现在」：还没等到的色条画到这里，图上最后多一行「现在」；没有开着的等待时用不到 */
   now?: string | null;
   /** 展开的是哪几轮；不给时只展开最新一轮 */
@@ -116,6 +128,35 @@ export interface SequenceInput {
 
 /** 一行是哪种消息：成果、你的输入、指导、询问、回答、要你决定、你决定。 */
 export type SequenceRowKind = "outcome" | "input" | "guidance" | "ask" | "answer" | "decide" | "decided";
+
+/**
+ * 点这一行打开的面板看什么：成果是那一版与差异，问答与你的话是全文。
+ *
+ * 面板只有一种（和点箭头、点节点同一个）：这里给出它要显示的事实，视图照着画，不自己猜。
+ */
+export type SequenceDetail =
+  /** 成果：那一版与差异走图上那条箭头，这里给找它用的流转记录与这一版的原文 */
+  | { kind: "outcome"; flowIds: string[]; text: string }
+  /** 询问与回答：问题与回答的全文，又问的写明是回答哪一次时问的 */
+  | {
+    kind: "ask";
+    fromLabel: string;
+    toLabel: string;
+    question: string;
+    /** 又问的那一次回答的是哪一次询问（那句问话的全文）；最外层为空 */
+    parent: string | null;
+    status: "进行中" | "已回答" | "没能回答";
+    answer: string | null;
+    /** 工程回答质检时分开的两个部分 */
+    facts: string | null;
+    explanation: string | null;
+    /** 解释旁写明核验角色对哪一版下了结论以后才看到 */
+    explanationNote: string | null;
+    /** 没能回答时写的原因 */
+    reason: string | null;
+  }
+  /** 你的输入、指导、要你决定与你决定：全文 */
+  | { kind: "text"; heading: string; text: string; note: string | null };
 
 /** 一段等待：画在哪一列上、是哪一种（在等回答、等你决定）。 */
 export interface SequenceBar {
@@ -148,6 +189,8 @@ export interface SequenceRow {
   open: boolean;
   /** 这一行上正在等的几段：提问方那一列上的色条 */
   bars: SequenceBar[];
+  /** 点这一行打开的面板看什么 */
+  detail: SequenceDetail;
 }
 
 /** 一轮：这一轮的行，折起来时写的一句摘要。 */
@@ -164,14 +207,16 @@ export interface SequenceColumn {
 }
 
 export interface SequenceView {
-  /** 你与这个事项冻结的组织里的职能，从左到右的顺序就是列的顺序 */
+  /** 你与这个事项冻结的组织里的职能，从左到右的顺序就是列的顺序；只看两个职能时只有它们两列 */
   columns: SequenceColumn[];
   rounds: SequenceRound[];
   /** 还有等待没到时的「现在」；没有开着的等待时为 null */
   now: string | null;
-  /** 一行也没有（这个事项还没有经过） */
+  /** 一行也没有（这个事项还没有经过，或者这两个职能之间还没有往来） */
   empty: boolean;
   latestRound: number;
+  /** 只看这两个职能（点线程折叠行的「在时序图里看」） */
+  scoped: boolean;
 }
 
 /** 内部的一行：加上排序用的次序、它关掉哪一段等待、以及它是哪一段等待的开始。 */
@@ -240,15 +285,24 @@ export function summaryOf(rows: readonly SequenceRow[]): string {
 }
 
 /**
- * 画一张时序图：列、按轮折起来的行、打回与放行的标记、等待的色条。
+ * 画一张时序图：列、按轮折起来的行、打回与放行的标记、等待的色条、点开看原文时给什么。
  *
  * 事项还没有经过（一条事实也没有）时给出空的轮，由页面说一句还没有往来。
  */
 export function sequenceOf(input: SequenceInput): SequenceView {
   const roles = input.roles;
-  const columns: SequenceColumn[] = [{ id: YOU, label: "你" }, ...roles.map((role) => ({ id: role.id, label: role.label }))];
-  const known = new Set(columns.map((column) => column.id));
-  const labelOf = (id: string): string => columns.find((column) => column.id === id)?.label ?? id;
+  const allColumns: SequenceColumn[] = [{ id: YOU, label: "你" }, ...roles.map((role) => ({ id: role.id, label: role.label }))];
+  const known = new Set(allColumns.map((column) => column.id));
+  const labelOf = (id: string): string => allColumns.find((column) => column.id === id)?.label ?? id;
+  // 只看这两个职能：两个标识都得是这份组织里的职能，否则按整件事画（不拿对不上的标识顶替）
+  const pair = input.pair !== null && input.pair !== undefined && input.pair.length === 2
+    && input.pair.every((id) => roles.some((role) => role.id === id))
+    ? input.pair
+    : null;
+  const columns: SequenceColumn[] = pair === null
+    ? allColumns
+    : allColumns.filter((column) => pair.includes(column.id));
+  const verifiers = input.verifiers ?? [];
   const materials = input.materials ?? null;
   const records = [...input.flow].sort((left, right) => left.position - right.position);
   const built: BuiltRow[] = [];
@@ -291,6 +345,10 @@ export function sequenceOf(input: SequenceInput): SequenceView {
       if (!existing.to.includes(record.direction_to)) {
         existing.to.push(record.direction_to);
       }
+      // 同一版还给别的职能：这一行点开时按其中哪一条都能找到图上那条箭头
+      if (existing.detail.kind === "outcome") {
+        existing.detail.flowIds.push(record.flow_id);
+      }
       // 这一版还给别的核验角色：打回与放行按两端找那一版时也要找得到
       const delivery = deliveryAt.get(key);
       if (delivery !== undefined && !delivery.to.includes(record.direction_to)) {
@@ -306,10 +364,16 @@ export function sequenceOf(input: SequenceInput): SequenceView {
     const title = name !== ""
       ? (revision === null ? name : `${name} v${revision}`)
       : content === "" ? record.kind : `${record.kind}：${content}`;
+    // 点开看原文：成果是那一版与差异（图上那条箭头），你的输入与指导是全文
+    const detail: SequenceDetail = record.kind === INPUT_KIND
+      ? { kind: "text", heading: "你的输入", text: record.content, note: null }
+      : record.kind === GUIDANCE_KIND
+        ? { kind: "text", heading: `给${labelOf(record.direction_to)}的指导`, text: record.content, note: null }
+        : { kind: "outcome", flowIds: [record.flow_id], text: record.content };
     const row = push({
       key, kind: kindOf(record.kind), dashed: false, from, to: [record.direction_to], who: "",
       at: record.created_at, title, depth: 0, round: Math.max(1, record.round),
-      verdict: null, open: false, closes: null, wait: null,
+      verdict: null, open: false, closes: null, wait: null, detail,
     });
     merged.set(key, row);
     if (record.kind === DELIVERY_KIND) {
@@ -344,15 +408,42 @@ export function sequenceOf(input: SequenceInput): SequenceView {
   }
 
   // 三、询问与回答（run.asks）：回答跟着它那一次询问缩进，等待在提问方那一列上
-  for (const ask of input.asks ?? []) {
+  const asks = input.asks ?? [];
+  const askById = new Map(asks.map((entry) => [entry.id, entry]));
+  for (const ask of asks) {
     const key = `ask:${ask.id}`;
     const depth = Math.max(0, ask.depth - 1);
+    // 又问的那一次：写明回答的是哪一次询问（那句问话的全文）
+    const parent = ask.parent === null || ask.parent === undefined ? undefined : askById.get(ask.parent);
+    // 点开看原文：问题与回答的全文；工程回答质检时分事实与解释，解释旁写核验角色对哪一版下了结论以后才看到
+    const detail: SequenceDetail = {
+      kind: "ask",
+      fromLabel: labelOf(ask.requester),
+      toLabel: labelOf(ask.recipient),
+      question: ask.question,
+      parent: parent === undefined ? null : parent.question,
+      status: ask.status,
+      answer: ask.answer ?? null,
+      facts: ask.answer_facts ?? null,
+      explanation: ask.answer_explanation ?? null,
+      explanationNote: explanationNoteOf({
+        requester: ask.requester,
+        recipient: ask.recipient,
+        explanation: ask.answer_explanation ?? "",
+        startPosition: ask.start_position,
+        verifiers,
+        nameOf: labelOf,
+        flow: records,
+      }),
+      reason: ask.reason ?? null,
+    };
     // 回答的那一行关掉提问方这一段等待；还没回答的留着，色条画到「现在」
     push({
       key, kind: "ask", dashed: true, from: ask.requester, to: [ask.recipient], who: "",
       at: ask.started_at, title: firstLine(ask.question), depth, round: roundAt(ask.started_at),
       verdict: null, open: ask.status === "进行中", closes: ask.status === "进行中" ? null : `${key}:answer`,
       wait: { column: ask.requester, kind: "ask", tip: `在等待${labelOf(ask.recipient)}的回答` },
+      detail,
     });
     if (ask.status === "进行中") {
       continue;
@@ -363,9 +454,10 @@ export function sequenceOf(input: SequenceInput): SequenceView {
       ? `答：${firstLine(ask.answer) || firstLine(ask.answer_facts) || "已回答"}`
       : `没能回答：${firstLine(ask.reason) || "没有写原因"}`;
     const at = ask.ended_at ?? ask.started_at;
+    // 点回答那一行打开的是同一个面板：问题与回答都在
     push({
       key: `${key}:answer`, kind: "answer", dashed: true, from: ask.recipient, to: [ask.requester], who: "",
-      at, title: text, depth, round: roundAt(at), verdict: null, open: false, closes: null, wait: null,
+      at, title: text, depth, round: roundAt(at), verdict: null, open: false, closes: null, wait: null, detail,
     });
   }
 
@@ -379,49 +471,66 @@ export function sequenceOf(input: SequenceInput): SequenceView {
     const column = by !== null && known.has(by) ? by : null;
     const key = `dec:${decision.decision_id}`;
     const answered = decision.status === "answered" && decision.answer !== null && decision.answer !== undefined;
+    const options = decision.request.options ?? [];
     push({
       key, kind: "decide", dashed: false, from: column ?? YOU, to: column === null ? [] : [YOU], who: "",
       at: decision.requested_at, title: `要你决定：${firstLine(decision.request.description ?? "")}`,
       depth: 0, round: roundAt(decision.requested_at), verdict: null, open: decision.status === "open",
       closes: answered ? `${key}:answer` : null,
       wait: column === null ? null : { column, kind: "user", tip: "等你决定" },
+      // 点开看原文：说明全文，可选项另写一行
+      detail: {
+        kind: "text", heading: "要你决定", text: decision.request.description ?? "",
+        note: options.length === 0 ? null : `选项：${options.map((item) => item.label).join("、")}`,
+      },
     });
     if (!answered) {
       continue;
     }
     const answer = decision.answer as DecisionAnswerLike;
-    const option = (decision.request.options ?? []).find((item) => item.id === answer.option);
+    const option = options.find((item) => item.id === answer.option);
     push({
       key: `${key}:answer`, kind: "decided", dashed: false, from: YOU, to: column === null ? [] : [column], who: "",
       at: answer.answered_at, title: `你决定：${option?.label ?? answer.option}`,
       depth: 0, round: roundAt(answer.answered_at), verdict: null, open: false, closes: null, wait: null,
+      // 点开看原文：你选的那一项与那时写的说明
+      detail: {
+        kind: "text", heading: "你决定", text: option?.label ?? "已回答",
+        note: answer.note === null || answer.note === undefined || answer.note === "" ? null : answer.note,
+      },
     });
   }
 
   // 行按时间排；同一时刻的按读到它们的先后（流转记录在前，其次询问，再其次决定）
   built.sort((left, right) => timeOf(left.at) - timeOf(right.at) || left.order - right.order);
-  for (const row of built) {
+  // 只看这两个职能：行只留两端都在它们之间的，去向也只留它们（你和产品那一侧的那些行不在这张图里）
+  const visible: BuiltRow[] = pair === null ? built : built
+    .filter((row) => pair.includes(row.from) && row.to.some((id) => pair.includes(id)))
+    .map((row) => ({ ...row, to: row.to.filter((id) => pair.includes(id)) }));
+  for (const row of visible) {
     row.who = row.to.length === 0 ? labelOf(row.from) : `${labelOf(row.from)} → ${row.to.map(labelOf).join("、")}`;
   }
 
   // 色条：从这一段等待开始的那一行画到关掉它的那一行；还没关掉的画到最后一行（也就是「现在」）
-  const at = new Map(built.map((row, index) => [row.key, index]));
-  const last = built.length - 1;
-  for (const row of built) {
-    if (row.wait === null) {
+  const columnIds = new Set(columns.map((column) => column.id));
+  const at = new Map(visible.map((row, index) => [row.key, index]));
+  const last = visible.length - 1;
+  for (const row of visible) {
+    // 只看两个职能时，等人那一列不在这张图上就没有这一段色条
+    if (row.wait === null || !columnIds.has(row.wait.column)) {
       continue;
     }
     const start = at.get(row.key) ?? 0;
     const end = row.closes === null ? last : at.get(row.closes) ?? last;
     for (let index = start; index <= end && index <= last; index += 1) {
-      built[index].bars.push(row.wait);
+      visible[index].bars.push(row.wait);
     }
   }
-  const waiting = built.some((row) => row.wait !== null && row.closes === null);
+  const waiting = visible.some((row) => row.wait !== null && row.closes === null);
 
   // 按轮折起来：只展开最新一轮，前面几轮各一行摘要
   const byRound = new Map<number, SequenceRow[]>();
-  for (const row of built) {
+  for (const row of visible) {
     byRound.set(row.round, [...(byRound.get(row.round) ?? []), row]);
   }
   const numbers = [...byRound.keys()].sort((left, right) => left - right);
@@ -437,7 +546,8 @@ export function sequenceOf(input: SequenceInput): SequenceView {
     columns,
     rounds,
     now: waiting ? (input.now ?? "") : null,
-    empty: built.length === 0,
+    empty: visible.length === 0,
     latestRound: latest,
+    scoped: pair !== null,
   };
 }
