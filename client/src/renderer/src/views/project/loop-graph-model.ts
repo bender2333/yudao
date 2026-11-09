@@ -6,7 +6,8 @@
 //   - project.loop：所选事项冻结的组织（节点、核验关系、关注关系）、每个职能在这件事项上的状态与原因、事项的轮次；
 //   - project.flow：箭头（成果与版本），按事项过滤；
 //   - work_item.materials：版本号、改了的文件、结论；
-//   - run.asks：开着的询问（提问方、被询问的职能、问题、状态、询问链的层数）；答完的只进节点的往来。
+//   - run.asks：开着的询问（提问方、被询问的职能、问题、状态、询问链的层数）；答完的只进节点的往来，
+//     用户打开「累计往来」时同一对职能的询问合成一条线（工单 #1642，次数含开着的）。
 //
 // 几条固定的读法（设计说明 4.14、4.15、department-loop「职能的状态」与术语表「循环图」）：
 //   - 节点是职能；箭头只放成果与版本（原文、PRD、交付、缺陷记录），询问不是成果，不画成成果箭头。
@@ -128,6 +129,27 @@ export interface LoopGraphInput {
   others?: Record<string, number>;
   /** 这个事项所在运行里的询问（run.asks）：开着的画虚线，答完的只进往来 */
   asks?: readonly AskViewLike[];
+  /**
+   * 用户打开了「累计往来」（工单 #1642）：同一对职能的询问合成一条线，次数含开着的；
+   * 不打开时图上仍然只画开着的询问。
+   */
+  accumulated?: boolean;
+}
+
+/** 一条虚线画在哪：主线相邻的一格、跨过中间节点另起一行、或旁边的职能与主线之间的竖线。 */
+export type LoopAskPlace = "gap" | "skip" | "side";
+
+/** 一条虚线画在图的哪里：放置、格子与两端在主线上的下标。 */
+export interface LoopAskSpot {
+  /** 画在哪：主线的一格、跨过中间节点另起一行、或旁边的职能与主线之间的竖线 */
+  place: LoopAskPlace;
+  /** place 为 gap 时主线的第几格；为 side 时是对接的那个主线职能的下标；skip 时为 -1 */
+  gap: number;
+  /** 两端在主线上的下标：旁边的职能与图外为 -1 */
+  fromIndex: number;
+  toIndex: number;
+  /** place 为 side 时它对接的主线职能 */
+  partner: string;
 }
 
 /**
@@ -136,7 +158,8 @@ export interface LoopGraphInput {
  * 开着的（open）画成写「询问」的虚线，不带版本；答完的虚线消失，只进节点面板的往来。
  * 放置与成果箭头分开：询问不是成果，不进 gaps 里的箭头，也不参与逐版看。
  */
-export interface LoopAsk {
+export interface LoopAsk extends LoopAskSpot {
+  kind: "ask";
   key: string;
   /** 提问方 */
   from: string;
@@ -148,18 +171,34 @@ export interface LoopAsk {
   open: boolean;
   /** 询问链上的层数：最外层为 1（询问里又问时每层一条） */
   depth: number;
-  /** 画在哪：主线的一格、跨过中间节点另起一行、或旁边的职能与主线之间的竖线 */
-  place: "gap" | "skip" | "side";
-  /** place 为 gap 时主线的第几格；为 side 时是对接的那个主线职能的下标；skip 时为 -1 */
-  gap: number;
-  /** 两端在主线上的下标：旁边的职能与图外为 -1 */
-  fromIndex: number;
-  toIndex: number;
-  /** place 为 side 时它对接的主线职能 */
-  partner: string;
   /** 这次询问开始的位置：同一个格子里按它排 */
   position: number;
 }
+
+/**
+ * 两个职能之间的累计往来（工单 #1642，设计说明 4.14「累计往来」）：这件事项的询问按两个职能合成的一条线。
+ *
+ * 次数含开着的；还有开着的在这条线的字后面写「开着」。来回问的两个方向各写几次，同一行里用逗号分开。
+ * 放在原来的询问线那一格：同一对职能在图上只有一个位置。
+ */
+export interface LoopAskPair extends LoopAskSpot {
+  kind: "pair";
+  key: string;
+  /** 两端：第一次问的那个方向（画线只看两端，不看方向） */
+  from: string;
+  to: string;
+  /** 每个方向问了几次，按第一次问的先后排 */
+  directions: { from: string; to: string; count: number }[];
+  /** 一共问了几次（含开着的） */
+  count: number;
+  /** 还有开着的 */
+  open: boolean;
+  /** 线上写的那句话，例如「工程问产品 2 次」「工程问产品 2 次，产品问工程 1 次 · 开着」 */
+  label: string;
+}
+
+/** 图上画的一条虚线：打开累计往来时是一对职能的合计，不打开时是一次开着的询问。 */
+export type LoopAskLine = LoopAsk | LoopAskPair;
 
 /** 一个节点：一个职能，加上它在这件事项上的状态与标记。 */
 export interface LoopNode {
@@ -211,8 +250,8 @@ export interface LoopSide {
   partner: string;
   /** 它与主线之间的箭头（直做的职能没有成果交接，因此通常是空的） */
   arrows: LoopArrow[];
-  /** 它与主线之间开着的询问：两节点之间的竖线换成虚线（「产品 · 工程」） */
-  asks: LoopAsk[];
+  /** 它与主线之间画的虚线：两节点之间的竖线换成它（「产品 · 工程」）；打开累计往来时是一对职能的合计 */
+  lines: LoopAskLine[];
 }
 
 export interface LoopGraph {
@@ -239,8 +278,13 @@ export interface LoopGraph {
   nodes: LoopNode[];
   /** 这件事项的询问（开着的在前，同一类按发生先后）：节点面板列它的往来时用 */
   asks: LoopAsk[];
-  /** 开着的询问：页面画成写「询问」的虚线；答完的收进线程与节点的往来 */
+  /** 开着的询问：节点上写「在等待某某的回答」用；答完的收进线程与节点的往来 */
   openAsks: LoopAsk[];
+  /**
+   * 图上画的虚线：打开累计往来时是每对职能合成的一条（次数含开着的），不打开时是开着的询问。
+   * 两种线点下去都只看这两个职能的时序图（设计说明 4.14）。
+   */
+  lines: LoopAskLine[];
 }
 
 const PRD_KIND = "PRD 新版本";
@@ -331,46 +375,49 @@ export function layoutOf(organization: FrozenOrganization, flow: readonly FlowRe
 }
 
 /**
- * 询问画在哪：主线相邻的两个职能在那一格；隔着职能的另起一行；旁边的职能与主线之间在竖线那一格。
+ * 一条线的两端画在哪：主线相邻的两个职能在那一格；隔着职能的另起一行；旁边的职能与主线之间在竖线那一格。
  *
- * 只取这份组织里两端的询问：换过组织以后旧事项按冻结的那一份画，两端对不上的不画、也不进往来。
- * 开着的在前（节点面板先列开着的），同一类按发生先后排；同时开着几次就有几条，询问链每层一条。
+ * 两端对不上这份组织时返回 null：换过组织以后旧事项按冻结的那一份画，对不上的不画、也不进往来。
+ */
+function spotOf(layout: ReturnType<typeof layoutOf>, from: string, to: string): LoopAskSpot | null {
+  const chain = layout.chain;
+  const fromIndex = chain.indexOf(from);
+  const toIndex = chain.indexOf(to);
+  if (fromIndex >= 0 && toIndex >= 0) {
+    const distance = Math.abs(fromIndex - toIndex);
+    if (distance === 1) {
+      return { place: "gap", gap: Math.max(fromIndex, toIndex), fromIndex, toIndex, partner: "" };
+    }
+    return distance > 1 ? { place: "skip", gap: -1, fromIndex, toIndex, partner: "" } : null;
+  }
+  const side = layout.side.find((part) =>
+    (part.id === from && part.partner === to) || (part.id === to && part.partner === from));
+  if (side === undefined) {
+    return null;
+  }
+  return { place: "side", gap: chain.indexOf(side.partner), fromIndex, toIndex, partner: side.partner };
+}
+
+/**
+ * 询问画在哪：一条询问一条线，放置由两端决定（spotOf）。
+ *
+ * 只取这份组织里两端的询问。开着的在前（节点面板先列开着的），同一类按发生先后排；
+ * 同时开着几次就有几条，询问链每层一条。
  */
 function asksOf(layout: ReturnType<typeof layoutOf>, raw: readonly AskViewLike[],
                 organization: FrozenOrganization): LoopAsk[] {
   const ids = new Set(organization.roles.map((role) => role.id));
-  const chain = layout.chain;
   const out: LoopAsk[] = [];
   for (const entry of raw) {
     if (!ids.has(entry.requester) || !ids.has(entry.recipient) || entry.requester === entry.recipient) {
       continue;
     }
-    const fromIndex = chain.indexOf(entry.requester);
-    const toIndex = chain.indexOf(entry.recipient);
-    let place: LoopAsk["place"] = "gap";
-    let gap = -1;
-    let partner = "";
-    if (fromIndex >= 0 && toIndex >= 0) {
-      const distance = Math.abs(fromIndex - toIndex);
-      if (distance === 1) {
-        gap = Math.max(fromIndex, toIndex);
-      } else if (distance > 1) {
-        place = "skip";
-      } else {
-        continue;
-      }
-    } else {
-      const side = layout.side.find((part) =>
-        (part.id === entry.requester && part.partner === entry.recipient)
-        || (part.id === entry.recipient && part.partner === entry.requester));
-      if (side === undefined) {
-        continue;
-      }
-      place = "side";
-      partner = side.partner;
-      gap = chain.indexOf(side.partner);
+    const spot = spotOf(layout, entry.requester, entry.recipient);
+    if (spot === null) {
+      continue;
     }
     out.push({
+      kind: "ask",
       key: entry.id,
       from: entry.requester,
       to: entry.recipient,
@@ -378,16 +425,71 @@ function asksOf(layout: ReturnType<typeof layoutOf>, raw: readonly AskViewLike[]
       status: entry.status,
       open: entry.status === "进行中",
       depth: entry.depth ?? 1,
-      place,
-      gap,
-      fromIndex,
-      toIndex,
-      partner,
       position: entry.start_position ?? 0,
+      ...spot,
     });
   }
   return out.sort((left, right) =>
     (left.open === right.open ? left.position - right.position : (left.open ? -1 : 1)));
+}
+
+/**
+ * 两个职能之间的累计往来（工单 #1642）：这件事项的询问按两个职能合成一条线，次数含开着的。
+ *
+ * 一对职能只有一个位置（放置取这一对里第一次问的那一条），来回问的两个方向各写几次；
+ * 还有开着的，在这条线的字后面写「开着」。已经答完的也数进去，所以已结束的事项也有线。
+ */
+function pairsOf(asks: readonly LoopAsk[], nameOfId: (id: string) => string): LoopAskPair[] {
+  type Group = {
+    first: LoopAsk;
+    directions: Map<string, { from: string; to: string; count: number }>;
+    open: boolean;
+  };
+  const groups = new Map<string, Group>();
+  // 按发生先后数：两个方向的先后与次数都由此定，同一份事实每次画出来一样
+  for (const ask of [...asks].sort((left, right) => left.position - right.position)) {
+    const key = [ask.from, ask.to].sort().join(">");
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, {
+        first: ask,
+        directions: new Map([[`${ask.from}>${ask.to}`, { from: ask.from, to: ask.to, count: 1 }]]),
+        open: ask.open,
+      });
+      continue;
+    }
+    const directionKey = `${ask.from}>${ask.to}`;
+    const direction = group.directions.get(directionKey);
+    if (direction === undefined) {
+      group.directions.set(directionKey, { from: ask.from, to: ask.to, count: 1 });
+    } else {
+      direction.count += 1;
+    }
+    group.open = group.open || ask.open;
+  }
+  const out: LoopAskPair[] = [];
+  for (const [key, group] of groups) {
+    const directions = [...group.directions.values()];
+    const label = directions
+      .map((direction) => `${nameOfId(direction.from)}问${nameOfId(direction.to)} ${direction.count} 次`)
+      .join("，") + (group.open ? " · 开着" : "");
+    out.push({
+      kind: "pair",
+      key: `pair:${key}`,
+      from: group.first.from,
+      to: group.first.to,
+      directions,
+      count: directions.reduce((sum, direction) => sum + direction.count, 0),
+      open: group.open,
+      label,
+      place: group.first.place,
+      gap: group.first.gap,
+      fromIndex: group.first.fromIndex,
+      toIndex: group.first.toIndex,
+      partner: group.first.partner,
+    });
+  }
+  return out;
 }
 
 /** 一条询问在节点往来里写的状态：开着的写「还没回答」，答完的写查询给的状态。 */
@@ -549,7 +651,7 @@ export function graphOf(input: LoopGraphInput): LoopGraph {
   if (organization === null) {
     return {
       chain: [], side: [], gaps: [], skip: [], sourceText: "", endText: "", endTone: "plain", rounds: 0, nodes: [],
-      asks: [], openAsks: [],
+      asks: [], openAsks: [], lines: [],
     };
   }
   const roles = rolesOf(organization, labels);
@@ -559,6 +661,10 @@ export function graphOf(input: LoopGraphInput): LoopGraph {
   // 询问从 run.asks 读：开着的画虚线，答完的只进节点的往来（设计说明 4.14）
   const asks = asksOf(layout, input.asks ?? [], organization);
   const openAsks = asks.filter((ask) => ask.open);
+  // 打开累计往来时按两个职能合成一条（次数含开着的），不打开时只画开着的询问（工单 #1642）
+  const lines: LoopAskLine[] = input.accumulated === true
+    ? pairsOf(asks, (id) => labelOf(id, organization, labels))
+    : openAsks;
   const waitingOf = (id: string): string[] => openAsks
     .filter((ask) => ask.from === id)
     .map((ask) => `在等待${labelOf(ask.to, organization, labels)}的回答`);
@@ -630,9 +736,9 @@ export function graphOf(input: LoopGraphInput): LoopGraph {
           node,
           partner: part.partner,
           arrows: outside.filter((arrow) => arrow.from === part.id || arrow.to === part.id),
-          // 它与主线之间开着的询问：竖线换成虚线（「产品 · 工程」）
-          asks: openAsks.filter((ask) => ask.place === "side" && ask.partner === part.partner
-            && (ask.from === part.id || ask.to === part.id)),
+          // 它与主线之间的虚线（开着的询问，或累计往来）：竖线换成它（「产品 · 工程」）
+          lines: lines.filter((line) => line.place === "side" && line.partner === part.partner
+            && (line.from === part.id || line.to === part.id)),
         };
     }).filter((part): part is LoopSide => part !== null),
     gaps,
@@ -644,6 +750,7 @@ export function graphOf(input: LoopGraphInput): LoopGraph {
     nodes,
     asks,
     openAsks,
+    lines,
   };
 }
 
