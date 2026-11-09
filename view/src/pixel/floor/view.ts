@@ -221,7 +221,7 @@ export interface FloorTestHooks {
   /** 点一个选项（端到端测试在真实画布上点章，这里给直接入口）。 */
   answer: (option: string) => Promise<void>;
   resync: () => void;
-  /** 画面上画出来的事实元素（覆盖层「来源」打开时）：端到端按它换算页面坐标、在画布上真的点一下（工单 #398）。 */
+  /** 画面上画出来的事实元素：端到端按它换算页面坐标、在画布上真的点一下（工单 #398、#1612）。 */
   facts: () => FactRect[];
   /** 来源卡片的状态（打开的元素与内容，工单 #398 的端到端核对）。 */
   sourceCard: () => {
@@ -309,8 +309,9 @@ export interface FloorViewOptions {
   onDecide?: (payload: DecisionAnswer) => Promise<DecisionResult> | DecisionResult;
   onGo?: (target: string) => void;
   /**
-   * 点了画面上一个事实元素（覆盖层「来源」打开时；工单 #398）：页面按事项与元素查来源与原始事件，
-   * 翻好一张 face 再交回 showSource。画面层不认识服务端的事件，只把这两个身份交出去。
+   * 点了画面上一个事实元素（工单 #398、#1612）：画面只交出哪个事项、哪个元件，不解读服务端的事件；
+   * 壳把它变成 Yudao 页面上带位置的地址并在新的标签页打开（工单 #1573），没有页面的宿主怎样处理由宿主定。
+   * 画出来的元件任何时候都能点开回链，不必先打开覆盖层「来源」。
    */
   onOpenSource?: (workItemId: string, element: FactElement) => void;
   /** 来源卡片上点「在时间轴上查看」：跳到来源事件的全局位置。 */
@@ -392,9 +393,11 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     canvas.style.cursor = pointer ?? (factAt(x, y) ? "pointer" : "default");
   };
 
-  /** 覆盖层「来源」打开时，点到哪个画出来的事实元素上（工单 #398）；没有打开覆盖层时一个也不命中。 */
+  /**
+   * 点到哪个画出来的事实元素上（工单 #398、#1612）：画出来的元件（`drawn` 为真）任何时候都能点开回链，
+   * 不必先打开覆盖层「来源」；缺来源的元件画面上没有它，点不中（覆盖层仍按它的位置标出）。
+   */
   function factAt(x: number, y: number): FactRect | null {
-    if (renderer.overlay.id !== "sources") return null;
     for (const rect of renderer.factRects) {
       if (!rect.drawn) continue;
       if (x >= rect.x && x <= rect.x + rect.w && y >= rect.y - 2 && y <= rect.y + rect.h + 2) return rect;
