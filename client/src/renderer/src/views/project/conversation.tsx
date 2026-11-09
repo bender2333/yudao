@@ -1,20 +1,21 @@
-// 对话页（工单 #1638、#1639，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
+// 对话页（工单 #1638、#1639、#1641，项目的组织设计说明 4.14「项目页是循环图加对话」、4.15「循环图跟着组织长」）。
 //
 // 页面上半是循环图：按所选事项冻结的组织画节点、成果箭头与结论。图上方的行选事项（默认最近在跑的），
 // 点节点、点箭头打开同一个面板。最上面是时间条（工单 #1653）：所选事项的已用时间与上限，在跑时另有「停止」。
+// 图右上角的「看经过」展开时序图（工单 #1641）：按轮折起来的经过，展开在循环图下面，不盖住线程。
 // 下面是线程与输入框（工单 #1639）：一条线程跨多个事项，已结束的事项默认收起；输入框上方一行收件人。
 //
 // 读的事实：project.loop（冻结的组织、职能状态、轮次与 run）、project.overview（事项标题）、
-// project.flow（箭头，以及线程里你的输入、指导、交完成与放行）、run.asks（每个事项的问答，线程里各读一次）、
-// decisions.list（要你决定的气泡）、work_item.materials（版本与改了的文件）、system.status（模型可不可用）。
-// 页面不另存一份，也不按形态名判断。一切「事实推出图与线程」的判断在 loop-graph-model.ts 与 thread-model.ts 里，
-// 两处都有单元测试。
+// project.flow（箭头，以及线程里你的输入、指导、交完成与放行）、work_item.materials（版本与改了的文件）、
+// decisions.list（要你决定的气泡）、run.asks（每个展开的事项各读一次，线程与时序图的问答都从它来）、
+// system.status（模型可不可用）。页面不另存一份，也不按形态名判断。
+// 一切「事实推出图与线程」的判断在 loop-graph-model.ts、sequence-model.ts 与 thread-model.ts 里，三处都有单元测试。
 
 import { useEffect, useMemo, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
-  DecisionList, ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
-  SystemStatus, WorkItemMaterialsResult,
+  DecisionList, DecisionView, ProjectFlowResult, ProjectLoopResult, ProjectOrganizationResult, ProjectOverviewResult,
+  RunAsksResult, SystemStatus, WorkItemMaterialsResult,
 } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import { providerNotice } from "../../shell/provider-status";
@@ -28,9 +29,11 @@ import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } fro
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
 import { LoopPanel } from "./loop-panel";
 import { ProjectTimeBar } from "./project-head";
+import { SequenceView } from "./sequence";
+import { hasSequence, sequenceOf } from "./sequence-model";
 import { ThreadView } from "./thread";
 import {
-  receiverOf, runningItem, workingRoleOf, type ComposerInput, type ThreadDecision,
+  receiverOf, runningItem, workingRoleOf, type ComposerInput,
 } from "./thread-model";
 import { useSnapshot } from "./use-snapshot";
 
@@ -64,7 +67,7 @@ export function ConversationPage(props: {
   // 图上画哪件事项：地址里写了就画它，没有时画最近在跑的那一件
   const item = useMemo(() => pickItem(items, props.route.workItemId), [items, props.route.workItemId]);
   const itemId = item?.work_item_id ?? "";
-  // 流转记录读整个项目（线程跨多个事项），画图时再按所选事项过滤
+  // 流转记录读整个项目（线程跨多个事项），画图与时序图时再按所选事项过滤
   const flow = useSnapshot<ProjectFlowResult>(props.app, "page.conversation.flow", "project.flow", {
     project_id: projectId,
   });
@@ -75,11 +78,15 @@ export function ConversationPage(props: {
     project_id: projectId,
     work_item: itemId,
   }, item === null);
-  // 要你决定的气泡（项目这一层；线程里按事项与项目层面分开摆）
+  // 要你决定的气泡（项目这一层；线程里按事项与项目层面分开摆，时序图只用所选事项的那几条）
   const decisions = useSnapshot<DecisionList>(props.app, "page.conversation.decisions", "decisions.list", {
     project_id: projectId,
   });
-  const decisionList = useMemo<ThreadDecision[]>(() => decisions.data?.decisions ?? [], [decisions.data]);
+  const decisionList = useMemo<DecisionView[]>(() => decisions.data?.decisions ?? [], [decisions.data]);
+  const itemDecisions = useMemo(
+    () => decisionList.filter((decision) => decision.work_item_id === itemId),
+    [decisionList, itemId],
+  );
   // 模型可不可用：没有可用的模型时对话里一句话提示并链到模型管理，写明不能开始
   const status = useSnapshot<SystemStatus>(props.app, "page.conversation.status", "system.status", {});
   const provider = providerNotice(status.data?.provider ?? null);
@@ -117,8 +124,42 @@ export function ConversationPage(props: {
   const [panel, setPanel] = useState<PanelState>({ item: null, value: null });
   const pick: LoopPanelPick = panel.item === itemId ? panel.value : null;
   const open = (value: LoopPanelPick): void => setPanel({ item: itemId, value });
+  // 时序图（工单 #1641）：图右上角的「看经过」展开它；展开以后才读询问（决定请求线程里一直在读）
+  const [sequenceOpen, setSequenceOpen] = useState(false);
+  // 展开的是哪几轮：没有点过时按模型给的默认（只展开最新一轮）；挂了哪一件事项一起记，换了事项就不留着旧选择
+  const [roundPick, setRoundPick] = useState<{ item: string; rounds: readonly number[] } | null>(null);
+  const openRounds = roundPick?.item === itemId ? roundPick.rounds : null;
+  const runId = useMemo(
+    () => loop.data?.work_items.find((card) => card.work_item_id === itemId)?.run_id ?? "",
+    [loop.data, itemId],
+  );
+  const asks = useSnapshot<RunAsksResult>(props.app, "page.conversation.asks", "run.asks", {
+    run_id: runId,
+  }, item === null || !sequenceOpen || runId === "");
+  // 列是这个事项冻结的组织里的职能和你（显示名用项目现在组织的名字，旧组织里的用冻结的那一份）
+  const roles = useMemo(
+    () => (item?.organization?.roles ?? []).map((role) => ({ id: role.id, label: labels[role.id] ?? role.label })),
+    [item, labels],
+  );
+  const sequence = useMemo(() => sequenceOf({
+    roles,
+    flow: itemFlow,
+    asks: asks.data?.asks ?? [],
+    decisions: itemDecisions,
+    materials: materials.data,
+    // 「现在」：还没等到的色条画到这里。按这一份事实算一次，不跟着每次重算而抖
+    now: new Date().toISOString(),
+    openRounds,
+  }), [roles, itemFlow, asks.data, itemDecisions, materials.data, openRounds]);
+  const toggleRound = (round: number): void => {
+    const shown = openRounds ?? sequence.rounds.filter((entry) => entry.open).map((entry) => entry.round);
+    setRoundPick({
+      item: itemId,
+      rounds: shown.includes(round) ? shown.filter((value) => value !== round) : [...shown, round],
+    });
+  };
 
-  // 线程：展开过的结束事项、点过的节点（收件人跟着切到给它的指导）、发送以后滚到最新一条
+  // 线程（工单 #1639）：展开过的结束事项、点过的节点（收件人跟着切到给它的指导）、发送以后滚到最新一条
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [focus, setFocus] = useState<string | null>(null);
   const [scrollSignal, setScrollSignal] = useState(0);
@@ -159,13 +200,13 @@ export function ConversationPage(props: {
   );
   const composerInput = useMemo<ComposerInput>(() => {
     const organization = composerItem?.organization ?? null;
-    const roles = organization === null ? departmentChoices : organization.roles;
+    const roleChoices = organization === null ? departmentChoices : organization.roles;
     const routing = organization?.routing ?? props.organization?.organization?.routing ?? "direct";
     const receiver = organization === null
       ? props.organization?.organization?.sources?.user_input ?? departmentChoices[0]?.id ?? ""
       : receiverOf(organization, composerFlow, current);
     return {
-      frozen: organization, roles, routing, receiver, working: workingRoleOf(composerItem),
+      frozen: organization, roles: roleChoices, routing, receiver, working: workingRoleOf(composerItem),
       focus, active: composerItem !== null, labels,
     };
   }, [composerItem, composerFlow, departmentChoices, props.organization, current, focus, labels]);
@@ -193,6 +234,15 @@ export function ConversationPage(props: {
                 <Empty text="这件事项冻结的组织不在这一版发布里，图上没有可画的节点。" />
               ) : (
                 <>
+                  {/* 图右上角的入口（工单 #1641）：只有一个职能时没有「看经过」，也没有时序图（设计说明 4.15） */}
+                  {hasSequence(roles) ? (
+                    <div className="y10-cv-tools">
+                      <button type="button" className="y10-btn small" aria-pressed={sequenceOpen}
+                              data-testid="show-sequence" onClick={() => setSequenceOpen(!sequenceOpen)}>
+                        看经过
+                      </button>
+                    </div>
+                  ) : null}
                   <LoopGraphView
                     graph={graph}
                     pick={pick}
@@ -210,6 +260,13 @@ export function ConversationPage(props: {
                     onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
                     onClose={() => open(null)}
                   />
+                  {/* 时序图展开在循环图下面，不是单独的页，也不盖住线程 */}
+                  {sequenceOpen && hasSequence(roles) ? (
+                    <>
+                      {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
+                      <SequenceView view={sequence} onClose={() => setSequenceOpen(false)} onToggleRound={toggleRound} />
+                    </>
+                  ) : null}
                 </>
               )}
               {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}
@@ -224,21 +281,23 @@ export function ConversationPage(props: {
               </button>
             </p>
           )}
-          <ThreadView
-            app={props.app}
-            items={items}
-            titles={titles}
-            flow={records}
-            decisions={decisionList}
-            labels={labels}
-            selected={itemId}
-            opened={opened}
-            onToggleItem={(workItem) => setOpened((previous) => ({ ...previous, [workItem]: !previous[workItem] }))}
-            onSelectItem={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
-            onLook={look}
-            onNavigate={props.onNavigate}
-            scrollSignal={scrollSignal}
-          />
+          {items.length === 0 ? null : (
+            <ThreadView
+              app={props.app}
+              items={items}
+              titles={titles}
+              flow={records}
+              decisions={decisionList}
+              labels={labels}
+              selected={itemId}
+              opened={opened}
+              onToggleItem={(workItem) => setOpened((previous) => ({ ...previous, [workItem]: !previous[workItem] }))}
+              onSelectItem={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
+              onLook={look}
+              onNavigate={props.onNavigate}
+              scrollSignal={scrollSignal}
+            />
+          )}
           <Composer
             app={props.app}
             projectId={projectId}
