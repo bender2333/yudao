@@ -79,7 +79,14 @@ from .recovery import RunRecovery
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter, asks_cannot_verify
-from .thin_driver import RoundDependencies, RoundFailure, RoundPreparation, RoundWork, ThinDriver
+from .thin_driver import (
+    RoundDependencies,
+    RoundFailure,
+    RoundPreparation,
+    RoundWork,
+    StopEventFields,
+    ThinDriver,
+)
 from .tools import in_force
 from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .watched_outputs import waiting_departments
@@ -91,9 +98,21 @@ _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GU
 
 def guidance_version(projection: RunProjection, department: str) -> int:
     # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（docs/design/department-guidance.md「必验反例」，S1d），
-    # 所以由薄驱动按运行状态投影给出，随一轮工作的开始事件记下
+    # 由应用按运行视图读，随一轮工作的开始事件记下
     return max((item.version for item in projection.department_guidance
                 if item.department == department), default=0)
+
+
+def stop_judgment_expired(projection: RunProjection, basis: WorkBasis, department: str, version: int,
+                          events: list[Any]) -> bool:
+    # 停止判断过期没有（工单 #964、#1678）：这次激活的工作期间有新的用户输入或指导到达，判断不再适用。
+    # 输入与指导的版本是应用的数据，所以这条判断留在应用一侧，薄驱动问钩子要答案
+    if projection.input_version != basis.input_version:
+        return True
+    # 新的指导在停止判断以后到达：同样过期，由下一次激活处理
+    if not any(event.type in _USER_EVENTS for event in events):
+        return False
+    return guidance_version(projection, department) > basis.guidance_version
 
 
 def work_basis(projection: RunProjection, department: str) -> WorkBasis:
@@ -398,12 +417,9 @@ class Orchestrator:
         # 这个事项冻结的那份定义：停止原因与部门按它核对（MCP 设置带来的工具不改这两样）
         return self.item_definitions(run_id)
 
-    def guidance_version(self, projection: RunProjection, department: str) -> int:
-        return guidance_version(projection, department)
-
-    def user_events(self) -> frozenset[str]:
-        # 用户提出的事件种类：薄驱动的停止判断核对流版本时用它（工单 #964、#1513）
-        return _USER_EVENTS
+    def run_view(self, transaction: Transaction) -> RunProjection:
+        # 事务里的运行视图：薄驱动不读它的字段，只原样交给路由（工单 #1678）
+        return transaction.projection
 
     def await_cancellers(self, run_id: str) -> None:
         self._await_cancellers(run_id)
@@ -451,6 +467,19 @@ class Orchestrator:
     async def close_mcp_sessions(self, run_id: str) -> None:
         await self._close_mcp_sessions(run_id)
 
+    def stop_superseded(self, transaction: Transaction, basis: Any, department: str, version: int) -> bool:
+        # 停止判断过期没有：输入与指导的版本读应用自己的运行视图，薄驱动只把答案写进事实（工单 #1678）
+        return stop_judgment_expired(transaction.projection, basis, department, version,
+                                     transaction.events_after(version))
+
+    def stop_event_fields(self, transaction: Transaction) -> StopEventFields:
+        # 暂停或失败事件要写的应用字段：当前部门、模型引用与累计用量（工单 #1678）
+        projection = transaction.projection
+        return StopEventFields(
+            department=projection.active_department, provider=projection.provider, model=projection.model,
+            cycle_count=projection.cycle_count, max_cycles=projection.max_cycles, token_used=projection.token_used,
+        )
+
     def await_model(self, transaction: Transaction, round_work: RoundWork, reason: str, message: str,
                     *, target: dict[str, Any] | None = None) -> None:
         # 待恢复：run 停在这次请求之前，发出待恢复的决定请求（说明与选项在应用这一侧）
@@ -465,11 +494,10 @@ class Orchestrator:
         if kind is not None:
             self._request_pause_resume(transaction, kind, department, reason, message, facts)
 
-    def record_lesson_candidate(self, transaction: Transaction, reason: str, source_event: Any,
-                                projection: RunProjection) -> None:
-        # 运行失败时记下教训候选（取消不算）
+    def record_lesson_candidate(self, transaction: Transaction, reason: str, source_event: Any) -> None:
+        # 运行失败时记下教训候选（取消不算）：运行视图由这里在自己的事务里读（工单 #1678）
         if reason != "cancelled":
-            self.submissions.record_lesson_candidate(transaction, source_event, projection)
+            self.submissions.record_lesson_candidate(transaction, source_event, transaction.projection)
 
     def transact_run(self, run_id: str, decide: Callable[[Transaction], Any], **options: Any) -> Any:
         return self._transact(run_stream(run_id), decide, **options)
