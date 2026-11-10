@@ -149,7 +149,7 @@
   "name": "来源没人接",
   "how": "删掉「工程架构师接上一层交来的任务」这一条",
   "expected": "确实缺：source-received",
-  "got": "一致；确实缺:source-received:子事项（上一层交来的任务）",
+  "got": "一致；确实缺:source-received:子事项（上一层交来的任务）；空位：子事项（上一层交来的任务） → 每一种事项的来源必有人接",
   "detected": true
  },
  {
