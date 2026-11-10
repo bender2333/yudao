@@ -30,6 +30,7 @@
 | `qgen.py` | 从模型里的对象生题：部分覆盖的关系（必有）、同类之间（对称）、两端不一（粒度）、经「属于」（继承），写 `questions/candidates.json` |
 | `answers.py`、`questions/baseline.json` | 题目答案：`verify` 逐字核对证据，`baseline` 存成基线，`recheck <提交>` 报每条证据在、挪走、改写还是没了；`next.py` 有基线时会调它 |
 | `axcheck.py`、`questions/axioms-draft.ttl` | 公理草稿（没批的）逐条加进模型副本：一致性、每批新推出的空位、没空位时埋错看抓不抓得到，写 `questions/axcheck.json` |
+| `reports/open-items-architect.md` | 第一批题查出、交总架构师定的：运维故障空位与 6 处文档打架 |
 | `reports/questions-batch1.md` | 第一批 32 道题的结果 |
 | `reports/skill-plan.md` | 把本体做成「该做什么了」技能的方案草稿（还没建） |
 | `reports/fix-tickets-draft.md` | 第 4 批三处代码问题的修复工单草稿（没建 GitHub 工单） |
