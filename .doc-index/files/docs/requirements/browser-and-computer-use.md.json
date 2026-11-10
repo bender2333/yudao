@@ -1,24 +1,24 @@
 {
 "schema":1,
 "path":"docs/requirements/browser-and-computer-use.md",
-"hash":"e451b287bc952c1c",
+"hash":"12b7eb2119b41ae2",
 "nodes":[
-{"hash":"e451b287bc952c1c","id":"docs/requirements/browser-and-computer-use.md","kind":"file","title":"docs/requirements/browser-and-computer-use.md"},
-{"hash":"807d6a6205882399","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","kind":"section","parent":"docs/requirements/browser-and-computer-use.md","title":"D34 浏览器与 computer use"},
-{"hash":"780a96150cdffc8e","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认","kind":"section","parent":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","title":"已确认"},
+{"hash":"12b7eb2119b41ae2","id":"docs/requirements/browser-and-computer-use.md","kind":"file","title":"docs/requirements/browser-and-computer-use.md"},
+{"hash":"e809e3f07b111300","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","kind":"section","parent":"docs/requirements/browser-and-computer-use.md","title":"D34 浏览器与 computer use"},
+{"hash":"19938a6382bc0891","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认","kind":"section","parent":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","title":"已确认"},
 {"hash":"2bdc865303f5197d","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 设计确定的内容","kind":"section","parent":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","title":"设计确定的内容"},
-{"hash":"72d36ed5921fbd6f","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项","kind":"section","parent":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","title":"computer use 专题待重新确定的事项"}
+{"hash":"7e30933d9f3c9436","id":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项","kind":"section","parent":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use","title":"computer use 专题待重新确定的事项"}
 ],
 "edges":[
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
-{"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"8f8d735f9578f3bf","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
-{"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"8f8d735f9578f3bf","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
-{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
-{"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"e089a6de06b8c18b","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f2264e65a3d7de26","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"f9d2024298d303f9","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
-{"dst":"docs/requirements/network-and-mcp.md","kind":"link","raws":["network-and-mcp.md"],"seen":"deb3948600a74a62","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
+{"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"4f2f768d3257e006","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
+{"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"4f2f768d3257e006","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"5f08d4ab7b3ac69f","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
+{"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"4f2f768d3257e006","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6277c47f32b3e3d7","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"225e11bc2f92b1fd","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
+{"dst":"docs/requirements/network-and-mcp.md","kind":"link","raws":["network-and-mcp.md"],"seen":"6ac217dee4c09f8b","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"8f8d735f9578f3bf","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 设计确定的内容"}
 ]
 }

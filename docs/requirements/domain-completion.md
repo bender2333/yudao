@@ -1,6 +1,6 @@
 # D12 职能的专业补全
 
-状态：有效。依据：[总图](../architecture.html)第一节「产品」「工程」「质检」方框；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」，道 01 职能与核验。
+状态：有效。依据：[总图](../architecture.html)第一节「产品」「工程」「质检」方框；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」，道 01 职能与核验。
 
 ## 有效规则
 

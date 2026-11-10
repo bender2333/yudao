@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/requirements/department-guidance.md",
-"hash":"646e562448a17fd9",
+"hash":"ad466d967457f488",
 "nodes":[
-{"hash":"646e562448a17fd9","id":"docs/requirements/department-guidance.md","kind":"file","title":"docs/requirements/department-guidance.md"},
-{"hash":"ed0deb67c5a36aca","id":"docs/requirements/department-guidance.md#D20 职能定向追加指导","kind":"section","parent":"docs/requirements/department-guidance.md","title":"D20 职能定向追加指导"},
+{"hash":"ad466d967457f488","id":"docs/requirements/department-guidance.md","kind":"file","title":"docs/requirements/department-guidance.md"},
+{"hash":"ca657c7eb123b7a6","id":"docs/requirements/department-guidance.md#D20 职能定向追加指导","kind":"section","parent":"docs/requirements/department-guidance.md","title":"D20 职能定向追加指导"},
 {"hash":"610e0fde2db9c930","id":"docs/requirements/department-guidance.md#D20 职能定向追加指导 > 已确认","kind":"section","parent":"docs/requirements/department-guidance.md#D20 职能定向追加指导","title":"已确认"},
 {"hash":"3d7b85ee43194808","id":"docs/requirements/department-guidance.md#D20 职能定向追加指导 > 必须保持的边界","kind":"section","parent":"docs/requirements/department-guidance.md#D20 职能定向追加指导","title":"必须保持的边界"},
 {"hash":"0270a039540d06b3","id":"docs/requirements/department-guidance.md#D20 职能定向追加指导 > 处理约定","kind":"section","parent":"docs/requirements/department-guidance.md#D20 职能定向追加指导","title":"处理约定"},
@@ -13,8 +13,8 @@
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导"},
 {"dst":"docs/design/department-guidance.md","kind":"link","raws":["../design/department-guidance.md"],"seen":"aa715c73a4c177a1","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"09f0ecd94c074a4a","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导"},
 {"dst":"docs/design/department-guidance.md","kind":"link","raws":["../design/department-guidance.md"],"seen":"aa715c73a4c177a1","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导 > 处理约定"},
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/requirements/department-guidance.md#D20 职能定向追加指导 > 处理约定"}
 ]

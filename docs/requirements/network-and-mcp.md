@@ -1,6 +1,6 @@
 # D36 网络取回与 MCP 工具
 
-状态：有效。依据：[总图](../architecture.html)第四节「动作」的缝（取回与 MCP 工具是动作的类别）与第一节「模型与工具」方框；设计：[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。路线位置：[总体路线图](../program-roadmap.md)阶段二（动作含网络与浏览器）；浏览器经它的 MCP 客户端模块接入（[D34](browser-and-computer-use.md)）。
+状态：有效。依据：[总图](../architecture.html)第四节「动作」的缝（取回与 MCP 工具是动作的类别）与第一节「模型与工具」方框；设计：[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 05 动作与工具（网络取回与 MCP、浏览器与截图）；浏览器经它的 MCP 客户端模块接入（[D34](browser-and-computer-use.md)）。
 
 ## 已确认
 

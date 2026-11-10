@@ -1,6 +1,6 @@
 # D07 产品 · 工程 · 质检相互专家问答
 
-状态：有效。依据：[总图](../architecture.html)第三节外环「询问中」状态与内环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)第 4 节、[职能内多角色设计说明](../design/department-roles.md)第 13 节。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」，道 01 职能与核验。
+状态：有效。依据：[总图](../architecture.html)第三节外环「询问中」状态与内环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)第 4 节、[职能内多角色设计说明](../design/department-roles.md)第 13 节。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」，道 01 职能与核验。
 
 ## 已确认
 

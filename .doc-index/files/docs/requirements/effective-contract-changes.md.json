@@ -1,17 +1,17 @@
 {
 "schema":1,
 "path":"docs/requirements/effective-contract-changes.md",
-"hash":"4e8a27acc57cec2d",
+"hash":"d07cf6619ee903d1",
 "nodes":[
-{"hash":"4e8a27acc57cec2d","id":"docs/requirements/effective-contract-changes.md","kind":"file","title":"docs/requirements/effective-contract-changes.md"},
-{"hash":"b3d5c50012ede5af","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","kind":"section","parent":"docs/requirements/effective-contract-changes.md","title":"D15 有效变化与执行依据"},
+{"hash":"d07cf6619ee903d1","id":"docs/requirements/effective-contract-changes.md","kind":"file","title":"docs/requirements/effective-contract-changes.md"},
+{"hash":"d71a2672cb6dce18","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","kind":"section","parent":"docs/requirements/effective-contract-changes.md","title":"D15 有效变化与执行依据"},
 {"hash":"4d831f2643ef8bd8","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据 > 有效规则","kind":"section","parent":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","title":"有效规则"},
 {"hash":"250e9ea9f9d5269f","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据 > 验收","kind":"section","parent":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","title":"验收"}
 ],
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"},
-{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"db24d9f7a164ce69","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"}
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"09f0ecd94c074a4a","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"},
+{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"e97f347021232778","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据"}
 ]
 }

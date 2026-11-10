@@ -1,5 +1,5 @@
 param(
-    [string]$Milestone = '阶段一：单机诚实闭环，三道槽位立缝',
+    [string]$Milestone = '阶段一：转完一圈',
     [string]$Owner = 'bender2333',
     [string]$Repo = 'yudao',
     [string]$Out = '.tmp/discussion-note/overlap.md',

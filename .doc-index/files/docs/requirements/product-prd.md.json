@@ -1,17 +1,17 @@
 {
 "schema":1,
 "path":"docs/requirements/product-prd.md",
-"hash":"75d2a12e7cd35914",
+"hash":"37223d0d9c35d97b",
 "nodes":[
-{"hash":"75d2a12e7cd35914","id":"docs/requirements/product-prd.md","kind":"file","title":"docs/requirements/product-prd.md"},
-{"hash":"7f4eee6d4e422169","id":"docs/requirements/product-prd.md#D04 产品维护 PRD.md","kind":"section","parent":"docs/requirements/product-prd.md","title":"D04 产品维护 PRD.md"},
+{"hash":"37223d0d9c35d97b","id":"docs/requirements/product-prd.md","kind":"file","title":"docs/requirements/product-prd.md"},
+{"hash":"e54a4f0701a9ad21","id":"docs/requirements/product-prd.md#D04 产品维护 PRD.md","kind":"section","parent":"docs/requirements/product-prd.md","title":"D04 产品维护 PRD.md"},
 {"hash":"5c88fc1289f3941f","id":"docs/requirements/product-prd.md#D04 产品维护 PRD.md > 已确认","kind":"section","parent":"docs/requirements/product-prd.md#D04 产品维护 PRD.md","title":"已确认"},
 {"hash":"0d16d2b7d39f1ff6","id":"docs/requirements/product-prd.md#D04 产品维护 PRD.md > 设计选择","kind":"section","parent":"docs/requirements/product-prd.md#D04 产品维护 PRD.md","title":"设计选择"}
 ],
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"f2b27f3193c18caf","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"09f0ecd94c074a4a","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md"},
 {"dst":"docs/requirements/expert-ask-react.md","kind":"link","raws":["expert-ask-react.md"],"seen":"40429c6eedbcdadf","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md > 已确认"},
 {"dst":"docs/requirements/effective-contract-changes.md","kind":"link","raws":["effective-contract-changes.md"],"seen":"4e8a27acc57cec2d","src":"docs/requirements/product-prd.md#D04 产品维护 PRD.md > 设计选择"}
 ]

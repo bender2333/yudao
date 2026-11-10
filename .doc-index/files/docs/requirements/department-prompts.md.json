@@ -1,18 +1,18 @@
 {
 "schema":1,
 "path":"docs/requirements/department-prompts.md",
-"hash":"e046d8c044ab59a6",
+"hash":"24773749a267564c",
 "nodes":[
-{"hash":"e046d8c044ab59a6","id":"docs/requirements/department-prompts.md","kind":"file","title":"docs/requirements/department-prompts.md"},
-{"hash":"41632eef626e3eef","id":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改","kind":"section","parent":"docs/requirements/department-prompts.md","title":"D02 产品 · 工程 · 质检的 prompt 展示与修改"},
+{"hash":"24773749a267564c","id":"docs/requirements/department-prompts.md","kind":"file","title":"docs/requirements/department-prompts.md"},
+{"hash":"3f70291645ac53f6","id":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改","kind":"section","parent":"docs/requirements/department-prompts.md","title":"D02 产品 · 工程 · 质检的 prompt 展示与修改"},
 {"hash":"d39f292c8d7b25bd","id":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改 > 已确认","kind":"section","parent":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改","title":"已确认"},
 {"hash":"ed738210d83783bd","id":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改 > 设计选择","kind":"section","parent":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改","title":"设计选择"}
 ],
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
-{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"a0a2b1711ed44ed1","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f2264e65a3d7de26","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"9a4efda5d635772a","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6277c47f32b3e3d7","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"a0a2b1711ed44ed1","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改 > 设计选择"},
 {"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f2264e65a3d7de26","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改 > 设计选择"},
 {"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"8ce5f9620e8e6304","src":"docs/requirements/department-prompts.md#D02 产品 · 工程 · 质检的 prompt 展示与修改 > 设计选择"}

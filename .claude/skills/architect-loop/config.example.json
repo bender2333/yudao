@@ -2,7 +2,7 @@
   "enabled": true,
   "worktree": "<架构师循环的 worktree 绝对路径>",
   "scope": {
-    "milestones": ["阶段二：可靠恢复、接入真实项目、独立评价、形态可换"]
+    "milestones": ["阶段一：转完一圈"]
   },
   "lockMinutes": 180
 }

@@ -1,6 +1,6 @@
 # D03 intend.md 原文保存
 
-状态：有效。依据：[总图](../architecture.html)第一节「你」与「一份事实」方框；相关记录：[D16](git-change-management.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」。
+状态：有效。依据：[总图](../architecture.html)第一节「你」与「一份事实」方框；相关记录：[D16](git-change-management.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」。
 
 ## 已确认
 

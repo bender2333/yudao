@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":".claude/skills/triage/SKILL.md",
-"hash":"fc7317e9cb4eb77e",
+"hash":"8d7322abf4de0651",
 "nodes":[
-{"hash":"fc7317e9cb4eb77e","id":".claude/skills/triage/SKILL.md","kind":"file","title":".claude/skills/triage/SKILL.md"},
+{"hash":"8d7322abf4de0651","id":".claude/skills/triage/SKILL.md","kind":"file","title":".claude/skills/triage/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/triage/SKILL.md#(开头)","kind":"section","parent":".claude/skills/triage/SKILL.md","title":"(开头)"},
 {"hash":"2152049493b7cdb0","id":".claude/skills/triage/SKILL.md#name: triagedescription: 分诊：solo 交回的 needs-triage 工单、solo 直接交给用户的 ready-for-human 工单、Discussions 的想法与外部报告。先在当时的 main 上核对前提，再按原因处理：补依赖、改写正文、拆小、补设计、关闭或交给用户，结论写成 TRIAGE: 评论。代替 Matt 的 /triage。argument-hint: \"<工单编号 | Discussions 帖子链接>\"","kind":"section","parent":".claude/skills/triage/SKILL.md","title":"name: triagedescription: 分诊：solo 交回的 needs-triage 工单、solo 直接交给用户的 ready-for-human 工单、Discussions 的想法与外部报告。先在当时的 main 上核对前提，再按原因处理：补依赖、改写正文、拆小、补设计、关闭或交给用户，结论写成 TRIAGE: 评论。代替 Matt 的 /triage。argument-hint: \"<工单编号 | Discussions 帖子链接>\""},
 {"hash":"f314d7e05419c32b","id":".claude/skills/triage/SKILL.md#分诊","kind":"section","parent":".claude/skills/triage/SKILL.md","title":"分诊"},
 {"hash":"2d564b1953b09e64","id":".claude/skills/triage/SKILL.md#分诊 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"何时用 / 何时不用"},
-{"hash":"fb04d60e118b1984","id":".claude/skills/triage/SKILL.md#分诊 > 先读什么","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"先读什么"},
+{"hash":"41da65b357937531","id":".claude/skills/triage/SKILL.md#分诊 > 先读什么","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"先读什么"},
 {"hash":"8e243a0be49186f8","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"交回的工单"},
 {"hash":"4a31d99a9f3f2e75","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 前提没满足，或者用到别的工单的结果却没设依赖","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","title":"前提没满足，或者用到别的工单的结果却没设依赖"},
 {"hash":"3afacc707b3fa37d","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 正文过时：名字搬了家、「只改」漏了文件","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","title":"正文过时：名字搬了家、「只改」漏了文件"},

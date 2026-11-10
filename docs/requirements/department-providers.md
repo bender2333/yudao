@@ -1,6 +1,6 @@
 # D18 统一 Provider 管理与职能绑定
 
-状态：有效。依据：[总图](../architecture.html)第四节「模型」的缝（每次请求解析一次调用目标，凭据只在控制主机）；设计：[模型管理设计说明](../design/model-management.md)。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 06 模型与判定点（多协议无状态调用与凭据隔离），阶段一「模型」缝立住。
+状态：有效。依据：[总图](../architecture.html)第四节「模型」的缝（每次请求解析一次调用目标，凭据只在控制主机）；设计：[模型管理设计说明](../design/model-management.md)。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 06 模型与判定点（多协议无状态调用与凭据隔离），阶段一。
 
 职能的模型选择与协议归属以 [D24 模型管理](model-management.md) 与[模型管理设计说明](../design/model-management.md)为准：职能默认加项目职能设置，调用协议属于模型访问定义（设计说明第 4.3 节）；本页的「职能绑定」指按这两层解析出的选择。启动与热生效见 [D22](startup-provider-reload.md)，统一 Provider 层见 [D23](provider-layer.md)：无配置可启动服务，创建任务才要求所选目标就绪。
 

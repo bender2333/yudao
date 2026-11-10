@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/requirements/semantic-system.md",
-"hash":"0cde5154df7bf64b",
+"hash":"3154bccd06f45217",
 "nodes":[
-{"hash":"0cde5154df7bf64b","id":"docs/requirements/semantic-system.md","kind":"file","title":"docs/requirements/semantic-system.md"},
+{"hash":"3154bccd06f45217","id":"docs/requirements/semantic-system.md","kind":"file","title":"docs/requirements/semantic-system.md"},
 {"hash":"979ca3d026b5aca3","id":"docs/requirements/semantic-system.md#D25 语义系统","kind":"section","parent":"docs/requirements/semantic-system.md","title":"D25 语义系统"},
-{"hash":"30ecb52e7412c5d9","id":"docs/requirements/semantic-system.md#D25 语义系统 > 上下文组装专题","kind":"section","parent":"docs/requirements/semantic-system.md#D25 语义系统","title":"上下文组装专题"},
+{"hash":"e632ef0f13cd537f","id":"docs/requirements/semantic-system.md#D25 语义系统 > 上下文组装专题","kind":"section","parent":"docs/requirements/semantic-system.md#D25 语义系统","title":"上下文组装专题"},
 {"hash":"50e0595afaf6984a","id":"docs/requirements/semantic-system.md#D25 语义系统 > TODO：惊讶机制与教训发现模块","kind":"section","parent":"docs/requirements/semantic-system.md#D25 语义系统","title":"TODO：惊讶机制与教训发现模块"},
-{"hash":"d1a51c277fb81ea6","id":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认","kind":"section","parent":"docs/requirements/semantic-system.md#D25 语义系统","title":"已确认"}
+{"hash":"5b283522e3143616","id":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认","kind":"section","parent":"docs/requirements/semantic-system.md#D25 语义系统","title":"已确认"}
 ],
 "edges":[
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/requirements/semantic-system.md#D25 语义系统"},
@@ -17,11 +17,11 @@
 {"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["meta-observer.md"],"seen":"cf3fd90e5cf95e22","src":"docs/requirements/semantic-system.md#D25 语义系统 > TODO：惊讶机制与教训发现模块"},
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/semantic-system.md#D25 语义系统 > 上下文组装专题"},
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"5553cffec4192ae1","src":"docs/requirements/semantic-system.md#D25 语义系统 > 上下文组装专题"},
-{"dst":"CONTEXT.md","kind":"link","raws":["../../CONTEXT.md"],"seen":"d077332456bb8349","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
+{"dst":"CONTEXT.md","kind":"link","raws":["../../CONTEXT.md"],"seen":"3155c298b5de85f1","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
-{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"a0a2b1711ed44ed1","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"9a4efda5d635772a","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"5553cffec4192ae1","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
-{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"4b04f3b149fbd7f9","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"30da2a0247300eb9","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"}
+{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"45358e9b48ebabb7","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"1457bf379c078098","src":"docs/requirements/semantic-system.md#D25 语义系统 > 已确认"}
 ]
 }

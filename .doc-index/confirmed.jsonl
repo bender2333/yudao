@@ -395,3 +395,24 @@
 {"down":"4adbcd95661b77ba","dst":"docs/design/model-management.md#模型管理设计说明 > 2. 分层","src":"docs/design/semantic-system.md#语义系统设计说明 > 7. 写入 > 7.2 证据核对","up":"5b1e20bd841bd464"}
 {"down":"c6f62d15f14456c4","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 4. 最小投影","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界","up":"23cd1463dd9453c0"}
 {"down":"39af9b0ddac88cad","dst":"README.md#Yudao Loop System > 模型配置","src":"docs/requirements/department-providers.md#D18 统一 Provider 管理与职能绑定 > 职责划分","up":"67a6e3df6d1b3c0e"}
+{"down":"4c653cb4540ff5b4","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 3","up":"0a628d6766736909"}
+{"down":"4bb1234ec030997a","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":".claude/skills/next/SKILL.md#下一件事 > 权限","up":"6c893273e349797b"}
+{"down":"1ad8a6449c854133","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":".claude/skills/trial-intake/SKILL.md#试用","up":"6c893273e349797b"}
+{"down":"fc79b26261a9fd81","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","src":".claude/skills/verify/SKILL.md#验收 > 何时用 / 何时不用","up":"e020bdd76d2e543c"}
+{"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"0a628d6766736909"}
+{"down":"45e24b8a97cdc6c6","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":"docs/agents/workflow.md#工作方式 > 6. 四个循环","up":"6c893273e349797b"}
+{"down":"f03abef70c72668f","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 4. Yudao 服务的运行 > 4.4 局域网访问","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 6. 能力清单与认证 > 6.2 访问方式与认证","up":"599aaa870bbbd206"}
+{"down":"3cc3640c0cabd0cf","dst":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"7e30933d9f3c9436"}
+{"down":"23a63d796c572230","dst":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"7e30933d9f3c9436"}
+{"down":"da1985412c9193a9","dst":"docs/requirements/operations-department.md#D27 运维 > 长时间运行","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 7. 截图作为证据 > 7.1 保存与绑定","up":"74fc5a880af863ec"}
+{"down":"425235f703dd128e","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 4. Yudao 服务的运行 > 4.4 局域网访问","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.3 远程执行代理 > 4.3.2 安装","up":"599aaa870bbbd206"}
+{"down":"425235f703dd128e","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.1 一次发布的内容","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.3 远程执行代理 > 4.3.2 安装","up":"c7851251a8bfb211"}
+{"down":"b1afe34b2aaccdd2","dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","src":"docs/design/semantic-system.md#语义系统设计说明 > 8. 抽象层与复盘","up":"1457bf379c078098"}
+{"down":"d697a9c7a0bdcdd7","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 10. 遗留","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","up":"d4b68bd37c19c5f6"}
+{"down":"12d610bed280ac23","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 9. 用户确认的决定","src":"docs/design/test-pyramid.md#测试分层设计说明 > 7. 前端与浏览器测试","up":"3b51c2e33bb961eb"}
+{"down":"d1b7f8808f1ab6be","dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 5. 自我修改按风险分级放开","up":"1457bf379c078098"}
+{"down":"4e27d5c8c4b8c6b5","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.1 一次发布的内容","src":"docs/design/visualization.md#画面与播放设计说明","up":"c7851251a8bfb211"}
+{"down":"4e27d5c8c4b8c6b5","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","src":"docs/design/visualization.md#画面与播放设计说明","up":"b263981f37edd761"}
+{"down":"0ac6cd359ca6ffbd","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","src":"docs/design/visualization.md#画面与播放设计说明 > 11. 画面跟着定义伸缩 > 11.1 输入","up":"b263981f37edd761"}
+{"down":"b5c07471d328449c","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","up":"b263981f37edd761"}
+{"down":"af08d57838cd45f9","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.1 一次发布的内容","src":"docs/design/visualization.md#画面与播放设计说明 > 9. 与其他文档的关系","up":"c7851251a8bfb211"}

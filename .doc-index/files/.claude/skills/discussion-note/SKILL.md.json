@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/discussion-note/SKILL.md",
-"hash":"8d63c7c4edcfc7cc",
+"hash":"2720a4a270ec529a",
 "nodes":[
-{"hash":"8d63c7c4edcfc7cc","id":".claude/skills/discussion-note/SKILL.md","kind":"file","title":".claude/skills/discussion-note/SKILL.md"},
+{"hash":"2720a4a270ec529a","id":".claude/skills/discussion-note/SKILL.md","kind":"file","title":".claude/skills/discussion-note/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/discussion-note/SKILL.md#(开头)","kind":"section","parent":".claude/skills/discussion-note/SKILL.md","title":"(开头)"},
 {"hash":"67c4bd9e46a53f75","id":".claude/skills/discussion-note/SKILL.md#name: discussion-notedescription: 任何 harness 做完一小段只读或有界的工作（扫描、试跑、复现、走查、查证、想法），把事实与结果写成 GitHub Discussions 帖子，供架构师分诊或以后复用。不发工单评论、不改标签、不派活、不动账本，不打断进行中的工单与流程。argument-hint: \"[扫描 | 观察 | 复现 | 想法] <范围>\"","kind":"section","parent":".claude/skills/discussion-note/SKILL.md","title":"name: discussion-notedescription: 任何 harness 做完一小段只读或有界的工作（扫描、试跑、复现、走查、查证、想法），把事实与结果写成 GitHub Discussions 帖子，供架构师分诊或以后复用。不发工单评论、不改标签、不派活、不动账本，不打断进行中的工单与流程。argument-hint: \"[扫描 | 观察 | 复现 | 想法] <范围>\""},
 {"hash":"4202bb0344448d6f","id":".claude/skills/discussion-note/SKILL.md#discussion-note","kind":"section","parent":".claude/skills/discussion-note/SKILL.md","title":"discussion-note"},
@@ -18,7 +18,7 @@
 {"hash":"909066017517517b","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 两种形态 > 表1 > A 报告型","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 两种形态","title":"A 报告型"},
 {"hash":"710a58ac06c12c5e","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 两种形态 > 表1 > B 素材型","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 两种形态","title":"B 素材型"},
 {"hash":"064953727abd6711","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 一、事实与判断分节","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"一、事实与判断分节"},
-{"hash":"7d25fac6b200bd31","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 二、可复现","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"二、可复现"},
+{"hash":"f92cf7656694e763","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 二、可复现","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"二、可复现"},
 {"hash":"e36f82a77aa5e0b4","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"标题前缀与分类"},
 {"hash":"a2ffdb8ed70d5f75","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > Issues","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"Issues"},
 {"hash":"9c736079c161b84a","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > Ideas","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"Ideas"},
@@ -39,6 +39,6 @@
 {"hash":"0f1065bbd1da7368","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 失败与收尾","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"失败与收尾"}
 ],
 "edges":[
-{"dst":".claude/skills/discussion-note/scripts/overlap-scan.ps1","kind":"code-path","raws":[".claude/skills/discussion-note/scripts/overlap-scan.ps1"],"seen":"3c52fc35113d1f53","src":".claude/skills/discussion-note/SKILL.md#discussion-note > 二、可复现"}
+{"dst":".claude/skills/discussion-note/scripts/overlap-scan.ps1","kind":"code-path","raws":[".claude/skills/discussion-note/scripts/overlap-scan.ps1"],"seen":"004a327b7c9e1383","src":".claude/skills/discussion-note/SKILL.md#discussion-note > 二、可复现"}
 ]
 }

@@ -1,6 +1,6 @@
 # D13 完整交付封存与恢复
 
-状态：有效。依据：[总图](../architecture.html)第三节外环「核验中」「接纳」（绑定合同、交付树、回执）与第四节「动作」的缝（工作区每次从封存快照建）；设计：[本地通用工具设计说明](../design/local-tools.md)、[恢复契约与故障矩阵](../design/recovery-contract-and-fault-matrix.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」。
+状态：有效。依据：[总图](../architecture.html)第三节外环「核验中」「接纳」（绑定合同、交付树、回执）与第四节「动作」的缝（工作区每次从封存快照建）；设计：[本地通用工具设计说明](../design/local-tools.md)、[恢复契约与故障矩阵](../design/recovery-contract-and-fault-matrix.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」。
 
 返工后若只能查部分声明文件与摘要，就无法还原完整受测内容，所以接受交付前要保存完整的受测内容。
 

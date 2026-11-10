@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/requirements/department-roles.md",
-"hash":"6e3357d24c141317",
+"hash":"7e66310e18b383b0",
 "nodes":[
-{"hash":"6e3357d24c141317","id":"docs/requirements/department-roles.md","kind":"file","title":"docs/requirements/department-roles.md"},
+{"hash":"7e66310e18b383b0","id":"docs/requirements/department-roles.md","kind":"file","title":"docs/requirements/department-roles.md"},
 {"hash":"bbd7f22298e74394","id":"docs/requirements/department-roles.md#D26 职能内多角色","kind":"section","parent":"docs/requirements/department-roles.md","title":"D26 职能内多角色"},
-{"hash":"4f4567094e4437d7","id":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求","kind":"section","parent":"docs/requirements/department-roles.md#D26 职能内多角色","title":"需求"},
+{"hash":"408af8f3a6665846","id":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求","kind":"section","parent":"docs/requirements/department-roles.md#D26 职能内多角色","title":"需求"},
 {"hash":"b69579aefbc60e7d","id":"docs/requirements/department-roles.md#D26 职能内多角色 > 验收标准","kind":"section","parent":"docs/requirements/department-roles.md#D26 职能内多角色","title":"验收标准"}
 ],
 "edges":[
@@ -14,10 +14,10 @@
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","kind":"link","raws":["../design/forms-and-verifier-role.md"],"seen":"d6f13fa7d91f364e","src":"docs/requirements/department-roles.md#D26 职能内多角色"},
 {"dst":"docs/design/project-organization.md","kind":"link","raws":["../design/project-organization.md"],"seen":"2966d3e0d29b234b","src":"docs/requirements/department-roles.md#D26 职能内多角色"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/department-roles.md#D26 职能内多角色"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"f9d2024298d303f9","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
-{"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["department-guidance.md"],"seen":"646e562448a17fd9","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
-{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"8ce5f9620e8e6304","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
-{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"4b04f3b149fbd7f9","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
-{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"18710d351608cd32","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"}
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"225e11bc2f92b1fd","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
+{"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["department-guidance.md"],"seen":"ad466d967457f488","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
+{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"0e452fe2912f94ae","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
+{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"45358e9b48ebabb7","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"},
+{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"3154bccd06f45217","src":"docs/requirements/department-roles.md#D26 职能内多角色 > 需求"}
 ]
 }

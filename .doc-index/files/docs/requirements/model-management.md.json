@@ -1,17 +1,17 @@
 {
 "schema":1,
 "path":"docs/requirements/model-management.md",
-"hash":"8ce5f9620e8e6304",
+"hash":"0e452fe2912f94ae",
 "nodes":[
-{"hash":"8ce5f9620e8e6304","id":"docs/requirements/model-management.md","kind":"file","title":"docs/requirements/model-management.md"},
-{"hash":"8f9aa5205c2e20ae","id":"docs/requirements/model-management.md#D24 模型管理与职能模型选择","kind":"section","parent":"docs/requirements/model-management.md","title":"D24 模型管理与职能模型选择"},
+{"hash":"0e452fe2912f94ae","id":"docs/requirements/model-management.md","kind":"file","title":"docs/requirements/model-management.md"},
+{"hash":"1f1d2e3342fd8b05","id":"docs/requirements/model-management.md#D24 模型管理与职能模型选择","kind":"section","parent":"docs/requirements/model-management.md","title":"D24 模型管理与职能模型选择"},
 {"hash":"026bd16cd921663c","id":"docs/requirements/model-management.md#D24 模型管理与职能模型选择 > 已确认","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与职能模型选择","title":"已确认"},
 {"hash":"b960310247f1360a","id":"docs/requirements/model-management.md#D24 模型管理与职能模型选择 > 后续功能","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与职能模型选择","title":"后续功能"}
 ],
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f2264e65a3d7de26","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"300101a814c6bd82","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6277c47f32b3e3d7","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择"},
 {"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f2264e65a3d7de26","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择 > 已确认"},
 {"dst":"docs/design/project-organization.md","kind":"link","raws":["../design/project-organization.md"],"seen":"2966d3e0d29b234b","src":"docs/requirements/model-management.md#D24 模型管理与职能模型选择 > 已确认"}
 ]

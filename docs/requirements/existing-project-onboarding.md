@@ -1,6 +1,6 @@
 # D33 接入已有项目
 
-状态：有效。依据：[总图](../architecture.html)第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）；设计：[接入已有项目设计说明](../design/existing-project-onboarding.md)、[ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)。路线位置：[总体路线图](../program-roadmap.md)阶段二薄片 ①「真实项目接着做」。
+状态：有效。依据：[总图](../architecture.html)第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）；设计：[接入已有项目设计说明](../design/existing-project-onboarding.md)、[ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)。路线位置：[总体路线图](../program-roadmap.md)阶段三「断了接得上」。
 
 ## 已确认
 

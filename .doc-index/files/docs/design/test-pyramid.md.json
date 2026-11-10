@@ -55,7 +55,7 @@
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ea572e94eeb4d291","src":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.4 用例的变化"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":"docs/design/test-pyramid.md#测试分层设计说明 > 6. 输出的读取"},
 {"dst":"docs/design/visualization.md#画面与播放设计说明 > 3. 分层与边界","kind":"link","raws":["visualization.md"],"seen":"ba345f7baa0d648d","src":"docs/design/test-pyramid.md#测试分层设计说明 > 7. 前端与浏览器测试"},
-{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 9. 用户确认的决定","kind":"link","raws":["web-interface-and-release.md"],"seen":"fb6f505fce86d822","src":"docs/design/test-pyramid.md#测试分层设计说明 > 7. 前端与浏览器测试"},
+{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 9. 用户确认的决定","kind":"link","raws":["web-interface-and-release.md"],"seen":"3b51c2e33bb961eb","src":"docs/design/test-pyramid.md#测试分层设计说明 > 7. 前端与浏览器测试"},
 {"dst":"docs/requirements/web-game-frontend.md","kind":"link","raws":["../requirements/web-game-frontend.md"],"seen":"7aaf6791d5aadd73","src":"docs/design/test-pyramid.md#测试分层设计说明 > 7. 前端与浏览器测试"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行","kind":"link","raws":["department-loop.md"],"seen":"e842c72b29ebc815","src":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法"},
 {"dst":"harness/proposals.py","kind":"code-path","raws":["harness/proposals.py"],"seen":"e22f894ac7e1b3fa","src":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法"},
