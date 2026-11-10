@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Sequence
 from copy import deepcopy
@@ -11,7 +12,10 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .definitions import DEFAULT_FORM, DEFINITIONS
+from .definitions import (
+    DEFAULT_FORM, DEFINITIONS, ITEM_SOURCES, Definitions, definitions_from_contents, parse_organization_changes,
+)
+from .organization_compose import compose_checked
 from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .kernel_events import canonical_hash
@@ -67,6 +71,159 @@ BASELINE_VERIFIED_REASON = "baseline_verified"
 # 发布以后再试。恢复、升级重新开始与建档修改轮说的是同一件事，写进项目流的开始失败
 ITEM_FORM_UNAVAILABLE_MESSAGE = (
     "这个事项冻结的形态不在当前发布里，这条命令没有生效；换回带那一份形态的发布以后再试")
+
+# 事项创建时冻结的整份合成结果（工单 #1517，项目的组织设计说明「冻结与升级」）：按内容摘要落盘的工件，
+# 种类写在这里。事项创建事件与 run 的创建事件都记下它的引用，之后写入核对、路由、装配、执行与重放都读这一份
+ITEM_DEFINITIONS_KIND = "item_definitions"
+# 进程里按内容摘要记住读回来的合成结果（工单 #1517）：工件按内容寻址、写进去不再改，同一份内容读回来的
+# 定义不变；上限只防止进程里留下太多份，旧的先丢
+_DEFINITIONS_CACHE: dict[str, Definitions] = {}
+_DEFINITIONS_CACHE_LIMIT = 8
+
+
+class OrganizationRejectedError(ValueError):
+    """新建事项时合成结果过不了结构校验（项目的组织设计说明「冻结与升级」「拒绝与提醒」）。
+
+    形态不在这一版发布里、本项目的改动与发布合不到一起，或者合成结果过不了加载时的同一套结构校验时抛出，
+    说明里逐项写明是哪一项。新建事项被拒绝；进行中的事项按各自冻结的那一份照常跑，项目的组织不变。
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
+def definitions_from_ref(artifacts: ArtifactStore, ref: Any) -> Definitions | None:
+    """事项创建时冻结的那份合成结果（工单 #1517）：按事件里的工件引用读回整份定义。
+
+    没有引用（旧事项只记了形态名）时为空，调用方按形态名在这一版发布里取。存的是合成结果的那几份定义文件
+    的内容（按定义文件的次序写），读回来逐文件相同，版本（内容摘要）也相同：发布后来改了形态不影响它。
+    工件按内容寻址、写进去就不再改，所以同一份合成结果按内容摘要记在进程里，页面查询不必每次重新解析
+    （工单 #1517 的审查：`project.loop` 一次查询要把这份 2MB 的内容读出来解析一次）。
+    """
+    if not isinstance(ref, dict) or not ref.get("path"):
+        return None
+    key = str(ref.get("content_hash") or ref.get("path"))
+    cached = _DEFINITIONS_CACHE.get(key)
+    if cached is not None:
+        return cached
+    definitions = definitions_from_contents(json.loads(artifacts.get(ArtifactRef(**ref)).decode("utf-8")))
+    if len(_DEFINITIONS_CACHE) >= _DEFINITIONS_CACHE_LIMIT:
+        _DEFINITIONS_CACHE.pop(next(iter(_DEFINITIONS_CACHE)))
+    _DEFINITIONS_CACHE[key] = definitions
+    return definitions
+
+
+def frozen_definitions_ref(store: EventStore, project_id: str, work_item_id: str) -> dict[str, Any] | None:
+    # 项目流上这个事项最近一次创建事件里冻结的合成结果（工单 #1517）：因升级重新开始时同一个事项会有
+    # 第二条创建事件，取最后一条；旧事件没有这一项时为空，按形态名在这一版发布里取
+    found: dict[str, Any] | None = None
+    for event in store.list_project_events(project_id):
+        if event.type == ProjectEventType.WORK_ITEM_CREATED \
+                and event.payload.get("work_item_id") == work_item_id:
+            found = event.payload.get("definitions_ref") or found
+    return found
+
+
+def _organization_issues_text(issues: list[tuple[str, str, str]]) -> str:
+    # 拒绝项写成人看的一句（文件与字段路径、说明，一条一项）：新建事项时随命令的拒绝交回，页面照实显示
+    return "组织合不到一起，新建事项被拒绝：" + "；".join(
+        f"{file} {field}：{message}" for file, field, message in issues)
+
+
+def _form_chosen(form: Any) -> NewProjectEvent:
+    # 新建项目或接入已有项目时选的那一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：写成一条
+    # 形态改动，原值是默认形态、改动为空、理由为空；组织版本是这张卡的合成结果（改动为空时就是它的版本）。
+    # 之后新建的事项按这一份冻结，历史里也看得到这一次选择
+    return NewProjectEvent(ProjectEventType.PROJECT_FORM_SET, {
+        "previous_form": DEFAULT_FORM, "form": form.name, "reason": "",
+        "changes": {}, "version": form.definitions.version,
+    }, actor="user:local")
+
+
+def _flatten_definitions(definitions: Definitions) -> dict[str, str]:
+    # 一份合成结果摊平成「项 → 文字」（工单 #1517）：两类合成结果之间的差异按它比较，不另存状态。
+    # 项写定义的路径，覆盖设计说明「冻结与升级」说的五项：轮转（轮转方式与它那份定义）、职能（显示名、
+    # 三样说明、关注的成果、建议能力、工具许可、可见范围、是不是核验角色）、成果（种类与分组的名与说明）、
+    # 核验（谁核验谁的哪种成果、各角色的写入范围）、事项的来源。清单类的项按排序后的一项一行。
+    # 不在这里的：角色 Prompt、部门的 Prompt 底稿、提案合同、事项种类的说明文字、停止原因与仓库概况的分类、
+    # 部门的角色清单（现在一个部门一个角色）、规则登记——它们属于模型与 Prompt 那一层，或是发布随事项照常读的
+    # 其余内容，不是「组织这一层」的五项（见交付说明的「自定的边界」第 15 条，工单 #1517 第 4 轮）
+    flat: dict[str, str] = {"routing": definitions.routing}
+    # 轮转方式自己那份定义（设计说明「冻结与升级」比五项里的轮转）：清单、最后采纳的成果、上限与结束原因
+    routing = next((item for item in definitions.routings.routings if item.id == definitions.routing), None)
+    if routing is not None:
+        prefix = f"routings.{routing.id}"
+        flat[f"{prefix}.label"] = routing.label
+        flat[f"{prefix}.why"] = routing.why
+        flat[f"{prefix}.departments"] = "、".join(routing.departments)
+        # 成果种类：引用分组的新写法与直接列出的旧写法各按自己写的读
+        flat[f"{prefix}.outcomes"] = routing.outcomes or "、".join(routing.outcome_kinds)
+        flat[f"{prefix}.final_outcome"] = routing.final_outcome or ""
+        flat[f"{prefix}.proposal_methods"] = "、".join(routing.proposal_methods)
+        for name in sorted(routing.limits):
+            flat[f"{prefix}.limits.{name}"] = str(routing.limits[name])
+        for name in sorted(routing.end_reasons):
+            reason = routing.end_reasons[name]
+            flat[f"{prefix}.end_reasons.{name}"] = (
+                f"{reason.label}｜{reason.outcome}｜{reason.human_action or ''}")
+    for department in definitions.organization.departments:
+        prefix = f"departments.{department.id}"
+        flat[f"{prefix}.label"] = department.label
+        flat[f"{prefix}.target"] = department.target
+        flat[f"{prefix}.evidence"] = department.evidence
+        flat[f"{prefix}.work"] = department.work
+        flat[f"{prefix}.watched"] = "、".join(department.watched)
+        flat[f"{prefix}.suggested_capabilities"] = "、".join(department.suggested_capabilities)
+        role = definitions.roles.get(department.id)
+        flat[f"{prefix}.tools"] = "、".join(sorted(role.tools)) if role is not None else ""
+        # 可见范围（roles.json 的 visibility）：权限的一项，与工具许可、写入范围并列（设计说明「职能详情」）
+        flat[f"{prefix}.visibility"] = "、".join(sorted(role.visibility)) if role is not None else ""
+        flat[f"{prefix}.verifier"] = "是" if definitions.is_verifier(department.id) else "不是"
+    # 事项种类里各部门的工具许可（work_items.json）：按种类覆盖角色的清单，跑起来用的是这一份
+    for kind_id in sorted(definitions.work_items.kinds):
+        work = definitions.work_items.kinds[kind_id].departments
+        for department_id in sorted(work):
+            flat[f"work_items.{kind_id}.departments.{department_id}.tools"] = "、".join(
+                sorted(work[department_id].tools))
+    for kind in definitions.outcome_kinds.kinds:
+        flat[f"outcome_kinds.{kind.id}.label"] = kind.label
+        flat[f"outcome_kinds.{kind.id}.why"] = kind.why
+    for kind in definitions.outcome_kinds.skeleton:
+        flat[f"outcome_kinds.skeleton.{kind.id}.label"] = kind.label
+        flat[f"outcome_kinds.skeleton.{kind.id}.why"] = kind.why
+    for group in definitions.outcome_kinds.groups:
+        prefix = f"outcome_kinds.groups.{group.id}"
+        flat[f"{prefix}.label"] = group.label
+        flat[f"{prefix}.why"] = group.why
+        flat[f"{prefix}.kinds"] = "、".join(group.kinds)
+    edges: dict[str, list[str]] = {}
+    for verifier, verified, outcome in definitions.rejection_edges():
+        edges.setdefault(verifier, []).append(f"{verified}:{outcome}")
+    for verifier, outcomes in edges.items():
+        flat[f"verification.{verifier}"] = "、".join(sorted(outcomes))
+    # 写入范围（organization.json 的 verification.write_scopes）：核验声明里的一项，与核验关系同一处比较；
+    # 项名与「高级」里采用历史那处差异（organization_compose._flatten）一致
+    for role, scope in definitions.verification.write_scopes.items():
+        flat[f"verification.write_scopes.{role}"] = f"{scope.scope}:{'/'.join(scope.paths)}"
+    for source in ITEM_SOURCES:
+        flat[f"sources.{source}"] = definitions.source_department(source)
+    return flat
+
+
+def definitions_difference(before: Definitions, after: Definitions) -> list[tuple[str, str, str]]:
+    """两份合成结果之间的差异（工单 #1517，项目的组织设计说明「冻结与升级」）。
+
+    「高级」里写明和这个项目上一个事项用的组织相比有什么不同：比较的是两份合成结果，不另存状态。
+    交回逐项的（项、改动前、改动后），项按名字排序；去掉或加上的部门、成果种类、核验关系整段算一项一项的差异。
+    """
+    old, new = _flatten_definitions(before), _flatten_definitions(after)
+    difference: list[tuple[str, str, str]] = []
+    for item in sorted(set(old) | set(new)):
+        if old.get(item, "") == new.get(item, ""):
+            continue
+        difference.append((item, old.get(item, ""), new.get(item, "")))
+    return difference
 
 
 def _empty_baseline_review() -> dict[str, Any]:
@@ -721,15 +878,18 @@ class ProjectService:
     # 项目登记与状态
 
     def register(self, name: str, goal: str, *, source: str = "idea",
-                 initial_directory: str | None = None,
+                 initial_directory: str | None = None, form: str | None = None,
                  command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
         # 不保存目标原文，也不新建项目。source 为 idea（想法新建）或 existing（接入已有项目）
         # initial_directory 是新建项目时一次性的起点文件夹（工单 #321，docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」）：
         # 在事务之前与 project.onboard 相同的采集路径只读采集公开树，采集失败时命令被拒绝，
-        # 不建立项目，不写入任何事件。采集的快照所属范围是项目（与 project_goal 工件相同），不属于任何 run
+        # 不建立项目，不写入任何事件。采集的快照所属范围是项目（与 project_goal 工件相同），不属于任何 run。
+        # form 是新建项目时选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：它就是项目现在的
+        # 组织，写成一条形态改动（原值是默认形态）；不给时项目跟随发布的默认形态
         _require_text("name", name)
         _require_text("goal", goal)
+        frozen_form = None if form is None else self.orchestrator.form_named(form)
         project_id = new_id("proj")
         snapshot = None
         if initial_directory is not None:
@@ -741,6 +901,8 @@ class ProjectService:
                 "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": source,
                 **({} if snapshot is None else {"initial_snapshot": snapshot}),
             }, actor="user:local"))
+            if frozen_form is not None:
+                transaction.append(_form_chosen(frozen_form))
 
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
@@ -748,16 +910,19 @@ class ProjectService:
     def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
                max_cycles: int | None = None,
                run_time_limit_sec: int | None = None,
-                context_window: int = 32_000,
+                context_window: int = 32_000, form: str | None = None,
                 command: Command | None = None) -> tuple[str, str, str]:
         # 接入已有项目（3.8 第 3.1 节）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
         # 登记建档事项（kind 为 onboarding，带快照记录），随后创建建档 run。
         # 快照在事务之前采集：采集失败时命令被拒绝，不建立项目，不写入任何事件。
-        # 调用方（应用层）先采集快照并把错误转成 source_invalid
+        # 调用方（应用层）先采集快照并把错误转成 source_invalid。
+        # form 是接入时选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：与新建项目同一做法，
+        # 写成一条形态改动，建档事项按它冻结
         _require_text("name", name)
         _require_text("goal", goal)
         _require_text("source_name", source_name)
         _require_text("source_path", source_path)
+        frozen_form = None if form is None else self.orchestrator.form_named(form)
         max_cycles, _default_limit = self._limit_values(max_cycles, None)
         run_time_limit_sec = self.onboarding_round_limit(None, run_time_limit_sec)
         project_id = new_id("proj")
@@ -772,6 +937,8 @@ class ProjectService:
             transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
                 "name": source_name, "path": source_path, "version": 1, "base_version": 0,
             }, actor="user:local"))
+            if frozen_form is not None:
+                transaction.append(_form_chosen(frozen_form))
             project = _default_settings(deepcopy(transaction.projection))
             return self._work_item_created(
                 transaction, project, goal, title=name, max_cycles=max_cycles,
@@ -799,6 +966,13 @@ class ProjectService:
         if any(item.status in ("in_progress", "awaiting_initial_prd")
                for item in _compose(self.store, deepcopy(project)).work_items):
             raise WorkItemInProgressError(f"work item in progress: {project_id}")
+        # 项目现在的形态不在这一版发布里（工单 #1517 第 4 轮审查，项目的组织设计说明「冻结与升级」）：
+        # 与新建事项同一条拒绝——重新开始建档以 `not_allowed` 收场并列出可以选的形态，不写事件；
+        # 不先核这一步时 `_work_item_created` 里的 form_named 会抛未处理的 ValueError（接口 500）
+        if project.form_name not in self.orchestrator.forms:
+            raise OrganizationRejectedError(
+                f"项目现在用的形态 {project.form_name} 不在这一版发布里，重新开始建档被拒绝；"
+                f"可以选的形态是：{'、'.join(self.orchestrator.forms)}")
         directory = project.source_directories.get(source_name)
         if directory is None:
             raise SourceDirectoryNotFoundError(f"unknown source directory: {source_name}")
@@ -938,8 +1112,11 @@ class ProjectService:
     def start_work_item(self, project_id: str, text: str, *, title: str | None = None,
                         max_cycles: int | None = None,
                         run_time_limit_sec: int | None = None,
-                        context_window: int = 32_000, command: Command | None = None) -> tuple[str, str]:
-        # 限额不给时取参数现值（工单 #349）：新事项按当前参数建立，调用方显式给出时按给出值
+                        context_window: int = 32_000, form: str | None = None,
+                        command: Command | None = None) -> tuple[str, str]:
+        # 限额不给时取参数现值（工单 #349）：新事项按当前参数建立，调用方显式给出时按给出值。
+        # form 是新建事项时临时选的一份形态（工单 #1517，设计说明「新建的入口」）：只影响这个事项，
+        # 项目的组织不变；不给时按项目现在的组织
         _require_text("text", text)
         _require_title(title)
         self._writable(project_id)
@@ -957,7 +1134,7 @@ class ProjectService:
                 transaction, project, text, title=title, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
-                source_run=point.source_run, work_item_id=work_item_id, run_id=run_id,
+                source_run=point.source_run, work_item_id=work_item_id, run_id=run_id, form=form,
             )
 
         return self._start(project_id, create, command=command)
@@ -1002,13 +1179,21 @@ class ProjectService:
                            additional_input: str | None = None,
                            restarted_from_run_id: str | None = None,
                            mcp_servers: dict[str, Any] | None = None,
-                           form: str | None = None) -> _NewWorkItem:
+                           form: str | None = None,
+                           item_definitions: Definitions | None = None,
+                           item_definitions_ref: dict[str, Any] | None = None) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
-        # 事项创建时冻结项目当时的形态（工单 #1392）：创建事件记下形态名与它的定义版本，之后这个事项的
-        # 写入核对、路由、装配与执行都按这一份定义。没有给 form 时取项目现在的形态（没有设过时是三部门）
+        # 事项创建时冻结项目当时的组织（工单 #1517，项目的组织设计说明「冻结与升级」）：形态加本项目的改动
+        # 合成、过同一套结构校验，把合成结果整份存进事实，创建事件记下形态名与它的版本。之后这个事项的
+        # 写入核对、路由、装配、执行与重放都读这一份，发布或项目的组织后来变了都不影响它。
+        # 没有给 form 时取项目现在的形态（没有设过时是三部门）；因升级重新开始同一个事项时沿用原事项冻结的
+        # 那一份（item_definitions 给了就按它，不重新合成）
         frozen_form = self.orchestrator.form_named(form or project.form_name)
-        definitions = frozen_form.definitions
+        if item_definitions is None:
+            definitions, definitions_ref = self._item_organization(project, form, frozen_form)
+        else:
+            definitions, definitions_ref = item_definitions, item_definitions_ref
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
                                   if department in project.department_settings else 0
@@ -1029,6 +1214,9 @@ class ProjectService:
             "definitions_version": definitions.version,
             # 事项创建时冻结的形态名（工单 #1392）：项目后来改了形态，这个事项仍按记下的这一份运行
             "form": frozen_form.name,
+            # 事项创建时冻结的整份合成结果（工单 #1517）：形态加本项目的改动的合成结果，按内容摘要落盘；
+            # 旧事件没有这一项时按形态名在这一版发布里取。有它以后发布改了形态也不影响这个事项
+            **({} if not definitions_ref else {"definitions_ref": definitions_ref}),
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
             "priority": priority,
             "kind": kind,
@@ -1047,8 +1235,37 @@ class ProjectService:
                 round=(1 if kind == "onboarding" else 0) if round is None else round,
                 onboarding_basis=onboarding_basis, additional_input=additional_input,
                 mcp_servers=frozen_mcp, form=frozen_form.name,
+                # 这个 run 按事项冻结的那份合成结果跑（工单 #1517）：形态名与整份定义各传一份，
+                # 发布里后来换掉这个名字指向的内容时不重新取。form_version 是创建时这一版发布里这个形态的
+                # 版本：「定义版本不同时继续或停止」按它与发布现在的那一版比（事项本身不随发布变化）
+                item_definitions=definitions, form_version=frozen_form.definitions.version,
+                **({} if not definitions_ref else {"item_definitions_ref": definitions_ref}),
             ),
         )
+
+    def _item_organization(self, project: ProjectProjection, form: str | None,
+                           frozen_form: Any) -> tuple[Definitions, dict[str, Any]]:
+        # 合成与冻结（工单 #1517，项目的组织设计说明「合成规则」「冻结与升级」）：形态加本项目的改动，
+        # 合成结果过加载时的同一套结构校验（与采用、校验草稿同一套），过了就整份存进事实。
+        # 临时选一份形态只影响这个事项（设计说明「新建的入口」）：那时用形态本身，不带本项目的改动——
+        # 改动按身份写的是本项目现在这一份形态上的项，换一份形态时它们不适用（页面换形态时确认过会丢掉哪些）。
+        # 合不到一起时抛出 OrganizationRejectedError，新建事项被拒绝并写明是哪一项
+        document: dict[str, Any] = {} if form else dict(project.organization_changes)
+        parsed, issues = parse_organization_changes(document)
+        if parsed is None:
+            raise OrganizationRejectedError(_organization_issues_text(issues))
+        definitions, issues = compose_checked(frozen_form.definitions, parsed, store=self.store)
+        if definitions is None:
+            raise OrganizationRejectedError(_organization_issues_text(issues))
+        return definitions, self._freeze_item_definitions(project.project_id, definitions)
+
+    def _freeze_item_definitions(self, project_id: str, definitions: Definitions) -> dict[str, Any]:
+        # 合成结果整份存进事实（工单 #1517）：按内容摘要落盘的工件，引用写进事项创建事件与 run 的创建事件。
+        # 所属范围是项目：一个项目里同一个组织版本只有一份，几个事项共用。按定义文件的次序写，
+        # 读回来逐文件相同，版本（内容摘要）也相同
+        text = json.dumps(definitions.contents, ensure_ascii=False, separators=(",", ":"))
+        ref = self.artifacts.put(project_id, ITEM_DEFINITIONS_KIND, text, media_type="application/json")
+        return asdict(ref)
 
     def _start(self, project_id: str, create: Callable[[Transaction], _NewWorkItem], *,
                command: Command | None = None) -> tuple[str, str]:
@@ -1151,8 +1368,12 @@ class ProjectService:
             form = self._restart_form(transaction, item, run_id)
             if form is None:
                 return None
+            # 同一个事项冻结的组织不变（工单 #1517）：沿用原事项存下的那份合成结果，不按现在的发布重新合成；
+            # 旧事项只记了形态名时没有这一项，照原来的做法按形态名取
+            frozen_ref = frozen_definitions_ref(self.store, run.project_id, item.work_item_id)
+            frozen = definitions_from_ref(self.artifacts, frozen_ref)
             if item.kind == "onboarding":
-                return self._onboarding_restarted(transaction, project, item, run_id, form)
+                return self._onboarding_restarted(transaction, project, item, run_id, form, frozen, frozen_ref)
             point = self._work_item_start_point(project)
             return self._work_item_created(
                 transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
@@ -1162,9 +1383,9 @@ class ProjectService:
                 work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
                 restarted_from_run_id=run_id,
                 # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
-                # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
+                # 形态与合成结果同样沿用（工单 #1392、#1517）：这是同一个事项，换的只是 run 的应用版本
                 mcp_servers=item.mcp_servers,
-                form=form,
+                form=form, item_definitions=frozen, item_definitions_ref=frozen_ref,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -1182,7 +1403,9 @@ class ProjectService:
         return created.work_item_id, created.run_id
 
     def _onboarding_restarted(self, transaction: Transaction, project: ProjectProjection,
-                              item: WorkItem, run_id: str, form: str) -> _NewWorkItem:
+                              item: WorkItem, run_id: str, form: str,
+                              item_definitions: Definitions | None = None,
+                              item_definitions_ref: dict[str, Any] | None = None) -> _NewWorkItem:
         # 建档事项因升级重新开始（最后一行）：第一轮用建档事项记录的快照重建，与开始建档时同样
         # 从快照开始、种类为 onboarding、没有基线、轮次为 1；修改轮带上一轮候选与修改意见重新开始，与回答
         # 「提出修改」建立的 run 依据相同（轮次、上一轮候选的事件编号、修改意见原文）。
@@ -1204,15 +1427,16 @@ class ProjectService:
             kind="onboarding", round=prior.round, onboarding_basis=basis, additional_input=note,
             restarted_from_run_id=run_id,
             # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
-            # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
+            # 形态与合成结果同样沿用（工单 #1392、#1517）：这是同一个事项，换的只是 run 的应用版本
             mcp_servers=item.mcp_servers,
-            form=form,
+            form=form, item_definitions=item_definitions, item_definitions_ref=item_definitions_ref,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
-                        command: Command | None = None) -> str:
+                        form: str | None = None, command: Command | None = None) -> str:
         # 排空期间新建的事项（3.1，ADR-0019）：在项目流按通常方式登记事项，但不创建它的 run，也不开始执行。
-        # run 流为空，事项的状态因此是「还没有开始」；它排在队列里等升级完成以后开始（调度由 3.4A 的 #19 实现）
+        # run 流为空，事项的状态因此是「还没有开始」；它排在队列里等升级完成以后开始（调度由 3.4A 的 #19 实现）。
+        # form 是新建事项时临时选的一份形态（工单 #1517），与 start_work_item 同一条读法
         _require_text("text", text)
         _require_title(title)
         self._writable(project_id)
@@ -1227,6 +1451,7 @@ class ProjectService:
                 run_time_limit_sec=run_time_limit_sec, context_window=32_000,
                 baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
                 source_run=point.source_run, work_item_id=work_item_id, run_id=run_id, priority=PRIORITY_USER,
+                form=form,
             )
             return work_item_id
 
@@ -1348,6 +1573,13 @@ class ProjectService:
                 for event in self.store.list_project_events(project_id)
                 if event.type == ProjectEventType.WORK_ITEM_CREATED
             }
+            # 事项创建时冻结的整份合成结果（工单 #1517）：有它的按它补建，版本与它相同；旧事项没有这一项，
+            # 照原来的做法按形态名在这一版发布里取
+            frozen_refs = {
+                event.payload["run_id"]: event.payload.get("definitions_ref")
+                for event in self.store.list_project_events(project_id)
+                if event.type == ProjectEventType.WORK_ITEM_CREATED
+            }
             for item in state.work_items:
                 if item.kind == "onboarding":
                     continue
@@ -1360,7 +1592,10 @@ class ProjectService:
                 if form is None:
                     # 事项冻结的形态已经不在发布里（项目的组织设计说明「冻结与升级」）：不补建，保留事项记录
                     continue
-                if item_definitions_version and item_definitions_version != form.definitions.version:
+                frozen_ref = frozen_refs.get(item.run_id)
+                frozen = definitions_from_ref(self.artifacts, frozen_ref)
+                if frozen is None and item_definitions_version \
+                        and item_definitions_version != form.definitions.version:
                     continue
                 snapshot = item.snapshot
                 tree = None
@@ -1385,6 +1620,8 @@ class ProjectService:
                     # 补建只读 work_item_created 里冻结的 MCP 服务器设置（工单 #236）：
                     # 不取项目当前设置，旧事件没有这个字段时为空，按空设置读取
                     mcp_servers=item.mcp_servers, form=form.name,
+                    # 冻结的整份合成结果（工单 #1517）同样只读事项记录里的那一份，不按现在的发布重新合成
+                    item_definitions=frozen, item_definitions_ref=frozen_ref,
                 )
                 created.append(item.run_id)
         return created

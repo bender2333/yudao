@@ -190,9 +190,10 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         capabilities = client.get("/api/capabilities").json()
         document = client.get("/openapi.json").json()
     assert capabilities["commands"] == [
-        {"name": "project.create", "reasons": ["source_invalid", "command_id_reused"]},
+        # 新建项目与接入已有项目可以选一张形态卡（工单 #1517）：发布带里没有那一份时以 not_allowed 拒绝
+        {"name": "project.create", "reasons": ["source_invalid", "not_allowed", "command_id_reused"]},
         {"name": "project.onboard",
-         "reasons": ["source_invalid", "busy", "provider_unavailable", "command_id_reused"]},
+         "reasons": ["source_invalid", "busy", "provider_unavailable", "not_allowed", "command_id_reused"]},
         {"name": "onboarding.restart",
          "reasons": ["not_found", "project_archived", "not_allowed", "source_invalid", "busy",
                      "provider_unavailable", "command_id_reused"]},
@@ -304,9 +305,14 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert capabilities["queries"][-3]["name"] == "run.loops"
     assert capabilities["queries"][-3]["replayable"] is True
     assert "model_requested" in capabilities["queries"][-3]["changed_by"]
-    # 项目现在的组织（工单 #1402）：这一版只有形态这一节，形态改动改变它
+    # 项目现在的组织（工单 #1402）：形态改动改变它自己那一份；事项的开始、结束、采纳与撤销也改变它
+    # （还在按它跑的事项数与上一个事项的比较，工单 #1517）
     assert capabilities["queries"][-2] == {
-        "name": "project.organization", "changed_by": ["project_form_set"], "replayable": False,
+        "name": "project.organization",
+        "changed_by": ["project_form_set", "work_item_created", "deliverable_adopted", "adoption_held",
+                       "baseline_adopted", "project_decision_withdrawn",
+                       "run_done", "run_failed", "run_paused", "run_resumed", "run_continued"],
+        "replayable": False,
     }
     # 校验草稿（工单 #1515）：结果只由请求与这个实例加载的发布带决定，不由任何事件改变
     assert capabilities["queries"][-1] == {

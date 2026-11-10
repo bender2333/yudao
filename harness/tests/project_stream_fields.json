@@ -127,6 +127,7 @@
       "writeback_enabled": "旧事件没有采纳写回开关；没有这个字段时默认为 false，不执行写回"
     },
     "work_item_created": {
+      "definitions_ref": "旧事件没有这个字段（工单 #1517），读取时按形态名在这一版发布里取：冻结整份合成结果之前登记的事项只记了形态名",
       "form": "旧事件没有这个字段（工单 #1392），读取时按默认形态（three_departments）处理：形态随事项冻结之前登记的事项都按当时加载的定义运行",
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
       "mcp_servers": "旧事件没有这个字段（工单 #236），读取时按空设置处理：保存 MCP 服务器设置之前登记的事项没有冻结的设置，后续 run 也不带",
@@ -448,6 +449,7 @@
     "work_item_created": {
       "baseline": "object?",
       "context_window": "integer",
+      "definitions_ref": "object?",
       "definitions_version": "string",
       "form": "string",
       "kind": "string",

@@ -22,12 +22,15 @@ from ..models import (
     GIT_VERSION_EVENTS, ProjectEventType, hash_bytes, stop_reason_name,
 )
 from ..observability import ObservabilityQuery
+from ..organization_compose import current_organization
 from ..providers.selection import ModelSelection
 from ..project_projection import replay_project, saved_project
 from ..projection import (
     RunNotFoundError, load_decisions, project_run, replay_decisions, replay_events, replay_run, run_handler,
 )
-from ..projects import ProjectNotFoundError, project_projection
+from ..projects import (
+    ProjectNotFoundError, definitions_difference, definitions_from_ref, project_projection,
+)
 from ..redact import redact_tool_args
 from ..streams import STOP_REASON_UPGRADE
 from ..replay_check import ReplayIntegrityError, verify_replay
@@ -476,6 +479,12 @@ class WorkItemOrganization(Contract):
     watched: list[WatchedRelation]
     asks: list[AskRelation]
     rejections: list[RejectionRelation]
+    # 这个事项用的组织的版本（工单 #1517，项目的组织设计说明「冻结与升级」）：合成结果的内容摘要，
+    # 事项创建时冻结，发布或项目后来改了组织都不变
+    version: str = ""
+    # 和项目现在的组织相同或不同（按设计说明「冻结与升级」比职能、角色、成果、核验与轮转五项，与「高级」里
+    # `previous_item.differences` 的取法一致；不含观察者，观察者不在冻结的内容里）：项目现在的组织取不到时为空
+    same_as_project: bool | None = None
 
 
 class WorkItemLoop(Contract):
@@ -528,6 +537,12 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         _work_item(state, request.work_item)
     at_time = None if through is None else store.created_at_at(through)
     forms = _release_definitions(application.system)
+    # 项目现在的组织版本（工单 #1517）：事项详情里「和项目现在的组织相同或不同」按它比较，
+    # 取不到（形态不在这一版发布里或改动合不到一起）时为空
+    project_definitions, _issues = current_organization(forms, state.form_name, state.organization_changes,
+                                                        store=store)
+    # 事项冻结的合成结果按内容摘要只读一次（工单 #1517）：几个事项用同一份组织时不必各读一遍那件工件
+    frozen: dict[str, Any] = {}
     rows: list[WorkItemLoop] = []
     for index, item in enumerate(state.work_items):
         if request.work_item is not None and item.work_item_id != request.work_item:
@@ -547,7 +562,10 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             recovery_state=observation, stop_reason=item.stop_reason,
             last_department=_last_department(store, item, through=through), version=item.stream_version,
             refs=_fact_refs(store, item, run, state),
-            organization=_work_item_organization(forms, store, item, through),
+            organization=_work_item_organization(forms, store, item, through,
+                                                 artifacts=application.system.artifacts,
+                                                 project_definitions=project_definitions,
+                                                 frozen=frozen),
         ))
     return Snapshot[ProjectLoopResult](
         position=_snapshot_position(store, through),
@@ -761,18 +779,32 @@ def _watched_relations(definitions: Any, kind: str, ref: FactRef) -> list[Watche
 
 
 def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
-                            through: int | None = None) -> WorkItemOrganization | None:
-    """这个事项冻结定义里的组织（工单 #1381）。
+                            through: int | None = None, *, artifacts: Any = None,
+                            project_definitions: Any = None,
+                            frozen: dict[str, Any] | None = None) -> WorkItemOrganization | None:
+    """这个事项冻结定义里的组织（工单 #1381、#1517）。
 
     取法与工具许可、提案校验读事项所用定义的做法相同（工单 #1165、#1392）：按事项创建时记下的形态名，
     在这一版发布加载的那几份里取那一份，不读进程加载时的模块级定义；项目后来换了形态、换了定义都不影响它。
-    形态不在这一版发布里时为空，不换一份定义顶替（项目的组织设计说明「冻结与升级」）
+    事项创建时存下了整份合成结果时（工单 #1517）按它取：形态名字还在发布里、发布把这一份的内容改了，
+    读的仍是这个事项冻结的那一份。形态不在这一版发布里时为空，不换一份定义顶替（项目的组织设计说明「冻结与升级」）。
+    version 是这个事项用的组织的版本；same_as_project 按设计说明「冻结与升级」的五项（职能、角色、成果、
+    核验与轮转）与项目现在的组织逐项比较，比的是两份合成结果、不另存状态，与「高级」里那处差异同一取法；
+    项目现在的组织取不到时为空。frozen 是这一次查询已经读过的合成结果（内容摘要 → 定义），同一份组织只读一次
     """
     form = item.form or DEFAULT_FORM
+    event = _organization_event(store, item, through)
     definitions = forms.get(form)
+    if definitions is not None and artifacts is not None:
+        reference = (event.payload or {}).get("definitions_ref")
+        key = "" if not isinstance(reference, dict) else str(reference.get("content_hash") or "")
+        cache = {} if frozen is None else frozen
+        if key not in cache:
+            cache[key] = definitions_from_ref(artifacts, reference)
+        definitions = cache[key] or definitions
     if definitions is None:
         return None
-    ref = _organization_ref(definitions, _organization_event(store, item, through))
+    ref = _organization_ref(definitions, event)
     roles = [OrganizationRole(id=role, label=definitions.department_labels.get(role, role), ref=ref)
              for role in definitions.departments]
     return WorkItemOrganization(
@@ -791,6 +823,9 @@ def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
               for recipient in definitions.departments if recipient != requester],
         rejections=[RejectionRelation(verifier=verifier, role=verified, outcome=outcome, ref=ref)
                     for verifier, verified, outcome in definitions.rejection_edges()],
+        version=definitions.version,
+        same_as_project=(None if project_definitions is None
+                         else not definitions_difference(definitions, project_definitions)),
     )
 
 
@@ -3637,6 +3672,8 @@ PROJECT_LOOP = QueryDefinition(
     name="project.loop", request=ProjectLoop, result=ProjectLoopResult, handle=_project_loop,
     replayable=True,
     changed_by=(ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.DELIVERABLE_ADOPTED,
+                # 事项详情里「和项目现在的组织相同或不同」跟着项目现在的组织变（工单 #1517）
+                ProjectEventType.PROJECT_FORM_SET,
                 EventType.RUN_CREATED, EventType.RUN_DONE, EventType.RUN_FAILED,
                 EventType.RUN_PAUSED, EventType.RUN_CONTINUED, EventType.RUN_RESUMED, EventType.DEPARTMENT_ACTIVATED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.TOOL_STARTED, EventType.TOOL_CALLED,

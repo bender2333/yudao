@@ -15,13 +15,13 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from harness import direct
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.definitions import (DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, Department, OutcomeKind,
-                                 VerificationDeclaration, VerifiedOutcomes, VerifierRole, WriteScope,
+from harness.definitions import (DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, definitions_from_contents,
                                  load_definitions)
 from harness.direct import (COMPLETION_KIND, DIRECT_TIGHTENING, REVIEW_KIND, RELEASE_VERDICT,
                             REWORK_VERDICT, SINGLE_ROLE_DIRECT)
@@ -64,41 +64,32 @@ REVIEW_CONTRACT = WITH_VERIFIER_FIXTURE.proposal_contracts.roles[QUALITY]
 def _with_quality_verifier() -> Any:
     """同一份定义加回质检做核验角色：只补部门、核验声明与核验结论那一样。
 
-    本项目的改动（project-organization 设计说明）还没有合成这一层实现，这里按它以后的样子从发布的那一份
-    定义复制一份：部门加质检，核验声明写质检核验工程交完成的那一份，路由的部门清单与提议方式跟着多一样，
+    本项目在组织上做「加一个核验角色」的改动时，合成结果是这样一份定义（project-organization 设计说明
+    「合成规则」第 4 条）：部门加质检，核验声明写质检核验工程交完成的那一份，路由的部门清单跟着多一样，
     成果种类多出核验结论。其余内容（产品与工程的角色材料、工具、文档、路由）一个字不改。
+    按定义文件的副本造出来，与真实的合成结果一样是一份完整的定义：内容与版本由同一套加载与校验得出，
+    事项创建时冻结的与后来读回来的因此是同一份（工单 #1517）。
     """
-    declared = SEVERAL_ROLES.routing_definition()
+    contents = deepcopy(SEVERAL_ROLES.contents)
     several_departments = {department.id for department in SEVERAL_ROLES.organization.departments}
-    quality = Department(id=QUALITY, label=DEFINITIONS.department_labels[QUALITY], roles=(QUALITY,), watched=())
-    organization = SEVERAL_ROLES.organization.model_copy(update={
-        "departments": (*SEVERAL_ROLES.organization.departments, quality),
-        "verification": VerificationDeclaration(
-            verifiers=(VerifierRole(role=QUALITY, verifies=(
-                VerifiedOutcomes(role=ENGINEERING, outcomes=(COMPLETION_KIND,)),)),),
-            write_scopes={QUALITY: WriteScope(scope="check_materials", paths=(CHECK_MATERIALS_DIR,))}),
-    })
-    routing = declared.model_copy(update={
-        "departments": (*declared.departments, QUALITY),
-        "proposal_methods": (*declared.proposal_methods, SUBMIT_REVIEW),
-    })
-    review_kind = OutcomeKind(id=REVIEW_KIND, label="核验结论",
-                              why="核验角色对工程交完成的当前这一版的结论：放行或打回")
-    group = SEVERAL_ROLES.outcome_kinds.groups[0].model_copy(
-        update={"kinds": (*SEVERAL_ROLES.outcome_kinds.groups[0].kinds, REVIEW_KIND)})
-    outcome_kinds = SEVERAL_ROLES.outcome_kinds.model_copy(
-        update={"kinds": (*SEVERAL_ROLES.outcome_kinds.kinds, review_kind), "groups": (group,)})
     assert several_departments == {PRODUCT, ENGINEERING}
-    return SEVERAL_ROLES.model_copy(update={
-        "version": "sha256:several-roles-direct-with-quality",
-        "organization": organization,
-        "roles": {**SEVERAL_ROLES.roles, QUALITY: QUALITY_ROLE},
-        "tools": {**SEVERAL_ROLES.tools, SUBMIT_REVIEW: REVIEW_TOOL},
-        "proposal_contracts": SEVERAL_ROLES.proposal_contracts.model_copy(
-            update={"roles": {**SEVERAL_ROLES.proposal_contracts.roles, QUALITY: REVIEW_CONTRACT}}),
-        "routings": SEVERAL_ROLES.routings.model_copy(update={"routings": (routing,)}),
-        "outcome_kinds": outcome_kinds,
+    organization = contents["organization.json"]
+    organization["departments"].append({
+        "id": QUALITY, "label": DEFINITIONS.department_labels[QUALITY], "roles": [QUALITY], "watched": [],
     })
+    organization["verification"] = {
+        "verifiers": [{"role": QUALITY, "verifies": [{"role": ENGINEERING, "outcomes": [COMPLETION_KIND]}]}],
+        "write_scopes": {QUALITY: {"scope": "check_materials", "paths": [CHECK_MATERIALS_DIR]}},
+    }
+    contents["roles.json"][QUALITY] = deepcopy(WITH_VERIFIER_FIXTURE.contents["roles.json"][QUALITY])
+    contents["tools.json"][SUBMIT_REVIEW] = deepcopy(WITH_VERIFIER_FIXTURE.contents["tools.json"][SUBMIT_REVIEW])
+    contents["proposal_contracts.json"]["roles"][QUALITY] = deepcopy(
+        WITH_VERIFIER_FIXTURE.contents["proposal_contracts.json"]["roles"][QUALITY])
+    routing = contents["routings.json"]["routings"][0]
+    routing["departments"].append(QUALITY)
+    if SUBMIT_REVIEW not in routing["proposal_methods"]:
+        routing["proposal_methods"].append(SUBMIT_REVIEW)
+    return definitions_from_contents(contents)
 
 
 WITH_VERIFIER = _with_quality_verifier()

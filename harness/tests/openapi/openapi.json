@@ -34,7 +34,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：source_invalid, command_id_reused",
+            "description": "命令被拒绝，可能的原因：source_invalid, not_allowed, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -85,7 +85,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, command_id_reused",
+            "description": "命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, not_allowed, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -11048,6 +11048,42 @@
         ],
         "title": "InstanceUpgradeRequested"
       },
+      "ItemOrganization": {
+        "properties": {
+          "work_item_id": {
+            "type": "string",
+            "title": "Work Item Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "differences": {
+            "items": {
+              "$ref": "#/components/schemas/FormDifference"
+            },
+            "type": "array",
+            "title": "Differences"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work_item_id",
+          "title",
+          "form",
+          "version"
+        ],
+        "title": "ItemOrganization"
+      },
       "KeptDelivery": {
         "properties": {
           "version": {
@@ -12414,10 +12450,16 @@
             "enum": [
               "release",
               "changed",
-              "added"
+              "added",
+              "running_item"
             ],
             "title": "Origin",
             "default": "release"
+          },
+          "running_items": {
+            "type": "integer",
+            "title": "Running Items",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -12922,6 +12964,18 @@
               }
             ],
             "title": "Initial Directory"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
           }
         },
         "additionalProperties": false,
@@ -13068,6 +13122,18 @@
             "type": "string",
             "minLength": 1,
             "title": "Source Path"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
           }
         },
         "additionalProperties": false,
@@ -13183,6 +13249,16 @@
               }
             ],
             "title": "Remove Verifier"
+          },
+          "previous_item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -18321,6 +18397,18 @@
               }
             ],
             "title": "Title"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
           }
         },
         "additionalProperties": false,
@@ -18690,6 +18778,22 @@
             },
             "type": "array",
             "title": "Rejections"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": ""
+          },
+          "same_as_project": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Same As Project"
           }
         },
         "additionalProperties": false,
@@ -37242,6 +37346,27 @@
             "default": 0,
             "title": "Round",
             "type": "integer"
+          },
+          "definitions_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "form_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form Version"
           }
         },
         "required": [
@@ -43104,6 +43229,16 @@
             "default": "",
             "title": "Form",
             "type": "string"
+          },
+          "definitions_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

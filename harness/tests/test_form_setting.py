@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,7 @@ from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.contracts import Accepted, Rejected
 from harness.app.form_commands import ORGANIZATION_ADOPT, OrganizationAdopt
 from harness.app.form_queries import PROJECT_ORGANIZATION, ProjectOrganization
-from harness.definitions import DEFAULT_FORM, DEFINITIONS, VerificationDeclaration
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, definitions_from_contents
 from harness.direct import SINGLE_ROLE_DIRECT
 from harness.models import EventType, ProjectEventType
 from harness.runtime import SEVERAL_ROLES_DIRECT, LoopSystem
@@ -36,13 +37,13 @@ from harness.tightening import WATCHED_OUTPUTS
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
 # 发布带的形态（工单 #1402）：三部门、测试目录里的任务池，以及一份没有核验角色的三部门副本
-# （副本的定义内容与三部门相同，只有核验声明为空；发布带里的五份形态中「一个角色直做」就是这个样子）
+# （副本的定义内容与三部门相同，只有核验声明为空；发布带里的五份形态中「一个角色直做」就是这个样子）。
+# 按定义文件的副本造出来（工单 #1517）：与真实的发布一样是一份完整的定义，内容与版本由同一套加载与校验
+# 得出，事项创建时冻结的与后来读回来的因此是同一份
 OPEN_LOOP_FORM = "three_departments_without_verifier"
-OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
-    "version": "sha256:three-departments-without-verifier",
-    "organization": DEFINITIONS.organization.model_copy(
-        update={"verification": VerificationDeclaration(verifiers=())}),
-})
+OPEN_LOOP_CONTENTS = deepcopy(DEFINITIONS.contents)
+OPEN_LOOP_CONTENTS["organization.json"]["verification"]["verifiers"] = []
+OPEN_LOOP_DEFINITIONS = definitions_from_contents(OPEN_LOOP_CONTENTS)
 FORMS = {
     DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
     OPEN_LOOP_FORM: (OPEN_LOOP_DEFINITIONS, WATCHED_OUTPUTS),
@@ -225,7 +226,8 @@ def test_the_query_lists_every_form_of_the_release_and_marks_the_one_without_a_v
     # 没有核验角色的那一份：说明里写清楚以开环完成结束
     assert (choices[OPEN_LOOP_FORM].verifier_roles, choices[OPEN_LOOP_FORM].open_loop) == ([], True)
     assert "没有核验角色" in choices[OPEN_LOOP_FORM].description
-    assert choices[OPEN_LOOP_FORM].version == "sha256:three-departments-without-verifier"
+    assert choices[OPEN_LOOP_FORM].version == OPEN_LOOP_DEFINITIONS.version
+    assert choices[OPEN_LOOP_FORM].version != choices[DEFAULT_FORM].version
     # 现在这一份形态里的部门（工单 #1457）：标识、显示名与是不是核验角色，按定义里的顺序。
     # 页面的部门页签、看板列与默认部门按这一项取，不写死三个
     assert [(department.id, department.label, department.verifier)
@@ -303,4 +305,11 @@ def test_the_command_and_the_query_are_registered_with_the_reasons_they_can_retu
     assert DEFAULT_REGISTRY.reasons("organization.adopt") == (
         "not_found", "stale_base", "project_archived", "not_allowed", "command_id_reused")
     assert DEFAULT_REGISTRY.queries["project.organization"] is PROJECT_ORGANIZATION
-    assert PROJECT_ORGANIZATION.changed_by == (ProjectEventType.PROJECT_FORM_SET,)
+    # 这份读取还看事项（工单 #1517）：事项开始、结束、采纳与撤销改变还在跑的事项数与上一个事项的比较，
+    # 形态改动改变它自己那一份。会改变结果的种类都在这份清单里，由 test_query_refresh_lists.py 的重放核对守住
+    assert PROJECT_ORGANIZATION.changed_by == (
+        ProjectEventType.PROJECT_FORM_SET, ProjectEventType.WORK_ITEM_CREATED,
+        ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
+        ProjectEventType.BASELINE_ADOPTED, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+        EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
+        EventType.RUN_RESUMED, EventType.RUN_CONTINUED)

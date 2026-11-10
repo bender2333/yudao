@@ -325,12 +325,43 @@ def compose_checked(form: Definitions, changes: OrganizationChanges, *,
     return definitions, []
 
 
+# 项目现在的组织按输入记在进程里（工单 #1517 第 4 轮审查）：合成一份组织是（形态名、形态版本、改动的
+# 规范化内容）的函数——形态按内容摘要算版本、改动的解析与核对不读别的事实，同一组输入读回来的定义不变
+# （`routing_issues` 只按定义核对，拿 store 只为把只读的事件读取器交给声明 use_facts 的路由，不看事件内容）。
+# 页面按 200ms 合并重查 `project.loop`，每一条都取这一份；不缓存时采用过组织改动的一处量到约 190 毫秒
+# （其中合成约 157、校验约 20），占住查询端点的同步调用。一份合成结果在进程里约十几 MB（含
+# model_capabilities），上限取 4 份（每个项目一份；同一项目换了组织以后旧的那一份不再用到），旧的先丢。
+_CURRENT_CACHE: dict[tuple[str, str, str, bool],
+                     tuple[Definitions | None, list[tuple[str, str, str]]]] = {}
+_CURRENT_CACHE_LIMIT = 4
+
+
+def _changes_key(changes: Any) -> str | None:
+    # 改动的规范化内容：同一个文档换了键的顺序也落到同一个缓存项；写不成 JSON 的输入不缓存，交给解析去报错
+    try:
+        return json.dumps(changes, sort_keys=True, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return None
+
+
+def _remember_current(key: tuple[str, str, str, bool] | None,
+                      definitions: Definitions | None,
+                      issues: list[tuple[str, str, str]]) -> tuple[Definitions | None,
+                                                                  list[tuple[str, str, str]]]:
+    if key is not None:
+        if len(_CURRENT_CACHE) >= _CURRENT_CACHE_LIMIT:
+            _CURRENT_CACHE.pop(next(iter(_CURRENT_CACHE)))
+        _CURRENT_CACHE[key] = (definitions, list(issues))
+    return definitions, issues
+
+
 def current_organization(forms: Mapping[str, Definitions], form_name: str, changes: Any, *,
                          store: Any = None) -> tuple[Definitions | None, list[tuple[str, str, str]]]:
     """项目现在的组织：形态加本项目的改动（合成结果就是这件事现在用的那份定义）。
 
     形态不在这一版发布里、改动文档不合法或合不到一起时交回空结果与逐项的问题；组织版本随之没有
-    （设计说明「冻结与升级」：页面照实写明原因，不拿别的形态顶替）。
+    （设计说明「冻结与升级」：页面照实写明原因，不拿别的形态顶替）。结果按（形态名、形态版本、改动的
+    规范化内容、有没有事件库）记在进程里，同一组输入只合成一次。
     """
     form = forms.get(form_name)
     if form is None:
@@ -338,10 +369,17 @@ def current_organization(forms: Mapping[str, Definitions], form_name: str, chang
     if not isinstance(changes, dict) or not changes:
         # 没有改动：组织就是这份形态本身，版本是它的定义版本
         return form, []
+    key_text = _changes_key(changes)
+    key = None if key_text is None else (form_name, form.version, key_text, store is not None)
+    cached = None if key is None else _CURRENT_CACHE.get(key)
+    if cached is not None:
+        # 交回一份新的问题清单：调用方会把它们逐个搬进自己的读取体，缓存项不跟着改
+        return cached[0], list(cached[1])
     parsed, issues = parse_organization_changes(changes)
     if parsed is None:
-        return None, issues
-    return compose_checked(form, parsed, store=store)
+        return _remember_current(key, None, issues)
+    definitions, issues = compose_checked(form, parsed, store=store)
+    return _remember_current(key, definitions, issues)
 
 
 # 一次点击加上的核验角色：它的三样说明与 Prompt 同时是它的角色材料（设计说明「加部门」：三样说明生成
