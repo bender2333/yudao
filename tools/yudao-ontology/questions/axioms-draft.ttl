@@ -1,0 +1,26 @@
+# 第一批题里「明说-必有」的结论写成的公理草稿。没经用户点头，不进 batches/。
+# 每条带 yd:question 指回题号，yd:basis 写原句（原句与行号在 questions/baseline.json）。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+yd:question a <http://www.w3.org/2002/07/owl#AnnotationProperty> .
+
+yd:ax-q32-source-has-receiver a yd:MustHaveAxiom ; rdfs:label "每一种事项的来源必有人接"@zh ;
+    yd:onClass yd:Source ; yd:viaProperty yd:receives ; yd:viaInverse true ; yd:filler yd:Actor ;
+    yd:question "Q11、Q20、Q32" ;
+    yd:basis "术语表「每一种来源都要有职能接」；形态与核验角色设计说明「没有职能接的来源，这种事项开始不了」；代码定义校验拒绝" .
+
+yd:ax-q16-role-belongs a yd:MustHaveAxiom ; rdfs:label "每个角色必属于一个职能"@zh ;
+    yd:onClass yd:Role ; yd:viaProperty yd:belongsTo ; yd:filler yd:Department ;
+    yd:question "Q16" ;
+    yd:basis "术语表「每个职能由一个角色做……职能里的多个角色仍用子组织的做法」；代码「角色不属于任何部门」即拒绝" .
+
+yd:ax-q23-form-has-rotation a yd:MustHaveAxiom ; rdfs:label "每个形态必有一种轮转方式"@zh ;
+    yd:onClass yd:Form ; yd:viaProperty yd:rotation ; yd:filler yd:RotationMode ;
+    yd:question "Q23" ;
+    yd:basis "术语表「每张卡带两个标记：轮转（直做、按成果）与结束（开环完成、独立核验放行）」" .
+
+yd:ax-q02-form-has-final a yd:MustHaveAxiom ; rdfs:label "每个形态必写明事项最后采纳的成果"@zh ;
+    yd:onClass yd:Form ; yd:viaProperty yd:finalOutcome ; yd:filler yd:OutcomeKind ;
+    yd:question "Q02" ;
+    yd:basis "项目的组织设计说明「事项无法结束：直做没有指定谁交完成；按成果没有写明事项最后采纳哪种成果，或没有职能交它」（拒绝）" .

@@ -170,3 +170,11 @@ yd:role-min yd:watches yd:ok-guidance ;
 # 运维发现的故障是一件新事项，不是打回（发布带还没有，仍按「以后」记不知道）。
 yd:src-incident yd:docRef "项目的组织设计说明 4.14" ; yd:batch 2 ;
     yd:quote "运维发现的故障从图外进来，开一件新事项，和打回分开画（发布带还没有）。" .
+
+# 11-10 第一批题 Q16 补抽（模型漏抽）：两份直做形态里的角色各属于哪个职能。题与证据见 questions/baseline.json
+yd:role-min yd:belongsTo yd:dept-engineering ;
+    yd:quote "「工程」只有一个角色，用工程这个职能的名字与工具" ; yd:docRef "形态与核验角色设计说明 4.5" .
+yd:role-sev-product yd:belongsTo yd:dept-product ;
+    yd:quote "「产品 · 工程」有两个自有角色，产品与工程，用这两个职能的名字与工具" .
+yd:role-sev-engineering yd:belongsTo yd:dept-engineering ;
+    yd:quote "「产品 · 工程」有两个自有角色，产品与工程，用这两个职能的名字与工具" .

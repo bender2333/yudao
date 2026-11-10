@@ -323,10 +323,18 @@ def main(argv: list[str]) -> None:
         cdir.mkdir(parents=True, exist_ok=True)
         (cdir / f"{imp['old']}..{imp['new']}.json").write_text(json.dumps(imp, ensure_ascii=False, indent=1), encoding="utf-8")
         (cdir / f"{imp['old']}..{imp['new']}.md").write_text(changes.render(imp), encoding="utf-8")
+    base = HERE / "questions" / "baseline.json"
+    if base.exists():  # 题目基线：每道题靠的原句在这个提交上还在不在原处（挪走、改写、没了）
+        import answers
+        if json.loads(base.read_text(encoding="utf-8"))["commit"] != commit:
+            r["baseline"] = answers.recheck(commit)
     outdir = HERE / "reports" / "next"
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / f"{commit}.json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
     md = render(r)
+    if r.get("baseline"):
+        import answers
+        md += "\n\n## 题目基线：证据还在不在\n" + answers.render(r["baseline"]) + "\n"
     (outdir / f"{commit}.md").write_text(md, encoding="utf-8")
     print(md)
 

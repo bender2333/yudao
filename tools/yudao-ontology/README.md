@@ -27,6 +27,10 @@
 | `renames.py`、`renames.json` | 改名从术语表与 git 改动推出，不靠人登记；术语表有证据的算确定，其余是候选，`renames.py confirm/reject` 记用户点的，存进 `renames.json`（缓存） |
 | `changes.py` | 变动影响清单：对齐的提交到这次的提交之间改了什么、对不上的原句怎么归类、波及哪些概念、哪里还用旧词；`next.py` 会调它，写 `reports/changes/` |
 | `heal.py` | 把模型跟上：副本上自动接原句、换名字、重新生成定义那一批，三道检查都过才写回，什么都不剩才挪 `aligned.json` |
+| `qgen.py` | 从模型里的对象生题：部分覆盖的关系（必有）、同类之间（对称）、两端不一（粒度）、经「属于」（继承），写 `questions/candidates.json` |
+| `answers.py`、`questions/baseline.json` | 题目答案：`verify` 逐字核对证据，`baseline` 存成基线，`recheck <提交>` 报每条证据在、挪走、改写还是没了；`next.py` 有基线时会调它 |
+| `axcheck.py`、`questions/axioms-draft.ttl` | 公理草稿逐条加进模型副本：一致性、每批新推出的空位、没空位时埋错看抓不抓得到，写 `questions/axcheck.json` |
+| `reports/questions-batch1.md` | 第一批 32 道题的结果 |
 | `reports/skill-plan.md` | 把本体做成「该做什么了」技能的方案草稿（还没建） |
 | `reports/fix-tickets-draft.md` | 第 4 批三处代码问题的修复工单草稿（没建 GitHub 工单） |
 | `reports/` | `results.json`、`mutations.json`、两批的抽取对照、报告 |
