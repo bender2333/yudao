@@ -29,8 +29,8 @@
 {"hash":"35052f4a8b2b44cc","id":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 11. 要点汇总","kind":"section","parent":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构","title":"11. 要点汇总"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"bd17490d65acfb60","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},
-{"dst":"docs/architecture.html#s4 > 路由","kind":"map-position","raws":["「路由」"],"seen":"ea2160748ff0b439","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"f18fdc934a1521ba","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},
+{"dst":"docs/architecture.html#s4 > 路由","kind":"map-position","raws":["「路由」"],"seen":"e86ecfe67524d489","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.1 四层各认识什么","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"3c9e59e993c498c0","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 5. 三道缝的契约 > 5.1 路由契约","kind":"link","raws":["skeleton-and-application.md"],"seen":"02fd7df73c124f8c","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},
 {"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["../requirements/department-guidance.md"],"seen":"646e562448a17fd9","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构"},

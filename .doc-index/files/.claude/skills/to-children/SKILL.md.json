@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":".claude/skills/to-children/SKILL.md",
-"hash":"b04a0bb8cc387360",
+"hash":"b85865dd2e4aee62",
 "nodes":[
-{"hash":"b04a0bb8cc387360","id":".claude/skills/to-children/SKILL.md","kind":"file","title":".claude/skills/to-children/SKILL.md"},
+{"hash":"b85865dd2e4aee62","id":".claude/skills/to-children/SKILL.md","kind":"file","title":".claude/skills/to-children/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/to-children/SKILL.md#(开头)","kind":"section","parent":".claude/skills/to-children/SKILL.md","title":"(开头)"},
 {"hash":"bf712e8057040209","id":".claude/skills/to-children/SKILL.md#name: to-childrendescription: 把 Yudao 的一张父工单拆成子工单：改写挂在它下面的旧工单，切出立缝与切片，按工单规范发布带依据、环、做法与验收层的子工单。代替 Matt 的 /to-tickets；父工单由 /to-parents 产生。argument-hint: \"<父工单编号>\"","kind":"section","parent":".claude/skills/to-children/SKILL.md","title":"name: to-childrendescription: 把 Yudao 的一张父工单拆成子工单：改写挂在它下面的旧工单，切出立缝与切片，按工单规范发布带依据、环、做法与验收层的子工单。代替 Matt 的 /to-tickets；父工单由 /to-parents 产生。argument-hint: \"<父工单编号>\""},
 {"hash":"302c7dd98190db33","id":".claude/skills/to-children/SKILL.md#拆成子工单","kind":"section","parent":".claude/skills/to-children/SKILL.md","title":"拆成子工单"},
-{"hash":"2b89a6c9af0db598","id":".claude/skills/to-children/SKILL.md#拆成子工单 > 两种做法","kind":"section","parent":".claude/skills/to-children/SKILL.md#拆成子工单","title":"两种做法"},
+{"hash":"aa52f7c18dd7608c","id":".claude/skills/to-children/SKILL.md#拆成子工单 > 两种做法","kind":"section","parent":".claude/skills/to-children/SKILL.md#拆成子工单","title":"两种做法"},
 {"hash":"728686e0569726c3","id":".claude/skills/to-children/SKILL.md#拆成子工单 > 步骤","kind":"section","parent":".claude/skills/to-children/SKILL.md#拆成子工单","title":"步骤"},
 {"hash":"b9a51dd17e7eb9a1","id":".claude/skills/to-children/SKILL.md#拆成子工单 > 步骤 > 1. 读","kind":"section","parent":".claude/skills/to-children/SKILL.md#拆成子工单 > 步骤","title":"1. 读"},
 {"hash":"c9f86cf268e1438d","id":".claude/skills/to-children/SKILL.md#拆成子工单 > 步骤 > 2. 处理归并的旧工单","kind":"section","parent":".claude/skills/to-children/SKILL.md#拆成子工单 > 步骤","title":"2. 处理归并的旧工单"},

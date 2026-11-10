@@ -52,8 +52,8 @@
 ],
 "edges":[
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"be2f2a8d91639563","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「模型与工具」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
-{"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"9318b13ea3585f40","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「模型与工具」"],"seen":"762ce1eedbb2875f","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
+{"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"bb852bc64f44ccbd","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"4890ea9efb53ab25","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 6. 控制核心内部 > 6.3 两类工具","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"83fd50a0c0dde4bc","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"1ada2d0dec500130","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明"},

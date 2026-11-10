@@ -17,7 +17,7 @@
 ],
 "edges":[
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」"],"seen":"762ce1eedbb2875f","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.1 合同","kind":"link","raws":["app-and-interface.md"],"seen":"62e758c789fcaf32","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
 {"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["existing-project-onboarding.md"],"seen":"4604e4d55473c0cf","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
 {"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"4de695e920eac8be","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},

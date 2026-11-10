@@ -46,8 +46,8 @@
 "edges":[
 {"dst":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"link","raws":["../adr/0021-client-pixel-view-follows-v9-structure.md"],"seen":"15afdd9d5eee1b57","src":"docs/design/visualization.md#画面与播放设计说明"},
 {"dst":"docs/architecture-view.html","kind":"link","raws":["../architecture-view.html"],"seen":"5aef2176a5e9304b","src":"docs/design/visualization.md#画面与播放设计说明"},
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「画面」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/visualization.md#画面与播放设计说明"},
-{"dst":"docs/architecture.html#s4 > 画面","kind":"map-position","raws":["「画面」"],"seen":"32b5d530f954827f","src":"docs/design/visualization.md#画面与播放设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「画面」"],"seen":"762ce1eedbb2875f","src":"docs/design/visualization.md#画面与播放设计说明"},
+{"dst":"docs/architecture.html#s4 > 画面","kind":"map-position","raws":["「画面」"],"seen":"eedf3d163687d302","src":"docs/design/visualization.md#画面与播放设计说明"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","kind":"link","raws":["app-and-interface.md"],"seen":"c64461e11d4738bb","src":"docs/design/visualization.md#画面与播放设计说明"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","kind":"link","raws":["test-pyramid.md"],"seen":"ad49142d91f90cad","src":"docs/design/visualization.md#画面与播放设计说明"},
 {"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.1 一次发布的内容","kind":"link","raws":["web-interface-and-release.md"],"seen":"c7851251a8bfb211","src":"docs/design/visualization.md#画面与播放设计说明"},

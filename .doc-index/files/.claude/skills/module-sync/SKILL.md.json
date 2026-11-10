@@ -13,7 +13,7 @@
 {"hash":"ab9b27c362ab7bc2","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"收尾"}
 ],
 "edges":[
-{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"2e10b28dbd6a1c04","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
+{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"3d2a33c5305f251b","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
 {"dst":"CLAUDE.md#角色 > 用户的参与方式","kind":"section-ref","raws":["CLAUDE.md"],"seen":"9573c1d173c0b787","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"3851a47f4f6c331d","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
 {"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"b8c5228c3945b337","src":".claude/skills/module-sync/SKILL.md#模块对齐"},

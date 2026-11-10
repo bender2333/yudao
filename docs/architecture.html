@@ -114,8 +114,6 @@
   .seam i { font-style: normal; color: var(--muted); font-size: 12px }
   .seam em { font-style: normal; margin: 2px 0 }
   .seam ul { margin: 0; padding-left: 16px; color: var(--muted) }
-  .seam .x { font-size: 12.5px; color: var(--muted); border-top: 1px dotted var(--soft); padding-top: 5px; margin-top: 3px }
-  .seam .x b { display: inline; font-size: 12.5px; color: var(--fg) }
 
   /* 第五节：自举 */
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
@@ -166,7 +164,7 @@
         <div class="box" tabindex="0" data-tech="技术名词：观察者（教训发现、元观察、演化）、振荡信号。">
           <b>观察者</b><small>在系统外面看。只出证据、提案与振荡信号，都经写入口；不动手。</small>
         </div>
-        <div class="box" tabindex="0" data-tech="技术名词：画面（同步层、翻译层、画面合同、播放时间线、画面层）。单独的目录、构建、测试与里程碑。">
+        <div class="box" tabindex="0" data-tech="技术名词：画面（同步层、翻译层、画面合同、播放时间线、画面层）。">
           <b>画面</b><small>在系统外面，像观察者一样只经接口读事实，操作也只发现有的命令。只要求诚实，可以落后；走自己的阶段，系统不等它。展开见<a href="architecture-view.html" style="color:var(--accent)">画面总图</a>。</small>
         </div>
         <div class="box" tabindex="0" data-tech="技术名词：命令接口、决定请求与回答、指导。">
@@ -187,32 +185,32 @@
             <div class="box" tabindex="0" data-tech="技术名词：成果驱动路由里的工程一轮、运行工作区、外包角色。">
               <b>工程</b><small>要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个职能的内部也可以是一个子组织。</small>
             </div>
-            <div class="box" tabindex="0" data-tech="技术名词：运维。外部动作走「模型与工具」。">
+            <div class="box" tabindex="0" data-tech="技术名词：运维。">
               <b>运维（以后）</b><small>监控、部署、故障记录。</small>
             </div>
           </div>
           <div class="col">
-            <div class="box fact" tabindex="0" data-tech="技术名词：事件日志、写入口、工件、封存快照、带版本的定义。项目流长期保存，run 流只在一次运行里用。">
+            <div class="box fact" tabindex="0" data-tech="技术名词：事件日志、写入口、工件、封存快照、带版本的定义。">
               <b>一份事实</b><small>发生过的事只记一份，只追加，谁都不能改。职能之间的询问也在这里。</small>
             </div>
-            <div class="box" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；直做；任务池）。换档位只换「谁开工、一轮怎么结束」与它自己的定义。核验角色不归哪一种路由，三种都能放。">
+            <div class="box" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；直做；任务池）。">
               <b>轮转方式</b>
               <div class="switch" style="margin-top:6px;grid-template-columns:1fr 1fr 1fr"><span>直做</span><span class="on">按成果</span><span>任务池（以后）</span></div>
               <small class="muted" style="margin-top:6px">直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。</small>
             </div>
           </div>
           <div class="col">
-            <div class="box" tabindex="0" data-tech="技术名词：核验角色、检查工作区。核验是角色的性质：只写检查材料、在独立副本上由主机跑检查、先看事实再看解释、结论绑定当前版本。">
+            <div class="box" tabindex="0" data-tech="技术名词：核验角色、检查工作区。">
               <b>质检</b><small>交付 → 缺陷或放行。它是默认形态里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。</small>
             </div>
-            <div class="box" tabindex="0" data-tech="加一个职能只写声明（组织定义），不改其他方框。">
+            <div class="box" tabindex="0" data-tech="技术名词：组织定义。">
               <b>下一个职能</b><small>加职能只写声明。职能拥有的是定义、角色材料与知识，不是代码。</small>
             </div>
           </div>
         </div>
         <div class="arrows">默认：产品 → 工程 → 质检 → 放行或打回工程；任何职能随时可以询问另一个职能。最少：只有工程一个职能，直做，交完成即开环完成</div>
         <div class="slots">
-          <div class="box fixed" tabindex="0" data-tech="技术名词：薄驱动、插件加载。只做连接，职能名与实现类名零命中；三道契约的版本在构造时核对。">
+          <div class="box fixed" tabindex="0" data-tech="技术名词：薄驱动、插件加载。">
             <b>薄驱动</b><small>只做连接：读事实、问路由、问装配、交执行、经写入口写回。不认识职能的名字。</small>
           </div>
           <div class="box" tabindex="0" data-tech="技术名词：路由实现（成果驱动）。">
@@ -231,7 +229,7 @@
       </div>
 
       <div class="col">
-        <div class="box fixed" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。裁决读最小投影，边界与停止原因清单来自定义。">
+        <div class="box fixed" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。">
           <b>裁决与边界</b><small>每次写入先过这里：有没有资格、引用的是不是最新、到没到上限。保证一定会停。</small>
         </div>
         <div class="box fixed" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）。">
@@ -266,7 +264,7 @@
         <div class="r">
           <b>只能向后兼容</b><small>三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。</small>
           <div class="r">
-            <b>只由你批准</b><small>一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。系统可以提案，运行中的系统改这一环要你批准；在开发仓库里改它，守的是内核测试、清单检查与测试覆盖，再加比别处更高的代码要求：改到的代码被故意改坏时内核测试必须报错，改到的函数圈复杂度不超过 10（分支路径不多于十条）。</small>
+            <b>只由你批准</b><small>一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。系统可以提案，运行中的系统改这一环要你批准；在开发仓库里改它，守的是内核测试、清单检查与测试覆盖，代码要求高于别处，由机器检查。</small>
           </div>
         </div>
       </div>
@@ -284,7 +282,7 @@
     <h2>一轮工作的经过<small>三种轮转方式共用一套状态词</small></h2>
     <p class="muted">下面的状态对一个职能成立。按成果时，状态由关注的成果推动；直做时，由你的输入、询问与交完成推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。</p>
     <div class="map" style="margin-top:12px">
-    <svg viewBox="0 -12 1000 712" role="img" aria-label="双环：外环是职能之间的流转，内环是一轮工作里的单步循环">
+    <svg viewBox="0 -12 1000 632" role="img" aria-label="双环：外环是职能之间的流转，内环是一轮工作里的单步循环">
       <defs>
         <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
         <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--stop)"/></marker>
@@ -326,7 +324,7 @@
       <path class="edge" style="stroke:var(--accent);stroke-width:2" d="M262 220 C 235 280, 225 340, 200 400 C 185 440, 110 440, 95 466" marker-end="url(#aha)"/>
       <text class="e-l" style="fill:var(--accent);font-weight:600" x="215" y="392">一轮工作中 = 内环在转</text>
       <!-- 内环区 -->
-      <rect class="zone" x="8" y="396" width="984" height="300" rx="8" style="stroke-dasharray:6 5"/>
+      <rect class="zone" x="8" y="396" width="984" height="216" rx="8" style="stroke-dasharray:6 5"/>
       <text class="zone-l" x="20" y="416">内环 · 一轮工作里的每一步（薄驱动连接，每步都停得下来）</text>
       <g class="st"><rect x="30" y="470" width="130" height="72" rx="4"/><text x="95" y="492">1 路由与边界</text><text x="95" y="510" class="s">谁开工、一轮怎么结束</text><text x="95" y="526" class="s">每步先问上限</text></g>
       <g class="st"><rect x="190" y="470" width="140" height="72" rx="4"/><text x="260" y="492">2 装配</text><text x="260" y="510" class="s">从事实减出这一轮要看的</text><text x="260" y="526" class="s">并入指导，记进事实</text></g>
@@ -340,48 +338,40 @@
       <path class="edge" d="M670 506 L698 506" marker-end="url(#ah)"/>
       <path class="edge" d="M840 506 L868 506" marker-end="url(#ah)"/>
       <!-- 内环回到第一步 -->
-      <path class="edge" style="stroke:var(--accent)" d="M925 542 L925 680 L95 680 L95 544" marker-end="url(#aha)"/>
-      <text class="e-l" style="fill:var(--accent)" x="510" y="672" text-anchor="middle">写回事实后进入下一步；一轮以提交成果、询问、决定请求或停止结束，回到外环</text>
-      <!-- 内环分支 -->
-      <g class="st side"><rect x="180" y="580" width="225" height="50" rx="4"/><text x="292" y="600">上下文逼近上限 → 压缩</text><text x="292" y="618" class="s">保留意图、有效合同、失败尝试与近期回合</text></g>
-      <path class="edge dashed" d="M260 542 L260 578" marker-end="url(#ah)"/>
-      <g class="st side"><rect x="420" y="580" width="240" height="50" rx="4"/><text x="540" y="600">失败的尝试、未获许可的工具</text><text x="540" y="618" class="s">记成事件供回查，不执行、不进有效历史</text></g>
-      <path class="edge dashed" d="M430 542 L480 578" marker-end="url(#ah)"/>
-      <path class="edge dashed" d="M600 542 L580 578" marker-end="url(#ah)"/>
-      <g class="st side"><rect x="676" y="580" width="236" height="50" rx="4"/><text x="794" y="600">重派与迟到的结果</text><text x="794" y="618" class="s">重派先写事件、编号加一；旧编号只记录</text></g>
-      <path class="edge dashed" d="M770 542 L770 578" marker-end="url(#ah)"/>
+      <path class="edge" style="stroke:var(--accent)" d="M925 542 L925 596 L95 596 L95 544" marker-end="url(#aha)"/>
+      <text class="e-l" style="fill:var(--accent)" x="510" y="588" text-anchor="middle">写回事实后进入下一步；一轮以提交成果、询问、决定请求或停止结束，回到外环</text>
     </svg>
     </div>
     <p class="muted" style="font-size:12.5px;margin-top:6px">两环的关系：外环的「一轮工作中」就是内环在转；内环每转一圈写回一次事实，外环只看写回的事实决定下一步。你中途的指导是职能关注的成果：职能在等待时，指导让它开始一轮；在一轮工作中时，指导在下一步作为通知加入。</p>
     <ul class="rules">
       <li><b>每一步先问边界</b>：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。</li>
-      <li><b>判定点</b>：需要判断的小问题（挑上下文、含糊的读法）可以问一个小模型，答案先写成事件再被使用；重放时读事件，不再问模型。校准通过之前只记录，不改变流程。拿不准时是继续还是发决定请求问你，由角色按自己的角色材料判断，不是结构上的规则；选了什么写成事件，事后查得到。</li>
+      <li><b>判定点</b>：需要判断的小问题（挑上下文、含糊的读法）可以问一个小模型，答案先写成事件再被使用；重放时读事件，不再问模型。拿不准时是继续还是发决定请求问你，由角色按自己的角色材料判断，不是结构上的规则；选了什么写成事件，事后查得到。</li>
       <li><b>增量与整份</b>：任务池模式下每个单元各自核验，但放行门仍是整份交付对要求的一次核验。</li>
       <li><b>开环完成</b>：定义里没有核验角色的事项，指定的角色交了完成就按流程采纳，不因为缺少核验发决定请求；记录、页面与报告上写开环完成，不写放行。最差的配置是「工程」由外部 agent 做，等于跑一次外面的 agent，外加快照、上限、写入口与这个标记。</li>
-      <li><b>子组织</b>：一个角色的一轮工作可以开一个子事项，子事项有自己的事件流、冻结的定义与边界，时间与用量从上一层剩下的里扣，层数有上限；结果作为这个角色的普通提案回到上一层，照常过裁决。职能内的多角色也用这一种做法。</li>
+      <li><b>子组织</b>：一个角色的一轮工作可以开一个子事项，子事项有自己的事件流、冻结的定义与边界；结果作为这个角色的普通提案回到上一层，照常过裁决。职能内的多角色也用这一种做法。</li>
     </ul>
   </section>
 
   <section id="s4">
     <h2>要守的缝<small>九道在系统里，四道在系统外</small></h2>
-    <p class="muted">一道缝连接两边，各自可以重写，合同不能偷偷改。<b>已定</b>：规矩不再改，子架构师现在就守；<b>未定</b>：我还在定，先别依赖。每张卡写两侧、保证什么、规矩，以及交换什么；交换的是意思，不是类型，代码里叫什么由子架构师定，总图和设计说明都不写；词与代码名不一致的，记在对照表里。所有合同带版本，字段只增。</p>
+    <p class="muted">一道缝连接两边，各自可以重写，合同不能偷偷改。<b>已定</b>：规矩不再改，子架构师现在就守；<b>未定</b>：我还在定，先别依赖。每张卡写两侧、保证什么与规矩。交换什么记在模块图旁的缝的清单里，写意思，不写类型，由子架构师维护；代码里叫什么由子架构师定，总图和设计说明都不写，词与代码名不一致的记在对照表里。所有合同带版本，字段只增。</p>
     <div class="seams" style="margin-top:12px">
-      <div class="seam" data-state="set"><b>写入口<span>已定</span></b><i>一切写入方 ↔ 一份事实</i><em>事实只从这里进，进了就不改。</em><ul><li>先过裁决与边界再写</li><li>同一事务里核对执行权、派发编号与版本</li><li>只追加；按消息身份去重</li></ul><div class="x"><b>交换：</b>消息身份、事项的执行权编号、这一轮的派发编号、期望版本、来源（职能、角色、工作单元）、内容（提案、回执、模型判断、你的回答、观察者信号）、证据引用。</div></div>
-      <div class="seam" data-state="set"><b>路由<span>已定</span></b><i>薄驱动 ↔ 路由实现</i><em>换轮转方式，循环本身不动。</em><ul><li>只回答谁开工、一轮怎么结束、事项怎么结束</li><li>只读事实与冻结的定义，自己从事件折叠要用的状态，不存别的</li><li>职能的名字不进代码；每种路由带自己的定义</li></ul><div class="x"><b>交换：</b>入：只读事实、冻结的定义、最新事件。出：下一步谁开工（职能或工作单元的认领）、这一轮怎么结束（继续、询问、等你、核验、结束）、事项是否结束及原因。</div></div>
-      <div class="seam" data-state="set"><b>装配<span>已定</span></b><i>执行 ↔ 装配实现</i><em>一轮看到的是事实的一个视图，不改事实。</em><ul><li>只读事实、定义与待并入的指导</li><li>同样的事件重放出同样的请求；判定点的选择先写事件</li><li>交给模型的那份与清单记进事实</li></ul><div class="x"><b>交换：</b>入：只读事实、角色定义、待并入的指导。出：交给模型的每一个字节、上下文清单（指令、意图、有效合同、摘要、放进去的事件位置）。</div></div>
-      <div class="seam" data-state="set"><b>执行<span>已定</span></b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用经裁决；结果写回事实，不自己存</li><li>外包角色是执行的一种实现：全新的状态目录、无历史的快照，模型与工具走受控入口；交回的是快照与差异，经写入口成为提案。没有下游核验角色时照样可以外包，事项记为开环完成</li></ul><div class="x"><b>交换：</b>入：装配结果、角色的工具。出：完成提案、工具请求、询问、开子事项的请求。每步前：用量与上限 → 继续或停止。</div></div>
-      <div class="seam" data-state="set"><b>模型<span>已定</span></b><i>执行 ↔ 模型服务</i><em>换模型不改循环。</em><ul><li>每次请求解析一次调用目标</li><li>尝试与用量记进事实；重放读事件不再调模型</li><li>凭据只在控制主机，不进事实与导出</li></ul><div class="x"><b>交换：</b>入：请求字节、调用目标。出：尝试记录、模型输出事件、用量。</div></div>
-      <div class="seam" data-state="set"><b>动作<span>已定</span></b><i>工具 ↔ 执行环境</i><em>每个动作有回执；结果未知时有核实办法。</em><ul><li>按类别带合同：成功证据、核实方法、能否取消</li><li>本机与远程同一份合同</li><li>工作区每次从封存快照建；环境可以温热</li></ul><div class="x"><b>交换：</b>请求：动作身份、起点快照、命令或改动、核实方法、能否取消。回执：退出状态、输出、终点快照、前后差异。</div></div>
-      <div class="seam" data-state="set"><b>投影<span>已定</span></b><i>一份事实 → 读的人</i><em>任何投影都能从事实重算。</em><ul><li>内核的最小投影是骨架的一部分，只给裁决读；应用可以读，但不为应用加字段。它不在这道缝里</li><li>应用的投影（轨迹、图谱、状态视图）推倒重算，不写回事实</li><li>骨架事件只增，应用事件可以排空</li></ul><div class="x"><b>交换：</b>折叠函数：当前状态 + 一条事件 → 下一状态；从头重算：事件序列 → 同一状态。</div></div>
-      <div class="seam" data-state="set"><b>接口<span>已定</span></b><i>页面、命令行、评测、观察者、画面 ↔ 应用层</i><em>外面只经这里读与发。</em><ul><li>只有命令、查询、事件流三种</li><li>命令带身份，重发不重做；事件流按位置续</li><li>带版本号；改了合同版本必升</li></ul><div class="x"><b>交换：</b>命令（带身份）、查询（只读快照）、事件流（从某个位置起）。</div></div>
-      <div class="seam" data-state="set"><b>定义<span>已定</span></b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li><li>采纳前校验谁能拒绝谁无环；核验角色核验的对象存在；每一种事项的来源都有职能接；没有核验角色的定义在事项上标为开环</li></ul><div class="x"><b>交换：</b>版本、职能与角色（关注的成果、目标、证据来源、可见范围、写入范围、工具许可、是否核验角色及核验谁）、事项的来源与接它的职能、成果种类与提案合同、谁能拒绝谁、判定点、登记的机器、路由实现与它的定义、工作单元的大小、限定采用的范围、上限、停止原因清单。</div></div>
+      <div class="seam" data-state="set"><b>写入口<span>已定</span></b><i>一切写入方 ↔ 一份事实</i><em>事实只从这里进，进了就不改。</em><ul><li>先过裁决与边界再写</li><li>同一事务里核对执行权、派发编号与版本</li><li>只追加；按消息身份去重</li></ul></div>
+      <div class="seam" data-state="set"><b>路由<span>已定</span></b><i>薄驱动 ↔ 路由实现</i><em>换轮转方式，循环本身不动。</em><ul><li>只回答谁开工、一轮怎么结束、事项怎么结束</li><li>只读事实与冻结的定义，自己从事件折叠要用的状态，不存别的</li><li>职能的名字不进代码；每种路由带自己的定义</li></ul></div>
+      <div class="seam" data-state="set"><b>装配<span>已定</span></b><i>执行 ↔ 装配实现</i><em>一轮看到的是事实的一个视图，不改事实。</em><ul><li>只读事实、定义与待并入的指导</li><li>同样的事件重放出同样的请求；判定点的选择先写事件</li><li>交给模型的那份与清单记进事实</li></ul></div>
+      <div class="seam" data-state="set"><b>执行<span>已定</span></b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用经裁决；结果写回事实，不自己存</li><li>外包角色是执行的一种实现：全新的状态目录、无历史的快照，模型与工具走受控入口；交回的是快照与差异，经写入口成为提案。没有下游核验角色时照样可以外包，事项记为开环完成</li></ul></div>
+      <div class="seam" data-state="set"><b>模型<span>已定</span></b><i>执行 ↔ 模型服务</i><em>换模型不改循环。</em><ul><li>每次请求解析一次调用目标</li><li>尝试与用量记进事实；重放读事件不再调模型</li><li>凭据只在控制主机，不进事实与导出</li></ul></div>
+      <div class="seam" data-state="set"><b>动作<span>已定</span></b><i>工具 ↔ 执行环境</i><em>每个动作有回执；结果未知时有核实办法。</em><ul><li>按类别带合同：成功证据、核实方法、能否取消</li><li>本机与远程同一份合同</li><li>工作区每次从封存快照建；环境可以温热</li></ul></div>
+      <div class="seam" data-state="set"><b>投影<span>已定</span></b><i>一份事实 → 读的人</i><em>任何投影都能从事实重算。</em><ul><li>内核的最小投影是骨架的一部分，只给裁决读；应用可以读，但不为应用加字段。它不在这道缝里</li><li>应用的投影（轨迹、图谱、状态视图）推倒重算，不写回事实</li><li>骨架事件只增，应用事件可以排空</li></ul></div>
+      <div class="seam" data-state="set"><b>接口<span>已定</span></b><i>页面、命令行、评测、观察者、画面 ↔ 应用层</i><em>外面只经这里读与发。</em><ul><li>只有命令、查询、事件流三种</li><li>命令带身份，重发不重做；事件流按位置续</li><li>带版本号；改了合同版本必升</li></ul></div>
+      <div class="seam" data-state="set"><b>定义<span>已定</span></b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li><li>采纳前校验谁能拒绝谁无环；核验角色核验的对象存在；每一种事项的来源都有职能接；没有核验角色的定义在事项上标为开环</li></ul></div>
     </div>
     <h3>系统之外的四道</h3>
     <div class="seams">
-      <div class="seam" data-state="set"><b>评价<span>已定</span></b><i>评价材料 → 系统</i><em>被开发的版本读不到评它的题。</em><ul><li>只经接口层操作，像用户一样</li><li>材料由运行中的上一版提供</li><li>只由你改</li></ul><div class="x"><b>交换：</b>题、说明书、判分器在外面；经接口的命令与查询；判分看数据库与文件产物。</div></div>
-      <div class="seam" data-state="set"><b>观察者<span>已定</span></b><i>观察者 ↔ 接口（读）与写入口（写）</i><em>只看，不动手。</em><ul><li>按读取范围经接口读事实</li><li>证据、提案与振荡信号都经写入口写入，经裁决</li><li>振荡信号是边界的输入：内核按定义停下受影响的分支，交给你</li></ul><div class="x"><b>交换：</b>读取范围；写入：统计证据、改进提案、振荡信号（哪个事项、哪条分支、依据的事件）。</div></div>
-      <div class="seam" data-state="set"><b>画面<span>已定</span></b><i>接口 ↔ 画面</i><em>画面整个换掉或落后，事实与页面不动。</em><ul><li>只经接口读快照与事件流，操作只发现有的命令；不要专用查询，不导入系统的代码</li><li>只要求诚实：能当真的都回链到事件，开环完成不画成放行；认不出的职能与事件简单画或不画，不报错</li><li>系统的验收不等画面，画面的测试不挡系统的合并；每一步只画系统已经有的记录</li><li>里面的结构见<a href="architecture-view.html" style="color:var(--accent)">画面总图</a></li></ul><div class="x"><b>交换：</b>带位置的查询快照与事件流、带版本的接口合同、现有的命令。</div></div>
-      <div class="seam" data-state="open"><b>看门狗<span>未定</span></b><i>看门狗 ↔ 实例</i><em>候选失败能退回。</em><ul><li>在进程外，不依赖 Yudao 的代码</li><li>两个槽位；心跳、金丝雀、观察期指标</li><li>只由你改</li></ul><div class="x"><b>交换：</b>健康探针、切换命令、排空命令。</div></div>
+      <div class="seam" data-state="set"><b>评价<span>已定</span></b><i>评价材料 → 系统</i><em>被开发的版本读不到评它的题。</em><ul><li>只经接口层操作，像用户一样</li><li>材料由运行中的上一版提供</li><li>只由你改</li></ul></div>
+      <div class="seam" data-state="set"><b>观察者<span>已定</span></b><i>观察者 ↔ 接口（读）与写入口（写）</i><em>只看，不动手。</em><ul><li>按读取范围经接口读事实</li><li>证据、提案与振荡信号都经写入口写入，经裁决</li><li>振荡信号是边界的输入：内核按定义停下受影响的分支，交给你</li></ul></div>
+      <div class="seam" data-state="set"><b>画面<span>已定</span></b><i>接口 ↔ 画面</i><em>画面整个换掉或落后，事实与页面不动。</em><ul><li>只经接口读快照与事件流，操作只发现有的命令；不要专用查询，不导入系统的代码</li><li>只要求诚实：能当真的都回链到事件，开环完成不画成放行；认不出的职能与事件简单画或不画，不报错</li><li>系统的验收不等画面，画面的测试不挡系统的合并；每一步只画系统已经有的记录</li><li>里面的结构见<a href="architecture-view.html" style="color:var(--accent)">画面总图</a></li></ul></div>
+      <div class="seam" data-state="open"><b>看门狗<span>未定</span></b><i>看门狗 ↔ 实例</i><em>候选失败能退回。</em><ul><li>在进程外，不依赖 Yudao 的代码</li><li>两个槽位；心跳、金丝雀、观察期指标</li><li>只由你改</li></ul></div>
     </div>
   </section>
 
@@ -393,8 +383,7 @@
         <ul>
           <li>改的对象是整个仓库，包括内核；内核的改动生效前要你批准。</li>
           <li>作为普通事项走产品 · 工程 · 质检的循环：工程改，质检在独立副本上核验并签回执。自举不用开环的配置。</li>
-          <li>发布：新版本在候选槽旁路启动，稳定槽先排空、保留为退回点。</li>
-          <li>看门狗在进程外检查：心跳、金丝雀任务、观察期指标；超时或不过就切回稳定版。</li>
+          <li>发布：稳定版先排空、保留为退回点，候选版本旁路启动；进程外的看门狗看着它，不过就切回稳定版。</li>
         </ul>
       </div>
       <div class="layer dashed">
@@ -475,16 +464,16 @@
     </ul>
     <h3>拆开以后的三个硬问题</h3>
     <table>
-      <thead><tr><th>问题</th><th>怎么解</th></tr></thead>
+      <thead><tr><th>问题</th><th>由哪道缝回答</th></tr></thead>
       <tbody>
-        <tr><td><b>工作区在别的机器上</b></td><td>执行机器不保存跨一轮工作的状态。每一轮工作从封存快照建工作区，只含这次要的文件，不带历史；上次被拒绝的尝试留下的东西不会污染这次。环境（依赖、编译缓存）可以温热。</td></tr>
-        <tr><td><b>消息丢了、重发了、迟到了</b></td><td>过网的消息都带身份，写入口按身份去重；执行权与派发编号只由控制主机发；重派先经写入口写事件，旧编号交回的结果只记录不接纳。</td></tr>
-        <tr><td><b>进程停了又起</b></td><td>控制核心是按事件重放的状态机，没有事件库之外的第二份事实。重启丢掉内存里的会话，从已提交的事件恢复；结果未知的在途动作按动作合同的核实方法查，查不到就从最近的快照重新装配执行。</td></tr>
+        <tr><td><b>工作区在别的机器上</b></td><td>动作：每一轮工作从封存快照建工作区，执行机器不留跨一轮的状态；环境可以温热。</td></tr>
+        <tr><td><b>消息丢了、重发了、迟到了</b></td><td>写入口：过网的消息带身份，按身份去重；执行权与派发编号只由控制主机发，旧编号交回的结果只记录不接纳。</td></tr>
+        <tr><td><b>进程停了又起</b></td><td>写入口与动作：状态只从已提交的事件恢复，没有第二份事实；结果未知的在途动作按动作合同的核实方法查。</td></tr>
       </tbody>
     </table>
   </section>
 
-  <footer>建设进度看 GitHub 的里程碑与工单。缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
+  <footer>建设进度看 GitHub 的里程碑与工单。缝的已定、未定由总架构师改。技术细节与每道缝交换什么见 docs/design/architecture/overall-architecture.md（模块图与缝的清单）。</footer>
 </main>
 </body>
 </html>

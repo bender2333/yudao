@@ -30,7 +30,7 @@
 {"hash":"5ed6460f3109f5ea","id":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 测试按三环留 > 12.2 新增测试怎么进来","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 测试按三环留","title":"12.2 新增测试怎么进来"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["第五节"],"seen":"bff92efe9855956f","src":"docs/design/test-pyramid.md#测试分层设计说明"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["第五节"],"seen":"d65fb409d4abd20a","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 11. 真实用户场景验收","kind":"link","raws":["skeleton-and-application.md"],"seen":"a153f29785e21da3","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/test-pyramid.md#测试分层设计说明"},
 {"dst":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","kind":"link","raws":["visualization.md"],"seen":"b5c07471d328449c","src":"docs/design/test-pyramid.md#测试分层设计说明"},

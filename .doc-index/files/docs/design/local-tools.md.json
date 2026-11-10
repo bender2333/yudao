@@ -13,8 +13,8 @@
 ],
 "edges":[
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"be2f2a8d91639563","src":"docs/design/local-tools.md#本地通用工具设计说明"},
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「模型与工具」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/local-tools.md#本地通用工具设计说明"},
-{"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"9318b13ea3585f40","src":"docs/design/local-tools.md#本地通用工具设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「模型与工具」"],"seen":"762ce1eedbb2875f","src":"docs/design/local-tools.md#本地通用工具设计说明"},
+{"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"bb852bc64f44ccbd","src":"docs/design/local-tools.md#本地通用工具设计说明"},
 {"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["existing-project-onboarding.md"],"seen":"3374003397544680","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"97b93618619c8d9b","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程"},
 {"dst":"docs/design/project-initial-files.md","kind":"link","raws":["project-initial-files.md"],"seen":"89c4591ec155694c","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程"},

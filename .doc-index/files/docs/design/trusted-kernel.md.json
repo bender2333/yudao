@@ -20,14 +20,14 @@
 {"hash":"19a850096c3a9f64","id":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系","kind":"section","parent":"docs/design/trusted-kernel.md#可信内核设计说明","title":"9. 与现有设计的关系"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」","「裁决与边界」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"b9b29c85a3d18cc8","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
-{"dst":"docs/architecture.html#s4 > 写入口","kind":"map-position","raws":["「写入口」"],"seen":"590bc262d07827fd","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」","「裁决与边界」"],"seen":"762ce1eedbb2875f","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"559efeaef4c4d376","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
+{"dst":"docs/architecture.html#s4 > 写入口","kind":"map-position","raws":["「写入口」"],"seen":"3b6a7a4d2f62ca36","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
 {"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"6362d110905936c3","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
 {"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"f0e8dce83a8e2a46","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"7238332bed3feff5","src":"docs/design/trusted-kernel.md#可信内核设计说明"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c967dae939e2fda6","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界"},
-{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.1 身份","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"18b16ffc1cce8283","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.1 身份","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"cd3329c50a02f40d","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.5 判定点的校准、记录与重放","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"9b44579c9f0d8583","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界"},
 {"dst":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 3. 一定会停","kind":"link","raws":["loops-and-convergence.md"],"seen":"a3fa6f2b5f39177f","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界"},
 {"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["rules-and-parameters.md"],"seen":"647155417a0c0f62","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界"},

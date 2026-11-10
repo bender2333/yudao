@@ -1,6 +1,6 @@
 # 上下文装配：把视图当作事件日志上的纯函数
 
-总图位置：第四节「装配」缝（装配契约：执行实现 ↔ 装配实现），第一节「装配实现」方框（第二节「可以整体重写」一环）；第三节「上下文逼近上限 → 压缩」（保留意图、有效合同、失败尝试与近期回合）。依据：回放读数与成本核对在 [docs/archive/evaluation/context-assembly-2026-10-29.md](../archive/evaluation/context-assembly-2026-10-29.md)、[context-assembly-replay-2026-10-29.md](../archive/evaluation/context-assembly-replay-2026-10-29.md)、[context-assembly-counterfactual-2026-10-29.json](../evaluation/context-assembly-counterfactual-2026-10-29.json)；规则清单另有机器可读的版本。
+总图位置：第四节「装配」缝（装配契约：执行实现 ↔ 装配实现），第一节「装配实现」方框（第二节「可以整体重写」一环）；第三节内环第 2 步「装配」。依据：回放读数与成本核对在 [docs/archive/evaluation/context-assembly-2026-10-29.md](../archive/evaluation/context-assembly-2026-10-29.md)、[context-assembly-replay-2026-10-29.md](../archive/evaluation/context-assembly-replay-2026-10-29.md)、[context-assembly-counterfactual-2026-10-29.json](../evaluation/context-assembly-counterfactual-2026-10-29.json)；规则清单另有机器可读的版本。
 
 ## 1. 问题、现状与方法
 
@@ -235,7 +235,7 @@
 
 ### 压缩以后保留失败的尝试
 
-目的：压缩以后，角色不再犯压缩以前已经犯过的错。上下文逼近上限压缩时保留四样东西（总图第三节）：
+目的：压缩以后，角色不再犯压缩以前已经犯过的错。上下文逼近上限压缩时保留四样东西：
 
 | 保留什么 | 在哪里 | 由谁保证 |
 | --- | --- | --- |

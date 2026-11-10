@@ -21,11 +21,11 @@
 {"hash":"caebef77d29e7ae5","id":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明 > 6. 未决问题","kind":"section","parent":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明","title":"6. 未决问题"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「页面」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
-{"dst":"docs/architecture.html#s4 > 定义","kind":"map-position","raws":["「定义」"],"seen":"a27af50a4138a916","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
-{"dst":"docs/architecture.html#s4 > 执行","kind":"map-position","raws":["「执行」"],"seen":"fac7456fab57034b","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
-{"dst":"docs/architecture.html#s4 > 投影","kind":"map-position","raws":["「投影」"],"seen":"f791f9c11958ba95","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
-{"dst":"docs/architecture.html#s4 > 接口","kind":"map-position","raws":["「接口」"],"seen":"df0d7ada3e8368ed","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「页面」"],"seen":"762ce1eedbb2875f","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
+{"dst":"docs/architecture.html#s4 > 定义","kind":"map-position","raws":["「定义」"],"seen":"aba57fe30f8efc7f","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
+{"dst":"docs/architecture.html#s4 > 执行","kind":"map-position","raws":["「执行」"],"seen":"65b681c4c2656256","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
+{"dst":"docs/architecture.html#s4 > 投影","kind":"map-position","raws":["「投影」"],"seen":"19cd03cec629ecf4","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
+{"dst":"docs/architecture.html#s4 > 接口","kind":"map-position","raws":["「接口」"],"seen":"e63f6205412e3598","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询","kind":"link","raws":["app-and-interface.md"],"seen":"a3ee61ea84082ec2","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 8. 工程的计划","kind":"link","raws":["department-loop.md"],"seen":"cc6a014cf17be212","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"fb91d0dffb8b7ad7","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},

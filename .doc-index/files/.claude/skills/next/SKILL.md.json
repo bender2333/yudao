@@ -32,7 +32,7 @@
 "edges":[
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/next/SKILL.md#下一件事"},
 {"dst":".claude/skills/architect-loop/SKILL.md","kind":"link","raws":["../architect-loop/SKILL.md"],"seen":"bd5b563f7f51e7af","src":".claude/skills/next/SKILL.md#下一件事 > 何时用 / 何时不用"},
-{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"2e10b28dbd6a1c04","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么"},
+{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"3d2a33c5305f251b","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么"},
 {"dst":".claude/skills/architect-loop/SKILL.md","kind":"link","raws":["../architect-loop/SKILL.md"],"seen":"bd5b563f7f51e7af","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事"},
 {"dst":".claude/skills/architect-loop/SKILL.md","kind":"link","raws":["../architect-loop/SKILL.md"],"seen":"bd5b563f7f51e7af","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 2"},

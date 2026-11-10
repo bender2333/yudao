@@ -21,8 +21,8 @@
 {"hash":"0992d2567dcd1dc4","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 12. 与现有设计的关系","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"12. 与现有设计的关系"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「独立的证据」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
-{"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"052770e8d9e24d0c","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「独立的证据」"],"seen":"762ce1eedbb2875f","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
+{"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"a989bc84206f2495","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["browser-and-computer-use.md"],"seen":"e089a6de06b8c18b","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"b3e70e8376b32832","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["network-and-mcp.md"],"seen":"a0712c5b9018387d","src":"docs/design/independent-verification.md#验证的独立性设计说明"},

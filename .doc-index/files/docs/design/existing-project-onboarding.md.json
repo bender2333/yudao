@@ -32,7 +32,7 @@
 "edges":[
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},
 {"dst":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","kind":"link","raws":["../adr/0034-adopted-change-writeback-three-tree-merge.md"],"seen":"7cb8e63e2228473b","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」","「你」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」","「你」"],"seen":"762ce1eedbb2875f","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令","kind":"link","raws":["app-and-interface.md"],"seen":"ac81ecb940494813","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 6. 控制核心内部","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"03d8e644e9375446","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},
 {"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"4de695e920eac8be","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明"},

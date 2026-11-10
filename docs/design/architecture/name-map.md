@@ -10,7 +10,7 @@
 2. 没立的缝不改名；不为对上这张表单独开改名工单。
 3. 立缝工单关闭时，子架构师在这里把该行的状态改为「一致」，代码名一栏写新名字。
 
-判断口径：**一致**：代码名是总图这个词的直译，或是总图第一节方框悬停里给出的技术名词、术语表（`CONTEXT.md`）里的词；**不一致**：代码里有对应的东西，但叫的是旧说法、术语表列为「避免」的说法，或者一个名字盖住了总图分开的两样东西，这一栏写明现在叫什么，不写改法；**代码里还没有**：没有对应的模块、类型、字段或标识符。「归哪道缝或哪条道」一栏，缝用总图第四节的名字，道用[路线图](../../program-roadmap.md)第 3 节的编号。
+判断口径：**一致**：代码名是总图这个词的直译，或是总图第一节方框悬停里给出的技术名词、术语表（`CONTEXT.md`）里的词；**不一致**：代码里有对应的东西，但叫的是旧说法、术语表列为「避免」的说法，或者一个名字盖住了总图分开的两样东西，这一栏写明现在叫什么，不写改法；**代码里还没有**：没有对应的模块、类型、字段或标识符。「总图位置」一栏写「第 1.3 节」的，指[总体架构](overall-architecture.md)第 1.3 节「每道缝交换什么」里这道缝的一行。「归哪道缝或哪条道」一栏，缝用总图第四节的名字，道用[路线图](../../program-roadmap.md)第 3 节的编号。
 
 内环六步各对应一道缝，不另列行：1 路由与边界 → 路由、写入口内侧（边界）；2 装配 → 装配；3 模型 / 外包 → 模型、执行（外包角色）；4 工具与环境 → 动作；5 裁决与写入口 → 写入口；6 投影 → 投影。
 
@@ -24,12 +24,12 @@
 | --- | --- | --- | --- | --- |
 | 一份事实 | 第一节「一份事实」；第四节写入口的一侧 | `event_store.py` 的 `EventStore`；流 `run_stream`、`project_stream`、`catalog_stream`；`kernel_events.py` 的 `Event`、`ProjectEvent`、`CatalogEvent`（`models.py` 转出） | 写入口 | 一致（方框的技术名词是事件日志） |
 | 写入口 | 第四节写入口 | `write_path.py` 的 `WritePath`、`Transaction`、`NewEvent`、`NewProjectEvent`、`NewCatalogEvent` | 写入口 | 一致 |
-| 期望版本 | 第四节写入口「交换」 | `WritePath.transact`、`append` 的参数 `expected_version`；`StreamVersionConflict`；`Event.stream_version` | 写入口 | 一致 |
-| 事项的执行权编号 | 第四节写入口「交换」 | `WritePath.claim_execution_right`、`StaleExecutionRight`；编号本身叫 `epoch`（`Event.epoch`、`event_store.py` 的表列） | 写入口 | 不一致：方法与异常叫执行权，编号字段叫 `epoch` |
-| 派发编号 | 第四节写入口「交换」；第三节「重派与迟到的结果」 | 无。一轮工作只有身份 `activation_id`（`new_id("act")`，记在事件内容、`ContextManifest` 与 `CheckReceipt` 里），不递增，写入口不核对 | 写入口 | 代码里还没有 |
+| 期望版本 | 第 1.3 节写入口「交换」 | `WritePath.transact`、`append` 的参数 `expected_version`；`StreamVersionConflict`；`Event.stream_version` | 写入口 | 一致 |
+| 事项的执行权编号 | 第 1.3 节写入口「交换」 | `WritePath.claim_execution_right`、`StaleExecutionRight`；编号本身叫 `epoch`（`Event.epoch`、`event_store.py` 的表列） | 写入口 | 不一致：方法与异常叫执行权，编号字段叫 `epoch` |
+| 派发编号 | 第 1.3 节写入口「交换」；第四节写入口的规矩；第六节「消息丢了、重发了、迟到了」 | 无。一轮工作只有身份 `activation_id`（`new_id("act")`，记在事件内容、`ContextManifest` 与 `CheckReceipt` 里），不递增，写入口不核对 | 写入口 | 代码里还没有 |
 | 消息身份、按消息身份去重 | 第四节写入口 | `event_store.py` 的 `Command`、`CommandRecord`、`DuplicateCommand`、`CommandIdReused`；`Event.command_id` | 写入口 | 不一致：叫命令身份，只覆盖经接口发来的命令 |
-| 来源（职能、角色、工作单元） | 第四节写入口「交换」 | `Event.department`、`Event.role`、`Event.actor`、`Event.session_id`；工作单元没有字段 | 写入口 | 不一致：分在四个字段里，没有「来源」这一组；工作单元代码里还没有 |
-| 证据引用 | 第四节写入口「交换」 | `Event.artifact_hashes`、`models.py` 的 `ArtifactRef`、`artifacts.py` | 写入口 | 一致（方框的技术名词是工件） |
+| 来源（职能、角色、工作单元） | 第 1.3 节写入口「交换」 | `Event.department`、`Event.role`、`Event.actor`、`Event.session_id`；工作单元没有字段 | 写入口 | 不一致：分在四个字段里，没有「来源」这一组；工作单元代码里还没有 |
+| 证据引用 | 第 1.3 节写入口「交换」 | `Event.artifact_hashes`、`models.py` 的 `ArtifactRef`、`artifacts.py` | 写入口 | 一致（方框的技术名词是工件） |
 | 提案、完成提案 | 第一节方程「U ≠ f」；第四节执行「出」 | `proposals.py`、`submissions.py`；事件 `proposal_submitted`、`proposal_rejected`；定义 `proposal_contracts.json` | 写入口、执行 | 一致 |
 | 裁决（U） | 第一节「裁决与边界」；方程里的 U | `adjudication.py`（`tool_permission`、`ToolPermission`、`proposal_decision`、`commit_decision`、`WorkBasis`）、`validation.py`（`evaluate_proposal`、`ProposalDecision`）；路由的收紧检查（总图没有这个词）：接口 `tightening_contract.py`，实现 `tightening.py` 的 `WatchedOutputsTightening` | 写入口内侧（内核，不是缝） | 一致 |
 | 边界 | 第一节「裁决与边界」；第三节「每一步先问边界」 | `bounds.py`（`activation_bound`、`time_used_up`、`time_left_sec`），读 `minimal_projection.py` 里的已用量（`UsedAmount`）；询问深度在 `adjudication.ask_chain_max_depth`；时钟的起点与事件写入在 `orchestrator.py` | 写入口内侧（内核，不是缝） | 一致 |
@@ -59,7 +59,7 @@
 | 装配契约 | 第四节装配 | `assembly_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`、`ContextAssembly` 协议的四个方法）；实现 `assembly.py` 的 `ContextAssembly` 声明 `CONTRACT_VERSION` | 装配 | 一致 |
 | 交给模型的那份 | 第四节装配「出」 | `assembly.py` 的 `StepRequest`；事件 `model_request_serialized` | 装配 | 一致 |
 | 上下文清单 | 第四节装配「出」 | `models.py` 的 `ContextManifest`、`ContextSource`、`ContextExclusion`；事件 `context_assembled` | 装配 | 一致 |
-| 压缩 | 第三节「上下文逼近上限 → 压缩」 | `compaction.py`（`plan_compaction`、`finish_compaction`、`CompactionCheckpoint`）；事件 `compaction_recorded` | 装配；道 04 | 一致 |
+| 压缩 | 第一节「槽位：装配」的技术名词 | `compaction.py`（`plan_compaction`、`finish_compaction`、`CompactionCheckpoint`）；事件 `compaction_recorded` | 装配；道 04 | 一致 |
 | 待并入的指导 | 第四节装配「入」；第三节两环的关系 | `assembly.pending_guidance`、`models.py` 的 `DepartmentGuidance`；事件 `department_guidance_received`、`_applied`、`_responded`；命令 `guidance.send` | 装配 | 一致 |
 | 判定点 | 第三节「判定点」；第四节装配「判定点的选择先写事件」 | 无 | 装配、定义；道 06 | 代码里还没有 |
 
@@ -105,7 +105,7 @@
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
 | 应用的投影 | 第四节投影 | `projection.py`（`project_run`、`replay_run`、`RunHandler`）、`project_projection.py`、`app/read_models.py` 的 `ReadModels`、`views.py`、`overview.py` | 投影 | 一致 |
-| 折叠函数、从头重算 | 第四节投影「交换」 | `projection.py` 的 `apply_event`、`replay_events`；`replay_check.py`；查询 `replay.check` | 投影 | 一致 |
+| 折叠函数、从头重算 | 第 1.3 节投影「交换」 | `projection.py` 的 `apply_event`、`replay_events`；`replay_check.py`；查询 `replay.check` | 投影 | 一致 |
 | 骨架事件、应用事件 | 第二节「只能向后兼容」；第四节投影 | 骨架事件：`kernel_events.py` 的 `SkeletonEventType`（run 流）、`ProjectEventType`、`CatalogEventType`，登记表 `SKELETON_EVENTS`；应用事件：`models.py` 的 `EventType` 里接着声明的部分，由 `app/payloads.py` 经 `register_application_event_types` 登记 | 投影、写入口 | 一致 |
 
 ### 接口
@@ -127,23 +127,23 @@
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
 | 定义、加载与校验 | 第二节「定义」；第四节定义 | `definitions/__init__.py` 的 `Definitions`、`load_definitions`、`DefinitionError`；文件 `organization.json`、`roles.json`、`tools.json`、`proposal_contracts.json`、`rules.json`、`stop_reasons.json`、`work_items.json`、`service_presets.json`、`model_capabilities.json`、`routings.json` | 定义；道 10 | 一致 |
-| 版本 | 第四节定义「交换」 | `Definitions` 的版本取全部文件的内容摘要 | 定义 | 一致 |
-| 职能与角色 | 第一节「下一个职能」；第四节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality`；对外合同里职能是字符串（`app/payloads.py` 的 `Department = str`），命令收到定义里没有的职能时拒绝并写明可用的 | 定义；道 01、02 | 不一致：代码里职能叫 department（部门），见下一行；`models.py` 的 `DEPARTMENTS` 与 `providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 都取自模块加载时的默认定义（`DEFINITIONS.departments`），`app/project_queries.py`、`app/catalog_*.py`、`department_prompts.py` 按它列职能；总图要的是随事项冻结的定义给出 |
-| 上限 | 第四节定义「交换」 | `rules.json` 与 `Rule`；`parameters.py`（`check_bounds`、`ParameterChange`、`fold_parameters`）；命令 `parameter.set`、事件 `parameter_set`、`project_parameter_set` | 定义 | 一致（方框的技术名词是上限与规则、参数） |
-| 停止原因清单 | 第三节外环「停止」；第四节定义「交换」 | `stop_reasons.json`、`StopReason`、`UnknownStopReason`、`models.stop_reason_name`、`Event.stop_reason` | 定义 | 一致 |
+| 版本 | 第 1.3 节定义「交换」 | `Definitions` 的版本取全部文件的内容摘要 | 定义 | 一致 |
+| 职能与角色 | 第一节「下一个职能」；第 1.3 节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality`；对外合同里职能是字符串（`app/payloads.py` 的 `Department = str`），命令收到定义里没有的职能时拒绝并写明可用的 | 定义；道 01、02 | 不一致：代码里职能叫 department（部门），见下一行；`models.py` 的 `DEPARTMENTS` 与 `providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 都取自模块加载时的默认定义（`DEFINITIONS.departments`），`app/project_queries.py`、`app/catalog_*.py`、`department_prompts.py` 按它列职能；总图要的是随事项冻结的定义给出 |
+| 上限 | 第 1.3 节定义「交换」 | `rules.json` 与 `Rule`；`parameters.py`（`check_bounds`、`ParameterChange`、`fold_parameters`）；命令 `parameter.set`、事件 `parameter_set`、`project_parameter_set` | 定义 | 一致（方框的技术名词是上限与规则、参数） |
+| 停止原因清单 | 第三节外环「停止」；第 1.3 节定义「交换」 | `stop_reasons.json`、`StopReason`、`UnknownStopReason`、`models.stop_reason_name`、`Event.stop_reason` | 定义 | 一致 |
 | 职能 | 第一节「下一个职能」；术语表「职能」 | 叫 department：`Department`、`Event.department`、`app/payloads.py` 的 `Department = str`、`DepartmentSession`、`DEPARTMENTS`、`DEPARTMENT_STATES`，事件与命令名里的 `department_*`（`department_activated`、`department_guidance_*`），查询名 `department.workspace` 等，界面里的 `DepartmentPage`、`DepartmentView` | 定义、执行、接口；道 01 | 不一致：代码与接口叫 department（部门），立缝时随各道缝改名，旧名留别名一版 |
 | 形态「产品 · 工程 · 质检」（默认） | 术语表「形态」 | `definitions/__init__.py` 的 `DEFAULT_FORM = "three_departments"`，定义在 `harness/definitions/` 根下 | 定义；道 01 | 不一致：标识按部门数起名 |
 | 形态「工程」 | 术语表「形态」 | `single_role_direct`（`runtime.py` 的 `SINGLE_ROLE_DIRECT`，定义 `definitions/forms/single_role_direct/`） | 定义；道 01、03 | 不一致：标识按角色数与轮转起名 |
 | 形态「产品 · 工程」 | 术语表「形态」 | `several_roles_direct`（`runtime.py` 的 `SEVERAL_ROLES_DIRECT`，定义 `definitions/forms/several_roles_direct/`） | 定义；道 01、03 | 不一致：标识按角色数与轮转起名 |
 | 形态「产品 · 工程 · 质检 · 运维」 | 术语表「形态」 | 无 | 定义；道 08 | 代码里还没有 |
 | 加独立核验、去掉独立核验 | 术语表「核验角色」「形态」 | 查询 `project.organization` 给出的改动 `add_verifier`、`remove_verifier`；采用命令的方式 `mode: "verifier"`（`app/form_commands.py` 的 `AdoptionMode`，另两种是 `template`、`advanced`）；合成 `organization_compose.py` 的 `verifier_changes` | 定义、接口 | 一致（核验角色的直译）；采用方式里的 `template` 指换形态，术语表把「模板」列为避免的说法 |
-| 谁能拒绝谁 | 第四节定义「交换」 | 由核验声明推出，不另写一份：`definitions/__init__.py` 的 `Definitions.rejection_edges`；加载时 `verification_issues`、`_rejection_cycles` 核对无环；各职能能提交什么另写在 `proposal_contracts.json` | 定义 | 一致 |
-| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第四节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方还写死：`app/project_queries.py` 的 `VERIFIER_OF`（`{"engineering": "quality"}`）、检查材料目录 `path_rules.py` 的 `QA_TESTS_DIR`、职能 id `quality` | 定义、路由；道 01 | 不一致：声明已有，读声明的只有定义模块自己，使用方仍写死在职能名上 |
-| 写入范围 | 第四节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 的写路径检查读 `Definitions.write_scope(职能)`，范围是检查材料时把写入限在声明的目录下，不按职能名 | 定义、写入口 | 一致 |
-| 成果种类与提案合同 | 第四节定义「交换」 | `outcome_kinds.json`（`OutcomeKinds`：成果种类与分组，单独的一项），路由按组名引用（`routings.json` 的 `outcomes`）；`proposal_contracts.json` | 定义；道 03 | 一致 |
-| 路由实现与它的定义、工作单元的大小 | 第四节定义「交换」 | 路由实现与它的定义：组织定义的 `routing`、`routings.json`（每种路由一条）、`Definitions.routing_definition`；工作单元的大小：无 | 定义、路由；道 03 | 一致（路由实现与它的定义）；代码里还没有（工作单元的大小） |
-| 登记的机器 | 第四节定义「交换」；第六节 | 无 | 定义；道 10 | 代码里还没有 |
-| 限定采用的范围 | 第四节定义「交换」；第五节第二层 | 无 | 定义 | 代码里还没有 |
+| 谁能拒绝谁 | 第 1.3 节定义「交换」 | 由核验声明推出，不另写一份：`definitions/__init__.py` 的 `Definitions.rejection_edges`；加载时 `verification_issues`、`_rejection_cycles` 核对无环；各职能能提交什么另写在 `proposal_contracts.json` | 定义 | 一致 |
+| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第 1.3 节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方还写死：`app/project_queries.py` 的 `VERIFIER_OF`（`{"engineering": "quality"}`）、检查材料目录 `path_rules.py` 的 `QA_TESTS_DIR`、职能 id `quality` | 定义、路由；道 01 | 不一致：声明已有，读声明的只有定义模块自己，使用方仍写死在职能名上 |
+| 写入范围 | 第 1.3 节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 的写路径检查读 `Definitions.write_scope(职能)`，范围是检查材料时把写入限在声明的目录下，不按职能名 | 定义、写入口 | 一致 |
+| 成果种类与提案合同 | 第 1.3 节定义「交换」 | `outcome_kinds.json`（`OutcomeKinds`：成果种类与分组，单独的一项），路由按组名引用（`routings.json` 的 `outcomes`）；`proposal_contracts.json` | 定义；道 03 | 一致 |
+| 路由实现与它的定义、工作单元的大小 | 第 1.3 节定义「交换」 | 路由实现与它的定义：组织定义的 `routing`、`routings.json`（每种路由一条）、`Definitions.routing_definition`；工作单元的大小：无 | 定义、路由；道 03 | 一致（路由实现与它的定义）；代码里还没有（工作单元的大小） |
+| 登记的机器 | 第 1.3 节定义「交换」；第六节 | 无 | 定义；道 10 | 代码里还没有 |
+| 限定采用的范围 | 第 1.3 节定义「交换」；第五节第二层 | 无 | 定义 | 代码里还没有 |
 
 ## 2. 系统之外的四道缝
 
@@ -151,7 +151,7 @@
 | --- | --- | --- | --- | --- |
 | 评价 | 第一节「评价」；第四节评价 | `evals/`（`scenarios/*/checks`、`scorer/`、`runner/`、`baseline/`）；发布检查 `harness/release_check.py`、`scripts/release.py`；内核清单 `harness/definitions/kernel-manifest.json` | 评价；道 08 | 一致（方框的技术名词是评测场景与隐藏检查、评分器、发布检查） |
 | 观察者 | 第一节「观察者」；第四节观察者 | 无；教训候选由 `submissions.py` 的 `SubmissionWriter.record_lesson_candidate` 在控制核心里写（`orchestrator.py` 调用），事件 `lesson_candidate_recorded`，不经观察者缝 | 观察者；道 07 | 代码里还没有 |
-| 读取范围、振荡信号 | 第四节观察者「交换」 | 无（最接近的是事件流按范围筛选，`app/event_stream.py` 的 `EventScope`，范围由连接的参数给出，不在定义里声明） | 观察者；道 07 | 代码里还没有 |
+| 读取范围、振荡信号 | 第 1.3 节观察者「交换」 | 无（最接近的是事件流按范围筛选，`app/event_stream.py` 的 `EventScope`，范围由连接的参数给出，不在定义里声明） | 观察者；道 07 | 代码里还没有 |
 | 看门狗（健康探针、切换命令、排空命令） | 第一节「看门狗」；第四节看门狗 | 看门狗与健康探针、切换命令都没有；排空已有：`streams.py` 的 `DrainState`、命令 `runtime.start_drain`、`runtime.force_upgrade`，事件 `runtime_drain_started`、`runtime_drain_finished` | 看门狗；道 10 | 代码里还没有（排空命令一项一致） |
 
 ### 画面

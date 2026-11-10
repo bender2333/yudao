@@ -22,8 +22,8 @@
 {"hash":"6312e6b3002a358a","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 11. 未决问题","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"11. 未决问题"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「裁决与边界」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"bd17490d65acfb60","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「裁决与边界」"],"seen":"762ce1eedbb2875f","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"f18fdc934a1521ba","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"fb91d0dffb8b7ad7","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"cc9397dfaf732c1e","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"241863e89464a786","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},

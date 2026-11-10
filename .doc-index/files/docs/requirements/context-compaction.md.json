@@ -1,19 +1,19 @@
 {
 "schema":1,
 "path":"docs/requirements/context-compaction.md",
-"hash":"558d405194837c8c",
+"hash":"1174f54b44beab62",
 "nodes":[
-{"hash":"558d405194837c8c","id":"docs/requirements/context-compaction.md","kind":"file","title":"docs/requirements/context-compaction.md"},
-{"hash":"8b46641b7027a516","id":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩","kind":"section","parent":"docs/requirements/context-compaction.md","title":"D10 上下文窗口、记忆与自动压缩"},
+{"hash":"1174f54b44beab62","id":"docs/requirements/context-compaction.md","kind":"file","title":"docs/requirements/context-compaction.md"},
+{"hash":"fb59775191c42cfc","id":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩","kind":"section","parent":"docs/requirements/context-compaction.md","title":"D10 上下文窗口、记忆与自动压缩"},
 {"hash":"649efd9ab24f3121","id":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩 > 已确认","kind":"section","parent":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩","title":"已确认"},
 {"hash":"2bb42ebff81bf008","id":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩 > 实现边界","kind":"section","parent":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩","title":"实现边界"}
 ],
 "edges":[
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
-{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
-{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"d02a872fc3efaba8","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"35e4ecd5be5ddb3d","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6277c47f32b3e3d7","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
+{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"5553cffec4192ae1","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
+{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"3154bccd06f45217","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩"},
 {"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩 > 实现边界"},
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩 > 实现边界"},
 {"dst":"docs/requirements/department-history.md","kind":"link","raws":["department-history.md"],"seen":"814946588a0f1bef","src":"docs/requirements/context-compaction.md#D10 上下文窗口、记忆与自动压缩 > 实现边界"}

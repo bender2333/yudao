@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/design/context-assembly.md",
-"hash":"2a10c845c606c329",
+"hash":"02536490e6759c48",
 "nodes":[
-{"hash":"2a10c845c606c329","id":"docs/design/context-assembly.md","kind":"file","title":"docs/design/context-assembly.md"},
-{"hash":"3981b727d1a5c48e","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","kind":"section","parent":"docs/design/context-assembly.md","title":"上下文装配：把视图当作事件日志上的纯函数"},
+{"hash":"02536490e6759c48","id":"docs/design/context-assembly.md","kind":"file","title":"docs/design/context-assembly.md"},
+{"hash":"0c3c8f5e7e9fbd7e","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","kind":"section","parent":"docs/design/context-assembly.md","title":"上下文装配：把视图当作事件日志上的纯函数"},
 {"hash":"a2524906e8876bb3","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 1. 问题、现状与方法","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","title":"1. 问题、现状与方法"},
 {"hash":"5ff7e262e491758e","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 1. 问题、现状与方法 > 1.1 要解决的问题","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 1. 问题、现状与方法","title":"1.1 要解决的问题"},
 {"hash":"4f5306c011ccc0d5","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 1. 问题、现状与方法 > 1.2 数据","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 1. 问题、现状与方法","title":"1.2 数据"},
@@ -27,7 +27,7 @@
 {"hash":"9edb3550e278df85","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条） > R7 work_limit_tokens（参数，form: boundary）","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条）","title":"R7 work_limit_tokens（参数，form: boundary）"},
 {"hash":"1330f8643e9097d3","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条） > 开启条件：只对缓存命中低的调用目标折叠","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条）","title":"开启条件：只对缓存命中低的调用目标折叠"},
 {"hash":"ce6f751bc0be9dc4","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 5. 装入顺序与截断","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","title":"5. 装入顺序与截断"},
-{"hash":"7bfc115ef54a0344","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 5. 装入顺序与截断 > 压缩以后保留失败的尝试","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 5. 装入顺序与截断","title":"压缩以后保留失败的尝试"},
+{"hash":"29c5440ff4ffa730","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 5. 装入顺序与截断 > 压缩以后保留失败的尝试","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 5. 装入顺序与截断","title":"压缩以后保留失败的尝试"},
 {"hash":"6e1c7e92cc649c6e","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","title":"6. 三项证明"},
 {"hash":"66c208e82da10bca","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明 > 6.1 确定性（通过）","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明","title":"6.1 确定性（通过）"},
 {"hash":"9a7cfe70a628fb4f","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明 > 6.2 反事实回放（做了，但这批模型上没有区分力）","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 6. 三项证明","title":"6.2 反事实回放（做了，但这批模型上没有区分力）"},
@@ -37,10 +37,10 @@
 {"hash":"a955941673b1e296","id":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 8. 未决问题","kind":"section","parent":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","title":"8. 未决问题"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「装配实现」"],"seen":"7a9842b0d9a1dbed","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「可以整体重写」"],"seen":"b9b29c85a3d18cc8","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「上下文逼近上限 → 压缩」"],"seen":"bd17490d65acfb60","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
-{"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"052770e8d9e24d0c","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「装配实现」"],"seen":"762ce1eedbb2875f","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「可以整体重写」"],"seen":"559efeaef4c4d376","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「装配」"],"seen":"f18fdc934a1521ba","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"a989bc84206f2495","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/archive/evaluation/context-assembly-2026-10-29.md","kind":"link","raws":["../archive/evaluation/context-assembly-2026-10-29.md"],"seen":"9e3db839c73835f9","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/archive/evaluation/context-assembly-replay-2026-10-29.md","kind":"link","raws":["../archive/evaluation/context-assembly-replay-2026-10-29.md"],"seen":"419993fac0c95164","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/evaluation/context-assembly-counterfactual-2026-10-29.json","kind":"link","raws":["../evaluation/context-assembly-counterfactual-2026-10-29.json"],"seen":"63546f541f1f7f4d","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},

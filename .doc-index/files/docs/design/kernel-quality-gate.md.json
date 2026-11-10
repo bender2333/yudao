@@ -23,8 +23,8 @@
 ],
 "edges":[
 {"dst":"docs/adr/0046-kernel-trusted-by-checks-not-size.md","kind":"link","raws":["../adr/0046-kernel-trusted-by-checks-not-size.md"],"seen":"6eaa56a8e442ec8a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"b9b29c85a3d18cc8","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
-{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「内核」"],"seen":"bff92efe9855956f","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"559efeaef4c4d376","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「内核」"],"seen":"d65fb409d4abd20a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码","kind":"link","raws":["test-pyramid.md"],"seen":"c44057ff5cf1957f","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
 {"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"7359eb9a655048af","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
@@ -34,7 +34,7 @@
 {"dst":"docs/design/test-pyramid.md","kind":"link","raws":["test-pyramid.md"],"seen":"fa1e1ab66f669cbb","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法","kind":"link","raws":["test-pyramid.md"],"seen":"491485060a686211","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["trusted-kernel.md"],"seen":"2136d5b05e88806e","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
-{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"ed10a3c9c33a110a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"35895eced8809b9a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"}
 ]
 }
