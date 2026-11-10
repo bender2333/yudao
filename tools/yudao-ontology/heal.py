@@ -124,9 +124,10 @@ def main(argv: list[str]) -> None:
         gate = gates(root, new, must)
         left_reword = [q for i, q in enumerate(groups, 1) if i not in accept]
         left_deleted = list(OrderedDict.fromkeys(x["quote"] for x in r["deleted"]))
-        done = gate["ok"] and not left_reword and not left_deleted and not inside
+        left_moved = list(OrderedDict.fromkeys(x["quote"] for x in r.get("moved", [])))  # 出处要改，先交人看挪到哪
+        done = gate["ok"] and not left_reword and not left_deleted and not left_moved and not inside
         summary = {"old": old, "new": new, "edited": count, "healed": len(r["healed"]), "accepted": accept,
-                   "left_reworded": len(left_reword), "left_deleted": len(left_deleted), "unextracted_inside": len(inside),
+                   "left_reworded": len(left_reword), "left_deleted": len(left_deleted), "left_moved": len(left_moved), "unextracted_inside": len(inside),
                    "gates": gate, "applied": False, "aligned_moved": False}
         if apply and gate["ok"]:
             for f in changes.HAND + ["batch3-definitions.ttl"]:
@@ -142,7 +143,7 @@ def main(argv: list[str]) -> None:
     lines = [f"模型 {old} → {new}：自动改了 {sum(count.values())} 处（" + "、".join(f"{k} {v}" for k, v in count.items()) + "）；",
              f"三道：原句核对{'过' if gate['quotes']['ok'] else '没过'}（还对不上 {gate['quotes']['stale']} 条），"
              f"一致性{'过' if gate['consistent']['ok'] else '没过'}，埋错 {gate['mutations']['detected']}/{gate['mutations']['total']}；",
-             f"剩给人的：改写 {len(left_reword)} 句、删掉 {len(left_deleted)} 句、模型挂过的节里新加 {len(inside)} 行。",
+             f"剩给人的：改写 {len(left_reword)} 句、删掉 {len(left_deleted)} 句、挪到别的文档 {len(left_moved)} 句、模型挂过的节里新加 {len(inside)} 行。",
              ("已写回 batches/。" if summary["applied"] else "没写回（试跑，或三道没过）。")
              + ("对齐点挪到 " + new + "。" if summary["aligned_moved"] else "对齐点没动。")]
     print("\n".join(lines))

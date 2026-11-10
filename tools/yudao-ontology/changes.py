@@ -60,6 +60,22 @@ def _found(q: str, text: str) -> bool:
     return all(quotecheck.norm(x) in text for part in q.split("……") for x in part.split("；") if quotecheck.norm(x))
 
 
+def elsewhere(old: str, new: str, quote: str, skip: str, cands) -> dict | None:
+    """原句在原来那份文档里没了时，看它是不是挪到了这次改过的别的文档（记录类文件不算）。
+    原样在那里：exact；换了格式或措辞：给最像的一句和相似度，和改写一样要人判。"""
+    best = None
+    for path in git("diff", "--name-only", old, new, "--", "docs", "CONTEXT.md").splitlines():
+        if path in skip.split("、") or any(path.startswith(h) for h in HISTORY) or not path.endswith((".md", ".html")):
+            continue
+        raw, text, keep = doc_text(new, [path])
+        if _found(quote, text):
+            return {"to": path, "exact": True, "score": 1.0, "candidate": quote}
+        score, sent = nearest(quote, raw, text, keep, cands)
+        if score >= REWORD and (best is None or score > best["score"]):
+            best = {"to": path, "exact": False, "score": round(score, 2), "candidate": sent}
+    return best
+
+
 def heal_one(quote: str, text: str, cands: list[tuple[str, str]]):
     """试候选的组合（最多 4 个，同一个旧词只取一种换法），换完新文档里真有这句才算接上。"""
     rel = [c for c in cands if c[0] in quote]
@@ -182,7 +198,7 @@ def impact(old: str, new: str) -> dict:
     qrows = quotecheck.check(new)
     stale = [r for r in qrows if r["found"] is False]
     texts: dict[str, tuple] = {}
-    healed, reworded, deleted, used = [], [], [], Counter()
+    healed, reworded, deleted, moved, used = [], [], [], [], Counter()
     for r in stale:
         if r["doc"] not in texts:
             texts[r["doc"]] = doc_text(new, r["doc"].split("、"))
@@ -193,6 +209,11 @@ def impact(old: str, new: str) -> dict:
             used.update(combo)
             continue
         score, sent = nearest(r["quote"], raw, text, keep, sure + [k for k in used if k not in sure])
+        if score < REWORD:
+            to = elsewhere(old, new, r["quote"], r["doc"], sure)
+            if to:  # 挪到了别的文档：出处要改；原样挪的意思没变，换了说法的照改写交人判
+                moved.append({**r, **to})
+                continue
         (reworded if score >= REWORD else deleted).append({**r, "score": round(score, 2), "candidate": sent})
 
     # 候选里要点的只有模型用得上的：接上过原句的，或者手写的标签、docRef 里有旧词的
@@ -232,7 +253,7 @@ def impact(old: str, new: str) -> dict:
     if prev.exists():
         diff4 = {"prev": prev.name}
     return {"old": old, "new": new, "record": record, "candidates": cand_rows, "ask": ask,
-            "quotes": len(qrows), "stale": len(stale), "healed": healed, "reworded": reworded, "deleted": deleted,
+            "quotes": len(qrows), "stale": len(stale), "healed": healed, "reworded": reworded, "deleted": deleted, "moved": moved,
             "labels": [{"file": f, "pred": p, "text": t} for f, p, t in labels],
             "concepts": list(concepts.values()), "generated": gen,
             "coverage": coverage(new, [x for x in sure if len(x[0]) >= 2]), "diff4": diff4}
@@ -265,7 +286,11 @@ def render(r: dict) -> str:
     nq = lambda rows: len({x["quote"] for x in rows})  # noqa: E731
     out.append(f"原句 {r['quotes']} 条，对不上 {r['stale']} 条：换词接上 {len(r['healed'])} 条（不用确认），"
                f"改写 {len(r['reworded'])} 条（{nq(r['reworded'])} 句话，要人判意思变没变），"
-               f"删掉 {len(r['deleted'])} 条（{nq(r['deleted'])} 句话）。")
+               f"删掉 {len(r['deleted'])} 条（{nq(r['deleted'])} 句话），"
+               f"挪到别的文档 {len(r.get('moved', []))} 条（出处要改；换了说法的要人判）。")
+    for x in r.get("moved", []):
+        how = "原样" if x["exact"] else f"换了说法，相似 {x['score']}，最像的「{x['candidate'][:60]}」"
+        out.append(f"- 挪走（{x['subject']}）：「{x['quote'][:60]}」从 {x['doc']} 到 {x['to']}（{how}）")
     for kind, rows in (("改写", r["reworded"]), ("删掉", r["deleted"])):
         groups = OrderedDict()
         for x in rows:
