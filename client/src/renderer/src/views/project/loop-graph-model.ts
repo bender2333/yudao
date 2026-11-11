@@ -71,7 +71,7 @@ export interface MaterialsView {
   contracts?: readonly { event_id: string; revision: number | null }[];
   deliveries?: readonly { event_id: string; revision: number | null; summary?: string | null; files?: readonly string[] }[];
   reviews?: readonly { event_id: string; verdict: string; rationale?: string }[];
-  inputs?: readonly { version: number; text: string }[];
+  inputs?: readonly { version: number; text: string; created_event_id?: string | null }[];
 }
 
 /** 一项职能在这件事项上的状态与原因（project.loop 的 departments 的一项）。 */
@@ -241,6 +241,11 @@ export interface LoopArrow {
   text: string;
   /** 改了的文件（交付有；别的成果没有） */
   files: string[];
+  /**
+   * 这一版在 work_item.materials 里的那条事实：箭头面板按它取这一版的文件清单、摘要与单个文件。
+   * 缺陷记录与来源箭头也带上自己的事件，图纸上画的时候不用，面板取资料时用。
+   */
+  eventId?: string | null;
 }
 
 /** 主线上一个节点与它旁边那些职能之间的一格：旁边的职能怎么和主线往来。 */
@@ -548,6 +553,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
     out.push({
       key: `src:${input.version}`, outcome: source, version: input.version, round: null,
       from: SOURCE, to: receiver, back: false, position: input.version, verdict: null, text: input.text, files: [],
+      eventId: input.created_event_id ?? null,
     });
   }
   const contracts = new Map((materials?.contracts ?? []).map((entry) => [entry.event_id, entry]));
@@ -570,6 +576,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       const arrow: LoopArrow = {
         key: record.flow_id, outcome, version, round: record.round ?? null, from, to, back: false,
         position: record.position, verdict: null, text: record.content, files: [],
+        eventId: record.event_id,
       };
       out.push(arrow);
       // 打回是对那一版的结论：标在它前面那一版交付上；前面还没有交付时留在这条缺陷记录上
@@ -590,6 +597,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       key: record.flow_id, outcome, version, round: record.round ?? null, from, to, back: false,
       position: record.position, verdict: null, text: delivery?.summary ?? record.content,
       files: [...(delivery?.files ?? [])],
+      eventId: record.event_id,
     };
     out.push(arrow);
     if (outcome === "交付") {
