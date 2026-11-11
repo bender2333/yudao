@@ -20,13 +20,16 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app import project_queries
 from harness.app.application import Application
-from harness.app.project_queries import ProjectLoop, WorkItemOrganization
+from harness.app.project_queries import ProjectFlow, ProjectLoop, WorkItemOrganization
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.event_store import project_stream, run_stream
-from harness.models import ProjectEventType
-from harness.runtime import LoopSystem
+from harness.models import EventType, ProjectEventType
+from harness.proposals import completion_turn
+from harness.runtime import SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, LoopSystem
+from harness.tests.helpers import delivery_turn, product_spec, quality_turns
 from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
 
@@ -271,3 +274,94 @@ def test_an_item_whose_form_is_not_in_the_release_has_no_organization(tmp_path, 
     # 换回不带这一份形态的实例读同一个数据目录
     reopened = _system(data_dir)
     assert _organization(_application(reopened), project_id, work_item_id) is None
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1703：职能状态与「你的输入」的去向按事项冻结的定义取
+
+PRODUCT = "product"
+ENGINEERING = "engineering"
+QUALITY = "quality"
+WRITTEN = {"src/echo.py": "import sys\nprint(sys.argv[1] if len(sys.argv) > 1 else '')\n"}
+
+
+def _running_system(data_dir: Path, script: dict[str, list[Any]]) -> LoopSystem:
+    # 跑假模型：职能状态要看跑到一轮工作里的那一次（工单 #1703 的验收第 1 条）
+    return LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+
+
+def _started(system: LoopSystem, name: str, form: str | None = None) -> tuple[str, str, str]:
+    project_id = system.projects.register(name, GOAL)
+    if form is not None:
+        _set_form(system, project_id, DEFAULT_FORM, form)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    return project_id, work_item_id, run_id
+
+
+def _first_activation(system: LoopSystem, run_id: str) -> int:
+    # 这个 run 第一条部门激活事件的位置：被叫起来的部门正在工作，事项还没有结束
+    return next(event.position for event in system.store.list_events(run_id)
+                if event.type == EventType.DEPARTMENT_ACTIVATED)
+
+
+def _states(application: Application, project_id: str, work_item_id: str, at: int) -> dict[str, str]:
+    item = application.query(
+        "project.loop", ProjectLoop(project_id=project_id, work_item=work_item_id, at=at)).data.work_items[0]
+    assert item.departments is not None
+    return {role: state.state for role, state in item.departments.items()}
+
+
+def _first_record(application: Application, project_id: str, work_item_id: str) -> Any:
+    records = application.query("project.flow", ProjectFlow(
+        project_id=project_id, work_item=work_item_id)).data.records
+    return records[0]
+
+
+def test_a_direct_item_shows_only_the_departments_of_its_frozen_form(tmp_path):
+    # 验收第 1 条：「工程」那一份只有工程一项，「产品 · 工程」那一份两项；进程里加载的默认定义是三部门
+    script = {ENGINEERING: [FakeTurn(writes=WRITTEN, checks={}), completion_turn("好了"),
+                            FakeTurn(writes=WRITTEN, checks={}), completion_turn("补好了")]}
+    system = _running_system(tmp_path / "loop", script)
+    application = _application(system)
+
+    project_id, work_item_id, run_id = _started(system, "一个角色直做", SINGLE_ROLE_DIRECT)
+    assert system.run_until_stop(run_id).stop_reason == "open_loop"
+    assert _states(application, project_id, work_item_id, _first_activation(system, run_id)) == {
+        ENGINEERING: "working"}
+
+    project_id, work_item_id, run_id = _started(system, "两个角色直做", SEVERAL_ROLES_DIRECT)
+    assert system.run_until_stop(run_id).stop_reason == "open_loop"
+    assert _states(application, project_id, work_item_id, _first_activation(system, run_id)) == {
+        PRODUCT: "waiting", ENGINEERING: "working"}
+    system.close()
+
+
+def test_each_item_shows_the_departments_of_the_definition_it_was_created_under(tmp_path):
+    # 验收第 4 条：同一实例里一件「工程」形态与一件默认形态的事项各按自己冻结的定义给出职能状态
+    script = {ENGINEERING: [FakeTurn(writes=WRITTEN, checks={}), completion_turn("好了"),
+                            delivery_turn("补了用法一节")],
+              PRODUCT: [product_spec()],
+              QUALITY: quality_turns("release", "看过了")}
+    system = _running_system(tmp_path / "loop", script)
+    application = _application(system)
+
+    direct_project, direct_item, direct_run = _started(system, "一个角色直做", SINGLE_ROLE_DIRECT)
+    assert system.run_until_stop(direct_run).stop_reason == "open_loop"
+    default_project, default_item, default_run = _started(system, "三部门")
+    assert system.run_until_stop(default_run).stop_reason == "released"
+
+    assert _states(application, direct_project, direct_item, _first_activation(system, direct_run)) == {
+        ENGINEERING: "working"}
+    assert _states(application, default_project, default_item,
+                   _first_activation(system, default_run)) == {
+        PRODUCT: "working", ENGINEERING: "waiting", QUALITY: "waiting"}
+    system.close()
+
+
+def test_the_input_of_a_default_item_goes_to_the_product_role(tmp_path):
+    # 验收第 2 条：默认形态的「你的输入」去向仍是产品，不因为这两处改成按定义取而变
+    system = _system(tmp_path / "loop")
+    project_id = system.projects.register("三部门", GOAL)
+    work_item_id, _run_id = system.projects.start_work_item(project_id, "做一件事")
+    first = _first_record(_application(system), project_id, work_item_id)
+    assert (first.kind, first.direction_to) == ("你的输入", PRODUCT)
