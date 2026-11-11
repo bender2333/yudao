@@ -120,11 +120,12 @@ test("最近一次请求的模型与档位取自工作间", () => {
   assert.deepEqual(workshopFacts(null), []);
 });
 
-test("底部两个入口：职能详情到设置页的职能设置，模型请求带着职能筛选", () => {
+test("底部两个入口：职能详情到节点所在职能的详情页，模型请求带着职能筛选", () => {
   const links = entryLinks("p1", "w1", "engineering");
-  assert.match(links.detail, /^#\/p\/p1\/settings\?/);
+  assert.match(links.detail, /^#\/p\/p1\/dept-detail\/engineering\?/);
   assert.match(links.detail, /w=w1/);
-  assert.match(links.detail, /section=departments/);
+  // 设置页不再有「职能设置」一节（工单 #1713），详情入口不再落到设置页
+  assert.doesNotMatch(links.detail, /settings/);
   assert.match(links.requests, /section=requests/);
   assert.match(links.requests, /dept=engineering/);
   assert.match(links.requests, /w=w1/);
@@ -136,7 +137,9 @@ test("底部两个入口：职能详情到设置页的职能设置，模型请�
   assert.equal(requests.requestFilters.department, "engineering");
   assert.equal(requests.workItemId, "w1");
   const detail = parseRoute(links.detail);
-  assert.equal(detail.settingsSection, "departments");
+  assert.equal(detail.name, "dept-detail");
+  assert.equal(detail.department, "engineering");
+  assert.equal(detail.workItemId, "w1");
 });
 
 test("整份正文：事实按从上到下的顺序给，入口地址取自节点所在的职能", () => {

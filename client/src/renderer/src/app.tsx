@@ -23,6 +23,7 @@ import { RuntimePage } from "./views/system/runtime";
 import { ToolsPage } from "./views/system/tools";
 import { ConversationPage } from "./views/project/conversation";
 import { DepartmentPage } from "./views/project/department";
+import { DepartmentDetailPage } from "./views/project/department-detail";
 import { MaterialsPage } from "./views/project/materials";
 import { AttemptDetailPage } from "./views/project/attempt-detail";
 import { ObservePage } from "./views/project/observe";
@@ -451,6 +452,10 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
       return <OverviewPage app={props.app} route={route} departments={props.departments} onNavigate={props.onNavigate} />;
     case "dept":
       return <DepartmentPage app={props.app} route={route} departments={props.departments} />;
+    case "dept-detail":
+      // 职能详情（工单 #1713）：职责与权限取自项目现在的组织，模型与 Prompt 写本项目的职能设置
+      return <DepartmentDetailPage app={props.app} route={route} organization={props.organization}
+        departments={props.departments} />;
     case "materials":
       return <MaterialsPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     case "observe":

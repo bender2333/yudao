@@ -107,11 +107,11 @@ export function lastRequestFacts(data: DepartmentWorkspaceResult | null): PanelF
   return [{ label: "最近一次请求", value: `${model}（请求 ${requested}，实际发送 ${sent}）` }];
 }
 
-/** 底部两个入口的地址：「职能详情」在 #1713 合并前指到设置页的职能设置一节。 */
+/** 底部两个入口的地址：「职能详情」到节点所在职能的详情页（工单 #1713）。 */
 export function entryLinks(projectId: string, workItemId: string, department: string): { detail: string; requests: string } {
   const workItem = workItemId === "" ? null : workItemId;
   return {
-    detail: paths.settings(projectId, { workItem, section: "departments" }),
+    detail: paths.departmentDetail(projectId, department, { workItem }),
     // 带着职能筛选去「模型请求与用量」：地址里写 dept，到那一节筛选立即生效（工单 #1710）
     requests: paths.settings(projectId, {
       workItem,
