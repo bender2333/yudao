@@ -71,7 +71,7 @@ export interface MaterialsView {
   contracts?: readonly { event_id: string; revision: number | null }[];
   deliveries?: readonly { event_id: string; revision: number | null; summary?: string | null; files?: readonly string[] }[];
   reviews?: readonly { event_id: string; verdict: string; rationale?: string }[];
-  inputs?: readonly { version: number; text: string }[];
+  inputs?: readonly { version: number; text: string; created_event_id?: string | null }[];
 }
 
 /** 一项职能在这件事项上的状态与原因（project.loop 的 departments 的一项）。 */
@@ -102,6 +102,11 @@ export interface LoopItemView {
   work_item_id: string;
   kind?: string | null;
   status: string;
+  /**
+   * 事项的停止原因（project.loop 给出，线程一侧读的也是它）：`open_loop` 表示以开环完成结束，
+   * 采纳以后状态变成 adopted、这一项仍是 open_loop（工单 #1704）。
+   */
+  stop_reason?: string | null;
   round?: number;
   started_at?: string | null;
   department?: string | null;
@@ -241,6 +246,11 @@ export interface LoopArrow {
   text: string;
   /** 改了的文件（交付有；别的成果没有） */
   files: string[];
+  /**
+   * 这一版在 work_item.materials 里的那条事实：箭头面板按它取这一版的文件清单、摘要与单个文件。
+   * 缺陷记录与来源箭头也带上自己的事件，图纸上画的时候不用，面板取资料时用。
+   */
+  eventId?: string | null;
 }
 
 /** 主线上一个节点与它旁边那些职能之间的一格：旁边的职能怎么和主线往来。 */
@@ -548,6 +558,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
     out.push({
       key: `src:${input.version}`, outcome: source, version: input.version, round: null,
       from: SOURCE, to: receiver, back: false, position: input.version, verdict: null, text: input.text, files: [],
+      eventId: input.created_event_id ?? null,
     });
   }
   const contracts = new Map((materials?.contracts ?? []).map((entry) => [entry.event_id, entry]));
@@ -570,6 +581,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       const arrow: LoopArrow = {
         key: record.flow_id, outcome, version, round: record.round ?? null, from, to, back: false,
         position: record.position, verdict: null, text: record.content, files: [],
+        eventId: record.event_id,
       };
       out.push(arrow);
       // 打回是对那一版的结论：标在它前面那一版交付上；前面还没有交付时留在这条缺陷记录上
@@ -590,6 +602,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       key: record.flow_id, outcome, version, round: record.round ?? null, from, to, back: false,
       position: record.position, verdict: null, text: delivery?.summary ?? record.content,
       files: [...(delivery?.files ?? [])],
+      eventId: record.event_id,
     };
     out.push(arrow);
     if (outcome === "交付") {
@@ -618,7 +631,13 @@ export function versionsOf(arrows: readonly LoopArrow[], arrow: LoopArrow): Loop
     .sort((left, right) => left.position - right.position);
 }
 
-/** 结束写什么：有核验角色时写谁放行；没有时写开环完成。 */
+/**
+ * 结束写什么：按事项怎么结束的写，看停止原因（工单 #1704）。
+ *
+ * 以开环完成结束的事项（停止原因是 open_loop）采纳以前与采纳以后都写「开环完成：没有人核验」；
+ * 组织里有核验角色、它只核验了中途成果时也一样，不写成放行。核验角色放行的写放行（放行待采纳与已采纳都写），
+ * 停下来的写已停止。与线程一侧同一个口径（thread-model 的 endingOf）。
+ */
 function endOf(item: LoopItemView | null, organization: FrozenOrganization,
                labels: Record<string, string>): { text: string; tone: "ok" | "open" | "plain" } {
   const names = verifierIds(organization).map((id) => labelOf(id, organization, labels)).join("、");
@@ -626,11 +645,17 @@ function endOf(item: LoopItemView | null, organization: FrozenOrganization,
   if (item !== null && item.status === "stopped") {
     return { text: "已停止", tone: "plain" };
   }
-  // 开环完成：没有核验角色核验它，不写成放行
-  if (item !== null && item.status === "released_unsettled") {
+  // 事项结束过的两个状态：放行待采纳与已采纳
+  const ended = item !== null && (item.status === "released_unsettled" || item.status === "adopted");
+  // 开环完成按停止原因认，不按状态：采纳以后状态是 adopted，停止原因仍是 open_loop。
+  // 停止原因还没有写下的旧数据里，没有核验角色的组织只能以开环完成结束，同样按它认
+  const openLoop = item !== null
+    && (item.stop_reason === "open_loop" || (item.stop_reason == null && names === "" && ended));
+  if (openLoop) {
     return { text: "开环完成：没有人核验", tone: "open" };
   }
-  if (conclusion === "release" || (item !== null && item.status === "adopted")) {
+  // 核验角色放行：放行待采纳与已采纳都写放行
+  if (conclusion === "release" || ended) {
     return { text: names === "" ? "完成" : `完成 · ${names}放行`, tone: "ok" };
   }
   if (names === "") {

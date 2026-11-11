@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":".claude/skills/trial/method/records.md",
-"hash":"4cfb9c95d3ffbb3b",
+"hash":"8a61e62a6e744143",
 "nodes":[
-{"hash":"4cfb9c95d3ffbb3b","id":".claude/skills/trial/method/records.md","kind":"file","title":".claude/skills/trial/method/records.md"},
+{"hash":"8a61e62a6e744143","id":".claude/skills/trial/method/records.md","kind":"file","title":".claude/skills/trial/method/records.md"},
 {"hash":"65cf784e950cfeb1","id":".claude/skills/trial/method/records.md#试用记录与命令","kind":"section","parent":".claude/skills/trial/method/records.md","title":"试用记录与命令"},
-{"hash":"ef609b9415038728","id":".claude/skills/trial/method/records.md#试用记录与命令 > 命令","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"命令"},
+{"hash":"f452300fcf393815","id":".claude/skills/trial/method/records.md#试用记录与命令 > 命令","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"命令"},
 {"hash":"f2660ae964a2097a","id":".claude/skills/trial/method/records.md#试用记录与命令 > 实例清单与阶段快照","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"实例清单与阶段快照"},
-{"hash":"bd97e5144e7baee1","id":".claude/skills/trial/method/records.md#试用记录与命令 > result.json","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"result.json"},
+{"hash":"efc7c45d61a481be","id":".claude/skills/trial/method/records.md#试用记录与命令 > result.json","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"result.json"},
 {"hash":"b2a46c5eae492576","id":".claude/skills/trial/method/records.md#试用记录与命令 > 第一眼与原话引用","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"第一眼与原话引用"},
 {"hash":"2ebddf3289c70d08","id":".claude/skills/trial/method/records.md#试用记录与命令 > 试用发现、复现与裁决","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"试用发现、复现与裁决"},
 {"hash":"15b5cc29524345c4","id":".claude/skills/trial/method/records.md#试用记录与命令 > 检查的边界","kind":"section","parent":".claude/skills/trial/method/records.md#试用记录与命令","title":"检查的边界"}
