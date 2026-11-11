@@ -21,7 +21,7 @@ import { ArrowSections } from "./arrow-panel.tsx";
 import { RunningBackgroundCommands } from "./department-parts.tsx";
 import { formatTime } from "./labels";
 import { RoomLiveOutput } from "./live-output";
-import { nodePanelView } from "./node-panel-model.ts";
+import { NO_WAIT_TEXT, nodePanelView } from "./node-panel-model.ts";
 import type { SequenceDetail, SequenceRow } from "./sequence-model";
 import { useSnapshot } from "./use-snapshot";
 import { WorkProcess } from "./work-process.tsx";
@@ -181,7 +181,7 @@ function NodePanel(props: {
           {view.waiting.map((line) => <li key={line}>{line}</li>)}
         </ul>
       )}
-      {view.waiting.length === 0 ? null : (
+      {view.waited === NO_WAIT_TEXT ? null : (
         <p className="y10-note v20-node-waited" data-testid="node-waited">{view.waited}</p>
       )}
       {doing === null ? null : (
