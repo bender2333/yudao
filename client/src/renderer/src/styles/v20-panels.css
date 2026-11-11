@@ -1,0 +1,57 @@
+/* 项目页收成两页这一组的样式（父工单 #1707，本文件从工单 #1711 起用）。
+   这里排箭头面板里的各段（#1711）与节点面板里的各段（#1712）；面板本体（.y10-cv-panel）
+   与循环图的画法仍在 v10-project.css，旧资料页（v10-project.css 里 .y10-mt- 那一组）不删不改。 */
+
+.v20-arrow-panel { display: grid; gap: 8px; }
+.v20-arrow-panel > * { min-width: 0; }
+
+/* 直做交完成、没有核验角色时那一句 */
+.v20-arrow-panel .y10-cv-verdict-line.is-open { color: var(--muted); }
+
+/* 标着放行或打回的那一版：结论、逐条结论、检查回执、缺陷、证据 */
+.v20-arrow-conclusion { display: grid; gap: 6px; }
+.v20-arrow-conclusion .y10-trials { font-size: 13px; }
+.v20-arrow-evidence {
+  display: grid; gap: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.v20-arrow-evidence .y10-trials h3.sub { margin: 6px 0 4px; font-size: 13px; }
+
+/* 这一版：那一版的一句话、与上一版的差异、文件清单与单个文件的下载 */
+.v20-arrow-version { display: grid; gap: 6px; }
+.v20-arrow-version .y10-cv-files { display: grid; gap: 4px; }
+.v20-arrow-files { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 6px; }
+.v20-arrow-files > li { display: grid; gap: 4px; }
+.v20-arrow-files > li > .file-path { overflow-wrap: anywhere; }
+.v20-arrow-files > li > .y10-link { justify-self: start; background: none; border: 0; padding: 0; font: inherit; }
+.v20-arrow-file { display: grid; gap: 6px; }
+.v20-arrow-file .y10-pre { max-height: 260px; overflow: auto; }
+.v20-arrow-file .y10-btn { justify-self: start; }
+
+/* 从图外进来的箭头：你的输入各版本与处理进度 */
+.v20-arrow-inputs { display: grid; gap: 6px; }
+.v20-arrow-inputs .y10-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 12.5px; }
+
+/* 建档事项的初始 PRD 箭头：建档各轮与确认记录 */
+.v20-arrow-rounds { display: grid; gap: 6px; }
+.v20-arrow-rounds .y10-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 12.5px; }
+.v20-arrow-rounds .y10-pre { max-height: 220px; overflow: auto; }
+
+/* 节点面板（#1712）：从上到下是状态与在等什么、在做什么、实时输出与后台命令、
+   工作间的事实、它的往来、底部两个入口。面板里的职能名都取自图上这个节点与工作间。 */
+.v20-node-panel { display: grid; gap: 8px; }
+.v20-node-panel > * { min-width: 0; }
+
+/* 在等什么：节点上开着的询问，一行一条 */
+.v20-node-waiting { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 12.5px; }
+
+/* 实时输出与后台命令：只有正在工作的职能有这一段 */
+.v20-node-live { display: grid; gap: 6px; }
+.v20-node-live .y10-ws-output { border-top: 1px dashed var(--line); padding-top: 6px; }
+
+/* 工作间的事实：执行机器、等模型服务、结果未知、未读指导、角色、最近一次请求 */
+.v20-node-facts { display: grid; gap: 4px; font-size: 12.5px; }
+
+/* 底部两个入口：职能详情、本职能的模型请求 */
+.v20-node-entries { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.v20-node-entries .y10-btn { text-decoration: none; }

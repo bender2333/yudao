@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -70,6 +71,13 @@ class QueryInputInvalid(ValueError):
 
 # 分页游标：第一页位置、最后一条记录的位置与标识
 CURSOR_PATTERN = re.compile(r"^\d+:\d+:.+$")
+
+# 直做的两种成果：交完成与对它的核验结论。种类与结论值由 harness/direct.py 定义，应用层按载荷里的名字读，
+# 不导入控制核心的直做模块（依赖规则见 docs/design/app-and-interface.md，工单 #1699）
+COMPLETION_KIND = "completion"
+COMPLETION_REVIEW_KIND = "completion_review"
+COMPLETION_RELEASE = "release"
+COMPLETION_REWORK = "rework"
 
 
 # ---------------------------------------------------------------------------
@@ -225,12 +233,14 @@ DEPARTMENT_STATES = ("waiting_user", "working", "asking", "verifying", "waiting"
 BLOCKING_SCOPES = ("run", "work_item")
 
 
-def _verifiers_of(department: str) -> tuple[str, ...]:
-    """核验这个部门的交付的核验角色：取自定义里的核验声明（工单 #1391）。
+def _verifiers_of(definitions: Any, department: str) -> tuple[str, ...]:
+    """核验这个部门的成果的核验角色：取自这份定义里的核验声明（工单 #1391、#1703）。
 
-    谁核验谁读定义里声明的「核验谁」，不写部门名；没有核验角色核验它时为空。
+    谁核验谁读定义里声明的「核验谁」，不写部门名，也不写死被核验的是哪一种成果：
+    默认形态核验交付，直做形态核验交完成的那一份；没有核验角色核验它时为空。
     """
-    return DEFINITIONS.verifiers_of(department, "delivery_spec")
+    return tuple(dict.fromkeys(
+        verifier for verifier, verified, _outcome in definitions.rejection_edges() if verified == department))
 
 
 class DepartmentState(Contract):
@@ -347,17 +357,21 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
     store = application.system.store
     state = _project(application, request.project_id, include_history=False)
     items = ([_work_item(state, request.work_item)] if request.work_item is not None else state.work_items)
+    forms = _release_definitions(application.system)
+    # 事项冻结的合成结果按内容摘要只读一次（工单 #1517、#1703）
+    frozen: dict[str, Any] = {}
     cards: list[WorkItemCard] = []
     for item in items:
         # run 投影、决定请求与事件一起读取一次：进度与部门状态都用这一份（工单 #903）
         run, decisions, events = _item_sources(application, item.run_id)
-        progress = _work_item_progress(run)
+        progress = _work_item_progress(run, application, events)
+        definitions = _item_definitions(forms, store, item, artifacts=application.system.artifacts, frozen=frozen)
         cards.append(WorkItemCard(
             work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
             version=item.stream_version, created_at=item.created_at, status=item.status,
             department=item.department,
             progress=progress,
-            departments=_departments(run, progress, _observation(run, decisions, events), decisions),
+            departments=_departments(run, progress, _observation(run, decisions, events), decisions, definitions),
             round=item.cycle_count,
             stop_reason=item.stop_reason, stop_note=item.stop_note,
             kept_delivery=None if item.kept_delivery is None else KeptDelivery(**item.kept_delivery),
@@ -560,13 +574,16 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         if request.work_item is not None and item.work_item_id != request.work_item:
             continue
         run, decisions, events = _item_sources(application, item.run_id, through=through)
-        progress = _work_item_progress(run)
+        progress = _work_item_progress(run, application, events)
         observation = _observation(run, decisions, events)
         bounds = store.run_time_bounds(item.run_id, through=through)
+        # 部门状态与事项的组织都按这个事项冻结的定义取，同一份只读一次（工单 #1703）
+        definitions = _item_definitions(forms, store, item, through,
+                                        artifacts=application.system.artifacts, frozen=frozen)
         rows.append(WorkItemLoop(
             work_item_id=item.work_item_id, kind=item.kind, sign=item.title, color_index=index + 1, status=item.status,
             department=item.department, progress=progress, round=item.cycle_count,
-            departments=_departments(run, progress, observation, decisions),
+            departments=_departments(run, progress, observation, decisions, definitions),
             started_at=None if bounds is None else bounds[0],
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
@@ -575,9 +592,8 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             last_department=_last_department(store, item, through=through), version=item.stream_version,
             refs=_fact_refs(store, item, run, state),
             organization=_work_item_organization(forms, store, item, through,
-                                                 artifacts=application.system.artifacts,
                                                  project_definitions=project_definitions,
-                                                 frozen=frozen),
+                                                 definitions=definitions),
         ))
     return Snapshot[ProjectLoopResult](
         position=_snapshot_position(store, through),
@@ -600,16 +616,21 @@ def _last_department(store: Any, item: Any, *, through: int | None = None) -> st
     return None
 
 
-def _work_item_progress(run: Any) -> WorkItemProgress | None:
+def _work_item_progress(run: Any, application: Application | None = None,
+                        events: Sequence[Any] = ()) -> WorkItemProgress | None:
     """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）。
 
     当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，
-    以及对最新交付的结论（缺陷记录或放行）。
+    以及对最新交付的结论（缺陷记录或放行）。直做的事项没有交付，最新一版就是交完成的那一份（工单 #1699）。
     """
     if run is None:
         return None
     spec = getattr(run, "product_spec", None)
     delivery = _current_delivery(run)
+    if delivery is None and application is not None:
+        completed = _completion_progress(application, run, events)
+        if completed is not None:
+            return completed
     review = _matching_review(run, delivery)
     conclusion = None if review is None else review.verdict
     # 交付依据的 PRD 版本：按交付记录的 PRD 摘要找到那一版的修订号
@@ -625,6 +646,67 @@ def _work_item_progress(run: Any) -> WorkItemProgress | None:
         delivery_product_spec_revision=basis_revision,
         conclusion=conclusion,
     )
+
+
+def _completion_progress(application: Application, run: Any, events: Sequence[Any]
+                         ) -> WorkItemProgress | None:
+    # 直做交完成的那一版在进度里的样子（工单 #1699）：完成事件是通用的成果接纳事件，种类写明是交完成。
+    stream = list(events)
+    if not stream and run.status in TERMINAL_STATUSES:
+        # 结束的事项 _item_sources 不再给事件（工单 #903），这一版要从它自己的事件里取
+        stream = application.system.store.list_events(run.run_id)
+    completions = [payload for payload in map(_accepted_payload, stream)
+                   if payload.get("artifact_kind") == COMPLETION_KIND]
+    if not completions:
+        return None
+    completion = completions[-1]
+    # 结论按这个事项冻结的定义里声明的核验角色给出：每个都放行才是放行，有人打回是打回；
+    # 还没有结论、或者没有核验角色时为空（开环完成不写成放行）
+    definitions = _frozen_definitions(application, stream)
+    author = completion.get("artifact_issuer")
+    verifiers = (definitions.verifiers_of(author, COMPLETION_KIND)
+                 if definitions is not None and isinstance(author, str) else ())
+    verdicts = [_conclusion_on(stream, verifier, completion.get("content_hash")) for verifier in verifiers]
+    conclusion = None
+    if verdicts and all(verdict is not None for verdict in verdicts):
+        if COMPLETION_REWORK in verdicts:
+            conclusion = COMPLETION_REWORK
+        elif all(verdict == COMPLETION_RELEASE for verdict in verdicts):
+            conclusion = COMPLETION_RELEASE
+    spec = getattr(run, "product_spec", None)
+    return WorkItemProgress(
+        product_spec_revision=None if spec is None else spec.revision,
+        delivery_revision=completion.get("artifact_version"),
+        delivery_product_spec_revision=None,
+        conclusion=conclusion,
+    )
+
+
+def _accepted_payload(event: Any) -> dict[str, Any]:
+    # 通用成果接纳事件的载荷：成果种类、作者部门、内容摘要、版本号这些统一字段都在里面（S2c，工单 #1098）
+    return dict(event.payload or {})
+
+
+def _conclusion_on(events: Sequence[Any], verifier: str, completion_hash: Any) -> str | None:
+    # 这个核验角色对那一版交完成给出的结论：同一版给了多次时以后一次为准（工单 #1396 的口径）
+    for event in reversed(events):
+        payload = _accepted_payload(event)
+        if (payload.get("artifact_kind") == COMPLETION_REVIEW_KIND
+                and payload.get("completion") == completion_hash
+                and payload.get("artifact_issuer") == verifier):
+            verdict = payload.get("verdict")
+            return verdict if isinstance(verdict, str) else None
+    return None
+
+
+def _frozen_definitions(application: Application, events: Sequence[Any]) -> Any:
+    # 这个事项冻结的定义（工单 #1699，父工单 #1698「读一件事项按它冻结的定义」）：run_created 里记下的
+    # 那份定义副本；旧事件没有记时为空，调用方按进程级定义的默认口径算
+    for event in events:
+        if event.type == EventType.RUN_CREATED:
+            return definitions_from_ref(application.system.artifacts,
+                                        (event.payload or {}).get("definitions_ref"))
+    return None
 
 
 def _current_delivery(run: Any) -> Any:
@@ -790,10 +872,33 @@ def _watched_relations(definitions: Any, kind: str, ref: FactRef) -> list[Watche
     return relations
 
 
+def _item_definitions(forms: dict[str, Any], store: Any, item: Any, through: int | None = None, *,
+                      artifacts: Any = None, frozen: dict[str, Any] | None = None) -> Any:
+    """这个事项冻结的定义（工单 #1703）：读事项的职能状态、「你的输入」的去向与核验时都经这一个口子。
+
+    取法与 _work_item_organization 相同：按事项创建时记下的形态名，在这一版发布加载的那几份里取那一份，
+    再按事项存下的合成结果读回冻结的那一份。形态不在这一版发布里、或读取没有事项可依时，
+    退回这一版加载的定义（默认形态）；「形态不在发布里时组织一项为空」仍由 _work_item_organization 判断。
+    frozen 是这一次查询已经读过的合成结果（内容摘要 → 定义），同一份定义只读一次。
+    """
+    definitions = None if item is None else forms.get(item.form or DEFAULT_FORM)
+    if definitions is None:
+        # 没有事项可依的读取：这是这个文件里唯一一处读这一版加载的定义，守卫用例按这一行登记
+        return DEFINITIONS
+    if artifacts is None:
+        return definitions
+    event = _organization_event(store, item, through)
+    reference = (event.payload or {}).get("definitions_ref")
+    key = "" if not isinstance(reference, dict) else str(reference.get("content_hash") or "")
+    cache = {} if frozen is None else frozen
+    if key not in cache:
+        cache[key] = definitions_from_ref(artifacts, reference)
+    return cache[key] or definitions
+
+
 def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
-                            through: int | None = None, *, artifacts: Any = None,
-                            project_definitions: Any = None,
-                            frozen: dict[str, Any] | None = None) -> WorkItemOrganization | None:
+                            through: int | None = None, *, project_definitions: Any = None,
+                            definitions: Any | None = None) -> WorkItemOrganization | None:
     """这个事项冻结定义里的组织（工单 #1381、#1517）。
 
     取法与工具许可、提案校验读事项所用定义的做法相同（工单 #1165、#1392）：按事项创建时记下的形态名，
@@ -802,20 +907,13 @@ def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
     读的仍是这个事项冻结的那一份。形态不在这一版发布里时为空，不换一份定义顶替（项目的组织设计说明「冻结与升级」）。
     version 是这个事项用的组织的版本；same_as_project 按设计说明「冻结与升级」的五项（职能、角色、成果、
     核验与轮转）与项目现在的组织逐项比较，比的是两份合成结果、不另存状态，与「高级」里那处差异同一取法；
-    项目现在的组织取不到时为空。frozen 是这一次查询已经读过的合成结果（内容摘要 → 定义），同一份组织只读一次
+    项目现在的组织取不到时为空。definitions 是调用方已经按 _item_definitions 读出的这一份，不再读一次。
     """
     form = item.form or DEFAULT_FORM
     event = _organization_event(store, item, through)
-    definitions = forms.get(form)
-    if definitions is not None and artifacts is not None:
-        reference = (event.payload or {}).get("definitions_ref")
-        key = "" if not isinstance(reference, dict) else str(reference.get("content_hash") or "")
-        cache = {} if frozen is None else frozen
-        if key not in cache:
-            cache[key] = definitions_from_ref(artifacts, reference)
-        definitions = cache[key] or definitions
-    if definitions is None:
+    if forms.get(form) is None:
         return None
+    definitions = (_item_definitions(forms, store, item, through) if definitions is None else definitions)
     ref = _organization_ref(definitions, event)
     roles = [OrganizationRole(id=role, label=definitions.department_labels.get(role, role), ref=ref)
              for role in definitions.departments]
@@ -873,11 +971,13 @@ def _observation(run: Any, decisions: Any, events: list[Any]) -> str | None:
 
 
 def _departments(run: Any, progress: WorkItemProgress | None, observation: str | None,
-                 decisions: dict[str, Any]) -> dict[str, DepartmentState] | None:
-    """三个部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）。
+                 decisions: dict[str, Any], definitions: Any) -> dict[str, DepartmentState] | None:
+    """这些部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）。
 
     状态不单独记录，由已经记录的事实现算：会话的状态、进行中的询问、没有回答的决定请求与成果。
     同时满足几条时按设计说明的顺序取第一条：等用户、在分支里回答、询问中、主线的一轮工作中、核验中、等待工作。
+    有哪些部门、哪个是核验角色、谁核验谁、各自的显示名都取自这个事项冻结的定义（工单 #1703）：
+    直做形态的事项只有它自己那几个部门，不带上默认定义的三部门。
     """
     if run is None or run.status in TERMINAL_STATUSES or observation == OBSERVATION_INTERRUPTED:
         return None
@@ -886,7 +986,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
     # 还没回答的询问：链上每一层一个，最内层在最后（投影的 ask_stack）
     asks = list(run.ask_stack)
     departments: dict[str, DepartmentState] = {}
-    for department in DEFINITIONS.departments:
+    for department in definitions.departments:
         session = run.sessions.get(department)
         main_session = None if session is None else session.session_id
         active = session is not None and session.status == "active"
@@ -897,19 +997,20 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         if department in waiting_user:
             state, note = "waiting_user", None
         elif incoming is not None:
-            state, note = "working", f"回答{_department_label(incoming.get('requester') or '')}的询问"
+            state, note = "working", f"回答{_department_label(definitions, incoming.get('requester') or '')}的询问"
         elif own_ask is not None:
-            state, note = "asking", f"在等待{_department_label(own_ask.get('recipient') or '')}的回答"
+            state, note = "asking", f"在等待{_department_label(definitions, own_ask.get('recipient') or '')}的回答"
         elif active:
             # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构 docs/design/department-loop.md「各职能在什么时候工作」）；
             # 谁是核验角色取自定义里的核验声明（工单 #1391）
-            predictive = (DEFINITIONS.is_verifier(department) and not run.delivery_specs and progress is not None
+            predictive = (definitions.is_verifier(department) and not run.delivery_specs and progress is not None
                           and progress.product_spec_revision is not None)
             state = "working"
             note = (f"预测性探索：按 PRD r{progress.product_spec_revision} 起草测试用例"
                     if predictive else None)
-        elif _awaiting_verification(department, progress):
-            verifiers = "、".join(_department_label(verifier) for verifier in _verifiers_of(department))
+        elif _awaiting_verification(definitions, department, progress):
+            verifiers = "、".join(_department_label(definitions, verifier)
+                                  for verifier in _verifiers_of(definitions, department))
             state, note = "verifying", f"等{verifiers}核验交付 r{progress.delivery_revision}"
         else:
             state, note = "waiting", None
@@ -917,10 +1018,10 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
     return departments
 
 
-def _awaiting_verification(department: str, progress: WorkItemProgress | None) -> bool:
-    # 核验中：最新的正式成果在等下游的结论。核验这个部门交付的角色从定义的核验声明取（工单 #1391）：
+def _awaiting_verification(definitions: Any, department: str, progress: WorkItemProgress | None) -> bool:
+    # 核验中：最新的正式成果在等下游的结论。核验这个部门的角色从这份定义的核验声明取（工单 #1391、#1703）：
     # 交付还没有它的缺陷记录或放行（循环结构 docs/design/department-loop.md「职能的状态」）
-    if not _verifiers_of(department) or progress is None or progress.delivery_revision is None:
+    if not _verifiers_of(definitions, department) or progress is None or progress.delivery_revision is None:
         return False
     return progress.conclusion is None
 
@@ -1510,7 +1611,8 @@ def _room_door(run: Any, status: str) -> str | None:
     return None
 
 def _room_view(application: Application, state: Any, item: Any, run: Any, department: str,
-               guidance: list[GuidanceRecord], effective: EffectiveModel, observation: str | None) -> RoomView:
+               guidance: list[GuidanceRecord], effective: EffectiveModel, observation: str | None,
+               definitions: Any) -> RoomView:
     # 部门房间的画面数据（v8 设计说明第 8 节）：状态、CRT、角色、门口状态、信箱与档案盒、管道状态。
     # Stage 4（运维）、3.2C（远程执行）与 3.2D（试用）的数据尚未进入 run 投影，这些字段保持为空或零。
     # 恢复观察状态由调用处读出（工单 #903）：房间与部门状态用它判断，不各读一次
@@ -1525,7 +1627,7 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     role_id = department + "-agent"
     role_kind = "ops" if department == "operations" else "agent"
     role_status = "working" if status == "working" else "idle"
-    role_name = f"{_department_label(department)}部门 Agent"
+    role_name = f"{_department_label(definitions, department)}部门 Agent"
     pose = {"role_id": role_id, "action": "typing"} if status == "working" else None
     # 传信数：问本部门、还没有回答的询问数（循环结构 docs/design/department-loop.md「询问的记录与查询」，工单 #903）
     letters_waiting = 0 if run is None else sum(1 for ask in run.ask_stack if ask.get("recipient") == department)
@@ -1569,9 +1671,9 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
         self_test=None,
     )
 
-def _department_label(department: str) -> str:
-    # 部门的中文名取自定义（工单 #1391）：定义里没有这个部门时退回部门编号
-    return DEFINITIONS.department_labels.get(department, department)
+def _department_label(definitions: Any, department: str) -> str:
+    # 部门的中文名取自这个事项冻结的定义（工单 #1391、#1703）：定义里没有这个部门时退回部门编号
+    return definitions.department_labels.get(department, department)
 
 
 def _department_workspace(application: Application, request: DepartmentWorkspace
@@ -1582,7 +1684,10 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     # 事项没有给出时没有 run，也没有部门状态；给出时一次读出 run、决定请求与事件（工单 #903）
     run, decisions, events = (None, {}, []) if item is None else _item_sources(application, item.run_id)
     observation = _observation(run, decisions, events)
-    progress = _work_item_progress(run)
+    progress = _work_item_progress(run, application, events)
+    # 部门状态与房间里的显示名按这个事项冻结的定义取（工单 #1703）：没有事项时退回这一版加载的定义
+    definitions = _item_definitions(_release_definitions(application.system), store, item,
+                                    artifacts=application.system.artifacts)
     configured = state.department_settings[request.department]
     used_version = _last_used_prompt_version(run, request.department)
     effective = _effective_model(application, configured, request.department)
@@ -1607,7 +1712,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             project_id=state.project_id, department=request.department,
             work_item_id=None if item is None else item.work_item_id,
             run_id=None if run is None else run.run_id, run_status=None if run is None else run.status,
-            departments=_departments(run, progress, observation, decisions),
+            departments=_departments(run, progress, observation, decisions, definitions),
             status=None if item is None else item.status,
             stop_reason=None if run is None else run.stop_reason,
             active=False if run is None else run.active_department == request.department,
@@ -1628,7 +1733,8 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             last_call=_last_call(run, request.department),
             # 当前生效模型不具备本部门建议能力时的提醒（docs/design/model-management.md「职能的建议能力」「职能工作间」）
             reminders=application.system.facade.model_reminders(effective.model_id, request.department),
-            room=_room_view(application, state, item, run, request.department, guidance, effective, observation),
+            room=_room_view(application, state, item, run, request.department, guidance, effective, observation,
+                            definitions),
         ),
     )
 
@@ -2745,6 +2851,11 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     # 沿用同一条产品需求，按那条需求的状态会让两版都是 active
     current_contract = None if run.effective_contract is None else run.effective_contract.content_hash
     trial_cases = {case.case_id: case for case in run.trial_cases}
+    # 交完成的那一版也是交付（工单 #1699）：它在事件流里，与流转记录里那条版本交付是同一个原始事件
+    stream = store.list_events(item.run_id)
+    completed = [_completion_version(application, event, stream) for event in stream
+                 if event.type == EventType.ARTIFACT_ACCEPTED
+                 and (event.payload or {}).get("artifact_kind") == COMPLETION_KIND]
     return Snapshot[WorkItemMaterialsResult](
         position=store.end_position(),
         data=WorkItemMaterialsResult(
@@ -2754,10 +2865,10 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
                                       value.revision, value.content_hash,
                                       _prd_summary(specs.get(value.product_spec_hash)), [])
                        for value in run.effective_contracts],
-            deliveries=[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
-                                       value.content_hash, value.summary, list(value.files),
-                                       launch=_launch_methods(value))
-                        for value in run.delivery_specs],
+            deliveries=[*[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
+                                         value.content_hash, value.summary, list(value.files),
+                                         launch=_launch_methods(value))
+                           for value in run.delivery_specs], *completed],
             reviews=[_review_entry(value, trial_cases) for value in run.reviews],
             inputs=[
                 InputView(
@@ -2777,6 +2888,37 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
             old_runs=_old_runs(application, state, item.work_item_id),
         ),
     )
+
+
+def _completion_version(application: Application, event: Any, stream: Sequence[Any]) -> VersionEntry:
+    # 交完成那一版在资料里的条目（工单 #1699）：版本、摘要与改了的文件。事件编号就是完成事件的编号，
+    # 页面上按它把流转记录那条版本交付对到这一版
+    payload = event.payload or {}
+    return _version_entry(event.event_id, "delivery", payload.get("status") or "active",
+                          payload.get("artifact_version"), payload.get("content_hash"),
+                          payload.get("summary", ""), _completion_files(application, event, stream))
+
+
+def _completion_files(application: Application, event: Any, stream: Sequence[Any]) -> list[str]:
+    # 交完成那一版的文件清单（工单 #1699）：完成事件只带这一版的公开树摘要，不带文件；事件流里每个工作区
+    # 动作记下动作后的公开树快照（工单 #17、#1398），摘要与这一版相同的那一份就是这一版的文件。
+    # 与交付各版本同一个口径（工单 #677）：这一版公开树的全部文件，按路径排序；没有对得上的快照时为空
+    digest = (event.payload or {}).get("artifact_tree_digest")
+    if not isinstance(digest, str) or not digest:
+        return []
+    artifacts = application.system.artifacts
+    for earlier in reversed(stream):
+        if earlier.position >= event.position or earlier.type != EventType.TOOL_CALLED:
+            continue
+        ref = (earlier.payload or {}).get("after_snapshot_ref")
+        if not ref:
+            continue
+        snapshot = json.loads(artifacts.get_for_run(event.run_id, ArtifactRef(**ref)))
+        if snapshot.get("digest") != digest:
+            continue
+        return sorted({str(entry[0]).replace("\\", "/") for entry in snapshot.get("entries") or ()})
+    return []
+
 
 def _old_runs(application: Application, state: Any, work_item_id: str) -> list[OldRunView]:
     # 旧版本的 run（工单 #1186）：这个事项因升级停止的 run，只读列出。建档事项因升级重新开始时
@@ -3312,17 +3454,23 @@ def _mcp_credential_status(application: Application,
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
     store = application.system.store
     state = _project(application, request.project_id, include_history=False)
-    settings = {
-        department: DepartmentSetting(
-            department=department, version=state.department_settings[department].version,
-            text=state.department_settings[department].text,
-            source=state.department_settings[department].source,
-            provider_id=state.department_settings[department].provider_id,
-            model_id=state.department_settings[department].model_id,
-            requested_tier=state.department_settings[department].requested_tier,
-            department_setting_configured=state.department_settings[department].configured_prompt)
-        for department in DEPARTMENTS
-    }
+    # 职能清单与默认 Prompt 按项目现在的组织给（工单 #1701，形态与核验角色设计说明「形态随事项冻结」）：
+    # 只列这份组织里的职能，每行没写职能 Prompt 时显示这份组织里那个职能的那一份；组织里没有的不出现
+    definitions = application.system.projects.current_definitions(request.project_id)
+    settings: dict[str, DepartmentSetting] = {}
+    for department in definitions.departments:
+        configured = state.department_settings.get(department)
+        default_text = definitions.role(department).prompt
+        settings[department] = DepartmentSetting(
+            department=department,
+            version=0 if configured is None else configured.version,
+            text=default_text if configured is None or not configured.configured_prompt else configured.text,
+            source="default" if configured is None else configured.source,
+            provider_id=None if configured is None else configured.provider_id,
+            model_id=None if configured is None else configured.model_id,
+            requested_tier=None if configured is None else configured.requested_tier,
+            department_setting_configured=False if configured is None else configured.configured_prompt,
+        )
     from ..parameters import effective_parameter_version
     return Snapshot[ProjectSettingsResult](
         position=store.end_position(),
@@ -3676,6 +3824,8 @@ PROJECT_OVERVIEW = QueryDefinition(
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED,
                 EventType.DEPARTMENT_ACTIVATED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.SPEC_ACCEPTED,
+                # 直做交完成的那一版也改变进度与核验中状态（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 EventType.DECISION_REQUESTED,
                 # 部门状态（工单 #903）：一轮工作结束以后部门回到等待工作或核验中，
@@ -3697,18 +3847,21 @@ PROJECT_LOOP = QueryDefinition(
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
                 ProjectEventType.BASELINE_ADOPTED,
-                # 事项的进度由成果推算：规格被接纳、交付到达、质检放行与退回都改变它
+                # 事项的进度由成果推算：规格被接纳、交付到达、质检放行与退回、直做交完成的那一版都改变它
                 EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                EventType.ARTIFACT_ACCEPTED,
                 # 激活结束以后事项的恢复状态改变
                 EventType.ACTIVATION_FINISHED),
 )
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
-    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达与质检的退回和放行都进流转记录；
-    # 你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636）
+    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达、质检的退回和放行、
+    # 直做交完成的那一版都进流转记录；你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636、#1699）
     changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED,
+                # 直做交完成的那一版在流转记录里是一条版本交付（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED,
                 EventType.QA_SUBMITTED,
                 EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
                 ProjectEventType.WORK_ITEM_CREATED),
@@ -3752,7 +3905,9 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 # 部门状态与房间的传信数（工单 #903）：一轮工作结束、决定请求的发出与回答、
                 # 交付到达与质检结论都改变它们
                 EventType.ACTIVATION_FINISHED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
-                EventType.DECISION_WITHDRAWN, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED),
+                EventType.DECISION_WITHDRAWN, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                # 直做交完成以后这个部门的房间里是核验中的状态（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED),
 )
 
 RUN_ACTIONS = QueryDefinition(
@@ -3781,6 +3936,8 @@ WORK_ITEM_MATERIALS = QueryDefinition(
     handle=_work_item_materials,
     changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.CONTRACT_ACCEPTED,
                 EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                # 直做交完成的那一版在交付各版本里（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED,
                 # 成果失效（S1b，工单 #858）：交付的失效状态在这一页的交付清单里
                 EventType.ARTIFACT_INVALIDATED,
                 ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,

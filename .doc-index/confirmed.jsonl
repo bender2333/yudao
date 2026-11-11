@@ -529,3 +529,8 @@
 {"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"8da243bee0082d49"}
 {"down":"3c539202fc2d546a","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","up":"fb6a4381900be056"}
 {"down":"e1cef7120c8744fb","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","up":"fb6a4381900be056"}
+{"down":"e3c77a24f6ad7dd9","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"cba078312e3014c7"}
+{"down":"3c539202fc2d546a","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","up":"829ff9afca7a3474"}
+{"down":"e1cef7120c8744fb","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","up":"829ff9afca7a3474"}
+{"down":"57fb2d8494ccda20","dst":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 5. 界面与评测","up":"eedeb4407e9b31df"}
+{"down":"411be13cc234a54e","dst":".claude/skills/next/SKILL.md#下一件事 > 长运行","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 后台长运行算作失败的超时","up":"7e039a6cc18b0f83"}

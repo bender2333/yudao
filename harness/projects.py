@@ -9,13 +9,13 @@ import re
 from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from .artifacts import ArtifactStore
 from .definitions import (
     DEFAULT_FORM, DEFINITIONS, ITEM_SOURCES, Definitions, definitions_from_contents, parse_organization_changes,
 )
-from .organization_compose import compose_checked
+from .organization_compose import compose_checked, current_organization
 from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .kernel_events import canonical_hash
@@ -417,21 +417,23 @@ def mcp_document_digest(document: dict[str, Any]) -> str:
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
-                       include_history: bool = True, through: int | None = None) -> ProjectProjection:
+                       include_history: bool = True, through: int | None = None,
+                       definitions: Any | None = None) -> ProjectProjection:
     # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态。
     # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们。
     # through 给出全局位置的上界时按位置读取：项目与所属 run 的投影都从事件重放到该位置（工单 #127）
+    # definitions 是项目现在的组织（工单 #1701）：默认 Prompt 与有哪几个部门按它填；不给时按进程加载的定义
     state = saved_project(store, project_id) if through is None else replay_project(store, project_id, through=through)
     if state is None:
         raise ProjectNotFoundError(project_id)
-    return _compose(store, state, include_history=include_history, through=through)
+    return _compose(store, state, include_history=include_history, through=through, definitions=definitions)
 
 
 def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True,
-             through: int | None = None) -> ProjectProjection:
+             through: int | None = None, definitions: Any | None = None) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
-    _default_settings(state)
+    _default_settings(state, definitions)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     awaiting, withdrawn = _initial_prd_requests(store, state.project_id, through)
@@ -505,15 +507,29 @@ def _initial_prd_requests(store: EventStore, project_id: str, through: int | Non
 
 
 
+def project_definitions(store: EventStore, state: ProjectProjection, forms: Mapping[str, Any]) -> Any:
+    # 项目现在的组织（工单 #1701，设计说明「冻结与升级」）：形态加本项目的组织改动（加或去掉核验角色）合成
+    # 出来的那一份。形态不在这一版发布里、改动合不到一起时按进程加载的那一份——项目一级的读取不该因此挡住
+    # 页面，写命令仍由应用层核对
+    composed, _issues = current_organization(forms, state.form_name, state.organization_changes, store=store)
+    return DEFINITIONS if composed is None else composed
+
+
 def _default_settings(state: ProjectProjection, definitions: Any | None = None) -> ProjectProjection:
-    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认。
-    # 部门清单与默认 Prompt 按项目现在的形态取（工单 #1509）：换一份把部门改了名的形态，默认 Prompt 也取
-    # 那一份的；没有交时按进程加载的定义
+    # 没有配置过的部门使用这份组织的默认 Prompt（版本 0），模型与请求档位都跟随部门默认。
+    # 部门清单与默认 Prompt 按项目现在的组织取（工单 #1509、#1701）：换一份把部门改了名的形态、或者采用时
+    # 加了一个核验角色，默认 Prompt 都取合成后那一份的；只写了模型或档位、没写职能 Prompt 的设置同样显示
+    # 这份组织里的默认 Prompt。没有交时按进程加载的定义
     definition = DEFINITIONS if definitions is None else definitions
     for department in definition.departments:
-        state.department_settings.setdefault(department, DepartmentSetting(
-            department=department, version=0, text=definition.role(department).prompt, source="default",
-        ))
+        prompt = definition.role(department).prompt
+        current = state.department_settings.get(department)
+        if current is None:
+            state.department_settings[department] = DepartmentSetting(
+                department=department, version=0, text=prompt, source="default",
+            )
+        elif not current.configured_prompt:
+            current.text = prompt
     return state
 
 
@@ -836,7 +852,11 @@ class ProjectService:
     # 读
 
     def projection(self, project_id: str) -> ProjectProjection:
-        return project_projection(self.store, self.artifacts, project_id)
+        # 默认 Prompt 按项目现在的组织填（工单 #1701）：换过形态或加过核验角色的项目读到的是这份组织的
+        state = saved_project(self.store, project_id)
+        if state is None:
+            raise ProjectNotFoundError(project_id)
+        return _compose(self.store, state, definitions=self._form_definitions(state))
 
     def list_projects(self, *, include_archived: bool = False) -> list[ProjectProjection]:
         projects = [project_projection(self.store, self.artifacts, project_id, include_history=False)
@@ -849,13 +869,23 @@ class ProjectService:
         return projects
 
     def _form_definitions(self, project: ProjectProjection) -> Any:
-        # 项目现在的形态那一份定义（工单 #1509）：项目一级按部门名核对的读与写都按它取。
-        # 记下的形态不在这个发布里时按进程加载的那一份（事项那边不换一份顶替、停在原处；
-        # 项目一级的读取不该因此挡住页面，写命令仍由 app 层核对）
-        try:
-            return self.orchestrator.form_named(project.form_name).definitions
-        except ValueError:
-            return DEFINITIONS
+        # 项目现在的组织（工单 #1509、#1701）：项目一级按部门名核对的读与写、项目职能设置的职能清单与默认
+        # Prompt 都按它取——形态加本项目的改动（加或去掉核验角色）合成出来的那一份
+        return project_definitions(self.store, project, self._project_forms())
+
+    def _project_forms(self) -> dict[str, Any]:
+        # 这一版发布里的形态（工单 #1701）：合成项目现在的组织时按名字取形态。没有控制核心时按空的一份，
+        # 合成退回进程加载的定义（写回、回放核对这类只用项目服务读写的场景）
+        forms = getattr(self.orchestrator, "forms", None) or {}
+        return {name: form.definitions for name, form in forms.items()}
+
+    def current_definitions(self, project_id: str) -> Any:
+        # 项目现在的组织（工单 #1701）：应用层的读取与核对按它列职能、取默认 Prompt，拒绝时按它列出可用的
+        # 职能。没有这个项目时抛出，由调用方收成拒绝
+        state = saved_project(self.store, project_id)
+        if state is None:
+            raise ProjectNotFoundError(project_id)
+        return self._form_definitions(state)
 
     def read_department_setting(self, project_id: str, department: str) -> dict[str, Any]:
         state = self.projection(project_id)
@@ -863,7 +893,7 @@ class ProjectService:
         if department not in definitions.departments:
             raise ValueError("unknown department")
         _default_settings(state, definitions)
-        return _setting_view(state.department_settings[department])
+        return _setting_view(state.department_settings[department], definitions)
 
     def read_projection_setting(self, project_id: str, department: str) -> DepartmentSetting | None:
         # 运行层每次请求读取的当前设置：直接取保存的项目投影，不拼接事项状态（避免每次请求重算全部事项）。
@@ -1879,13 +1909,13 @@ class ProjectService:
             current = _default_settings(
                 deepcopy(self._writable_in(transaction, project_id)), definitions).department_settings[department]
             if base_version != current.version:
-                raise DepartmentSettingConflict(_setting_view(current))
+                raise DepartmentSettingConflict(_setting_view(current, definitions))
             unchanged = (current.provider_id == selection.provider_id
                          and current.model_id == selection.model_id
                          and current.requested_tier == selection.requested_tier
                          and _current_prompt(current) == selection.department_prompt)
             if unchanged:
-                return {**_setting_view(current), "unchanged": True}
+                return {**_setting_view(current, definitions), "unchanged": True}
             payload = selection.event_payload()
             if selection.department_prompt is not None:
                 ref = save_department_prompt(self.artifacts, project_id, department,
@@ -2106,11 +2136,16 @@ def _current_prompt(setting: DepartmentSetting) -> str | None:
     # 项目部门设置中写入的部门 Prompt；没有写入时为 None，读取模型补成内置默认 Prompt
     return setting.text if setting.configured_prompt else None
 
-def _setting_view(setting: DepartmentSetting) -> dict[str, Any]:
+def _setting_view(setting: DepartmentSetting, definitions: Any | None = None) -> dict[str, Any]:
+    # 默认 Prompt 按项目现在的组织取（工单 #1701）：只写了模型或档位、没写职能 Prompt 时，显示与生效的
+    # 都是这份组织里那个职能的那一份；这份组织里没有这个职能时照保存的内容
+    definition = DEFINITIONS if definitions is None else definitions
+    default_text = (definition.role(setting.department).prompt
+                    if setting.department in definition.departments else setting.text)
     return {
         "department": setting.department,
-        "text": setting.text,
-        "default_text": DEFINITIONS.role(setting.department).prompt,
+        "text": setting.text if setting.configured_prompt else default_text,
+        "default_text": default_text,
         "department_setting_configured": setting.configured_prompt,
         "provider_id": setting.provider_id,
         "model_id": setting.model_id,

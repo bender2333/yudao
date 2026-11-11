@@ -1,0 +1,26 @@
+/* 项目头部的当前成果一行（工单 #1714；项目的组织设计说明「节点面板与箭头面板接住的内容」的项目头部一条）。
+   一行写当前成果是哪一版、建档基线、写回状态，贴在组织标签下面；点开用与节点、箭头面板同一套外壳
+   （.y10-cv-panel，见 v10-project.css），写全以后再收起。类名前缀：y10-phead-outcome 这一行，
+   y10-phead-panel 它的面板。 */
+
+.y10-phead-outcome { padding: 4px 32px 0; }
+
+.y10-phead-outcome-btn {
+  display: inline-flex; align-items: baseline; gap: 8px; max-width: 100%;
+  padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px;
+  text-align: left; cursor: pointer;
+}
+.y10-phead-outcome-btn:hover { background: var(--tint); }
+.y10-phead-outcome-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+/* 这一行的调子：写回还没有做时虚线边（看得出还差这一步），写回已经做完时绿边，其余照常 */
+.y10-phead-outcome-btn.is-open { border-style: dashed; }
+.y10-phead-outcome-btn.is-ok { border-color: var(--green); }
+.y10-phead-outcome-text { overflow-wrap: anywhere; }
+.y10-phead-outcome-more { color: var(--green); font-size: 12px; white-space: nowrap; }
+
+/* 面板：外壳与节点、箭头面板同一个位置感（这一行下面），宽度不跟着页签走 */
+.y10-phead-panel { margin: 6px 0 0; max-width: 720px; }
+.y10-phead-panel-row { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12.5px; }
+.y10-phead-panel-label { min-width: 5em; color: var(--muted); font-weight: 600; }
+.y10-phead-panel-value { flex: 1 1 14em; overflow-wrap: anywhere; }

@@ -7,6 +7,15 @@
 - 创建工单：`gh issue create --title "..." --body "..."`，多行正文用 `--body-file`。
 - 读取工单：`gh issue view <编号> --comments`，需要时用 `--json` 与 `jq` 取标签与评论。
 - 列出工单：`gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`，按需加 `--label` 与 `--state`。
+- 一次读多张工单：用一次 `gh api graphql`，每张工单一个别名，字段按需增减。每次 `gh` 调用都要新建一次连接，逐张读二十张要二十多秒，中途某一次连接断开时那一张会缺失；一次查询两秒左右，结果要么完整要么整体报错。
+
+  ```bash
+  Q='query{repository(owner:"bender2333",name:"yudao"){'
+  for n in <编号> <编号>; do Q="$Q i$n:issue(number:$n){number title state labels(first:100){nodes{name}} milestone{title} body blockedBy(first:100){nodes{number state}}}"; done
+  gh api graphql -f query="$Q}}" --jq '[.data.repository[]]'
+  ```
+
+  写操作（评论、加减标签、改里程碑、关闭）逐张运行，每张看退出码。
 - 评论：`gh issue comment <编号> --body "..."`
 - 加减标签：`gh issue edit <编号> --add-label "..."` / `--remove-label "..."`
 - 关闭：`gh issue close <编号> --comment "..."`

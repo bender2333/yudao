@@ -40,7 +40,7 @@ require.extensions[".tsx"] = loader;
 require.extensions[".ts"] = loader;
 
 const { renderToStaticMarkup } = require("react-dom/server");
-const { DepartmentsLine } = require("../../src/renderer/src/views/project/department.tsx");
+const { DepartmentsLine } = require("../../src/renderer/src/views/project/department-parts.tsx");
 
 const THREE: Record<string, DepartmentStateView> = {
   product: { state: "working", note: "回答工程的询问" },

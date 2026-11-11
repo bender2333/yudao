@@ -45,7 +45,7 @@ from harness.event_store import Command, EventStore, catalog_stream, run_stream
 from harness.models import EventType, json_dumps
 from harness.projection import dump_decision, replay_decisions, saved_decisions
 from harness.project_projection import catalog_handler, handler_for
-from harness.projects import project_projection
+from harness.projects import project_definitions, project_projection
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
@@ -173,13 +173,19 @@ class _Scope:
 
 class _ReplayProjects:
     # 重放核对期间的项目读取：只从新的事件存储读（源系统的项目服务读的是源事件存储）
-    def __init__(self, store: EventStore, artifacts: Any) -> None:
+    def __init__(self, store: EventStore, artifacts: Any, forms: Any) -> None:
         self.store = store
         self.artifacts = artifacts
+        self.forms = forms
 
     def list_projects(self, *, include_archived: bool = False) -> list[Any]:
         return [project_projection(self.store, self.artifacts, project_id, include_history=False)
                 for project_id in self.store.list_project_ids()]
+
+    def current_definitions(self, project_id: str) -> Any:
+        # 项目现在的组织（工单 #1701）：职能设置的查询按它列职能，形态与改动都从重放的那份存储读
+        state = project_projection(self.store, self.artifacts, project_id, include_history=False)
+        return project_definitions(self.store, state, self.forms)
 
 
 class _ReplayCore:
@@ -214,7 +220,8 @@ class _ReplayCore:
 
     @property
     def projects(self) -> _ReplayProjects:
-        return _ReplayProjects(self.store, self.artifacts)
+        return _ReplayProjects(self.store, self.artifacts,
+                               {name: form.definitions for name, form in self._source.forms.items()})
 
     def provider_status(self) -> dict[str, Any]:
         return self._source.provider_status()

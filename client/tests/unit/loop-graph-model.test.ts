@@ -235,6 +235,77 @@ test("工程：一行，你的输入 → 工程 → 开环完成", () => {
   assert.equal(graph.endText, "开环完成：没有人核验");
 });
 
+// 结束写什么（工单 #1704）：按事项怎么结束的写，看停止原因 — 以开环完成结束的，采纳以前与采纳以后都写
+// 「开环完成：没有人核验」；核验角色放行的才写放行。与线程一侧同一个口径（thread-model 的 endingOf）。
+
+test("以开环完成结束的事项被采纳以后，终点仍写「开环完成：没有人核验」，不写成完成（工单 #1704）", () => {
+  const organization = productEngineering();
+  const flow: FlowRecordLike[] = [
+    record({ flow_id: "in-1", kind: "版本交付", position: 3, direction_from: "engineering", direction_to: null, content: "活动页文案已改" }),
+  ];
+  const materials: MaterialsView = { deliveries: [{ event_id: "evt-in-1", revision: 1, summary: "活动页文案已改" }] };
+  const departments = working({ engineering: "waiting", product: "waiting" });
+  // 采纳以前：状态是 released_unsettled，停止原因是 open_loop
+  const before = graphOf({
+    item: item({ work_item_id: "w17", organization, status: "released_unsettled", stop_reason: "open_loop", departments }),
+    flow, materials,
+  });
+  assert.deepEqual([before.endText, before.endTone], ["开环完成：没有人核验", "open"]);
+  // 采纳以后：状态是 adopted，停止原因没有变，终点写的还是同一句
+  const after = graphOf({
+    item: item({ work_item_id: "w17", organization, status: "adopted", stop_reason: "open_loop", departments }),
+    flow, materials,
+  });
+  assert.deepEqual([after.endText, after.endTone], ["开环完成：没有人核验", "open"]);
+  assert.equal(after.endText.includes("放行"), false);
+});
+
+test("组织里有核验角色、事项却以开环完成结束时，终点也写开环完成，不出现「放行」（工单 #1704）", () => {
+  const organization = threeDepartments();
+  const flow: FlowRecordLike[] = [
+    record({ flow_id: "p1", kind: "PRD 新版本", position: 3, direction_from: "product", direction_to: "engineering", round: 1 }),
+    record({ flow_id: "d1", kind: "版本交付", position: 6, direction_from: "engineering", direction_to: "quality", round: 1 }),
+  ];
+  // 有核验角色，只核验了中途的成果：事项在创建时标为开环，最后交完成就结束（形态与核验角色设计说明 4.7 第 4 条）
+  const graph = graphOf({
+    item: item({
+      work_item_id: "w19", organization, round: 1, status: "adopted", stop_reason: "open_loop",
+      departments: working({ product: "waiting", engineering: "waiting", quality: "waiting" }),
+    }),
+    flow,
+    materials: { contracts: [{ event_id: "evt-p1", revision: 1 }], deliveries: [{ event_id: "evt-d1", revision: 1 }] },
+  });
+  assert.deepEqual([graph.endText, graph.endTone], ["开环完成：没有人核验", "open"]);
+  assert.equal(graph.endText.includes("放行"), false);
+  // 核验角色仍在这份组织里、节点上仍有核验标记：写开环完成的理由是最后采纳的那一版没有经过核验
+  assert.equal(graph.chain.find((node) => node.id === "quality")?.verifier, true);
+});
+
+test("核验角色放行的事项写放行（采纳以前与采纳以后都写），停下来的事项仍写已停止（工单 #1704）", () => {
+  const organization = threeDepartments();
+  // 放行并采纳
+  const adopted = graphOf({
+    item: item({
+      work_item_id: "w20", organization, status: "adopted", stop_reason: "released",
+      progress: { conclusion: "release" },
+    }),
+    flow: [], materials: null,
+  });
+  assert.deepEqual([adopted.endText, adopted.endTone], ["完成 · 质检放行", "ok"]);
+  // 放行待采纳：同样按停止原因写放行，它没有以开环完成结束
+  const waiting = graphOf({
+    item: item({ work_item_id: "w20", organization, status: "released_unsettled", stop_reason: "released" }),
+    flow: [], materials: null,
+  });
+  assert.deepEqual([waiting.endText, waiting.endTone], ["完成 · 质检放行", "ok"]);
+  // 已停止：停止原因是什么都写已停止
+  const stopped = graphOf({
+    item: item({ work_item_id: "w21", organization, status: "stopped", stop_reason: "time_limit" }),
+    flow: [], materials: null,
+  });
+  assert.deepEqual([stopped.endText, stopped.endTone], ["已停止", "plain"]);
+});
+
 test("旧事项仍按它冻结的组织画：换过组织以后节点还是那三个，现在的组织里没有的标「只在旧组织里」", () => {
   const organization = threeDepartments();
   const frozen = item({

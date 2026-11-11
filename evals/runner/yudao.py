@@ -427,11 +427,33 @@ def register_model(client, model_name, limits):
     return admission
 
 
-def create_project(client, name, goal, initial_directory=None):
-    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「输入」）。"""
-    created = client.command("project.create", {"name": name, "goal": goal,
-                                                "initial_directory": initial_directory})
+def create_project(client, name, goal, initial_directory=None, form=None):
+    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「输入」）。
+
+    `form` 是发布带里的形态标识（工单 #1705）：指定形态的运行用这份组织建项目，单独列出。
+    不给形态时不发这个字段，发出的命令与以前一字不差；不认识的形态由服务拒绝，见 `form_refusal`。
+    """
+    body = {"name": name, "goal": goal, "initial_directory": initial_directory}
+    if form is not None:
+        body["form"] = form
+    created = client.command("project.create", body)
     return created["refs"]["project_id"]
+
+
+def form_refusal(error):
+    """形态被拒时的说明：正文里写着可以选的形态，清单因此取自服务，运行器不写死（工单 #1705）。
+
+    服务的说明是「发布带里没有形态 X；可以选的形态是：…」（harness/app/project_commands.py 的
+    `_chosen_form`）。不是形态的拒绝返回 None，调用方照常把它抛出去。
+    """
+    try:
+        problem = json.loads(getattr(error, "body", "") or "")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(problem, dict) or problem.get("reason") != "not_allowed":
+        return None
+    message = str(problem.get("message") or "")
+    return message if "发布带里没有形态" in message else None
 
 
 def save_department_settings(client, project_id):
@@ -456,14 +478,17 @@ def submit_requirement(client, project_id, text):
 # ---------------------------------------------------------------------------
 # 场景 2 的建档：接入已有仓库、确认初始 PRD（接入已有项目 docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」、「建档流程」）
 
-def onboard_project(client, name, goal, source_path):
+def onboard_project(client, name, goal, source_path, form=None):
     """接入已有项目：新建项目、登记源目录、采集快照、开始建档事项（docs/design/existing-project-onboarding.md「命令」）。
 
     返回项目、建档事项与建档 run 三个编号：建档的导出按 run 取，与事项的导出分开。
+    `form` 同 `create_project`：给了形态就按这份组织建档，不给时不发这个字段。
     """
-    created = client.command("project.onboard", {"name": name, "goal": goal,
-                                                 "source_name": ONBOARDING_SOURCE_NAME,
-                                                 "source_path": source_path})
+    body = {"name": name, "goal": goal, "source_name": ONBOARDING_SOURCE_NAME,
+            "source_path": source_path}
+    if form is not None:
+        body["form"] = form
+    created = client.command("project.onboard", body)
     refs = created["refs"]
     return refs["project_id"], refs["work_item_id"], refs["run_id"]
 

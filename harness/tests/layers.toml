@@ -82,6 +82,7 @@
 "test_department_prompts.py" = "module"
 "test_department_providers.py" = "integration"
 "test_department_states.py" = "integration"
+"test_direct_page_path.py" = "integration"
 "test_direct_routing.py" = "integration"
 "test_direct_several_roles.py" = "integration"
 "test_direct_with_verifier.py" = "integration"

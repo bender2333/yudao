@@ -6,12 +6,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..event_store import Command
-from ..definitions import DEFINITIONS
+from ..definitions import DEFINITIONS, Definitions
 from ..models import DEPARTMENTS, TERMINAL_STATUSES, Event, ProjectEvent
 from ..interactions import RunTerminalError
+from ..organization_compose import current_organization
+from ..project_projection import ProjectProjection
 from ..projection import RunNotFoundError
 from ..providers.errors import CatalogValidationError
 from ..providers.selection import ModelSelection
@@ -126,11 +128,31 @@ async def _restore_project(application: "Application", command: Command, request
 # ---------------------------------------------------------------------------
 # 记录原文（新建类：不核对基准版本）
 
-def _unknown_department(department: str) -> Rejection:
-    # 部门的名字由定义给出（工单 #1389，设计说明「形态随事项冻结」）：定义里没有这个名字时照旧拒绝，
-    # 错误里写出这份定义可用的部门，提交的人不必再去别处找。中文名给提交的人看，编号给提交的命令用
-    available = "、".join(f"{DEFINITIONS.department_labels.get(name, name)}（{name}）" for name in DEPARTMENTS)
+def _unknown_department(department: str, definitions: Any) -> Rejection:
+    # 部门的名字由定义给出（工单 #1389、#1701，形态与核验角色设计说明「形态随事项冻结」）：这份组织里没有
+    # 这个名字时照旧拒绝，错误里写出这份组织可用的部门，提交的人不必再去别处找。中文名给提交的人看，编号
+    # 给提交的命令用
+    available = "、".join(f"{definitions.department_labels.get(name, name)}（{name}）"
+                          for name in definitions.departments)
     return Rejection("not_allowed", f"部门不存在：{department}；可用的部门：{available}")
+
+
+def _project_definitions(application: "Application", project_id: str) -> Any:
+    # 项目现在的组织（工单 #1701）：项目一级的核对与拒绝说明按它列职能。项目取不到时按进程加载的定义，
+    # 由后面的读写给出 not_found（工单 #1389 的先后不变）
+    try:
+        return application.system.projects.current_definitions(project_id)
+    except ProjectNotFoundError:
+        return DEFINITIONS
+
+
+def _item_definitions(application: "Application", run_id: str) -> Any:
+    # 事项冻结的组织（工单 #1701）：指导的接收方按它核对，项目后来换了形态也不影响进行中的事项。那份形态
+    # 不在这个发布里时按进程加载的定义，由 _require_item_form 给出 not_allowed
+    try:
+        return application.system.orchestrator.item_form(run_id).definitions
+    except (ValueError, RunNotFoundError):
+        return DEFINITIONS
 
 
 class MaterialRecord(CommandRequest):
@@ -140,13 +162,17 @@ class MaterialRecord(CommandRequest):
     department: str | None = None
 
 
-def _material_department(request: MaterialRecord) -> None:
-    if request.department is not None and request.department not in DEPARTMENTS:
-        raise _unknown_department(request.department)
+def _material_department(application: "Application", request: MaterialRecord) -> None:
+    # 记录原文的职能按项目现在的组织核对（工单 #1701）：组织外的不写事件
+    if request.department is None:
+        return
+    definitions = _project_definitions(application, request.project_id)
+    if request.department not in definitions.departments:
+        raise _unknown_department(request.department, definitions)
 
 
 async def _record_material(application: "Application", command: Command, request: MaterialRecord) -> None:
-    _material_department(request)
+    _material_department(application, request)
     try:
         application.system.projects.record_material(
             request.project_id, request.text, department=request.department, command=command)
@@ -217,11 +243,18 @@ async def _create_work_item(application: "Application", command: Command, reques
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝
     if system.orchestrator.busy():
         raise Rejection("busy", "已有事项正在执行，等它结束以后才能新建")
-    status = system.provider_status()
+    # 模型就绪只看这件事项要冻结的那份组织里的职能（工单 #1700，形态与核验角色设计说明「形态随事项冻结」）：
+    # 「工程」的项目只要工程有可用的模型就能开始，别的职能没有模型不挡它。假适配器在激活时按 fake 协议
+    # 登记目标，仍按原来的整体就绪问
+    departments = _item_departments(application, project, request, forms)
+    if system.orchestrator.test_adapter_factory is not None:
+        status = system.provider_status()
+    else:
+        status = system.facade.describe_readiness(departments)
     if not status.get("available", False):
         raise Rejection("provider_unavailable", status.get("message") or "模型调用目标不可用")
-    # 新建事项前按该项目的设置对三个部门解析：任何一个无法解析时拒绝，说明部门与具体项
-    failure = _unresolved_department(application, request.project_id)
+    # 再按该项目的设置对这些职能逐个解析（项目里的部门设置覆盖系统默认）：任何一个无法解析时拒绝，说明职能与具体项
+    failure = _unresolved_department(application, request.project_id, departments)
     if failure is not None:
         department, item, message = failure
         raise Rejection("provider_unavailable", f"部门 {department} 的{item}无法解析：{message}")
@@ -241,14 +274,28 @@ async def _create_work_item(application: "Application", command: Command, reques
     system.orchestrator.start_work_item(run_id)
 
 
-def _unresolved_department(application: "Application", project_id: str) -> tuple[str, str, str] | None:
-    # 按该项目的设置解析三个部门（模型访问定义与请求档位分别继承），返回第一个无法解析的部门与具体项。
+def _item_departments(application: "Application", project: ProjectProjection, request: WorkItemCreate,
+                      forms: dict[str, Definitions]) -> tuple[str, ...]:
+    # 这件事项要冻结的那份组织里的职能（工单 #1700，项目的组织设计说明「冻结与升级」）：临时选一份形态时
+    # 用形态本身（不带本项目的改动，与 Projects._item_organization 同一个口径），否则用项目现在的形态加本项目
+    # 的改动。合不到一起时交回三个默认职能，原因由 start_work_item 的 OrganizationRejectedError 写明
+    form_name = request.form or project.form_name
+    changes = {} if request.form is not None else dict(project.organization_changes)
+    definitions, _issues = current_organization(forms, form_name, changes, store=application.system.store)
+    if definitions is None:
+        return DEPARTMENTS
+    return tuple(str(department.id) for department in definitions.organization.departments)
+
+
+def _unresolved_department(application: "Application", project_id: str,
+                           departments: tuple[str, ...]) -> tuple[str, str, str] | None:
+    # 按该项目的设置解析这份组织里的职能（模型访问定义与请求档位分别继承），返回第一个无法解析的职能与具体项。
     # 没有写入任何项目部门设置的项目按部门默认检查（最后一段）
     system = application.system
     if system.orchestrator.test_adapter_factory is not None:
         # 确定性测试与演示的适配器在激活时按 fake 协议登记目标，这里不重复解析目录（#45 答复第 6 条）
         return None
-    for department in DEPARTMENTS:
+    for department in departments:
         setting = system.projects.read_projection_setting(project_id, department)
         project_selection = ModelSelection(
             provider_id=None if setting is None else setting.provider_id,
@@ -328,14 +375,27 @@ class GuidanceSend(CommandRequest):
     text: Text
 
 
-def _guidance_department(request: GuidanceSend) -> None:
-    if request.department not in DEPARTMENTS:
-        raise _unknown_department(request.department)
+def _guidance_run_id(application: "Application", work_item_id: str) -> str | None:
+    # 事项不在时为空（工单 #1389）：先按定义核对部门名，再把 not_found 交回去，拒绝的先后不变
+    try:
+        return _run_id_for(application, work_item_id)
+    except Rejection:
+        return None
+
+
+def _guidance_department(application: "Application", run_id: str | None, request: GuidanceSend) -> None:
+    # 指导的接收方按事项冻结的组织核对（工单 #1701，设计说明「形态随事项冻结」）：项目后来换了形态，
+    # 进行中的事项仍按它开始时那两份形态收指导
+    definitions = DEFINITIONS if run_id is None else _item_definitions(application, run_id)
+    if request.department not in definitions.departments:
+        raise _unknown_department(request.department, definitions)
 
 
 async def _send_guidance(application: "Application", command: Command, request: GuidanceSend) -> None:
-    _guidance_department(request)
-    run_id = _run_id_for(application, request.work_item_id)
+    run_id = _guidance_run_id(application, request.work_item_id)
+    _guidance_department(application, run_id, request)
+    if run_id is None:
+        raise Rejection("not_found", "没有这个事项，请重新读取以后提交")
     _require_item_form(application, run_id)
     try:
         application.system.orchestrator.add_guidance(
@@ -367,8 +427,11 @@ class DepartmentSettingsSaveRefs(Contract):
 
 async def _save_department_settings(application: "Application", command: Command,
                                     request: DepartmentSettingsSave) -> None:
-    if request.department not in DEPARTMENTS:
-        raise _unknown_department(request.department)
+    # 保存的对象按项目现在的组织核对（工单 #1701）：组织外的职能在这里被拒成 not_allowed，
+    # 而不是落到下层按形态再抛一次
+    definitions = _project_definitions(application, request.project_id)
+    if request.department not in definitions.departments:
+        raise _unknown_department(request.department, definitions)
     if (request.provider_id is None) != (request.model_id is None):
         raise Rejection("not_allowed", "模型访问定义引用必须同时给出所属连接与定义")
     project_selection = ModelSelection(
