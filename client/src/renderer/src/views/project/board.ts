@@ -11,7 +11,10 @@
 //     不写死产品、工程、质检三栏；换了部门名的定义，部门列跟着换。
 
 import type { WorkItemCard } from "../../api/generated/types.gen";
-import { departmentName, isOpenLoopCompleted } from "./labels.ts";
+import { departmentName, isOpenLoopCompleted, stoppedCardLine, workItemStatusText, workingDepartmentsText } from "./labels.ts";
+// 停止原因照清单的说法写：清单里有一条（cannot_verify）不在 labels.ts 那张表里，事项面板已经补上那一句，
+// 列表复用同一份，不再抄第二遍（工单 #1709）
+import { stopReasonText } from "./item-panel-model.ts";
 import { boardDepartments, type DepartmentView } from "./organization.ts";
 
 // 按状态分的五组，与事项的部门无关
@@ -172,4 +175,63 @@ export function boardGroups(items: WorkItemCard[], organization: BoardOrganizati
     { key: "adopted", title: fixedTitle("adopted"), items: columns.adopted },
     { key: "stopped", title: fixedTitle("stopped"), items: columns.stopped },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// 全部事项的分组列表（工单 #1709；docs/design/project-organization.md「事项面板与全部事项」）：
+// 分组、顺序与件数用看板的同一份口径，不另算一遍；卡片上写标题、状态、正在工作的部门与轮次，
+// 停了的写停止原因，同名的停止事项再写一行事项标识与停止时间，点之前就能分清
+// （docs/design/app-and-interface.md「事项看板在页面上的显示」）。
+
+// 没有轮次的事项（还没开始）不写轮次
+const NO_ROUND = 0;
+
+export interface AllItemsCard {
+  workItemId: string;
+  title: string;
+  statusText: string;
+  /** 正在工作的部门，没有时为空（结束的事项写所在部门） */
+  workingText: string;
+  /** 「第 N 轮」，还没开始时为空 */
+  roundText: string;
+  /** 停止原因，照清单的说法；没停时为空 */
+  stopText: string;
+  /** 停止的事项：事项标识与停止时间，其他事项为空 */
+  identity: string;
+}
+
+export interface AllItemsGroup {
+  key: string;
+  title: string;
+  /** 这一组的事项数（一件同时在几个部门的列里时，每个列各算一次） */
+  count: number;
+  cards: AllItemsCard[];
+}
+
+export interface AllItemsList {
+  /** 事项数：一件同时在几个部门的列里时只算一次 */
+  total: number;
+  groups: AllItemsGroup[];
+}
+
+function cardOf(item: WorkItemCard): AllItemsCard {
+  return {
+    workItemId: item.work_item_id,
+    title: item.title,
+    statusText: workItemStatusText(item),
+    workingText: workingDepartmentsText(item),
+    roundText: item.round === NO_ROUND ? "" : `第 ${item.round} 轮`,
+    stopText: stopReasonText(item.stop_reason),
+    identity: item.status === "stopped" ? stoppedCardLine(item) : "",
+  };
+}
+
+export function allItemsList(items: WorkItemCard[], organization: BoardOrganization = {}): AllItemsList {
+  const groups: AllItemsGroup[] = [];
+  const seen = new Set<string>();
+  for (const group of boardGroups(items, organization)) {
+    groups.push({ key: group.key, title: group.title, count: group.items.length, cards: group.items.map(cardOf) });
+    for (const item of group.items) seen.add(item.work_item_id);
+  }
+  return { total: seen.size, groups };
 }
