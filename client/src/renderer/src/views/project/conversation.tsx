@@ -400,7 +400,7 @@ export function ConversationPage(props: {
                   {/* 组织刚改过、在跑的事项还按旧组织：图下面多一行小图，写「之后新建的事项按现在的组织走」 */}
                   {nextGraph === null ? null : (
                     <div className="y10-cv-next" data-testid="next-organization">
-                      <p className="y10-note">之后新建的事项按现在的组织走</p>
+                      <p className="y10-cv-next-text">之后新建的事项按现在的组织走</p>
                       <LoopGraphView
                         graph={nextGraph}
                         pick={null}

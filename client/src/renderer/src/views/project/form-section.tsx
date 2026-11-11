@@ -112,7 +112,7 @@ export function FormSection(props: { app: ClientApp; projectId: string }) {
       {data === null ? null : (
         <>
           <div data-testid="organization-row">
-            <p className="y10-line" data-testid="organization-line">{organizationLine(data)}</p>
+            <p className="y10-org-line" data-testid="organization-line">{organizationLine(data)}</p>
             {editable ? (
               <div className="y10-row">
                 {canAddVerifier(data) ? (
