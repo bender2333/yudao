@@ -71,6 +71,13 @@ class QueryInputInvalid(ValueError):
 # 分页游标：第一页位置、最后一条记录的位置与标识
 CURSOR_PATTERN = re.compile(r"^\d+:\d+:.+$")
 
+# 直做的两种成果：交完成与对它的核验结论。种类与结论值由 harness/direct.py 定义，应用层按载荷里的名字读，
+# 不导入控制核心的直做模块（依赖规则见 docs/design/app-and-interface.md，工单 #1699）
+COMPLETION_KIND = "completion"
+COMPLETION_REVIEW_KIND = "completion_review"
+COMPLETION_RELEASE = "release"
+COMPLETION_REWORK = "rework"
+
 
 # ---------------------------------------------------------------------------
 # 公共形状
@@ -339,7 +346,7 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
     for item in items:
         # run 投影、决定请求与事件一起读取一次：进度与部门状态都用这一份（工单 #903）
         run, decisions, events = _item_sources(application, item.run_id)
-        progress = _work_item_progress(run)
+        progress = _work_item_progress(run, application, events)
         cards.append(WorkItemCard(
             work_item_id=item.work_item_id, kind=item.kind, title=item.title, text=item.text, run_id=item.run_id,
             version=item.stream_version, created_at=item.created_at, status=item.status,
@@ -548,7 +555,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
         if request.work_item is not None and item.work_item_id != request.work_item:
             continue
         run, decisions, events = _item_sources(application, item.run_id, through=through)
-        progress = _work_item_progress(run)
+        progress = _work_item_progress(run, application, events)
         observation = _observation(run, decisions, events)
         bounds = store.run_time_bounds(item.run_id, through=through)
         rows.append(WorkItemLoop(
@@ -588,16 +595,21 @@ def _last_department(store: Any, item: Any, *, through: int | None = None) -> st
     return None
 
 
-def _work_item_progress(run: Any) -> WorkItemProgress | None:
+def _work_item_progress(run: Any, application: Application | None = None,
+                        events: Sequence[Any] = ()) -> WorkItemProgress | None:
     """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）。
 
     当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，
-    以及对最新交付的结论（缺陷记录或放行）。
+    以及对最新交付的结论（缺陷记录或放行）。直做的事项没有交付，最新一版就是交完成的那一份（工单 #1699）。
     """
     if run is None:
         return None
     spec = getattr(run, "product_spec", None)
     delivery = _current_delivery(run)
+    if delivery is None and application is not None:
+        completed = _completion_progress(application, run, events)
+        if completed is not None:
+            return completed
     review = _matching_review(run, delivery)
     conclusion = None if review is None else review.verdict
     # 交付依据的 PRD 版本：按交付记录的 PRD 摘要找到那一版的修订号
@@ -613,6 +625,67 @@ def _work_item_progress(run: Any) -> WorkItemProgress | None:
         delivery_product_spec_revision=basis_revision,
         conclusion=conclusion,
     )
+
+
+def _completion_progress(application: Application, run: Any, events: Sequence[Any]
+                         ) -> WorkItemProgress | None:
+    # 直做交完成的那一版在进度里的样子（工单 #1699）：完成事件是通用的成果接纳事件，种类写明是交完成。
+    stream = list(events)
+    if not stream and run.status in TERMINAL_STATUSES:
+        # 结束的事项 _item_sources 不再给事件（工单 #903），这一版要从它自己的事件里取
+        stream = application.system.store.list_events(run.run_id)
+    completions = [payload for payload in map(_accepted_payload, stream)
+                   if payload.get("artifact_kind") == COMPLETION_KIND]
+    if not completions:
+        return None
+    completion = completions[-1]
+    # 结论按这个事项冻结的定义里声明的核验角色给出：每个都放行才是放行，有人打回是打回；
+    # 还没有结论、或者没有核验角色时为空（开环完成不写成放行）
+    definitions = _frozen_definitions(application, stream)
+    author = completion.get("artifact_issuer")
+    verifiers = (definitions.verifiers_of(author, COMPLETION_KIND)
+                 if definitions is not None and isinstance(author, str) else ())
+    verdicts = [_conclusion_on(stream, verifier, completion.get("content_hash")) for verifier in verifiers]
+    conclusion = None
+    if verdicts and all(verdict is not None for verdict in verdicts):
+        if COMPLETION_REWORK in verdicts:
+            conclusion = COMPLETION_REWORK
+        elif all(verdict == COMPLETION_RELEASE for verdict in verdicts):
+            conclusion = COMPLETION_RELEASE
+    spec = getattr(run, "product_spec", None)
+    return WorkItemProgress(
+        product_spec_revision=None if spec is None else spec.revision,
+        delivery_revision=completion.get("artifact_version"),
+        delivery_product_spec_revision=None,
+        conclusion=conclusion,
+    )
+
+
+def _accepted_payload(event: Any) -> dict[str, Any]:
+    # 通用成果接纳事件的载荷：成果种类、作者部门、内容摘要、版本号这些统一字段都在里面（S2c，工单 #1098）
+    return dict(event.payload or {})
+
+
+def _conclusion_on(events: Sequence[Any], verifier: str, completion_hash: Any) -> str | None:
+    # 这个核验角色对那一版交完成给出的结论：同一版给了多次时以后一次为准（工单 #1396 的口径）
+    for event in reversed(events):
+        payload = _accepted_payload(event)
+        if (payload.get("artifact_kind") == COMPLETION_REVIEW_KIND
+                and payload.get("completion") == completion_hash
+                and payload.get("artifact_issuer") == verifier):
+            verdict = payload.get("verdict")
+            return verdict if isinstance(verdict, str) else None
+    return None
+
+
+def _frozen_definitions(application: Application, events: Sequence[Any]) -> Any:
+    # 这个事项冻结的定义（工单 #1699，父工单 #1698「读一件事项按它冻结的定义」）：run_created 里记下的
+    # 那份定义副本；旧事件没有记时为空，调用方按进程级定义的默认口径算
+    for event in events:
+        if event.type == EventType.RUN_CREATED:
+            return definitions_from_ref(application.system.artifacts,
+                                        (event.payload or {}).get("definitions_ref"))
+    return None
 
 
 def _current_delivery(run: Any) -> Any:
@@ -1570,7 +1643,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     # 事项没有给出时没有 run，也没有部门状态；给出时一次读出 run、决定请求与事件（工单 #903）
     run, decisions, events = (None, {}, []) if item is None else _item_sources(application, item.run_id)
     observation = _observation(run, decisions, events)
-    progress = _work_item_progress(run)
+    progress = _work_item_progress(run, application, events)
     configured = state.department_settings[request.department]
     used_version = _last_used_prompt_version(run, request.department)
     effective = _effective_model(application, configured, request.department)
@@ -2733,6 +2806,11 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     # 沿用同一条产品需求，按那条需求的状态会让两版都是 active
     current_contract = None if run.effective_contract is None else run.effective_contract.content_hash
     trial_cases = {case.case_id: case for case in run.trial_cases}
+    # 交完成的那一版也是交付（工单 #1699）：它在事件流里，与流转记录里那条版本交付是同一个原始事件
+    stream = store.list_events(item.run_id)
+    completed = [_completion_version(application, event, stream) for event in stream
+                 if event.type == EventType.ARTIFACT_ACCEPTED
+                 and (event.payload or {}).get("artifact_kind") == COMPLETION_KIND]
     return Snapshot[WorkItemMaterialsResult](
         position=store.end_position(),
         data=WorkItemMaterialsResult(
@@ -2742,10 +2820,10 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
                                       value.revision, value.content_hash,
                                       _prd_summary(specs.get(value.product_spec_hash)), [])
                        for value in run.effective_contracts],
-            deliveries=[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
-                                       value.content_hash, value.summary, list(value.files),
-                                       launch=_launch_methods(value))
-                        for value in run.delivery_specs],
+            deliveries=[*[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
+                                         value.content_hash, value.summary, list(value.files),
+                                         launch=_launch_methods(value))
+                           for value in run.delivery_specs], *completed],
             reviews=[_review_entry(value, trial_cases) for value in run.reviews],
             inputs=[
                 InputView(
@@ -2765,6 +2843,37 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
             old_runs=_old_runs(application, state, item.work_item_id),
         ),
     )
+
+
+def _completion_version(application: Application, event: Any, stream: Sequence[Any]) -> VersionEntry:
+    # 交完成那一版在资料里的条目（工单 #1699）：版本、摘要与改了的文件。事件编号就是完成事件的编号，
+    # 页面上按它把流转记录那条版本交付对到这一版
+    payload = event.payload or {}
+    return _version_entry(event.event_id, "delivery", payload.get("status") or "active",
+                          payload.get("artifact_version"), payload.get("content_hash"),
+                          payload.get("summary", ""), _completion_files(application, event, stream))
+
+
+def _completion_files(application: Application, event: Any, stream: Sequence[Any]) -> list[str]:
+    # 交完成那一版的文件清单（工单 #1699）：完成事件只带这一版的公开树摘要，不带文件；事件流里每个工作区
+    # 动作记下动作后的公开树快照（工单 #17、#1398），摘要与这一版相同的那一份就是这一版的文件。
+    # 与交付各版本同一个口径（工单 #677）：这一版公开树的全部文件，按路径排序；没有对得上的快照时为空
+    digest = (event.payload or {}).get("artifact_tree_digest")
+    if not isinstance(digest, str) or not digest:
+        return []
+    artifacts = application.system.artifacts
+    for earlier in reversed(stream):
+        if earlier.position >= event.position or earlier.type != EventType.TOOL_CALLED:
+            continue
+        ref = (earlier.payload or {}).get("after_snapshot_ref")
+        if not ref:
+            continue
+        snapshot = json.loads(artifacts.get_for_run(event.run_id, ArtifactRef(**ref)))
+        if snapshot.get("digest") != digest:
+            continue
+        return sorted({str(entry[0]).replace("\\", "/") for entry in snapshot.get("entries") or ()})
+    return []
+
 
 def _old_runs(application: Application, state: Any, work_item_id: str) -> list[OldRunView]:
     # 旧版本的 run（工单 #1186）：这个事项因升级停止的 run，只读列出。建档事项因升级重新开始时
@@ -3661,6 +3770,8 @@ PROJECT_OVERVIEW = QueryDefinition(
                 EventType.RUN_CONTINUED, EventType.RUN_RESUMED,
                 EventType.DEPARTMENT_ACTIVATED,
                 EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED, EventType.SPEC_ACCEPTED,
+                # 直做交完成的那一版也改变进度与核验中状态（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED,
                 EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 EventType.DECISION_REQUESTED,
                 # 部门状态（工单 #903）：一轮工作结束以后部门回到等待工作或核验中，
@@ -3682,18 +3793,21 @@ PROJECT_LOOP = QueryDefinition(
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN, ProjectEventType.ONBOARDING_REVISION_STARTED,
                 ProjectEventType.BASELINE_ADOPTED,
-                # 事项的进度由成果推算：规格被接纳、交付到达、质检放行与退回都改变它
+                # 事项的进度由成果推算：规格被接纳、交付到达、质检放行与退回、直做交完成的那一版都改变它
                 EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                EventType.ARTIFACT_ACCEPTED,
                 # 激活结束以后事项的恢复状态改变
                 EventType.ACTIVATION_FINISHED),
 )
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
-    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达与质检的退回和放行都进流转记录；
-    # 你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636）
+    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达、质检的退回和放行、
+    # 直做交完成的那一版都进流转记录；你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636、#1699）
     changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED,
                 EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED,
+                # 直做交完成的那一版在流转记录里是一条版本交付（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED,
                 EventType.QA_SUBMITTED,
                 EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
                 ProjectEventType.WORK_ITEM_CREATED),
@@ -3737,7 +3851,9 @@ DEPARTMENT_WORKSPACE = QueryDefinition(
                 # 部门状态与房间的传信数（工单 #903）：一轮工作结束、决定请求的发出与回答、
                 # 交付到达与质检结论都改变它们
                 EventType.ACTIVATION_FINISHED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
-                EventType.DECISION_WITHDRAWN, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED),
+                EventType.DECISION_WITHDRAWN, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                # 直做交完成以后这个部门的房间里是核验中的状态（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED),
 )
 
 RUN_ACTIONS = QueryDefinition(
@@ -3766,6 +3882,8 @@ WORK_ITEM_MATERIALS = QueryDefinition(
     handle=_work_item_materials,
     changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.CONTRACT_ACCEPTED,
                 EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                # 直做交完成的那一版在交付各版本里（工单 #1699）
+                EventType.ARTIFACT_ACCEPTED,
                 # 成果失效（S1b，工单 #858）：交付的失效状态在这一页的交付清单里
                 EventType.ARTIFACT_INVALIDATED,
                 ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,
