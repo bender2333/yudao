@@ -37,7 +37,7 @@ require.extensions[".tsx"] = loader;
 require.extensions[".ts"] = loader;
 
 const { renderToStaticMarkup } = require("react-dom/server");
-const { GuidanceSection } = require("../../src/renderer/src/views/project/department.tsx");
+const { GuidanceSection } = require("../../src/renderer/src/views/project/department-parts.tsx");
 
 // 接口里的三种状态（#1039）：查询 department.workspace 的 guidance 一项，同一条指导随着工作推进换状态
 const STATUS_IN_ORDER = ["received", "in_input", "answered"];

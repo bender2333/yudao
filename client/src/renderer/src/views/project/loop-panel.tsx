@@ -12,13 +12,16 @@
 // 给出（成果按第几轮，询问与回答按询问编号对激活的会话编号）。
 
 import type { ClientApp } from "../../contract/client-app";
-import type { RunStepsResult } from "../../api/generated/types.gen";
+import type { DepartmentWorkspaceResult, RunStepsResult } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
 import { askStateText, nameOf, versionsOf } from "./loop-graph-model";
 import { arrowText, type LoopPanelPick } from "./loop-graph";
 import { ArrowSections } from "./arrow-panel.tsx";
+import { RunningBackgroundCommands } from "./department-parts.tsx";
 import { formatTime } from "./labels";
+import { RoomLiveOutput } from "./live-output";
+import { nodePanelView } from "./node-panel-model.ts";
 import type { SequenceDetail, SequenceRow } from "./sequence-model";
 import { useSnapshot } from "./use-snapshot";
 import { WorkProcess } from "./work-process.tsx";
@@ -128,6 +131,8 @@ function ArrowPanel(props: WorkSource & {
 
 function NodePanel(props: {
   app: ClientApp;
+  projectId: string;
+  workItemId: string;
   runId: string;
   graph: LoopGraph;
   node: LoopNode;
@@ -146,11 +151,26 @@ function NodePanel(props: {
     { run_id: props.runId, department: node.id },
     !node.working || props.runId === "",
   );
+  // 工作间（工单 #1712）：执行机器、等模型服务、结果未知、未读指导、角色、最近一次请求的模型与档位
+  // 与部门页读同一条查询（department.workspace），不新增查询
+  const workspace = useSnapshot<DepartmentWorkspaceResult>(
+    props.app,
+    `page.cv.node.workspace.${node.id}`,
+    "department.workspace",
+    { project_id: props.projectId, department: node.id, work_item: props.workItemId === "" ? null : props.workItemId },
+    props.projectId === "",
+  );
   const doing = nodeDoing(steps.data, node.working);
+  const view = nodePanelView(node, workspace.data, props.projectId, props.workItemId);
   return (
-    <section className="y10-cv-panel" aria-label={node.label} data-testid="loop-panel-node">
+    <section className="y10-cv-panel v20-node-panel" aria-label={node.label} data-testid="loop-panel-node">
       <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>×</button>
-      <h3>{node.label}<small> {node.state === "" ? "现在没有状态" : node.state}</small></h3>
+      <h3>{node.label}<small> {view.state}</small></h3>
+      {view.waiting.length === 0 ? null : (
+        <ul className="y10-list v20-node-waiting" data-testid="node-waiting">
+          {view.waiting.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      )}
       {doing === null ? null : (
         <p className="y10-cv-doing" data-testid="node-doing">
           <b>在做什么</b>
@@ -158,8 +178,15 @@ function NodePanel(props: {
         </p>
       )}
       {steps.error === null ? null : <p className="y10-cv-note">{readFailureText(steps.error)}</p>}
-      <ul className="y10-list y10-cv-facts">
-        <li>职能：{node.label}{node.state === "" ? "" : `，${node.state}`}</li>
+      {view.live ? (
+        <div className="v20-node-live" data-testid="node-live">
+          <RoomLiveOutput app={props.app} department={node.id} />
+          <RunningBackgroundCommands commands={steps.data?.background_commands ?? []} />
+        </div>
+      ) : null}
+      {workspace.error === null ? null : <p className="y10-cv-note">{readFailureText(workspace.error)}</p>}
+      <ul className="y10-list y10-cv-facts v20-node-facts">
+        {view.facts.map((fact) => <li key={fact.label}>{fact.label}：{fact.value}</li>)}
         {node.verifier ? <li>它的角色是核验角色：核验交付的那一版，放行时写它的显示名</li> : null}
         {node.others > 0 ? <li>别的事项正在这个职能上的有 {node.others} 件</li> : null}
         {node.oldOnly ? <li>这个职能只在旧组织里：项目现在的组织里已经没有它，这件事项仍按它冻结的组织做完</li> : null}
@@ -178,6 +205,10 @@ function NodePanel(props: {
           </ul>
         </div>
       )}
+      <div className="v20-node-entries">
+        <a className="y10-btn is-small small" href={view.links.detail} data-testid="node-detail-link">职能详情</a>
+        <a className="y10-btn is-small small" href={view.links.requests} data-testid="node-requests-link">本职能的模型请求</a>
+      </div>
     </section>
   );
 }
@@ -307,5 +338,5 @@ export function LoopPanel(props: WorkSource & {
   return node === undefined
     ? null
     : <NodePanel graph={props.graph} node={node} onClose={props.onClose}
-                 app={props.app} runId={props.runId} />;
+                 app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId} />;
 }
