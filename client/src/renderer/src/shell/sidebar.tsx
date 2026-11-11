@@ -163,7 +163,9 @@ export function Sidebar(props: SidebarProps) {
         <ul className="y10-project-list nav-group">
           {visible.map((project) => {
             const marks = statusMarks(project, props.decisions);
-            const pending = props.pendingByProject[project.project_id] ?? 0;
+            // 待你决定的数量从两个职能起显示（项目的组织设计说明「项目页是循环图加对话」）：
+            // 一个职能直做的项目没有别人要你决定，数字不显示。职能数由 projects.list 随每一行给出
+            const pending = project.department_count >= 2 ? (props.pendingByProject[project.project_id] ?? 0) : 0;
             const selected = project.project_id === props.activeProjectId;
             return (
               <li key={project.project_id} className="project-entry">

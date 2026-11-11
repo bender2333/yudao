@@ -37,12 +37,14 @@ def _chosen_form(application: "Application", form: str | None) -> str | None:
 
 class ProjectCreate(CommandRequest):
     # 新建项目：新建类命令，没有依据的对象
+    # goal 是长期目标，可选（工单 #1647，项目的组织设计说明「形态一键选用」）：不写时项目上下文里没有
+    # 这一项，之后在设置页里写；其余与写了时一样
     # initial_directory 是可选的起点文件夹（控制主机上的文件夹路径，工单 #321）：
     # 它的快照成为项目的起点文件，不建档，项目来源仍是 idea；不可读或含宿主私有路径时以 source_invalid 拒绝
     # form 是选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：完成时项目就用这份组织，可选
     base_version: None = None
     name: Text
-    goal: Text
+    goal: Text | None = None
     initial_directory: Text | None = None
     form: Text | None = None
 
@@ -64,10 +66,11 @@ def _project_refs(events: list[Event | ProjectEvent]) -> ProjectRefs:
 
 class ProjectOnboard(CommandRequest):
     # 接入已有项目：新建项目、登记源目录、采集代码快照、开始建档事项（3.8 第 3.1 节）
+    # goal 是长期目标，可选（工单 #1647）：不写时项目上下文里没有这一项；不写这一项时建档事项的输入用项目名
     # form 是选的一张形态卡（工单 #1517）：建档事项按这份组织冻结，可选
     base_version: None = None
     name: Text
-    goal: Text
+    goal: Text | None = None
     source_name: Text
     source_path: Text
     form: Text | None = None

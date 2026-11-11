@@ -62,9 +62,11 @@ async def _rename_project(application: "Application", command: Command, request:
 
 
 class ProjectSetGoal(CommandRequest):
+    # 长期目标可以清空（工单 #1647，项目的组织设计说明「形态一键选用」）：不写 goal 就是清掉它，
+    # 清掉以后项目上下文里没有这一项，写了的照旧
     base_version: int
     project_id: str
-    goal: Text
+    goal: Text | None = None
 
 
 async def _set_project_goal(application: "Application", command: Command, request: ProjectSetGoal) -> None:

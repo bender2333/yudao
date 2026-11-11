@@ -131,13 +131,21 @@ class ProjectOrganization(Contract):
 
 class FormChoice(Contract):
     # 发布带的一份形态：名字（发布带里的标识）、形态名（它有哪几个职能，从这份定义推出）、一句说明、
-    # 这份定义的版本（改动为空时它就是组织版本）、核验角色的编号（空表示没有核验角色）与开环与否
+    # 这份定义的版本（改动为空时它就是组织版本）、核验角色的编号（空表示没有核验角色）与开环与否。
+    # 工单 #1647 只增五项：轮转方式的标识与显示名、结束方式（开环完成或独立核验放行）、卡上的一句话，
+    # 以及这份形态的合成结果（与 project.organization 的 organization 同一种类型，页面画小循环图）。
+    # 这五项都由这份定义读出，forms.list 与 project.organization 走同一段代码
     form: str
     label: str
     description: str
     version: str
     verifier_roles: list[str]
     open_loop: bool
+    routing: str
+    routing_label: str
+    ending: str
+    card_line: str
+    organization: DraftOrganization
 
 
 class OrganizationDepartment(Contract):
@@ -209,6 +217,13 @@ class ProjectOrganizationResult(Contract):
     previous_item: ItemOrganization | None = None
 
 
+class FormCatalogResult(Contract):
+    # 发布带的形态清单（工单 #1647，项目的组织设计说明「形态一键选用」、总图第四节的「接口」与「定义」缝）：
+    # 不带项目也读得到，新建项目时选卡就靠它。每一份形态给卡上要的全部内容，与 project.organization 的
+    # forms 同源，两处对同一份形态给出相同内容
+    forms: list[FormChoice]
+
+
 def release_forms(system: Any) -> dict[str, Definitions]:
     # 发布带的形态：实例加载的那几份（测试与演示可以把别的几份交给组装处）。
     # 只读打开没有组装处，按发布带的登记处读出名字与定义：这两种读取只要这两样，不接路由
@@ -239,10 +254,20 @@ def _label(definitions: Definitions) -> str:
     return " · ".join(labels[department] for department in definitions.departments)
 
 
+def _ending(definitions: Definitions) -> str:
+    # 结束方式（工单 #1647，项目的组织设计说明「形态一键选用」的两个标记之一）：定义里没有核验角色时
+    # 事项以开环完成结束，有核验角色时靠它独立放行。与这份形态的 open_loop 是同一件事的两种写法
+    return "开环完成" if not definitions.verifier_roles() else "独立核验放行"
+
+
 def _choice(name: str, definitions: Definitions) -> FormChoice:
     verifiers = list(definitions.verifier_roles())
+    organization = _organization_of(name, definitions)
     return FormChoice(form=name, label=_label(definitions), description=_describe(definitions),
-                      version=definitions.version, verifier_roles=verifiers, open_loop=not verifiers)
+                      version=definitions.version, verifier_roles=verifiers, open_loop=not verifiers,
+                      routing=definitions.routing, routing_label=organization.routing_label,
+                      ending=_ending(definitions), card_line=definitions.organization.card_line,
+                      organization=organization)
 
 
 def _origin(department: str, changes: dict[str, Any]) -> str:
@@ -415,6 +440,24 @@ PROJECT_ORGANIZATION = QueryDefinition(
                 ProjectEventType.BASELINE_ADOPTED, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
                 EventType.RUN_DONE, EventType.RUN_FAILED, EventType.RUN_PAUSED,
                 EventType.RUN_RESUMED, EventType.RUN_CONTINUED),
+)
+
+
+def _form_catalog(application: Application, request: None) -> Snapshot[FormCatalogResult]:
+    # 发布带的形态清单：与 project.organization 的 forms 用同一段代码（release_forms 与 _choice），
+    # 所以两处对同一份形态给出的内容一致
+    store = application.system.store
+    forms = release_forms(application.system)
+    return Snapshot[FormCatalogResult](
+        position=store.end_position(),
+        data=FormCatalogResult(forms=[_choice(name, definitions) for name, definitions in forms.items()]))
+
+
+FORM_CATALOG = QueryDefinition(
+    name="forms.list", request=None, result=FormCatalogResult,
+    handle=_form_catalog,
+    # 结果只由这个实例加载的发布带决定，不由任何事件改变
+    changed_by=(),
 )
 
 
