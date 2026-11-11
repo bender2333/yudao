@@ -13,6 +13,7 @@ import type { ProjectList, ProjectLoopResult } from "../../api/generated/types.g
 import { emptyOrFailureText } from "../../contract/read-failure";
 import { projectDoingText, projectSlotText } from "../project/floor-text";
 import { Section } from "../project/common";
+import { paths } from "../../shell/routing";
 
 /** 每个项目的事项查询结果（首页取一次，这一节与「项目」一节共用）。 */
 export interface ProjectLoops {
@@ -71,14 +72,14 @@ export function BuildingSection(props: BuildingSectionProps): React.JSX.Element 
   const rows = useMemo(() => floorRows(props.projects, props.loops), [props.projects, props.loops]);
 
   return (
-    <Section className="y10-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一行，按所选位置的快照显示" : "每个项目一行；点击项目名进入项目概览"}>
+    <Section className="y10-home-building" title="全部项目与机器" note={at !== null ? "回放中：每个项目一行，按所选位置的快照显示" : "每个项目一行；点击项目名进入这个项目的对话页"}>
       {rows.length === 0 ? (
         <p className="y10-note note">{emptyOrFailureText(props.error, "还没有项目")}</p>
       ) : (
         <ul className="building-list">
           {rows.map((row) => (
             <li key={row.project_id}>
-              <button type="button" className="link" onClick={() => props.onNavigate(`#/p/${row.project_id}/overview`)}>
+              <button type="button" className="link" onClick={() => props.onNavigate(paths.conversation(row.project_id))}>
                 {row.name}
               </button>
               <span>{row.doing}</span>

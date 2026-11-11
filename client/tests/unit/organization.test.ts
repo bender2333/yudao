@@ -1,5 +1,7 @@
-// 页面的部门从事实来（工单 #1457）：项目现在组织里的部门 → 部门页签、默认部门与显示名；
+// 页面的部门从事实来（工单 #1457）：项目现在组织里的部门 → 默认部门与显示名；
 // 事项冻结的组织 → 每个事项的部门；看板的部门列 = 现在组织里的部门 + 还在跑的事项里旧组织的部门。
+// 页签不再按部门列（工单 #1715：项目页的页签只有对话与设置，由 routing.ts 的 projectTabs 给），
+// 这一份不再核对部门页签。
 // 期望值写成字面值，不复用实现的公式。
 
 import { test } from "node:test";
@@ -9,7 +11,7 @@ import type {
   ProjectLoopResult, ProjectOrganizationResult, WorkItemCard,
 } from "../../src/renderer/src/api/generated/types.gen.ts";
 import {
-  boardDepartments, defaultDepartment, departmentLabel, departmentLabels, departmentTabs, itemDepartments,
+  boardDepartments, defaultDepartment, departmentLabel, departmentLabels, itemDepartments,
   projectDepartments, type DepartmentView,
 } from "../../src/renderer/src/views/project/organization.ts";
 
@@ -57,18 +59,6 @@ test("项目现在组织里的部门按定义里的顺序给出，查询没有�
   ])), [{ id: "engineering", label: "工程" }, { id: "quality", label: "质检" }]);
   assert.deepEqual(projectDepartments(organization(null)), []);
   assert.deepEqual(projectDepartments(organization([])), []);
-});
-
-test("部门页签按现在组织里的部门列：一个角色直做的项目只有一个部门页签", () => {
-  assert.deepEqual(departmentTabs("p1", THREE, { workItem: "w1" }), [
-    { label: "产品", hash: "#/p/p1/dept/product?w=w1", query: "department.workspace" },
-    { label: "工程", hash: "#/p/p1/dept/engineering?w=w1", query: "department.workspace" },
-    { label: "质检", hash: "#/p/p1/dept/quality?w=w1", query: "department.workspace" },
-  ]);
-  assert.deepEqual(departmentTabs("p1", [{ id: "engineering", label: "工程" }], { workItem: null }), [
-    { label: "工程", hash: "#/p/p1/dept/engineering", query: "department.workspace" },
-  ]);
-  assert.deepEqual(departmentTabs("p1", [], { workItem: null }), []);
 });
 
 test("部门页的默认部门：地址里有就用地址里的，没有时取现在组织里的第一个", () => {

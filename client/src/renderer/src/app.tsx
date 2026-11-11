@@ -12,7 +12,7 @@ import { optionalRead } from "./contract/read-failure.ts";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
-import { attemptBackPath, parseRoute, pathLabel, paths, type Route } from "./shell/routing";
+import { attemptBackPath, parseRoute, pathLabel, paths, projectTabs, type Route } from "./shell/routing";
 import { HomePage } from "./views/home/page";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
@@ -31,7 +31,7 @@ import { OverviewPage } from "./views/project/overview";
 import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
-import { departmentTabs, projectDepartments, type DepartmentView } from "./views/project/organization";
+import { projectDepartments, type DepartmentView } from "./views/project/organization";
 import { useSnapshot } from "./views/project/use-snapshot";
 import { projectsListParams } from "./views/project/project-list";
 
@@ -310,7 +310,7 @@ export function App() {
   }
 
   const capabilities = state.capabilities;
-  const tabs = buildTabs(route, capabilities, departments);
+  const tabs = buildTabs(route, capabilities);
   const project = projects.find((item) => item.project_id === route.projectId) ?? null;
 
   return (
@@ -475,27 +475,18 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
 }
 
 // 项目标签（原型 v8 设计说明第 3.2 节）：按能力清单显示，缺少查询的标签不出现
+// 页签只有对话与设置两项（工单 #1715，设计说明「项目页只有两页」），任何组织下都一样；
+// 页签清单由 routing.ts 的 projectTabs 给，这里只按服务端能给的查询筛。
 // 页签的地址带着当前的事项范围（工单 #746）：切页签不丢范围，
 // 范围是项目级的一份（写在 ?w= 中），设置页不按范围筛选内容，但范围同样带着
-// 部门页签取自项目现在的组织（工单 #1457）：一个角色直做的项目只有一个部门页签，不写死三个
-function buildTabs(route: Route, capabilities: Capabilities, departments: DepartmentView[] = []): Tab[] {
+function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
   if (!route.projectId) {
     return [];
   }
   const has = (name: string) => capabilities.queries.some((query) => query.name === name);
-  const projectId = route.projectId;
-  const scope = { workItem: route.workItemId };
-  const candidates: { label: string; hash: string; query: string }[] = [
-    // 对话页是打开项目时的那一页（工单 #1638）；概览、资料这些页先留着，收成对话与设置两页另行处理
-    { label: "对话", hash: paths.conversation(projectId, scope), query: "project.loop" },
-    { label: "概览", hash: paths.overview(projectId, scope), query: "project.overview" },
-    ...departmentTabs(projectId, departments, scope),
-    { label: "资料", hash: paths.materials(projectId, scope), query: "work_item.materials" },
-    // 观测页的部门筛选条件带着（工单 #801）：点当前的观测页签不会把这一格筛选丢掉
-    { label: "观测", hash: paths.observe(projectId, { ...scope, department: route.departmentFilter }), query: "project.attempts" },
-    { label: "设置", hash: paths.settings(projectId, scope), query: "project.settings" },
-  ];
-  return candidates.filter((tab) => has(tab.query)).map((tab) => ({ label: tab.label, hash: tab.hash }));
+  return projectTabs(route.projectId, route.workItemId)
+    .filter((tab) => has(tab.query))
+    .map((tab) => ({ label: tab.label, hash: tab.hash }));
 }
 
 // 页面路径（工单 #303：不用路由名）：项目内的页名与页签一致，

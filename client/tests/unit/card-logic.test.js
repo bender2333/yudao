@@ -210,6 +210,26 @@ test("初始 PRD 的卡片材料与给像素画面的纯文字版本共用", () 
   assert.deepEqual(card.links.map((link) => link.label), ["PRD.md", "STRUCTURE.md"]);
 });
 
+// 工单 #1715：资料页收进对话页，决定卡片上不再生成资料页的地址。
+// 建档的工件在「建档事项的初始 PRD」那条箭头的面板里看，链接落到建档事项的对话页。
+test("初始 PRD 的两个工件链接落在建档事项的对话页，不再指向资料页", () => {
+  const card = face(initialPrd(), new Date("2026-10-02T10:01:00Z").getTime());
+  assert.deepEqual(card.links.map((link) => link.href), [
+    "#/p/p1/conversation?w=w1",
+    "#/p/p1/conversation?w=w1",
+  ]);
+  // 卡片自己的「在项目中查看」同样落到对话页（初始 PRD 按建档的轮次看）
+  assert.equal(viewHref(initialPrd()), "#/p/p1/conversation?w=w1");
+  assert.ok(!card.links.some((link) => link.href.includes("/materials")), "卡片上不应再有资料页的地址");
+});
+
+// 工单 #1715：没有事项的决定落到项目的对话页（概览页已收进对话）
+test("没有事项的决定落到项目的对话页", () => {
+  const projectWide = decision({ kind: "release_check_failed", work_item_id: null, request: { kind: "release_check_failed", blocks: "", options: [], description: "有检查没通过" } });
+  assert.equal(viewHref(projectWide), "#/p/p1/conversation");
+  assert.ok(!viewHref(projectWide).includes("/overview"), "卡片上不应再生成概览页的地址");
+});
+
 test("界面不再包含已删除的 unknown_action 与 pending_verification", () => {
   assert.equal(DECISION_KIND.unknown_action, undefined);
   assert.equal(RECOVERY_STATE.pending_verification, undefined);

@@ -1,6 +1,7 @@
 // 页面的部门从事实来（工单 #1457；项目的组织设计说明「页面跟着级别伸缩」；形态与核验角色设计说明
-// 「形态随事项冻结」）：项目现在的组织（project.organization 的 departments）给出部门页签、看板的列、
-// 部门页的默认部门与部门显示名；事项按它冻结的组织（project.loop 的 organization.roles）给出每个事项的部门。
+// 「形态随事项冻结」）：项目现在的组织（project.organization 的 departments）给出看板的列、详情页的
+// 默认部门与部门显示名；事项按它冻结的组织（project.loop 的 organization.roles）给出每个事项的部门。
+// 页签不再按部门列（工单 #1715：项目页的页签只有对话与设置），这里不再生成部门页的地址。
 //
 // 这里只做取值与判断，不触碰网络与界面；页面组件引用这些函数，单元测试直接核对。
 // 部门的中文名也在这里取：组织里有这个部门时用组织给的显示名，旧数据里的部门不在组织里时才用
@@ -9,7 +10,6 @@
 import type {
   ProjectLoopResult, ProjectOrganizationResult, WorkItemCard,
 } from "../../api/generated/types.gen";
-import { paths } from "../../shell/routing.ts";
 import { departmentName } from "./labels.ts";
 
 // 一个部门在页面上的样子：标识与显示名
@@ -54,20 +54,6 @@ export function departmentLabel(id: string | null | undefined, labels: Departmen
 export function defaultDepartment(requested: string | null | undefined,
                                   departments: readonly DepartmentView[]): string {
   return requested ?? departments[0]?.id ?? "";
-}
-
-// 部门页签：每个部门一个页签，页签名与地址都取自事实，不写死三个
-export function departmentTabs(projectId: string, departments: readonly DepartmentView[],
-                               scope: { workItem: string | null }): {
-  label: string;
-  hash: string;
-  query: string;
-}[] {
-  return departments.map((department) => ({
-    label: department.label,
-    hash: paths.dept(projectId, department.id, scope),
-    query: "department.workspace",
-  }));
 }
 
 // 每个事项冻结的组织里的部门（project.loop 的 organization.roles）；形态不在这一版发布里的事项没有
