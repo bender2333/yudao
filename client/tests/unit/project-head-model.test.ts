@@ -8,17 +8,23 @@
 //
 // 确认框的后果原文由 cancel-text.ts 给，irreversible-confirm.test.ts 已经核对；这里只核对它接的是那一份，
 // 不重复断言它的文字。
+//
+// 当前成果一行（工单 #1714）：这一行读 project.overview 的 current_adoption 与 project.writeback 的记录，
+// 写当前成果是哪一版、是不是建档基线、写回到了哪一步；写回那一句的短名与全句由 writeback-text.ts 给
+// （writeback.test.ts 已经核对），这里只核对接的是哪一份。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
-  DraftOrganization, OrganizationDepartment, ProjectOrganizationResult,
+  AdoptionView, DraftOrganization, OrganizationDepartment, ProjectOrganizationResult,
+  ProjectOverviewResult, ProjectWritebackResult, WritebackRecordView,
 } from "../../src/renderer/src/api/generated/types.gen.ts";
 import {
-  OUT_OF_RELEASE, projectHead, stopConfirm, timeBar,
+  OUT_OF_RELEASE, outcomeHead, projectHead, stopConfirm, timeBar, writebackLine,
 } from "../../src/renderer/src/views/project/project-head-model.ts";
 import { cancelConfirmLines, cancelConfirmTitle } from "../../src/renderer/src/views/project/cancel-text.ts";
 import { OPEN_LOOP_STATUS_TEXT } from "../../src/renderer/src/views/project/labels.ts";
+import { WRITEBACK_STATUS } from "../../src/renderer/src/views/project/writeback-text.ts";
 
 // 一份查询结果：默认是发布带的「工程」（一个职能、直做、开环、没有本项目改动）
 function organization(over: Partial<ProjectOrganizationResult> = {}): ProjectOrganizationResult {
@@ -216,4 +222,151 @@ test("「停止」先确认：确认框的标题与后果照取消事项的那�
   assert.equal(confirm.title, cancelConfirmTitle("in_progress"));
   assert.deepEqual(confirm.lines, cancelConfirmLines("in_progress"));
   assert.notEqual(confirm.confirm, confirm.cancel);
+});
+
+// ---------------------------------------------------------------- 当前成果一行（工单 #1714）
+
+// 当前成果一行只读这几栏：采纳版本（摘要、采纳时间、文件、检查、已知风险）、建档基线的快照、现有缺陷
+function adoption(over: Partial<AdoptionView> = {}): AdoptionView {
+  return {
+    adoption_id: "a1",
+    work_item_id: "w1",
+    run_id: "r1",
+    summary: "补了用法一节",
+    files: ["README.md", "docs/usage.md"],
+    check_names: ["unit"],
+    known_risks: [],
+    code_tree_digest: "digest",
+    adopted_at: "2026-11-11T12:10:00Z",
+    event_id: "e1",
+    previous_adoption_id: null,
+    onboarding_baseline: false,
+    snapshot_source: null,
+    snapshot_provenance: null,
+    existing_defect_count: 0,
+    ...over,
+  };
+}
+
+function overview(over: Partial<ProjectOverviewResult> = {}): ProjectOverviewResult {
+  return {
+    project_id: "p1",
+    name: "项目一",
+    goal: "把日志清理脚本补全",
+    version: 3,
+    current_adoption: adoption(),
+    stats: {} as ProjectOverviewResult["stats"],
+    work_items: [],
+    start_point: null,
+    ...over,
+  };
+}
+
+function record(over: Partial<WritebackRecordView> = {}): WritebackRecordView {
+  return {
+    status: "completed",
+    work_item_id: "w1",
+    adoption_id: "a1",
+    target_commit: "abc1234",
+    created_at: "2026-11-11T12:20:00Z",
+    event_id: "e2",
+    branch: "yudao/issue-1714",
+    target_branch: "main",
+    pull_request_title: "工单 #1714",
+    pull_request_local_only: true,
+    ...over,
+  };
+}
+
+function writeback(...records: WritebackRecordView[]): ProjectWritebackResult {
+  return { project_id: "p1", records };
+}
+
+function rowOf(head: { rows: { label: string; value: string }[] } | null, label: string): string {
+  return head?.rows.find((row) => row.label === label)?.value ?? "";
+}
+
+test("有采纳成果的项目写当前成果是哪一版，并写写回还没有做", () => {
+  const head = outcomeHead(overview(), writeback());
+  assert.ok(head?.text.startsWith("当前成果 补了用法一节（采纳于 "), head?.text);
+  assert.ok(head?.text.endsWith("写回：还没有写回"), head?.text);
+  // 还没有写回：这一行让用户看得出还差这一步
+  assert.equal(head?.tone, "open");
+  assert.ok(!head.text.includes("建档基线"), "不是接入已有项目的采纳不写建档基线");
+  assert.equal(rowOf(head, "当前成果").startsWith("补了用法一节（采纳于 "), true);
+  assert.equal(rowOf(head, "文件"), "2 项：README.md、docs/usage.md");
+  assert.equal(rowOf(head, "检查"), "1 项：unit");
+  assert.equal(rowOf(head, "已知风险"), "没有已知风险");
+  assert.equal(rowOf(head, "写回"), "还没有写回");
+});
+
+test("接入已有项目的写建档基线、快照来源与现有缺陷", () => {
+  const head = outcomeHead(overview({
+    current_adoption: adoption({
+      onboarding_baseline: true,
+      snapshot_source: "本地登记的源目录 src",
+      snapshot_provenance: { commit: "abc1234", branch: "main", dirty: false },
+      existing_defect_count: 3,
+    }),
+  }), writeback());
+  assert.ok(head?.text.includes(" · 建档基线"), head?.text);
+  // 建档基线是接入时的代码快照：按设计不写回，不说成还差一步
+  assert.ok(head?.text.endsWith("写回：建档基线不写回"), head?.text);
+  assert.equal(head?.tone, "plain");
+  assert.equal(rowOf(head, "建档基线"), "当前成果来自接入的代码快照：下面的来源与缺陷数按快照采集时的原样显示");
+  assert.equal(rowOf(head, "快照来源"), "本地登记的源目录 src");
+  assert.equal(rowOf(head, "快照提交"), "git 提交 abc1234（分支 main，没有未提交的修改）");
+  assert.equal(rowOf(head, "现有缺陷"), "现有缺陷 3 项");
+});
+
+test("快照来源没有上报时照实写，不写成空", () => {
+  const head = outcomeHead(overview({ current_adoption: adoption({ onboarding_baseline: true }) }), writeback());
+  assert.equal(rowOf(head, "快照来源"), "未上报");
+  // 没有 git 仓库：快照采集时的目录内容
+  assert.equal(rowOf(head, "快照提交"), "没有 git 仓库，快照采集时的目录内容");
+});
+
+test("写回的三种状态各写一句：还没有写回、写回等待、已经写回", () => {
+  const cases: [ProjectWritebackResult, string, string][] = [
+    [writeback(), "还没有写回", "open"],
+    [writeback(record({ status: "held", reason: "waiting_previous_adoption" })), "写回等待", "plain"],
+    [writeback(record({ status: "completed" })), "已经写回仓库", "ok"],
+  ];
+  for (const [records, line, tone] of cases) {
+    const head = outcomeHead(overview(), records);
+    assert.ok(head?.text.endsWith(`写回：${line}`), `${records.records.length} 条记录：${head?.text}`);
+    assert.equal(head?.tone, tone, line);
+    // 面板里写全：含同一个短名，完整的那句由 writeback-text.ts 给
+    assert.ok(rowOf(head, "写回").includes(line), rowOf(head, "写回"));
+  }
+  // 有记录时面板写全句（分支与目标分支），不只有短名
+  const written = outcomeHead(overview(), writeback(record({ status: "completed" })));
+  assert.equal(rowOf(written, "写回"), "成果已经写回仓库：分支 yudao/issue-1714，目标分支 main；合并请求：工单 #1714（合并请求目前只记录在本地，还没有在代码托管平台上创建）");
+});
+
+test("写回记录属于别的采纳时按还没有写回写，不拿别的采纳的记录顶替", () => {
+  const head = outcomeHead(overview(), writeback(record({ adoption_id: "a0" })));
+  assert.ok(head?.text.endsWith("写回：还没有写回"), head?.text);
+});
+
+test("写回那一句的短名照 writeback-text.ts，不为这一行另写一套话", () => {
+  assert.equal(writebackLine(null, false), "还没有写回");
+  assert.equal(writebackLine(record(), true), "建档基线不写回");
+  for (const status of Object.keys(WRITEBACK_STATUS)) {
+    assert.equal(writebackLine(record({ status }), false), WRITEBACK_STATUS[status], status);
+  }
+  // 页面还不认识的状态照实写服务端给的那个词，不猜成已完成
+  assert.equal(writebackLine(record({ status: "running" }), false), "running");
+});
+
+test("没有成果的新项目这一行写还没有成果", () => {
+  const head = outcomeHead(overview({ current_adoption: null }), writeback());
+  assert.equal(head?.text, "还没有成果");
+  assert.equal(head?.tone, "plain");
+  assert.deepEqual(head?.rows, [{ label: "当前成果", value: "这个项目还没有采纳过成果" }]);
+});
+
+test("概览或写回记录还没有读到时这一行不出现，不写一半", () => {
+  assert.equal(outcomeHead(null, writeback()), null);
+  assert.equal(outcomeHead(overview(), null), null);
 });

@@ -3,11 +3,13 @@
 // 工单 #904 在这里核对概览与看板的文字：所在部门一行写三个部门各自的状态与原因、按成果写的进度行、
 // 看板卡片上正在工作的部门。工单 #1372 核对分组的口径：部门列按部门在事项上的状态分（几个部门同时
 // 工作时同一事项在几列里，与部门状态行说的是同一件事）、部门列取自事项的部门（换了部门名的定义列跟着换）。
-// 期望值写成字面值，不复用实现的公式。
+// 工单 #1709 核对「全部事项」列表：与看板同一份分组口径，每组写件数，件数与事项统计对得上；
+// 开环完成与放行分在两组；同名的已停止事项靠事项标识与停止时间分辨；排队中的顺序就是执行顺序；
+// 职能列取自事项冻结的组织。期望值写成字面值，不复用实现的公式。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boardColumns,boardGroups } from "../../src/renderer/src/views/project/board.ts";
+import { allItemsList,boardColumns,boardGroups } from "../../src/renderer/src/views/project/board.ts";
 import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,isOpenLoopCompleted,label,progressLabel,stopNoteView,workItemStatusText,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { DepartmentState,WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
@@ -404,4 +406,107 @@ test("没有已收下的交付时停止说明不变", () => {
   assert.equal(stopNoteView("出错了", null).keptDelivery, undefined);
   assert.equal(stopNoteView(null).keptDelivery, undefined);
   assert.deepEqual(stopNoteView(null, null), { kind: "none" });
+});
+
+// ---------------------------------------------------------------------------
+// 全部事项的分组列表（工单 #1709；依据 docs/design/project-organization.md「事项面板与全部事项」、
+// docs/design/app-and-interface.md「事项看板在页面上的显示」）：列表与看板用同一份分组与计数，
+// 每组写这一组的件数；开环完成与放行分在两组；同名的已停止事项靠事项标识与停止时间分辨；
+// 排队中的顺序就是执行顺序，不重排；职能列取自事项冻结的组织。期望值写成字面值。
+
+const working = { state: "working" } as const;
+
+test("各组件数与事项统计一致，一件同时在几个职能列里时总数不重复算", () => {
+  const items = [
+    // 排队中：还没交给任何职能（已登记没开始、成果挂起、等待确认初始 PRD）
+    item({ work_item_id: "q1", status: "not_started", department: "engineering" }),
+    item({ work_item_id: "q2", status: "held", department: "engineering" }),
+    item({ work_item_id: "q3", status: "awaiting_initial_prd", department: null }),
+    // 进行中：工程在看
+    item({ work_item_id: "w1", departments: { engineering: working }, department: "engineering" }),
+    item({ work_item_id: "w2", departments: { engineering: working }, department: "engineering" }),
+    // 结束的三种
+    item({ work_item_id: "r1", status: "released_unsettled", stop_reason: "released", department: "engineering" }),
+    item({ work_item_id: "o1", status: "released_unsettled", stop_reason: "open_loop", department: "engineering" }),
+    item({ work_item_id: "a1", status: "adopted", department: "engineering" }),
+    item({ work_item_id: "a2", status: "adopted", department: "engineering" }),
+    item({ work_item_id: "s1", status: "stopped", stop_reason: "cancelled", department: "engineering" }),
+  ];
+  const list = allItemsList(items);
+  const countOf = (title: string): number => list.groups.filter((group) => group.title === title)[0]?.count ?? -1;
+  // 逐项与 project.overview 的 stats 对上（stats：total 10、not_started 1、held 1、in_progress 2、
+  // released_unsettled 1、open_loop 1、adopted 2、stopped 1；开环完成不在 released_unsettled 里，
+  // 「等待确认初始 PRD」没有单独一项，它在看板落进排队中）
+  assert.equal(countOf("排队中"), 1 + 1 + 1);
+  assert.equal(countOf("工程"), 2);
+  assert.equal(countOf("已放行"), 1);
+  assert.equal(countOf("开环完成"), 1);
+  assert.equal(countOf("已采纳"), 2);
+  assert.equal(countOf("已停止"), 1);
+  assert.equal(list.total, 10);
+});
+
+test("开环完成与放行分在两组，开环完成不写成放行", () => {
+  const released = item({ work_item_id: "r1", status: "released_unsettled", stop_reason: "released" });
+  const openLoop = item({ work_item_id: "o1", status: "released_unsettled", stop_reason: "open_loop" });
+  const list = allItemsList([released, openLoop]);
+  const group = (title: string) => list.groups.filter((entry) => entry.title === title)[0];
+  assert.deepEqual(group("已放行").cards.map((card) => card.workItemId), ["r1"]);
+  assert.deepEqual(group("开环完成").cards.map((card) => card.workItemId), ["o1"]);
+  assert.equal(group("已放行").count, 1);
+  assert.equal(group("开环完成").count, 1);
+  assert.equal(group("开环完成").cards[0].statusText, "开环完成");
+  assert.ok(!group("开环完成").cards[0].statusText.includes("放行"));
+});
+
+test("同名的已停止事项靠事项标识与停止时间分辨，停止原因照清单的说法写", () => {
+  const first = item({
+    work_item_id: "w1", title: "修登录", status: "stopped", stop_reason: "time_limit",
+    stopped_at: "2026-01-02T03:04:05Z",
+  });
+  const second = item({
+    work_item_id: "w2", title: "修登录", status: "stopped", stop_reason: "provider_error",
+    stopped_at: "2026-01-03T03:04:05Z",
+  });
+  const cards = allItemsList([first, second]).groups.filter((group) => group.title === "已停止")[0].cards;
+  assert.equal(cards[0].title, cards[1].title);
+  assert.notEqual(cards[0].identity, cards[1].identity);
+  assert.equal(cards[0].identity, `事项标识 w1 · 停止于 ${formatTime("2026-01-02T03:04:05Z")}`);
+  assert.equal(cards[1].identity, `事项标识 w2 · 停止于 ${formatTime("2026-01-03T03:04:05Z")}`);
+  assert.equal(cards[0].stopText, "运行时间已达上限");
+  assert.equal(cards[1].stopText, "模型服务失败");
+});
+
+test("排队中的按执行顺序排，不按标题重排", () => {
+  // 查询按登记顺序给出排队中的事项，这个顺序就是执行顺序；列表照原样写
+  const items = [
+    item({ work_item_id: "w3", title: "丙", status: "not_started" }),
+    item({ work_item_id: "w1", title: "甲", status: "held" }),
+    item({ work_item_id: "w2", title: "乙", status: "awaiting_initial_prd" }),
+  ];
+  const queue = allItemsList(items).groups[0];
+  assert.equal(queue.title, "排队中");
+  assert.deepEqual(queue.cards.map((card) => card.workItemId), ["w3", "w1", "w2"]);
+});
+
+test("只有一个职能的项目，分组里没有别的职能", () => {
+  const items = [
+    item({ work_item_id: "w1", departments: { engineering: working }, department: "engineering" }),
+    item({ work_item_id: "w2", status: "adopted", departments: null, department: "engineering" }),
+  ];
+  const list = allItemsList(items);
+  assert.deepEqual(
+    list.groups.map((group) => group.title),
+    ["排队中", "工程", "已放行", "开环完成", "已采纳", "已停止"],
+  );
+  assert.deepEqual(list.groups.filter((group) => group.title === "工程")[0].cards.map((card) => card.workItemId), ["w1"]);
+  assert.ok(!list.groups.some((group) => group.title === "产品" || group.title === "质检"));
+  assert.ok(!list.groups.some((group) => group.key === "department:product" || group.key === "department:quality"));
+});
+
+test("没有事项时总数是零，五组都是零件", () => {
+  const list = allItemsList([]);
+  assert.equal(list.total, 0);
+  assert.deepEqual(list.groups.map((group) => group.title), ["排队中", "已放行", "开环完成", "已采纳", "已停止"]);
+  assert.deepEqual(list.groups.map((group) => group.count), [0, 0, 0, 0, 0]);
 });
