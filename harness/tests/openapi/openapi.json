@@ -4247,6 +4247,27 @@
         }
       }
     },
+    "/api/queries/forms.list": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "forms.list",
+        "operationId": "query_forms_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_FormCatalogResult_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/organization.draft": {
       "get": {
         "tags": [
@@ -9240,7 +9261,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 16
+            "example": 17
           },
           "contract_digest": {
             "type": "string",
@@ -10320,6 +10341,23 @@
         ],
         "title": "FlowRecord"
       },
+      "FormCatalogResult": {
+        "properties": {
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormChoice"
+            },
+            "type": "array",
+            "title": "Forms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "forms"
+        ],
+        "title": "FormCatalogResult"
+      },
       "FormChange": {
         "properties": {
           "event_id": {
@@ -10422,6 +10460,25 @@
           "open_loop": {
             "type": "boolean",
             "title": "Open Loop"
+          },
+          "routing": {
+            "type": "string",
+            "title": "Routing"
+          },
+          "routing_label": {
+            "type": "string",
+            "title": "Routing Label"
+          },
+          "ending": {
+            "type": "string",
+            "title": "Ending"
+          },
+          "card_line": {
+            "type": "string",
+            "title": "Card Line"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/DraftOrganization"
           }
         },
         "additionalProperties": false,
@@ -10432,7 +10489,12 @@
           "description",
           "version",
           "verifier_roles",
-          "open_loop"
+          "open_loop",
+          "routing",
+          "routing_label",
+          "ending",
+          "card_line",
+          "organization"
         ],
         "title": "FormChoice"
       },
@@ -12949,8 +13011,15 @@
             "title": "Name"
           },
           "goal": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Goal"
           },
           "initial_directory": {
@@ -12982,8 +13051,7 @@
         "type": "object",
         "required": [
           "command_id",
-          "name",
-          "goal"
+          "name"
         ],
         "title": "ProjectCreate"
       },
@@ -13109,8 +13177,15 @@
             "title": "Name"
           },
           "goal": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Goal"
           },
           "source_name": {
@@ -13141,7 +13216,6 @@
         "required": [
           "command_id",
           "name",
-          "goal",
           "source_name",
           "source_path"
         ],
@@ -13536,6 +13610,10 @@
           "waiting_resume_count": {
             "type": "integer",
             "title": "Waiting Resume Count"
+          },
+          "department_count": {
+            "type": "integer",
+            "title": "Department Count"
           }
         },
         "additionalProperties": false,
@@ -13559,7 +13637,8 @@
           "current_adoption",
           "onboarding_status",
           "interrupted_count",
-          "waiting_resume_count"
+          "waiting_resume_count",
+          "department_count"
         ],
         "title": "ProjectRow"
       },
@@ -13579,8 +13658,15 @@
             "title": "Project Id"
           },
           "goal": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Goal"
           }
         },
@@ -13589,8 +13675,7 @@
         "required": [
           "command_id",
           "base_version",
-          "project_id",
-          "goal"
+          "project_id"
         ],
         "title": "ProjectSetGoal"
       },
@@ -15795,6 +15880,24 @@
           "data"
         ],
         "title": "Snapshot[ExternalSourceEvidenceResult]"
+      },
+      "Snapshot_FormCatalogResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FormCatalogResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[FormCatalogResult]"
       },
       "Snapshot_LiveAttempt_": {
         "properties": {

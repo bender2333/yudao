@@ -153,15 +153,26 @@ class ProjectRow(Contract):
     # 为零时仍是 0，不省略
     interrupted_count: int
     waiting_resume_count: int
+    # 现在组织的职能数（工单 #1647，项目的组织设计说明「项目页是循环图加对话」）：这份形态与本项目的改动
+    # 合成以后有几个职能。左侧栏按它决定项目名旁的数字显示不显示（从两个职能起显示）
+    department_count: int
 
 
 class ProjectList(Contract):
     projects: list[ProjectRow]
 
 
+def _department_count(store: Any, forms: dict[str, Any], state: Any) -> int:
+    # 现在组织的职能数（工单 #1647）：形态加本项目的改动合成以后有几个职能，与 project.organization 的
+    # departments 是同一份事实的计数。形态不在这一版发布里、或改动合不到一起时没有现在这份组织，记 0
+    definitions, _issues = current_organization(forms, state.form_name, state.organization_changes, store=store)
+    return 0 if definitions is None else len(definitions.departments)
+
+
 def _projects_list(application: Application, request: ProjectsList) -> Snapshot[ProjectList]:
     store = application.system.store
     through = check_position(application, request.at)
+    forms = _release_definitions(application.system)
     rows: list[ProjectRow] = []
     for project_id in store.list_project_ids(through=through):
         state = _project(application, project_id, through=through)
@@ -181,6 +192,7 @@ def _projects_list(application: Application, request: ProjectsList) -> Snapshot[
             onboarding_status=_onboarding_status(state),
             interrupted_count=observations.count(OBSERVATION_INTERRUPTED),
             waiting_resume_count=observations.count(OBSERVATION_WAITING_RESUME),
+            department_count=_department_count(store, forms, state),
         ))
     return Snapshot[ProjectList](position=_snapshot_position(store, through), data=ProjectList(projects=rows))
 
@@ -3747,6 +3759,9 @@ def recovery_status(application: Application) -> RecoveryStatus:
 PROJECT_EVENT_KINDS: tuple[str, ...] = (
     ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
     ProjectEventType.PROJECT_GOAL_CHANGED, ProjectEventType.PROJECT_PINNED,
+    # 形态改动（工单 #1647）：项目列表里的职能数按项目现在的组织读，采用以后组织版本与职能数都变，
+    # 所以这一种事件也要让读项目流版本的查询重查
+    ProjectEventType.PROJECT_FORM_SET,
     ProjectEventType.PROJECT_ARCHIVED, ProjectEventType.PROJECT_RESTORED,
     ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
     ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,

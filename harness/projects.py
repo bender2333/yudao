@@ -742,9 +742,12 @@ def project_context_text(project: ProjectProjection, title: str,
         adopted = "\n".join(adopted_lines)
     else:
         adopted = "已采纳事项：无"
+    # 长期目标可选（工单 #1647，项目的组织设计说明「形态一键选用」）：没有写时项目上下文里没有这一项，
+    # 其余各行与写了时一样，连顺序也不变
+    goal_lines = [] if not project.goal else [f"长期目标：{project.goal}"]
     return "\n".join([
         f"项目：{project.name}",
-        f"长期目标：{project.goal}",
+        *goal_lines,
         f"当前采用成果：{current}",
         adopted,
         _effective_decisions_section(adoption, source_run),
@@ -907,7 +910,7 @@ class ProjectService:
 
     # 项目登记与状态
 
-    def register(self, name: str, goal: str, *, source: str = "idea",
+    def register(self, name: str, goal: str | None, *, source: str = "idea",
                  initial_directory: str | None = None, form: str | None = None,
                  command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
@@ -916,9 +919,10 @@ class ProjectService:
         # 在事务之前与 project.onboard 相同的采集路径只读采集公开树，采集失败时命令被拒绝，
         # 不建立项目，不写入任何事件。采集的快照所属范围是项目（与 project_goal 工件相同），不属于任何 run。
         # form 是新建项目时选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：它就是项目现在的
-        # 组织，写成一条形态改动（原值是默认形态）；不给时项目跟随发布的默认形态
+        # 组织，写成一条形态改动（原值是默认形态）；不给时项目跟随发布的默认形态。
+        # goal 可选（工单 #1647）：不写时按空串记，项目上下文里没有「长期目标」这一项
         _require_text("name", name)
-        _require_text("goal", goal)
+        goal_text = _goal_text(goal)
         frozen_form = None if form is None else self.orchestrator.form_named(form)
         project_id = new_id("proj")
         snapshot = None
@@ -926,9 +930,9 @@ class ProjectService:
             _tree, snapshot = ingest_snapshot(initial_directory, self.artifacts, project_id)
 
         def register(transaction: Transaction) -> None:
-            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal_text, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": source,
+                "name": name, "goal": goal_text, "goal_ref": asdict(goal_ref), "source": source,
                 **({} if snapshot is None else {"initial_snapshot": snapshot}),
             }, actor="user:local"))
             if frozen_form is not None:
@@ -937,7 +941,7 @@ class ProjectService:
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
 
-    def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
+    def onboard(self, name: str, goal: str | None, source_name: str, source_path: str, *,
                max_cycles: int | None = None,
                run_time_limit_sec: int | None = None,
                 context_window: int = 32_000, form: str | None = None,
@@ -947,9 +951,10 @@ class ProjectService:
         # 快照在事务之前采集：采集失败时命令被拒绝，不建立项目，不写入任何事件。
         # 调用方（应用层）先采集快照并把错误转成 source_invalid。
         # form 是接入时选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：与新建项目同一做法，
-        # 写成一条形态改动，建档事项按它冻结
+        # 写成一条形态改动，建档事项按它冻结。
+        # goal 可选（工单 #1647）：不写时项目上下文里没有「长期目标」这一项，建档事项的输入用项目名
         _require_text("name", name)
-        _require_text("goal", goal)
+        goal_text = _goal_text(goal)
         _require_text("source_name", source_name)
         _require_text("source_path", source_path)
         frozen_form = None if form is None else self.orchestrator.form_named(form)
@@ -960,9 +965,9 @@ class ProjectService:
         tree, snapshot = ingest_snapshot(source_path, self.artifacts, run_id)
 
         def onboard(transaction: Transaction) -> _NewWorkItem | None:
-            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal_text, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "existing",
+                "name": name, "goal": goal_text, "goal_ref": asdict(goal_ref), "source": "existing",
             }, actor="user:local"))
             transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
                 "name": source_name, "path": source_path, "version": 1, "base_version": 0,
@@ -971,7 +976,7 @@ class ProjectService:
                 transaction.append(_form_chosen(frozen_form))
             project = _default_settings(deepcopy(transaction.projection))
             return self._work_item_created(
-                transaction, project, goal, title=name, max_cycles=max_cycles,
+                transaction, project, goal_text or name, title=name, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
                 work_item_id=work_item_id, run_id=run_id, kind="onboarding",
@@ -1097,15 +1102,16 @@ class ProjectService:
 
         self.writes.transact(project_stream(project_id), rename, command=command)
 
-    def set_goal(self, project_id: str, goal: str, *, command: Command | None = None) -> None:
-        # 修改长期目标：写成项目流事件，之后开始的事项使用新目标，进行中的事项按 run_created 记下的开始时的目标做完
-        _require_text("goal", goal)
+    def set_goal(self, project_id: str, goal: str | None, *, command: Command | None = None) -> None:
+        # 修改长期目标：写成项目流事件，之后开始的事项使用新目标，进行中的事项按 run_created 记下的开始时的目标做完。
+        # 不写目标就是清空（工单 #1647）：事件照写，目标按空串记，之后的项目上下文里没有「长期目标」这一项
+        goal_text = _goal_text(goal)
 
         def set_goal(transaction: Transaction) -> None:
             self._writable_in(transaction, project_id)
-            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal_text, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_GOAL_CHANGED, {
-                "goal": goal, "goal_ref": asdict(goal_ref),
+                "goal": goal_text, "goal_ref": asdict(goal_ref),
             }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), set_goal, command=command)
@@ -2177,3 +2183,11 @@ def _mcp_settings_view(config: McpServersConfig) -> dict[str, Any]:
 def _require_text(name: str, value: Any) -> None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
+
+
+def _goal_text(goal: str | None) -> str:
+    # 长期目标可选（工单 #1647）：不写时按空串记，写了就照旧要求非空
+    if goal is None:
+        return ""
+    _require_text("goal", goal)
+    return goal

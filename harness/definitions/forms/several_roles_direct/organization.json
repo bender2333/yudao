@@ -24,6 +24,7 @@
     "onboarding": "engineering"
   },
   "routing": "direct",
+  "card_line": "工程做并交付，要求不清就问产品，没有人核验",
   "verification": {
     "verifiers": []
   },

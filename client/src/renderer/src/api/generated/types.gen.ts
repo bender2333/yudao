@@ -3192,6 +3192,16 @@ export type FlowRecord = {
 };
 
 /**
+ * FormCatalogResult
+ */
+export type FormCatalogResult = {
+    /**
+     * Forms
+     */
+    forms: Array<FormChoice>;
+};
+
+/**
  * FormChange
  */
 export type FormChange = {
@@ -3267,6 +3277,23 @@ export type FormChoice = {
      * Open Loop
      */
     open_loop: boolean;
+    /**
+     * Routing
+     */
+    routing: string;
+    /**
+     * Routing Label
+     */
+    routing_label: string;
+    /**
+     * Ending
+     */
+    ending: string;
+    /**
+     * Card Line
+     */
+    card_line: string;
+    organization: DraftOrganization;
 };
 
 /**
@@ -4830,7 +4857,7 @@ export type ProjectCreate = {
     /**
      * Goal
      */
-    goal: string;
+    goal?: string | null;
     /**
      * Initial Directory
      */
@@ -4924,7 +4951,7 @@ export type ProjectOnboard = {
     /**
      * Goal
      */
-    goal: string;
+    goal?: string | null;
     /**
      * Source Name
      */
@@ -5185,6 +5212,10 @@ export type ProjectRow = {
      * Waiting Resume Count
      */
     waiting_resume_count: number;
+    /**
+     * Department Count
+     */
+    department_count: number;
 };
 
 /**
@@ -5206,7 +5237,7 @@ export type ProjectSetGoal = {
     /**
      * Goal
      */
-    goal: string;
+    goal?: string | null;
 };
 
 /**
@@ -6458,6 +6489,17 @@ export type SnapshotExternalSourceEvidenceResult = {
      */
     position: number;
     data: ExternalSourceEvidenceResult;
+};
+
+/**
+ * Snapshot[FormCatalogResult]
+ */
+export type SnapshotFormCatalogResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: FormCatalogResult;
 };
 
 /**
@@ -23794,6 +23836,22 @@ export type QueryProjectOrganizationResponses = {
 };
 
 export type QueryProjectOrganizationResponse = QueryProjectOrganizationResponses[keyof QueryProjectOrganizationResponses];
+
+export type QueryFormsListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/queries/forms.list';
+};
+
+export type QueryFormsListResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotFormCatalogResult;
+};
+
+export type QueryFormsListResponse = QueryFormsListResponses[keyof QueryFormsListResponses];
 
 export type QueryOrganizationDraftData = {
     body?: never;
