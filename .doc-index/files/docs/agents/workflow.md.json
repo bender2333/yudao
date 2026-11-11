@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/agents/workflow.md",
-"hash":"bd0ae6c93fa81f38",
+"hash":"cdca2f368d0ab648",
 "nodes":[
-{"hash":"bd0ae6c93fa81f38","id":"docs/agents/workflow.md","kind":"file","title":"docs/agents/workflow.md"},
+{"hash":"cdca2f368d0ab648","id":"docs/agents/workflow.md","kind":"file","title":"docs/agents/workflow.md"},
 {"hash":"e08a7afc874769b7","id":"docs/agents/workflow.md#工作方式","kind":"section","parent":"docs/agents/workflow.md","title":"工作方式"},
 {"hash":"5b80fcba0f5b137a","id":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"1. 事实放在哪"},
 {"hash":"5e61efb082bdbd4d","id":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 意图：目的、判据、基础规则的意思；评价标准","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪","title":"意图：目的、判据、基础规则的意思；评价标准"},
@@ -61,7 +61,7 @@
 {"hash":"3ad5f664b1bac8f4","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 后台长运行重跑一次仍失败","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"后台长运行重跑一次仍失败"},
 {"hash":"d1ae63f92cfdf362","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 要放宽验收","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"要放宽验收"},
 {"hash":"de63e29217dbff90","id":"docs/agents/workflow.md#工作方式 > 8. 独立审查","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"8. 独立审查"},
-{"hash":"ed741be891bcedb5","id":"docs/agents/workflow.md#工作方式 > 9. 技能","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"9. 技能"},
+{"hash":"cba078312e3014c7","id":"docs/agents/workflow.md#工作方式 > 9. 技能","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"9. 技能"},
 {"hash":"5b26ae13ecc63ae5","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改意图：目的、判据、基础规则的意思（D38、基础规则）","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"改意图：目的、判据、基础规则的意思（D38、基础规则）"},
 {"hash":"7ee10a30b02a4390","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"改规则、CI 工作流"},
 {"hash":"0654733ce8c8971d","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 关闭试用工单与里程碑","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"关闭试用工单与里程碑"},
