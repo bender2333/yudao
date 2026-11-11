@@ -58,6 +58,8 @@ const PAGE_LABELS: Record<string, string> = {
   materials: "资料",
   observe: "观测",
   "observe-detail": "请求详情",
+  // 职能详情（工单 #1713）：从节点面板的「职能详情」进，路径上写职能名，见 pathLabel
+  "dept-detail": "职能详情",
   settings: "设置",
   recovery: "恢复",
   "sys-models": "模型管理",
@@ -79,7 +81,8 @@ export function pathLabel(route: Route, projects: { project_id: string; name: st
   if (route.name.startsWith("sys-")) {
     return PAGE_LABELS[route.name] ?? "系统";
   }
-  const page = route.name === "dept" ? departmentName(route.department) : PAGE_LABELS[route.name] ?? "这个页面";
+  const named = route.name === "dept" || route.name === "dept-detail";
+  const page = named ? departmentName(route.department) : PAGE_LABELS[route.name] ?? "这个页面";
   const project = projects.find((item) => item.project_id === route.projectId);
   const name = project?.name ?? route.projectId ?? "";
   return `${name} / ${page}`;
@@ -108,6 +111,13 @@ export function parseRoute(hash: string): Route {
     route.projectId = segments[1];
     // 事项范围：空值按没有范围处理（地址里不留空的 ?w=，工单 #746）
     route.workItemId = query.get("w") || null;
+    if (segments[2] === "dept-detail" && segments[3]) {
+      // 职能详情（工单 #1713）：#/p/{项目}/dept-detail/{职能}；事项范围写在参数 w 中，
+      // 关闭这一页时按它回到原来的事项
+      route.name = "dept-detail";
+      route.department = segments[3];
+      return route;
+    }
     if (segments[2] === "dept" && segments[3]) {
       route.name = "dept";
       route.department = segments[3];
@@ -209,6 +219,9 @@ export const paths = {
     `#/p/${projectId}/overview${scopeQuery(options.workItem)}`,
   dept: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/dept/${department}${scopeQuery(options.workItem)}`,
+  // 职能详情（工单 #1713）：从节点面板的「职能详情」进来，关闭时按 ?w= 回到原来的事项
+  departmentDetail: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
+    `#/p/${projectId}/dept-detail/${department}${scopeQuery(options.workItem)}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
   materials: (projectId: string, options: { workItem?: string | null; round?: number | null } = {}) => {
     const query = new URLSearchParams();
@@ -303,6 +316,13 @@ export function withScope(route: Route, workItemId: string | null, defaultDepart
       return department === ""
         ? paths.overview(projectId, { workItem: workItemId })
         : paths.dept(projectId, department, { workItem: workItemId });
+    }
+    case "dept-detail": {
+      // 职能详情（工单 #1713）跟着事项范围走：换范围留在同一个职能的这一页
+      const department = route.department ?? defaultDepartment;
+      return department === ""
+        ? paths.conversation(projectId, { workItem: workItemId })
+        : paths.departmentDetail(projectId, department, { workItem: workItemId });
     }
     case "materials":
       return paths.materials(projectId, { workItem: workItemId });
