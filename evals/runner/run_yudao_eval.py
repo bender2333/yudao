@@ -142,11 +142,12 @@ def score_deliveries(first_dir, final_dir, evidence_dir):
 def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds, limits, *,
              scenario=None, wait_prd_confirmation=False,
              onboarding_timeout_seconds=ONBOARDING_TIMEOUT_SECONDS,
-             prd_confirmation_timeout_seconds=PRD_CONFIRMATION_TIMEOUT_SECONDS):
+             prd_confirmation_timeout_seconds=PRD_CONFIRMATION_TIMEOUT_SECONDS, form=None):
     """运行一次 Yudao，评分并收好原始证据。
 
     提交号在启动服务之前记下：每次运行各带自己的提交号（docs/design/evaluation-scenarios.md「两边的运行条件」「运行环境」）。
     给出 `scenario` 时这次运行在它指定的场景下，结束后恢复原来的场景。
+    `form` 是发布带里的形态标识（工单 #1705）：不给时用发布的默认形态，建项目与建档的调用与以前一字不差。
     """
     context = yudao.scenario(scenario) if scenario is not None else contextlib.nullcontext()
     with context:
@@ -154,11 +155,19 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds, limits
             return _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds,
                                   limits, wait_prd_confirmation=wait_prd_confirmation,
                                   onboarding_timeout_seconds=onboarding_timeout_seconds,
-                                  prd_confirmation_timeout_seconds=prd_confirmation_timeout_seconds)
-        return _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, limits)
+                                  prd_confirmation_timeout_seconds=prd_confirmation_timeout_seconds,
+                                  form=form)
+        return _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, limits,
+                              form=form)
 
 
-def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, limits):
+def _form_arguments(form):
+    """形态只在给了的时候作为关键字传下去：不给时调用点的写法和以前一样（工单 #1705）。"""
+    return {} if form is None else {"form": form}
+
+
+def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, limits,
+                   form=None):
     """场景 3：新建项目、带入起始文件夹、提交需求原文加接口约定、等待结束。"""
     commit = yudao.yudao_commit()
     data_dir = yudao.data_dir_for(runs_root, run_id)
@@ -184,7 +193,8 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         served_model = admission.get("admitted_model") or model_name
         project_id = yudao.create_project(client, "评测 · 场景 3",
                                           "按需求原文与接口约定实现地铁换乘查询程序",
-                                          initial_directory=start_dir)
+                                          initial_directory=start_dir,
+                                          **_form_arguments(form))
         yudao.save_department_settings(client, project_id)
         work_item_id, run_id_yudao = yudao.submit_requirement(client, project_id,
                                                                yudao.requirement_text())
@@ -238,6 +248,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 
     return {
         "run_id": run_id,
+        "form": form,
         "yudao_run_id": export["run_id"],
         "yudao_commit": commit,
         "served_model": served_model,
@@ -260,7 +271,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 
 def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, limits, *,
                    wait_prd_confirmation, onboarding_timeout_seconds,
-                   prd_confirmation_timeout_seconds):
+                   prd_confirmation_timeout_seconds, form=None):
     """场景 2：接入已有仓库、确认初始 PRD、再新建事项提交需求原文（docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」、「前提与未决事项」）。
 
     建档与事项是两个 run：建档的用量与耗时单独导出、单独列出，不计入事项的指标；
@@ -296,7 +307,8 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         # 一、接入已有仓库并建档；确认初始 PRD 以后基线采纳，项目可以开始新的事项
         started_onboarding = time.monotonic()
         project_id, onboarding_item_id, onboarding_run_id = yudao.onboard_project(
-            client, "评测 · 场景 2", "在这个仓库上按需求原文加上新的功能", source_dir)
+            client, "评测 · 场景 2", "在这个仓库上按需求原文加上新的功能", source_dir,
+            **_form_arguments(form))
         try:
             decision = yudao.wait_for_initial_prd(client, project_id, onboarding_item_id,
                                                   onboarding_timeout_seconds)
@@ -352,6 +364,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         # 初始 PRD 没有被确认：不新建事项，也没有可以评分的交付；这次运行作废
         return {
             "run_id": run_id,
+            "form": form,
             "yudao_run_id": None,
             "yudao_commit": commit,
             "served_model": served_model,
@@ -392,6 +405,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 
     return {
         "run_id": run_id,
+        "form": form,
         "yudao_run_id": export["run_id"],
         "yudao_commit": commit,
         "served_model": served_model,
@@ -450,6 +464,11 @@ def parse_args(argv=None):
     parser.add_argument("--scenario", type=int, choices=(2, 3), default=3,
                         help="评测场景：3 从较长的 PRD 新建项目（默认），2 接入已有仓库")
     parser.add_argument("--runs", type=int, default=1, help="运行次数（每个场景每边 3 次）")
+    parser.add_argument("--form", default=None,
+                        help="用发布带里的哪一份形态建项目（取值是形态标识，例如 three_departments、"
+                             "single_role_direct、several_roles_direct）；不给时用默认形态。"
+                             "指定形态的运行在结果里标明形态、单独列出，不并入默认形态的次数，"
+                             "也不进与单个 agent 的对照")
     parser.add_argument("--limit-seconds", type=float, default=TIME_LIMIT_SECONDS,
                         help="单次运行的墙钟上限（场景 2 从新建事项开始计算）")
     parser.add_argument("--onboarding-timeout-seconds", type=float,
@@ -476,6 +495,9 @@ def main(argv=None):
     yudao.set_scenario("scenario-" + str(args.scenario))
     limits = model_service.model_limits(args.model, args.context_window, args.max_output_tokens)
     print("model capacity: " + model_service.describe(limits), flush=True)
+    if args.form is not None:
+        print("form: " + args.form + "（指定形态的运行：单独列出，不并入默认形态的次数，"
+              "也不进与单个 agent 的对照）", flush=True)
 
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO, "yudao")
 
@@ -484,10 +506,19 @@ def main(argv=None):
     for index in range(1, args.runs + 1):
         run_id = "%s-%d" % (args.run_id_prefix, index)
         print("running " + run_id + "...", flush=True)
-        run = run_once(run_id, args.runs_root, evidence_root, args.model, args.limit_seconds,
-                       limits, wait_prd_confirmation=args.wait_prd_confirmation,
-                       onboarding_timeout_seconds=args.onboarding_timeout_seconds,
-                       prd_confirmation_timeout_seconds=args.prd_confirmation_timeout_seconds)
+        try:
+            run = run_once(run_id, args.runs_root, evidence_root, args.model, args.limit_seconds,
+                           limits, wait_prd_confirmation=args.wait_prd_confirmation,
+                           onboarding_timeout_seconds=args.onboarding_timeout_seconds,
+                           prd_confirmation_timeout_seconds=args.prd_confirmation_timeout_seconds,
+                           form=args.form)
+        except yudao.YudaoRejected as rejected:
+            # 不认识的形态在开始工作以前就被服务拒绝，说明里列着可以选的形态（工单 #1705）
+            refusal = yudao.form_refusal(rejected)
+            if refusal is None:
+                raise
+            print("形态 " + str(args.form) + " 用不了：" + refusal, flush=True)
+            return 2
         runs.append(run)
         run_reports.append(yudao_report.run_section(run, run["score"]))
         completion = (" completion=%.4f" % run["score"]["completion"]) if run.get("score") else ""
@@ -503,6 +534,7 @@ def main(argv=None):
         model=runs[0]["served_model"],
         runs=runs,
         model_capacity=limits,
+        form=args.form,
         notes=[note for note in [empty_output_note(runs)] if note],
     )
     if args.result:

@@ -1863,3 +1863,254 @@ def test_the_report_lists_both_delivery_scores_and_the_qa_improvement():
     assert "| 完成度 | 0.6 |" in text
     assert "| 质检在时间上限以内给出结论 | 是 |" in text
     assert "提高 2 条" in text
+
+
+# ---------------------------------------------------------------------------
+# 指定形态（工单 #1705）：按参数带形态建项目；没有核验角色的形态只读两样
+# （docs/design/evaluation-scenarios.md「两边的运行条件」「形态」与「Yudao 的过程检查点」）
+
+# 发布带里的形态标识与这份形态的显示名（harness/runtime.py 的 FORM_REGISTRY、
+# harness/definitions/forms/single_role_direct/organization.json）
+FORM = "single_role_direct"
+UNKNOWN_FORM = "不存在的形态"
+FORM_LIST_TEXT = ("发布带里没有形态 " + UNKNOWN_FORM
+                  + "；可以选的形态是：three_departments、single_role_direct、several_roles_direct")
+OPEN_LOOP_NOT_APPLICABLE = "不适用：这份形态没有核验角色"
+OUTCOME = {"timed_out": False, "elapsed_seconds": 20.0, "hidden_failures": []}
+CHECKPOINT_KEYS = ("ended_within_limit", "quality_release_bound_to_delivery",
+                   "replay_consistent", "no_false_release", "release_coverage")
+
+
+class _RecordingClient:
+    """只记下发出的一条命令：核对 `create_project` 的请求体。"""
+
+    def __init__(self):
+        self.calls = []
+
+    def command(self, name, body):
+        self.calls.append((name, dict(body)))
+        return {"refs": {"project_id": "project-1"}}
+
+
+def _open_loop_export(stop_reason="open_loop"):
+    """没有核验角色的形态的导出：`run_created` 记着 open_loop，终端事件的停止原因是 open_loop。"""
+    created = {"type": "run_created",
+               "payload": {"open_loop": True, "definitions_version": "defs-1",
+                           "parameters_version": "params-1"}}
+    done = {"type": "run_done", "state_after": "done", "stop_reason": stop_reason,
+            "payload": {"stop_reason": stop_reason}}
+    return {"run_id": "yudao-run-1",
+            "projection": {"status": "done", "stop_reason": stop_reason},
+            "events": [created, done], "usage": {}}
+
+
+def _stub_form_run(monkeypatch, tmp_path, export, calls=None):
+    """同 `_stub_run_once`，另外把 `create_project` 换成收得下形态的那一个并记下收到什么。
+
+    建项目的调用点保持真实：`form` 只在给了形态时才作为关键字传下去（验收②）。
+    """
+    _stub_run_once(monkeypatch, tmp_path, export, calls)
+    recorded = {}
+
+    def create_project(client, name, goal, initial_directory=None, form=None):
+        recorded["form"] = form
+        recorded["initial_directory"] = initial_directory
+        return "project-1"
+
+    monkeypatch.setattr(yudao, "create_project", create_project)
+    return recorded
+
+
+def test_the_form_option_parses_and_defaults_to_no_form(runs_root):
+    """不带 `--form` 时没有形态（用发布的默认形态），给了就是发布带里的那个标识。"""
+    assert run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", runs_root]).form is None
+    parsed = run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", runs_root,
+                                        "--form", FORM])
+    assert parsed.form == FORM
+
+
+def test_the_project_create_command_is_unchanged_without_a_form():
+    """不带形态时 `project.create` 的请求体与原来一字不差（验收②）。"""
+    client = _RecordingClient()
+
+    project_id = yudao.create_project(client, "评测 · 场景 3", "按需求原文实现", "/runs/1/start")
+
+    assert project_id == "project-1"
+    assert client.calls == [("project.create", {"name": "评测 · 场景 3", "goal": "按需求原文实现",
+                                                "initial_directory": "/runs/1/start"})]
+
+
+def test_the_project_create_command_carries_the_form():
+    """给了形态时请求体多一个 `form`，取值就是参数里的那个标识。"""
+    client = _RecordingClient()
+
+    yudao.create_project(client, "评测 · 场景 3", "按需求原文实现", "/runs/1/start", form=FORM)
+
+    assert client.calls[0][1] == {"name": "评测 · 场景 3", "goal": "按需求原文实现",
+                                  "initial_directory": "/runs/1/start", "form": FORM}
+
+
+def test_an_unknown_form_stops_before_any_work(monkeypatch, tmp_path, runs_root, capsys):
+    """不认识的形态：服务拒绝，运行器写出服务给的形态清单并以 2 结束，不写结果文件（验收①）。"""
+    body = json.dumps({"command_id": "c-1", "reason": "not_allowed", "current_version": None,
+                       "message": FORM_LIST_TEXT}, ensure_ascii=False)
+
+    def run_once(*args, **kwargs):
+        raise yudao.YudaoRejected("project.create", 409, body)
+
+    monkeypatch.setattr(run_yudao_eval, "run_once", run_once)
+    monkeypatch.setattr(model_service, "model_limits",
+                        lambda model, context_window=None, max_output_tokens=None: dict(LIMITS))
+    monkeypatch.setattr(yudao_report, "default_evidence_dir", lambda: str(tmp_path / "evidence"))
+    result_path = str(tmp_path / "result.json")
+
+    code = run_yudao_eval.main(["--model", MODEL, "--form", UNKNOWN_FORM,
+                                "--runs-root", runs_root, "--result", result_path])
+
+    printed = capsys.readouterr().out
+    assert code == 2
+    assert UNKNOWN_FORM in printed
+    assert "可以选的形态是" in printed
+    for available in ("three_departments", "single_role_direct", "several_roles_direct"):
+        assert available in printed
+    assert not os.path.exists(result_path)
+
+
+def test_another_rejection_is_not_read_as_a_form_refusal():
+    """别的拒绝（不是形态）返回 None，运行器照常把它抛出去。"""
+    body = json.dumps({"command_id": "c-1", "reason": "source_invalid", "message": "目录不存在"},
+                      ensure_ascii=False)
+    assert yudao.form_refusal(yudao.YudaoRejected("project.create", 409, body)) is None
+    assert yudao.form_refusal(yudao.YudaoRejected("project.create", 409, "not json")) is None
+    assert yudao.form_refusal(
+        yudao.YudaoRejected("project.create", 409,
+                            json.dumps({"reason": "not_allowed", "message": FORM_LIST_TEXT},
+                                       ensure_ascii=False))) == FORM_LIST_TEXT
+
+
+def test_a_form_run_creates_the_project_with_that_form(monkeypatch, tmp_path, runs_root):
+    """带形态跑一次：`project.create` 收到这份形态，这一次运行的结果里记着它（验收③）。"""
+    recorded = _stub_form_run(monkeypatch, tmp_path, _open_loop_export())
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS, form=FORM)
+
+    assert run["form"] == FORM
+    assert recorded["form"] == FORM
+
+
+def test_a_run_without_a_form_still_creates_the_project_without_the_keyword(monkeypatch, tmp_path,
+                                                                           runs_root):
+    """不带形态的运行：建项目的调用点不出现 `form` 关键字，结果里 `form` 为空（验收②）。"""
+    recorded = _stub_form_run(monkeypatch, tmp_path, _export())
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS)
+
+    assert run["form"] is None
+    assert recorded["form"] is None
+
+
+def test_the_result_of_a_form_run_names_the_form_and_the_open_loop_end(monkeypatch, tmp_path,
+                                                                      runs_root):
+    """带「工程」跑一次的假服务：结果写明形态，开环完成时结果里不出现放行（验收③）。"""
+    recorded = _stub_form_run(monkeypatch, tmp_path, _open_loop_export())
+    monkeypatch.setattr(model_service, "model_limits",
+                        lambda model, context_window=None, max_output_tokens=None: dict(LIMITS))
+    monkeypatch.setattr(yudao_report, "default_evidence_dir", lambda: str(tmp_path / "evidence"))
+    result_path = str(tmp_path / "result.json")
+
+    code = run_yudao_eval.main(["--model", MODEL, "--form", FORM, "--runs-root", runs_root,
+                                "--result", result_path])
+
+    assert code == 0
+    assert recorded["form"] == FORM
+    with open(result_path, encoding="utf-8") as handle:
+        result = json.load(handle)
+    assert result["form"] == FORM
+    assert result["counts_toward_default"] is False
+    run = result["runs"][0]
+    assert run["form"] == FORM
+    assert run["metrics"]["end_status"] == "ended"
+    assert run["metrics"]["end_reason"] == "open_loop"
+    assert run["metrics"]["open_loop_readings"]["recorded_as_release"] is False
+    assert run["metrics"]["checkpoints"]["ended_within_limit"]["passed"] is None
+
+
+def test_an_open_loop_form_marks_the_five_checkpoints_not_applicable():
+    """没有核验角色的形态：五项都写「不适用」，只读两样（验收⑤）。"""
+    collected = yudao_metrics.collect(_open_loop_export(), OUTCOME)
+
+    assert set(collected["checkpoints"]) == set(CHECKPOINT_KEYS)
+    for checkpoint in collected["checkpoints"].values():
+        assert checkpoint["passed"] is None
+        assert checkpoint["applicable"] is False
+        assert checkpoint["detail"] == OPEN_LOOP_NOT_APPLICABLE
+    assert collected["end_status"] == "ended"
+    assert collected["end_reason"] == "open_loop"
+    readings = collected["open_loop_readings"]
+    assert readings["ended_open_loop"] is True
+    assert readings["recorded_as_release"] is False
+    assert readings["passed"] is True
+
+
+def test_a_run_recorded_as_released_on_an_open_loop_form_fails_the_reading():
+    """记录上写成放行算没过：这份形态没有核验角色，不该有放行。"""
+    collected = yudao_metrics.collect(_open_loop_export("released"), OUTCOME)
+
+    readings = collected["open_loop_readings"]
+    assert readings["recorded_as_release"] is True
+    assert readings["passed"] is False
+    assert "放行" in readings["detail"]
+
+
+def test_the_default_form_keeps_the_five_checkpoints_as_before():
+    """默认形态的五项检查点照旧逐项判定，不写不适用（验收⑤）。"""
+    collected = yudao_metrics.collect(_export(), OUTCOME)
+
+    assert collected["open_loop"] is False
+    assert collected["open_loop_readings"] is None
+    assert set(collected["checkpoints"]) == set(CHECKPOINT_KEYS)
+    for checkpoint in collected["checkpoints"].values():
+        assert checkpoint.get("applicable") is not False
+
+
+def test_the_report_lists_a_form_run_apart_from_the_default_form(tmp_path):
+    """报告里有形态一行与「单独列出」那句，开环的五项写「不适用」（验收④⑤）。"""
+    metrics = yudao_metrics.collect(_open_loop_export(), OUTCOME)
+    run = _run(metrics=metrics, form=FORM)
+
+    result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                       [run], form=FORM)
+    assert result["form"] == FORM
+    assert result["counts_toward_default"] is False
+
+    path = str(tmp_path / "form.md")
+    yudao_report.write_report(result, path, [yudao_report.run_section(run, run["score"])])
+    text = open(path, encoding="utf-8").read()
+    assert "| 形态 | " + FORM in text
+    assert "不并入默认形态的次数" in text
+    assert OPEN_LOOP_NOT_APPLICABLE in text
+    assert "只读两样" in text
+    # 开环完成的运行不写成放行：结束原因与停止原因都写「开环完成」（验收③⑤）
+    assert "| 结束原因 | 开环完成 |" in text
+    assert "| 停止原因 | 开环完成 |" in text
+    assert "| 停止原因 | open_loop |" not in text
+
+
+def test_a_form_run_stays_out_of_the_single_agent_comparison():
+    """指定形态的运行不进与单个 agent 的对照：结论「受阻」并写明原因（验收④）。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1", false_release=False)]
+    yudao_result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                             runs, form=FORM)
+    opencode = _opencode_side([_opencode_run("oc-1")])
+
+    comparison = yudao_compare.compare_sides(yudao_result, opencode)
+
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert FORM in comparison["block_reason"]
+    assert "不进与单个 agent 的对照" in comparison["block_reason"]
+    assert comparison["pairs"] == []
