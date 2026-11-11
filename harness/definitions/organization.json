@@ -25,6 +25,7 @@
     "onboarding": "product"
   },
   "routing": "watched_outputs",
+  "card_line": "产品写需求、工程做、质检核验，放行才算完成",
   "verification": {
     "verifiers": [
       {

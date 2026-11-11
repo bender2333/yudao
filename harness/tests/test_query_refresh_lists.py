@@ -5,9 +5,12 @@
 # 一个新的事件存储，每写一条调用一次全部已登记的查询；某条事件改变了一个查询的结果，而它的种类既不在刷新
 # 清单里也不在不刷新清单里，用例失败。失败信息写明查询、事件种类、事件位置与变化的字段。
 #
-# 场景分两部分：一个项目里完整的三部门循环（询问、缺陷返工、指导、决定请求与回答、采纳），
-# 以及一段项目命令（改名、置顶、保存部门设置、登记源目录）。假模型脚本按部门给出（工单 #877）。
+# 场景分三部分：一个项目里完整的三部门循环（询问、缺陷返工、指导、决定请求与回答、采纳），
+# 一段项目命令（改名、置顶、保存部门设置、登记源目录），以及一次形态采用（工单 #1647：
+# 项目列表里的职能数与组织版本跟着形态改动变，所以项目流的这一种事件也要进重放核对）。
+# 假模型脚本按部门给出（工单 #877）。
 
+import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -19,8 +22,10 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.catalog_queries import ChangeImpactRequest
+from harness.app.contracts import Accepted
 from harness.app.decision_queries import DecisionsList
 from harness.app.evidence_queries import ScreenshotEvidence
+from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import ProjectOrganization
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
@@ -35,11 +40,12 @@ from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import LiveAttemptRequest, SystemStatusRequest
 from harness.app.tools_queries import TOOLS_REGISTRY
 from harness.app.trial_queries import RunTrials
+from harness.definitions import DEFAULT_FORM
 from harness.event_store import Command, EventStore, catalog_stream, run_stream
 from harness.models import EventType, json_dumps
 from harness.projection import dump_decision, replay_decisions, saved_decisions
 from harness.project_projection import catalog_handler, handler_for
-from harness.projects import project_projection
+from harness.projects import project_definitions, project_projection
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
@@ -97,7 +103,7 @@ def _answer_decision(system: LoopSystem, run_id: str) -> None:
 
 
 def _scenario(data_dir: Path) -> tuple[LoopSystem, str, str, str]:
-    # 跑出场景：一个项目里完整的三部门循环与一段项目命令。返回系统与项目、事项、run 的身份
+    # 跑出场景：一个项目里完整的三部门循环、一段项目命令与一次形态采用。返回系统与项目、事项、run 的身份
     system = LoopSystem.for_testing(data_dir, FakeAdapter(_script()))
     project_id = system.projects.register("重放核对项目", GOAL)
     work_item_id, run_id = system.projects.start_work_item(project_id, "完成一个事项")
@@ -114,6 +120,16 @@ def _scenario(data_dir: Path) -> tuple[LoopSystem, str, str, str]:
     system.projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt="交付前先说明输出边界。"), 0)
     system.projects.configure_source_directory(project_id, "主仓库", str(data_dir / "source"), base_version=0)
+    # 第三部分：形态采用（工单 #1647）：再选一次默认形态，改动为空；项目流的版本随之加一，
+    # 项目列表里的职能数按这一份组织读，所以这一次事件必须出现在读项目流版本的查询的刷新清单里
+    application = Application(system)
+    organization = application.query("project.organization", ProjectOrganization(project_id=project_id)).data
+    adopted = asyncio.run(application.command(
+        "organization.adopt",
+        OrganizationAdopt(command_id=str(uuid.uuid4()), project_id=project_id, form=DEFAULT_FORM,
+                          base_version=organization.version),
+        actor="user:local"))
+    assert isinstance(adopted, Accepted), adopted
     return system, project_id, work_item_id, run_id
 
 
@@ -157,13 +173,19 @@ class _Scope:
 
 class _ReplayProjects:
     # 重放核对期间的项目读取：只从新的事件存储读（源系统的项目服务读的是源事件存储）
-    def __init__(self, store: EventStore, artifacts: Any) -> None:
+    def __init__(self, store: EventStore, artifacts: Any, forms: Any) -> None:
         self.store = store
         self.artifacts = artifacts
+        self.forms = forms
 
     def list_projects(self, *, include_archived: bool = False) -> list[Any]:
         return [project_projection(self.store, self.artifacts, project_id, include_history=False)
                 for project_id in self.store.list_project_ids()]
+
+    def current_definitions(self, project_id: str) -> Any:
+        # 项目现在的组织（工单 #1701）：职能设置的查询按它列职能，形态与改动都从重放的那份存储读
+        state = project_projection(self.store, self.artifacts, project_id, include_history=False)
+        return project_definitions(self.store, state, self.forms)
 
 
 class _ReplayCore:
@@ -198,7 +220,8 @@ class _ReplayCore:
 
     @property
     def projects(self) -> _ReplayProjects:
-        return _ReplayProjects(self.store, self.artifacts)
+        return _ReplayProjects(self.store, self.artifacts,
+                               {name: form.definitions for name, form in self._source.forms.items()})
 
     def provider_status(self) -> dict[str, Any]:
         return self._source.provider_status()
@@ -433,7 +456,7 @@ def test_the_scenario_covers_the_asked_for_behaviours(data_dir):
             EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
             EventType.DEPARTMENT_GUIDANCE_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RESPONDED} <= types
     assert {"project_renamed", "project_pinned", "department_prompt_configured",
-            "source_directory_configured", "deliverable_adopted"} <= project_types
+            "source_directory_configured", "deliverable_adopted", "project_form_set"} <= project_types
 
 
 def test_the_registry_checks_the_unchanged_list():

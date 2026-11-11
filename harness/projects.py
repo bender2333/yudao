@@ -9,13 +9,13 @@ import re
 from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from .artifacts import ArtifactStore
 from .definitions import (
     DEFAULT_FORM, DEFINITIONS, ITEM_SOURCES, Definitions, definitions_from_contents, parse_organization_changes,
 )
-from .organization_compose import compose_checked
+from .organization_compose import compose_checked, current_organization
 from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .kernel_events import canonical_hash
@@ -417,21 +417,23 @@ def mcp_document_digest(document: dict[str, Any]) -> str:
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
-                       include_history: bool = True, through: int | None = None) -> ProjectProjection:
+                       include_history: bool = True, through: int | None = None,
+                       definitions: Any | None = None) -> ProjectProjection:
     # 项目的读取模型：保存的项目投影，加上没有配置过的部门的默认 Prompt，以及由所属 run 的投影派生的事项状态。
     # include_history 为假时不再读取所属 run 的事件历史（交接与返工记录）：应用层的查询用读取模型提供它们。
     # through 给出全局位置的上界时按位置读取：项目与所属 run 的投影都从事件重放到该位置（工单 #127）
+    # definitions 是项目现在的组织（工单 #1701）：默认 Prompt 与有哪几个部门按它填；不给时按进程加载的定义
     state = saved_project(store, project_id) if through is None else replay_project(store, project_id, through=through)
     if state is None:
         raise ProjectNotFoundError(project_id)
-    return _compose(store, state, include_history=include_history, through=through)
+    return _compose(store, state, include_history=include_history, through=through, definitions=definitions)
 
 
 def _compose(store: EventStore, state: ProjectProjection, *, include_history: bool = True,
-             through: int | None = None) -> ProjectProjection:
+             through: int | None = None, definitions: Any | None = None) -> ProjectProjection:
     # 在给出的项目投影上补齐默认 Prompt 与事项状态
     project_id = state.project_id
-    _default_settings(state)
+    _default_settings(state, definitions)
     adopted = {item.run_id: item for item in state.adoptions}
     held = {item.run_id: item for item in state.held}
     awaiting, withdrawn = _initial_prd_requests(store, state.project_id, through)
@@ -505,15 +507,29 @@ def _initial_prd_requests(store: EventStore, project_id: str, through: int | Non
 
 
 
+def project_definitions(store: EventStore, state: ProjectProjection, forms: Mapping[str, Any]) -> Any:
+    # 项目现在的组织（工单 #1701，设计说明「冻结与升级」）：形态加本项目的组织改动（加或去掉核验角色）合成
+    # 出来的那一份。形态不在这一版发布里、改动合不到一起时按进程加载的那一份——项目一级的读取不该因此挡住
+    # 页面，写命令仍由应用层核对
+    composed, _issues = current_organization(forms, state.form_name, state.organization_changes, store=store)
+    return DEFINITIONS if composed is None else composed
+
+
 def _default_settings(state: ProjectProjection, definitions: Any | None = None) -> ProjectProjection:
-    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认。
-    # 部门清单与默认 Prompt 按项目现在的形态取（工单 #1509）：换一份把部门改了名的形态，默认 Prompt 也取
-    # 那一份的；没有交时按进程加载的定义
+    # 没有配置过的部门使用这份组织的默认 Prompt（版本 0），模型与请求档位都跟随部门默认。
+    # 部门清单与默认 Prompt 按项目现在的组织取（工单 #1509、#1701）：换一份把部门改了名的形态、或者采用时
+    # 加了一个核验角色，默认 Prompt 都取合成后那一份的；只写了模型或档位、没写职能 Prompt 的设置同样显示
+    # 这份组织里的默认 Prompt。没有交时按进程加载的定义
     definition = DEFINITIONS if definitions is None else definitions
     for department in definition.departments:
-        state.department_settings.setdefault(department, DepartmentSetting(
-            department=department, version=0, text=definition.role(department).prompt, source="default",
-        ))
+        prompt = definition.role(department).prompt
+        current = state.department_settings.get(department)
+        if current is None:
+            state.department_settings[department] = DepartmentSetting(
+                department=department, version=0, text=prompt, source="default",
+            )
+        elif not current.configured_prompt:
+            current.text = prompt
     return state
 
 
@@ -726,9 +742,12 @@ def project_context_text(project: ProjectProjection, title: str,
         adopted = "\n".join(adopted_lines)
     else:
         adopted = "已采纳事项：无"
+    # 长期目标可选（工单 #1647，项目的组织设计说明「形态一键选用」）：没有写时项目上下文里没有这一项，
+    # 其余各行与写了时一样，连顺序也不变
+    goal_lines = [] if not project.goal else [f"长期目标：{project.goal}"]
     return "\n".join([
         f"项目：{project.name}",
-        f"长期目标：{project.goal}",
+        *goal_lines,
         f"当前采用成果：{current}",
         adopted,
         _effective_decisions_section(adoption, source_run),
@@ -833,7 +852,11 @@ class ProjectService:
     # 读
 
     def projection(self, project_id: str) -> ProjectProjection:
-        return project_projection(self.store, self.artifacts, project_id)
+        # 默认 Prompt 按项目现在的组织填（工单 #1701）：换过形态或加过核验角色的项目读到的是这份组织的
+        state = saved_project(self.store, project_id)
+        if state is None:
+            raise ProjectNotFoundError(project_id)
+        return _compose(self.store, state, definitions=self._form_definitions(state))
 
     def list_projects(self, *, include_archived: bool = False) -> list[ProjectProjection]:
         projects = [project_projection(self.store, self.artifacts, project_id, include_history=False)
@@ -846,13 +869,23 @@ class ProjectService:
         return projects
 
     def _form_definitions(self, project: ProjectProjection) -> Any:
-        # 项目现在的形态那一份定义（工单 #1509）：项目一级按部门名核对的读与写都按它取。
-        # 记下的形态不在这个发布里时按进程加载的那一份（事项那边不换一份顶替、停在原处；
-        # 项目一级的读取不该因此挡住页面，写命令仍由 app 层核对）
-        try:
-            return self.orchestrator.form_named(project.form_name).definitions
-        except ValueError:
-            return DEFINITIONS
+        # 项目现在的组织（工单 #1509、#1701）：项目一级按部门名核对的读与写、项目职能设置的职能清单与默认
+        # Prompt 都按它取——形态加本项目的改动（加或去掉核验角色）合成出来的那一份
+        return project_definitions(self.store, project, self._project_forms())
+
+    def _project_forms(self) -> dict[str, Any]:
+        # 这一版发布里的形态（工单 #1701）：合成项目现在的组织时按名字取形态。没有控制核心时按空的一份，
+        # 合成退回进程加载的定义（写回、回放核对这类只用项目服务读写的场景）
+        forms = getattr(self.orchestrator, "forms", None) or {}
+        return {name: form.definitions for name, form in forms.items()}
+
+    def current_definitions(self, project_id: str) -> Any:
+        # 项目现在的组织（工单 #1701）：应用层的读取与核对按它列职能、取默认 Prompt，拒绝时按它列出可用的
+        # 职能。没有这个项目时抛出，由调用方收成拒绝
+        state = saved_project(self.store, project_id)
+        if state is None:
+            raise ProjectNotFoundError(project_id)
+        return self._form_definitions(state)
 
     def read_department_setting(self, project_id: str, department: str) -> dict[str, Any]:
         state = self.projection(project_id)
@@ -860,7 +893,7 @@ class ProjectService:
         if department not in definitions.departments:
             raise ValueError("unknown department")
         _default_settings(state, definitions)
-        return _setting_view(state.department_settings[department])
+        return _setting_view(state.department_settings[department], definitions)
 
     def read_projection_setting(self, project_id: str, department: str) -> DepartmentSetting | None:
         # 运行层每次请求读取的当前设置：直接取保存的项目投影，不拼接事项状态（避免每次请求重算全部事项）。
@@ -877,7 +910,7 @@ class ProjectService:
 
     # 项目登记与状态
 
-    def register(self, name: str, goal: str, *, source: str = "idea",
+    def register(self, name: str, goal: str | None, *, source: str = "idea",
                  initial_directory: str | None = None, form: str | None = None,
                  command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
@@ -886,9 +919,10 @@ class ProjectService:
         # 在事务之前与 project.onboard 相同的采集路径只读采集公开树，采集失败时命令被拒绝，
         # 不建立项目，不写入任何事件。采集的快照所属范围是项目（与 project_goal 工件相同），不属于任何 run。
         # form 是新建项目时选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：它就是项目现在的
-        # 组织，写成一条形态改动（原值是默认形态）；不给时项目跟随发布的默认形态
+        # 组织，写成一条形态改动（原值是默认形态）；不给时项目跟随发布的默认形态。
+        # goal 可选（工单 #1647）：不写时按空串记，项目上下文里没有「长期目标」这一项
         _require_text("name", name)
-        _require_text("goal", goal)
+        goal_text = _goal_text(goal)
         frozen_form = None if form is None else self.orchestrator.form_named(form)
         project_id = new_id("proj")
         snapshot = None
@@ -896,9 +930,9 @@ class ProjectService:
             _tree, snapshot = ingest_snapshot(initial_directory, self.artifacts, project_id)
 
         def register(transaction: Transaction) -> None:
-            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal_text, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": source,
+                "name": name, "goal": goal_text, "goal_ref": asdict(goal_ref), "source": source,
                 **({} if snapshot is None else {"initial_snapshot": snapshot}),
             }, actor="user:local"))
             if frozen_form is not None:
@@ -907,7 +941,7 @@ class ProjectService:
         self.writes.transact(project_stream(project_id), register, expected_version=0, command=command)
         return project_id
 
-    def onboard(self, name: str, goal: str, source_name: str, source_path: str, *,
+    def onboard(self, name: str, goal: str | None, source_name: str, source_path: str, *,
                max_cycles: int | None = None,
                run_time_limit_sec: int | None = None,
                 context_window: int = 32_000, form: str | None = None,
@@ -917,9 +951,10 @@ class ProjectService:
         # 快照在事务之前采集：采集失败时命令被拒绝，不建立项目，不写入任何事件。
         # 调用方（应用层）先采集快照并把错误转成 source_invalid。
         # form 是接入时选的一张形态卡（工单 #1517，项目的组织设计说明「新建的入口」）：与新建项目同一做法，
-        # 写成一条形态改动，建档事项按它冻结
+        # 写成一条形态改动，建档事项按它冻结。
+        # goal 可选（工单 #1647）：不写时项目上下文里没有「长期目标」这一项，建档事项的输入用项目名
         _require_text("name", name)
-        _require_text("goal", goal)
+        goal_text = _goal_text(goal)
         _require_text("source_name", source_name)
         _require_text("source_path", source_path)
         frozen_form = None if form is None else self.orchestrator.form_named(form)
@@ -930,9 +965,9 @@ class ProjectService:
         tree, snapshot = ingest_snapshot(source_path, self.artifacts, run_id)
 
         def onboard(transaction: Transaction) -> _NewWorkItem | None:
-            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal_text, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_REGISTERED, {
-                "name": name, "goal": goal, "goal_ref": asdict(goal_ref), "source": "existing",
+                "name": name, "goal": goal_text, "goal_ref": asdict(goal_ref), "source": "existing",
             }, actor="user:local"))
             transaction.append(NewProjectEvent(ProjectEventType.SOURCE_DIRECTORY_CONFIGURED, {
                 "name": source_name, "path": source_path, "version": 1, "base_version": 0,
@@ -941,7 +976,7 @@ class ProjectService:
                 transaction.append(_form_chosen(frozen_form))
             project = _default_settings(deepcopy(transaction.projection))
             return self._work_item_created(
-                transaction, project, goal, title=name, max_cycles=max_cycles,
+                transaction, project, goal_text or name, title=name, max_cycles=max_cycles,
                 run_time_limit_sec=run_time_limit_sec, context_window=context_window,
                 baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
                 work_item_id=work_item_id, run_id=run_id, kind="onboarding",
@@ -1067,15 +1102,16 @@ class ProjectService:
 
         self.writes.transact(project_stream(project_id), rename, command=command)
 
-    def set_goal(self, project_id: str, goal: str, *, command: Command | None = None) -> None:
-        # 修改长期目标：写成项目流事件，之后开始的事项使用新目标，进行中的事项按 run_created 记下的开始时的目标做完
-        _require_text("goal", goal)
+    def set_goal(self, project_id: str, goal: str | None, *, command: Command | None = None) -> None:
+        # 修改长期目标：写成项目流事件，之后开始的事项使用新目标，进行中的事项按 run_created 记下的开始时的目标做完。
+        # 不写目标就是清空（工单 #1647）：事件照写，目标按空串记，之后的项目上下文里没有「长期目标」这一项
+        goal_text = _goal_text(goal)
 
         def set_goal(transaction: Transaction) -> None:
             self._writable_in(transaction, project_id)
-            goal_ref = self.artifacts.put(project_id, "project_goal", goal, media_type="text/markdown")
+            goal_ref = self.artifacts.put(project_id, "project_goal", goal_text, media_type="text/markdown")
             transaction.append(NewProjectEvent(ProjectEventType.PROJECT_GOAL_CHANGED, {
-                "goal": goal, "goal_ref": asdict(goal_ref),
+                "goal": goal_text, "goal_ref": asdict(goal_ref),
             }, actor="user:local"))
 
         self.writes.transact(project_stream(project_id), set_goal, command=command)
@@ -1873,13 +1909,13 @@ class ProjectService:
             current = _default_settings(
                 deepcopy(self._writable_in(transaction, project_id)), definitions).department_settings[department]
             if base_version != current.version:
-                raise DepartmentSettingConflict(_setting_view(current))
+                raise DepartmentSettingConflict(_setting_view(current, definitions))
             unchanged = (current.provider_id == selection.provider_id
                          and current.model_id == selection.model_id
                          and current.requested_tier == selection.requested_tier
                          and _current_prompt(current) == selection.department_prompt)
             if unchanged:
-                return {**_setting_view(current), "unchanged": True}
+                return {**_setting_view(current, definitions), "unchanged": True}
             payload = selection.event_payload()
             if selection.department_prompt is not None:
                 ref = save_department_prompt(self.artifacts, project_id, department,
@@ -2100,11 +2136,16 @@ def _current_prompt(setting: DepartmentSetting) -> str | None:
     # 项目部门设置中写入的部门 Prompt；没有写入时为 None，读取模型补成内置默认 Prompt
     return setting.text if setting.configured_prompt else None
 
-def _setting_view(setting: DepartmentSetting) -> dict[str, Any]:
+def _setting_view(setting: DepartmentSetting, definitions: Any | None = None) -> dict[str, Any]:
+    # 默认 Prompt 按项目现在的组织取（工单 #1701）：只写了模型或档位、没写职能 Prompt 时，显示与生效的
+    # 都是这份组织里那个职能的那一份；这份组织里没有这个职能时照保存的内容
+    definition = DEFINITIONS if definitions is None else definitions
+    default_text = (definition.role(setting.department).prompt
+                    if setting.department in definition.departments else setting.text)
     return {
         "department": setting.department,
-        "text": setting.text,
-        "default_text": DEFINITIONS.role(setting.department).prompt,
+        "text": setting.text if setting.configured_prompt else default_text,
+        "default_text": default_text,
         "department_setting_configured": setting.configured_prompt,
         "provider_id": setting.provider_id,
         "model_id": setting.model_id,
@@ -2142,3 +2183,11 @@ def _mcp_settings_view(config: McpServersConfig) -> dict[str, Any]:
 def _require_text(name: str, value: Any) -> None:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
+
+
+def _goal_text(goal: str | None) -> str:
+    # 长期目标可选（工单 #1647）：不写时按空串记，写了就照旧要求非空
+    if goal is None:
+        return ""
+    _require_text("goal", goal)
+    return goal

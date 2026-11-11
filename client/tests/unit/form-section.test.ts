@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
+  DraftOrganization,
   FormChange,
   FormChoice,
   ProjectOrganizationResult,
@@ -33,6 +34,22 @@ const THREE = "three_departments";
 const SINGLE = "single_role";
 
 // 发布带的一份形态：字段与生成的 FormChoice 合同一致
+// 工单 #1647 给 FormChoice 加了五样（轮转、结束方式、卡上的一句话与合成结果），这一节只读形态名、
+// 一句说明与核验角色，其余按默认形态写一份占位
+function draft(overrides: Partial<DraftOrganization> = {}): DraftOrganization {
+  return {
+    version: "sha256:three",
+    form: THREE,
+    routing: "watched_outputs",
+    routing_label: "成果驱动",
+    departments: [],
+    outcome_kinds: [],
+    verification: [],
+    sources: {},
+    ...overrides,
+  };
+}
+
 function choice(overrides: Partial<FormChoice> = {}): FormChoice {
   return {
     form: THREE,
@@ -41,6 +58,11 @@ function choice(overrides: Partial<FormChoice> = {}): FormChoice {
     version: "sha256:three",
     verifier_roles: ["quality"],
     open_loop: false,
+    routing: "watched_outputs",
+    routing_label: "成果驱动",
+    ending: "独立核验放行",
+    card_line: "产品写需求、工程做、质检核验，放行才算完成",
+    organization: draft(),
     ...overrides,
   };
 }

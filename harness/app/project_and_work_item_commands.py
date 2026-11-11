@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..event_store import Command
 from ..definitions import DEFINITIONS, Definitions
@@ -64,9 +64,11 @@ async def _rename_project(application: "Application", command: Command, request:
 
 
 class ProjectSetGoal(CommandRequest):
+    # 长期目标可以清空（工单 #1647，项目的组织设计说明「形态一键选用」）：不写 goal 就是清掉它，
+    # 清掉以后项目上下文里没有这一项，写了的照旧
     base_version: int
     project_id: str
-    goal: Text
+    goal: Text | None = None
 
 
 async def _set_project_goal(application: "Application", command: Command, request: ProjectSetGoal) -> None:
@@ -126,11 +128,31 @@ async def _restore_project(application: "Application", command: Command, request
 # ---------------------------------------------------------------------------
 # 记录原文（新建类：不核对基准版本）
 
-def _unknown_department(department: str) -> Rejection:
-    # 部门的名字由定义给出（工单 #1389，设计说明「形态随事项冻结」）：定义里没有这个名字时照旧拒绝，
-    # 错误里写出这份定义可用的部门，提交的人不必再去别处找。中文名给提交的人看，编号给提交的命令用
-    available = "、".join(f"{DEFINITIONS.department_labels.get(name, name)}（{name}）" for name in DEPARTMENTS)
+def _unknown_department(department: str, definitions: Any) -> Rejection:
+    # 部门的名字由定义给出（工单 #1389、#1701，形态与核验角色设计说明「形态随事项冻结」）：这份组织里没有
+    # 这个名字时照旧拒绝，错误里写出这份组织可用的部门，提交的人不必再去别处找。中文名给提交的人看，编号
+    # 给提交的命令用
+    available = "、".join(f"{definitions.department_labels.get(name, name)}（{name}）"
+                          for name in definitions.departments)
     return Rejection("not_allowed", f"部门不存在：{department}；可用的部门：{available}")
+
+
+def _project_definitions(application: "Application", project_id: str) -> Any:
+    # 项目现在的组织（工单 #1701）：项目一级的核对与拒绝说明按它列职能。项目取不到时按进程加载的定义，
+    # 由后面的读写给出 not_found（工单 #1389 的先后不变）
+    try:
+        return application.system.projects.current_definitions(project_id)
+    except ProjectNotFoundError:
+        return DEFINITIONS
+
+
+def _item_definitions(application: "Application", run_id: str) -> Any:
+    # 事项冻结的组织（工单 #1701）：指导的接收方按它核对，项目后来换了形态也不影响进行中的事项。那份形态
+    # 不在这个发布里时按进程加载的定义，由 _require_item_form 给出 not_allowed
+    try:
+        return application.system.orchestrator.item_form(run_id).definitions
+    except (ValueError, RunNotFoundError):
+        return DEFINITIONS
 
 
 class MaterialRecord(CommandRequest):
@@ -140,13 +162,17 @@ class MaterialRecord(CommandRequest):
     department: str | None = None
 
 
-def _material_department(request: MaterialRecord) -> None:
-    if request.department is not None and request.department not in DEPARTMENTS:
-        raise _unknown_department(request.department)
+def _material_department(application: "Application", request: MaterialRecord) -> None:
+    # 记录原文的职能按项目现在的组织核对（工单 #1701）：组织外的不写事件
+    if request.department is None:
+        return
+    definitions = _project_definitions(application, request.project_id)
+    if request.department not in definitions.departments:
+        raise _unknown_department(request.department, definitions)
 
 
 async def _record_material(application: "Application", command: Command, request: MaterialRecord) -> None:
-    _material_department(request)
+    _material_department(application, request)
     try:
         application.system.projects.record_material(
             request.project_id, request.text, department=request.department, command=command)
@@ -349,14 +375,27 @@ class GuidanceSend(CommandRequest):
     text: Text
 
 
-def _guidance_department(request: GuidanceSend) -> None:
-    if request.department not in DEPARTMENTS:
-        raise _unknown_department(request.department)
+def _guidance_run_id(application: "Application", work_item_id: str) -> str | None:
+    # 事项不在时为空（工单 #1389）：先按定义核对部门名，再把 not_found 交回去，拒绝的先后不变
+    try:
+        return _run_id_for(application, work_item_id)
+    except Rejection:
+        return None
+
+
+def _guidance_department(application: "Application", run_id: str | None, request: GuidanceSend) -> None:
+    # 指导的接收方按事项冻结的组织核对（工单 #1701，设计说明「形态随事项冻结」）：项目后来换了形态，
+    # 进行中的事项仍按它开始时那两份形态收指导
+    definitions = DEFINITIONS if run_id is None else _item_definitions(application, run_id)
+    if request.department not in definitions.departments:
+        raise _unknown_department(request.department, definitions)
 
 
 async def _send_guidance(application: "Application", command: Command, request: GuidanceSend) -> None:
-    _guidance_department(request)
-    run_id = _run_id_for(application, request.work_item_id)
+    run_id = _guidance_run_id(application, request.work_item_id)
+    _guidance_department(application, run_id, request)
+    if run_id is None:
+        raise Rejection("not_found", "没有这个事项，请重新读取以后提交")
     _require_item_form(application, run_id)
     try:
         application.system.orchestrator.add_guidance(
@@ -388,8 +427,11 @@ class DepartmentSettingsSaveRefs(Contract):
 
 async def _save_department_settings(application: "Application", command: Command,
                                     request: DepartmentSettingsSave) -> None:
-    if request.department not in DEPARTMENTS:
-        raise _unknown_department(request.department)
+    # 保存的对象按项目现在的组织核对（工单 #1701）：组织外的职能在这里被拒成 not_allowed，
+    # 而不是落到下层按形态再抛一次
+    definitions = _project_definitions(application, request.project_id)
+    if request.department not in definitions.departments:
+        raise _unknown_department(request.department, definitions)
     if (request.provider_id is None) != (request.model_id is None):
         raise Rejection("not_allowed", "模型访问定义引用必须同时给出所属连接与定义")
     project_selection = ModelSelection(

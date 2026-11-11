@@ -16,6 +16,7 @@
     "onboarding": "engineering"
   },
   "routing": "direct",
+  "card_line": "工程一个角色做完就结束，没有人核验",
   "verification": {
     "verifiers": []
   },

@@ -251,3 +251,42 @@ def test_a_reworked_completion_has_its_own_version_and_a_conclusion(tmp_path):
             for record in _records(application, project_id, work_item_id) if record.kind == "版本交付"] \
         == [(ENGINEERING, QUALITY), (ENGINEERING, QUALITY)]
     system.close()
+
+
+def test_the_input_of_a_direct_item_goes_to_the_engineering_role(tmp_path):
+    # 验收第 2 条：两份直做形态里「你的输入」都送给工程（进程里加载的默认定义送给产品）
+    for form, name in ((SINGLE_ROLE_DIRECT, "一个角色直做"), (SEVERAL_ROLES_DIRECT, "两个角色直做")):
+        system = _system(tmp_path / form, {})
+        application = Application(system)
+        project_id = _created(application, form, name)
+        work_item_id, _run_id = _started(application, project_id)
+        [first] = _records(application, project_id, work_item_id)[:1]
+        assert (first.kind, first.direction_to) == ("你的输入", ENGINEERING)
+        system.close()
+
+
+def test_the_completing_role_waits_in_verification_until_the_reviewer_concludes(tmp_path):
+    # 验收第 3 条：工程交完成以后、质检给结论以前，工程的状态是核验中并写明在等质检；
+    # 放行以后事项结束，职能状态不再给出
+    script = {**_direct_script(), QUALITY: [review_turn("release", "看过了")]}
+    system = _system(tmp_path / "loop", script)
+    application = Application(system)
+    project_id = _created(application, FORM, "直做加一个核验角色")
+    work_item_id, run_id = _started(application, project_id)
+    assert system.run_until_stop(run_id).stop_reason == "released"
+
+    # 质检被叫起来的那一刻：它的核验声明来自这个事项冻结的定义，不是进程里加载的默认定义
+    reviewing = next(event.position for event in system.store.list_events(run_id)
+                     if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == QUALITY)
+    during = application.query("project.loop", ProjectLoop(
+        project_id=project_id, work_item=work_item_id, at=reviewing)).data.work_items[0]
+    assert list(during.departments) == [ENGINEERING, QUALITY]
+    assert (during.departments[ENGINEERING].state, during.departments[ENGINEERING].note) == (
+        "verifying", "等质检核验交付 r1")
+    assert during.departments[QUALITY].state == "working"
+    assert (during.progress.delivery_revision, during.progress.conclusion) == (1, None)
+
+    ended = _loop(application, project_id, work_item_id)
+    assert ended.departments is None
+    assert ended.progress.conclusion == direct.RELEASE_VERDICT
+    system.close()

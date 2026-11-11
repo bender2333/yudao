@@ -275,8 +275,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.change_impact", "changed_by": catalog_impact_changed_by, "replayable": False},
     ]
-    # 校验草稿（工单 #1515）排在最后，下面的下标相应前移一位
-    assert capabilities["queries"][-6] == {
+    # 形态清单（工单 #1647）排在项目现在的组织之后、校验草稿之前，从这一行起下面的下标各前移一位
+    assert capabilities["queries"][-7] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
             "ask_started", "ask_answered",
@@ -291,28 +291,33 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         ],
     }
     # 规则登记：现值是参数事件折叠的结果，参数修改触发重查（工单 #349）
-    assert capabilities["queries"][-5] == {
+    assert capabilities["queries"][-6] == {
         "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
     }
     # 工具登记（工单 #1177）：MCP 服务器的设置与最近一次探测、取回动作的取回记录
-    assert capabilities["queries"][-4] == {
+    assert capabilities["queries"][-5] == {
         "name": "tools.registry",
         "changed_by": ["project_registered", "project_renamed", "mcp_servers_configured",
                        "tool_server_probe_finished", "tool_started", "tool_called"],
         "replayable": False,
     }
     # 收敛状态（工单 #397）：按运行实例标识返回五层循环树，按位置回放
-    assert capabilities["queries"][-3]["name"] == "run.loops"
-    assert capabilities["queries"][-3]["replayable"] is True
-    assert "model_requested" in capabilities["queries"][-3]["changed_by"]
+    assert capabilities["queries"][-4]["name"] == "run.loops"
+    assert capabilities["queries"][-4]["replayable"] is True
+    assert "model_requested" in capabilities["queries"][-4]["changed_by"]
     # 项目现在的组织（工单 #1402）：形态改动改变它自己那一份；事项的开始、结束、采纳与撤销也改变它
     # （还在按它跑的事项数与上一个事项的比较，工单 #1517）
-    assert capabilities["queries"][-2] == {
+    assert capabilities["queries"][-3] == {
         "name": "project.organization",
         "changed_by": ["project_form_set", "work_item_created", "deliverable_adopted", "adoption_held",
                        "baseline_adopted", "project_decision_withdrawn",
                        "run_done", "run_failed", "run_paused", "run_resumed", "run_continued"],
         "replayable": False,
+    }
+    # 形态清单（工单 #1647）：不带项目读发布带的每一份形态与卡上要的内容，结果只由这个实例加载的
+    # 发布带决定，不由任何事件改变
+    assert capabilities["queries"][-2] == {
+        "name": "forms.list", "changed_by": [], "replayable": False,
     }
     # 校验草稿（工单 #1515）：结果只由请求与这个实例加载的发布带决定，不由任何事件改变
     assert capabilities["queries"][-1] == {
@@ -328,7 +333,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
         "evidence.external_source", "run.trials", "evidence.screenshot", "tools.registry", "run.loops",
         "acceptance.coverage",
-        "project.organization", "organization.draft",
+        "project.organization", "forms.list", "organization.draft",
     }
     # 可回放的查询：接受 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {

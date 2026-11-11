@@ -297,6 +297,9 @@ class Organization(_Definition):
     # 核验声明：谁核验谁的哪种成果、角色的写入范围。没有写时按旧定义的三部门解释（LEGACY_VERIFICATION），
     # 所以字段只增，旧文件照旧能读
     verification: VerificationDeclaration | None = None
+    # 形态卡上的一句话（工单 #1647，项目的组织设计说明「形态一键选用」）：卡的文字照这一句显示，页面不写死。
+    # 字段只增，没有写这一句的旧定义按空串读
+    card_line: str = ""
     rules: OrganizationRules
 
     freeze_sources = _frozen("sources")
