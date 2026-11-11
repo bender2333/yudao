@@ -21,7 +21,7 @@
 "edges":[
 {"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 1. 记录身份与结论","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"a99ad5bdf3884ed5","src":".claude/skills/verify/SKILL.md#验收"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/verify/SKILL.md#验收"},
-{"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"e020bdd76d2e543c","src":".claude/skills/verify/SKILL.md#验收 > 何时用 / 何时不用"},
+{"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"76bdf842d664a6e8","src":".claude/skills/verify/SKILL.md#验收 > 何时用 / 何时不用"},
 {"dst":".claude/skills/seam-diff/SKILL.md","kind":"link","raws":["../seam-diff/SKILL.md"],"seen":"bd006cf1855865c9","src":".claude/skills/verify/SKILL.md#验收 > 步骤"},
 {"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"0fccb8603e114307","src":".claude/skills/verify/SKILL.md#验收 > 步骤"},
 {"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"8e944ff99a32bbae","src":".claude/skills/verify/SKILL.md#验收 > 步骤"}

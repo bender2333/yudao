@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/README.md",
-"hash":"71d8751475da70a0",
+"hash":"d27211c6b7ef68d6",
 "nodes":[
-{"hash":"71d8751475da70a0","id":".claude/skills/README.md","kind":"file","title":".claude/skills/README.md"},
+{"hash":"d27211c6b7ef68d6","id":".claude/skills/README.md","kind":"file","title":".claude/skills/README.md"},
 {"hash":"ca87f05aee040baa","id":".claude/skills/README.md#技能使用说明","kind":"section","parent":".claude/skills/README.md","title":"技能使用说明"},
 {"hash":"7ec9afd6a534fb98","id":".claude/skills/README.md#技能使用说明 > 先记住三件事","kind":"section","parent":".claude/skills/README.md#技能使用说明","title":"先记住三件事"},
 {"hash":"b8005a7ed01f9daa","id":".claude/skills/README.md#技能使用说明 > 谁用哪些","kind":"section","parent":".claude/skills/README.md#技能使用说明","title":"谁用哪些"},
@@ -43,7 +43,7 @@
 {"hash":"1dcfed0487cd8b83","id":".claude/skills/README.md#技能使用说明 > 技能一览 > 外部积木 > 表1 > codebase-design","kind":"row","parent":".claude/skills/README.md#技能使用说明 > 技能一览 > 外部积木","title":"codebase-design"},
 {"hash":"2791b4f2f6139106","id":".claude/skills/README.md#技能使用说明 > 技能一览 > 外部积木 > 表1 > tdd、diagnosing-bugs","kind":"row","parent":".claude/skills/README.md#技能使用说明 > 技能一览 > 外部积木","title":"tdd、diagnosing-bugs"},
 {"hash":"e3dec09a8484440c","id":".claude/skills/README.md#技能使用说明 > 技能一览 > 外部积木 > 表1 > code-review","kind":"row","parent":".claude/skills/README.md#技能使用说明 > 技能一览 > 外部积木","title":"code-review"},
-{"hash":"4b9c3634bda131e2","id":".claude/skills/README.md#技能使用说明 > 常见用法","kind":"section","parent":".claude/skills/README.md#技能使用说明","title":"常见用法"},
+{"hash":"3655ce654338be0b","id":".claude/skills/README.md#技能使用说明 > 常见用法","kind":"section","parent":".claude/skills/README.md#技能使用说明","title":"常见用法"},
 {"hash":"e3c77a24f6ad7dd9","id":".claude/skills/README.md#技能使用说明 > 写或改一个技能","kind":"section","parent":".claude/skills/README.md#技能使用说明","title":"写或改一个技能"}
 ],
 "edges":[

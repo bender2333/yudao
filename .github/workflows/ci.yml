@@ -1,4 +1,5 @@
 # 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/autopilot-runtime.md「main 的规则」）。
+# 只改文档、日记与规则文件的改动不运行测试：main 的推送整个不触发；PR 上由「范围」作业判断，六个作业跳过，check 直接通过。
 # 测试按层与时机运行（docs/design/test-pyramid.md docs/design/test-pyramid.md「各角色运行哪一层」）：
 #   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端、工作台脚本、内核检查六个作业并行，check 汇总六项的结果
 #     并在运行摘要里写出各层的表；PR 上另有「用例变化」，列出合并前后各层用例的增减，只显示，不挡合并
@@ -11,13 +12,19 @@ on:
   pull_request:
   push:
     branches: [main]
-    # 只改文档与日记的推送（架构师经常直接推送）不运行；PR 上不跳过，check 是合并必须通过的检查
+    # 只改文档、日记与规则文件的推送（架构师经常直接推送）不运行。PR 上 check 是合并必须通过的检查，
+    # 工作流不能整个跳过，由下面的「范围」作业按同一份清单判断（清单改了两处一起改；tools/ 只在这里）
     paths-ignore:
       - "docs/**"
       - "agents_jour/**"
       - "claude_jour.md"
       - "tools/**"
       - ".doc-index/**"
+      - "CLAUDE.md"
+      - "AGENTS.md"
+      - "CONTEXT.md"
+      - "README.md"
+      - ".claude/skills/**/*.md"
   workflow_dispatch:
 
 # PR 与手动触发：同一分支的新运行取消旧运行。main 的推送：每个合并提交各自运行到底，
@@ -27,8 +34,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # PR 只改了文档、日记与规则文件时 code 为 false，六个测试作业与「用例变化」跳过，check 直接通过。
+  # 其他触发方式一律为 true。清单与上面 push 的 paths-ignore 相同，只少 tools/（工具改了要跑它自己的测试）
+  scope:
+    name: 范围
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: diff
+        name: 改动有没有碰到文档以外的文件
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ]; then
+            # PR 的检出是合并提交，第一个父提交是合并前的 main
+            other=$(git -c core.quotepath=false diff --name-only HEAD^1 HEAD | grep -Ev '^(docs/|agents_jour/|\.doc-index/|claude_jour\.md$|CLAUDE\.md$|AGENTS\.md$|CONTEXT\.md$|README\.md$|\.claude/skills/.*\.md$)' || true)
+            if [ -z "$other" ]; then code=false; else echo "$other" | head -n 20; fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "code=$code"
+
   unit:
     name: ① 单元层
+    needs: scope
+    if: ${{ needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -60,6 +96,8 @@ jobs:
 
   module:
     name: ② 模块层
+    needs: scope
+    if: ${{ needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -105,6 +143,8 @@ jobs:
 
   evals:
     name: 评测工具
+    needs: scope
+    if: ${{ needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -141,6 +181,8 @@ jobs:
 
   client:
     name: 客户端
+    needs: scope
+    if: ${{ needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -185,6 +227,8 @@ jobs:
   # 这些脚本决定派哪张工单、谁在做、收账成不成立，判断一旦错整个交付队列都跟着错，所以与产品代码同样进 CI
   workbench:
     name: 工作台脚本
+    needs: scope
+    if: ${{ needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -214,6 +258,8 @@ jobs:
   # 工具一出现就自己生效，不靠谁在合并以后想起来
   kernel:
     name: 内核检查
+    needs: scope
+    if: ${{ needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -268,25 +314,33 @@ jobs:
   # 无论六个作业结果如何都运行，在运行摘要里写出各层的表
   check:
     if: ${{ always() }}
-    needs: [unit, module, evals, client, workbench, kernel]
+    needs: [scope, unit, module, evals, client, workbench, kernel]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: 只改了文档，不运行测试
+        if: ${{ needs.scope.outputs.code == 'false' }}
+        run: echo "只改了文档、日记与规则文件，六个作业跳过" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
+        if: ${{ needs.scope.outputs.code != 'false' }}
 
       - uses: actions/download-artifact@v4
+        if: ${{ needs.scope.outputs.code != 'false' }}
         with:
           pattern: "*-results"
           path: .tmp/test-results
           merge-multiple: true
 
       - name: 各层的结果
+        if: ${{ needs.scope.outputs.code != 'false' }}
         run: |
           python3 scripts/ci_layers.py summary --layers harness/tests/layers.toml \
             --junit unit=.tmp/test-results/unit.xml --junit module=.tmp/test-results/module.xml \
             --junit evals=.tmp/test-results/evals.xml --pending integration | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: 六项都通过
+        if: ${{ needs.scope.outputs.code != 'false' }}
         run: |
           echo "① 单元层：${{ needs.unit.result }}；② 模块层：${{ needs.module.result }}；评测工具：${{ needs.evals.result }}；客户端：${{ needs.client.result }}；工作台脚本：${{ needs.workbench.result }}；内核检查：${{ needs.kernel.result }}"
           test "${{ needs.unit.result }}" = success
@@ -300,7 +354,8 @@ jobs:
   # 只显示，不是合并必须通过的检查；删除的用例由审查者与交付说明逐条核对
   inventory:
     name: 用例变化
-    if: ${{ github.event_name == 'pull_request' }}
+    needs: scope
+    if: ${{ github.event_name == 'pull_request' && needs.scope.outputs.code == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 30
     env:

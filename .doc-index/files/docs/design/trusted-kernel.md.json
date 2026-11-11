@@ -44,7 +44,7 @@
 {"dst":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研 > 4. 成熟做法","kind":"link","raws":["../research/complexity-and-mutation-testing.md"],"seen":"67bf07a6314c97a3","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.1 版本关系"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c967dae939e2fda6","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.3 执行位置与接口令牌"},
 {"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["execution-environment.md"],"seen":"32c37249c00f5e5c","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.3 执行位置与接口令牌"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"1457bf379c078098","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 5. 自我修改按风险分级放开"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"3a2388972a6d25d6","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 5. 自我修改按风险分级放开"},
 {"dst":"docs/design/kernel-quality-gate.md","kind":"link","raws":["kernel-quality-gate.md"],"seen":"7c04be1a568d7c96","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 8. 验收"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["app-and-interface.md"],"seen":"1e73a165bc6cbd7b","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c0ad35140a868277","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
