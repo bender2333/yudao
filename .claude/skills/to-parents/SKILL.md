@@ -23,7 +23,7 @@ disable-model-invocation: true
 
 ## 阶段工单与里程碑
 
-阶段工单（一个阶段一张）与里程碑（一个阶段一个，标题是阶段名，`docs/agents/ticket-spec.md`）由总架构师建，时间与条件见[验收证据规则](../../../docs/agents/acceptance-evidence.md)第 6 节。范围的阶段工单或里程碑不存在时停下来告诉用户，不自己建；父工单只挂在已有的阶段工单下、放进已有的里程碑。
+阶段工单（一个阶段一张）与里程碑（一个阶段一个，标题是编号加阶段名，`docs/agents/ticket-spec.md`）由总架构师建，时间与条件见[验收证据规则](../../../docs/agents/acceptance-evidence.md)第 6 节。范围的阶段工单或里程碑不存在时停下来告诉用户，不自己建；父工单只挂在已有的阶段工单下、放进已有的里程碑。
 
 ## 已在执行的范围
 

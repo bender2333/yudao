@@ -122,7 +122,7 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | report | evidenc
 
 | 用户说 | 怎么落 |
 | --- | --- |
-| 「把「职能之间：转实」的工单做完」 | `next --milestone "职能之间：转实"`（脚本按标题换成里程碑编号存进 `scope`） |
+| 「把「职能之间：转实」的工单做完」 | `next --milestone "1.1 职能之间：转实"`（脚本按标题换成里程碑编号存进 `scope`） |
 | 「带 bug 标签的」 | `next --label bug` |
 | 「[路由的缝] 开头的」 | `next --prefix "[路由的缝]"` |
 | 「都做」/ 没说范围 | `next --all` |

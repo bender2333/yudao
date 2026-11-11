@@ -58,7 +58,7 @@ argument-hint: "[扫描 | 观察 | 复现 | 想法] <范围>"
 
 ```powershell
 pwsh -NoProfile -File .claude/skills/discussion-note/scripts/overlap-scan.ps1 `
-  -Milestone "职能之间：转实" `
+  -Milestone "1.1 职能之间：转实" `
   -Signature "<署名>"
 ```
 
