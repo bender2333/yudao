@@ -1,6 +1,7 @@
-/* 项目页 · 选事项一行与事项面板（工单 #1708，项目的组织设计说明 4.14「事项面板与全部事项」）。
+/* 项目页 · 选事项一行与事项面板（工单 #1708，项目的组织设计说明「事项面板与全部事项」）。
    这一份只写这张工单新增的结构：面板的壳（.y10-cv-panel）、键值行（.y10-kv）、按钮（.y10-btn）、
-   列表与折叠块（.y10-list、.y10-details）都沿用已有的样式，别处正在改的那份样式文件不动。 */
+   列表与折叠块（.y10-list、.y10-details）都沿用已有的样式，别处正在改的那份样式文件不动。
+   末尾一段是选事项一行末尾的「全部事项」入口与它的分组列表（工单 #1709），同样只写新增的结构。 */
 
 /* 选事项一行：选中那件事项的标题可以点，点开它的事项面板；文字与四周同一号字，只是一条链接 */
 .v20-items-title {
@@ -42,3 +43,37 @@
 /* 用量到上限的那几项、等执行槽位的那一句、三个操作 */
 .v20-item-panel .v20-item-slots { margin: 0; }
 .v20-item-actions { flex-wrap: wrap; }
+
+/* 选事项一行（工单 #1709）：标题那里一段，末尾放这个项目全部事项的入口 */
+.v20-items-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline;
+}
+
+.v20-items-all {
+  margin-left: auto; font-size: 12px;
+}
+
+/* 全部事项的分组列表（工单 #1709）：每组写件数，每件一行，同名的事项靠停止那一行分辨 */
+.v20-all-items-group { display: grid; gap: 4px; margin-top: 6px; }
+
+.v20-all-items-head { margin: 0; font-size: 13px; font-weight: 600; }
+
+.v20-all-items-count { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+.v20-all-items-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+
+.v20-all-items-row {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  padding: 4px 8px; border: 1px solid transparent; border-radius: var(--radius);
+}
+
+.v20-all-items-row:hover { background: var(--soft); }
+.v20-all-items-row.is-on { background: var(--tint); border-color: var(--green); }
+
+.v20-all-items-item { font-size: 12.5px; }
+
+.v20-all-items-meta { color: var(--muted); font-size: 12px; }
+
+.v20-all-items-stop { color: var(--amber); font-size: 12px; }
+
+.v20-all-items-identity { color: var(--muted); font-family: var(--mono); font-size: 12px; }
