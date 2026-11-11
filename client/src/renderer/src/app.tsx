@@ -3,7 +3,7 @@
 // （网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, ProjectWritebackResult, SystemStatus } from "./api/generated/types.gen";
 import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
@@ -12,7 +12,7 @@ import { optionalRead } from "./contract/read-failure.ts";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
-import { parseRoute, pathLabel, paths, type Route } from "./shell/routing";
+import { attemptBackPath, parseRoute, pathLabel, paths, type Route } from "./shell/routing";
 import { HomePage } from "./views/home/page";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
@@ -24,7 +24,8 @@ import { ToolsPage } from "./views/system/tools";
 import { ConversationPage } from "./views/project/conversation";
 import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
-import { ObserveDetailPage, ObservePage } from "./views/project/observe";
+import { AttemptDetailPage } from "./views/project/attempt-detail";
+import { ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
 import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
@@ -110,6 +111,16 @@ export function App() {
     { project_id: route.projectId ?? "" },
     route.projectId === null || state.kind !== "connected");
   const departments: DepartmentView[] = projectDepartments(organization.data);
+  // 当前成果一行（工单 #1714）：头部的这一行与它的面板读项目概览里的当前成果与写回记录。
+  // 与上面那一行一样，没有项目、还没有连上或者服务没有登记这条查询时不打开，这一行因此不出现
+  const overview = useSnapshot<ProjectOverviewResult>(
+    state.kind === "connected" ? app : null, "shell.overview", "project.overview",
+    { project_id: route.projectId ?? "" },
+    route.projectId === null || state.kind !== "connected");
+  const writeback = useSnapshot<ProjectWritebackResult>(
+    state.kind === "connected" ? app : null, "shell.writeback", "project.writeback",
+    { project_id: route.projectId ?? "" },
+    route.projectId === null || state.kind !== "connected");
   // 侧栏「显示归档的项目」开关：项目列表按它取数，勾上时已归档的项目也在列表里（工单 #672）
   const [includeArchived, setIncludeArchived] = useState(false);
   useEffect(() => {
@@ -336,9 +347,17 @@ export function App() {
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
           onNavigate={navigate}
         />
-        {/* 项目头部一行标签（工单 #1653）：形态名（改过几处）、轮转方式、有核验或开环。对话与设置都在，
-            读项目现在的组织（project.organization），不读选中事项冻结的那一份 */}
-        {route.projectId === null ? null : <ProjectHead organization={organization.data} />}
+        {/* 项目头部的两行（工单 #1653、#1714）：一行组织标签，一行当前成果（点开面板写全，含重新建档的入口）。
+            两处都读项目现在的事实，不读选中事项冻结的那一份 */}
+        {route.projectId === null ? null : (
+          <ProjectHead
+            app={app}
+            projectId={route.projectId}
+            organization={organization.data}
+            overview={overview.data}
+            writeback={writeback.data}
+          />
+        )}
         <Tabbar tabs={tabs} activeHash={window.location.hash} onNavigate={navigate} />
         <main className="y10-content content">
           {route.name === "home" ? (
@@ -435,9 +454,12 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
     case "materials":
       return <MaterialsPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     case "observe":
-      return <ObservePage app={props.app} route={route} />;
+      // 观测页（工单 #80、#1710）：请求记录与用量统计是设置页那一节的同一份部件；
+      // 职能清单取自项目现在的组织，部门页签与这一页的职能下拉用同一份
+      return <ObservePage app={props.app} route={route} departments={props.departments} />;
     case "observe-detail":
-      return <ObserveDetailPage app={props.app} route={route} />;
+      // 请求详情（工单 #1710）：返回的去处按进来时的地址决定（设置页那一节或对话页的工作过程）
+      return <AttemptDetailPage app={props.app} route={route} back={attemptBackPath(route)} />;
     case "settings":
       return <SettingsPage app={props.app} route={route} departments={props.departments} />;
     case "recovery":

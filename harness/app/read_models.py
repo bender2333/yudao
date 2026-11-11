@@ -17,11 +17,14 @@ from ..definitions import DEFINITIONS
 from ..event_store import EventStore
 from ..models import Event, EventType, ProjectEvent, ProjectEventType, json_dumps
 from ..observability import AttemptFold, search_text
-from ..projects import REWORK_VERDICTS
+from ..projects import REWORK_VERDICTS, definitions_from_ref
 
 ATTEMPTS = "attempts"
 FLOWS = "flows"
 BATCH = 500
+# 直做交完成的成果种类：与 harness/direct.py 的 COMPLETION_KIND 同名，应用层按载荷里的名字读成果种类，
+# 不导入控制核心的直做模块（依赖规则见 docs/design/app-and-interface.md，工单 #1699）
+COMPLETION_KIND = "completion"
 # 查询按公开状态筛选：合同的字段类型取这里，接口层据此校验请求
 AttemptStatus = Literal[("success", "failed", "cancelled", "running")]
 # 调用尝试表吸收的事件种类：只有它们会改变一条尝试记录
@@ -30,12 +33,14 @@ ATTEMPT_TYPES = frozenset({
     EventType.MODEL_REQUEST_SERIALIZED, EventType.MODEL_MESSAGE, EventType.MODEL_ATTEMPT_FINISHED,
     EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_RETRY_SCHEDULED, EventType.MODEL_STREAM_PROGRESS,
 })
-# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回、PRD 被接纳，
-# 以及你的输入（收到用户输入）与指导（发给某个职能）。主线激活只用来推第几轮，自己不产生记录（工单 #1636）
+# 流转记录吸收的事件种类：部门之间的请求与回答、交付到达与质检退回、PRD 被接纳、
+# 直做交完成的那一版，以及你的输入（收到用户输入）与指导（发给某个职能）。
+# 主线激活只用来推第几轮、run 创建只用来记下这个事项冻结的核验声明，两者自己不产生记录
+# （工单 #1636、#1699）
 FLOW_TYPES = frozenset({
     EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
     EventType.SPEC_ACCEPTED, EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
-    EventType.DEPARTMENT_ACTIVATED,
+    EventType.DEPARTMENT_ACTIVATED, EventType.ARTIFACT_ACCEPTED, EventType.RUN_CREATED,
 })
 # 项目流里进流转记录的事件种类：事项的创建就是你给它的第一句输入（工单 #1636）
 PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
@@ -44,7 +49,8 @@ PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
 # 读模型是增量投影，修了算法不会让旧行跟着变（工单 #684）。
 # 第 2 版：流转记录开始吸收 PRD 被接纳（工单 #882）。
 # 第 3 版：流转记录带第几轮，并增加你的输入、指导与放行（工单 #1636）。
-DERIVATION_VERSION = 3
+# 第 4 版：直做交完成的那一版进流转记录（工单 #1699）。
+DERIVATION_VERSION = 4
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
 
@@ -277,9 +283,10 @@ class ReadModels:
                                                (run_id,)).fetchone()
                     states[run_id] = _empty_flow_state() if saved is None else json.loads(saved["state"])
                 state = states[run_id]
-                _advance_flow_state(state, event)
+                _advance_flow_state(state, event, self.artifacts)
             for row in flow_rows(event, work_round=_flow_round(state, event),
-                                 deliveries=None if state is None else state["deliveries"]):
+                                 deliveries=None if state is None else state["deliveries"],
+                                 edges=None if state is None else state.get("verifiers")):
                 _upsert_flow(connection, row)
         for run_id, state in states.items():
             connection.execute(
@@ -425,8 +432,9 @@ def _upsert_flow(connection: sqlite3.Connection, row: dict[str, Any]) -> None:
 
 
 def _empty_flow_state() -> dict[str, Any]:
-    # 一个 run 的流转记录推导状态：当前轮次、每个会话在它那次激活里的轮次、询问分支的会话、已接纳的交付版本
-    return {"round": 0, "sessions": {}, "branches": [], "deliveries": {}}
+    # 一个 run 的流转记录推导状态：当前轮次、每个会话在它那次激活里的轮次、询问分支的会话、已接纳的交付版本，
+    # 以及这个事项冻结的定义里的核验声明（工单 #1699：交完成那一版的去向按它取）
+    return {"round": 0, "sessions": {}, "branches": [], "deliveries": {}, "verifiers": []}
 
 
 def _flow_run_id(event: Event | ProjectEvent) -> str | None:
@@ -436,12 +444,20 @@ def _flow_run_id(event: Event | ProjectEvent) -> str | None:
     return event.run_id
 
 
-def _advance_flow_state(state: dict[str, Any], event: Event | ProjectEvent) -> None:
+def _advance_flow_state(state: dict[str, Any], event: Event | ProjectEvent,
+                        artifacts: ArtifactStore | None = None) -> None:
     # 按事件顺序累出轮次（工单 #1636）：主线激活推进一轮，激活事件自己记下的 cycle 就是这一轮的编号；
-    # 询问分支的激活沿用当时的轮次，不推进（循环结构 docs/design/department-loop.md「询问分支」）
+    # 询问分支的激活沿用当时的轮次，不推进（循环结构 docs/design/department-loop.md「询问分支」）。
+    # run 创建时把这个事项冻结的定义里的核验声明记下来（工单 #1699）：交完成那一版的去向按它取，
+    # 后面每条交完成不再去读定义文件
     if not isinstance(event, Event):
         return
     payload = event.payload or {}
+    if event.type == EventType.RUN_CREATED:
+        definitions = None if artifacts is None else definitions_from_ref(artifacts, payload.get("definitions_ref"))
+        if definitions is not None:
+            state["verifiers"] = [list(edge) for edge in definitions.rejection_edges()]
+        return
     if event.type == EventType.DEPARTMENT_ACTIVATED:
         session = event.session_id
         cycle = payload.get("cycle")
@@ -477,11 +493,14 @@ def _flow_round(state: dict[str, Any] | None, event: Event | ProjectEvent) -> in
 
 
 def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
-              deliveries: dict[str, int] | None = None) -> list[dict[str, Any]]:
+              deliveries: dict[str, int] | None = None,
+              edges: Sequence[Sequence[str]] | None = None) -> list[dict[str, Any]]:
     # 一条事件产生的流转记录：迁移与退回产生新记录，部门之间的回答与关闭更新同一条咨询记录。
     # 记录的去向按定义推出（工单 #1391）：PRD 的新版本送到关注它的部门，「交付送到谁」「返工回到谁」
     # 由核验声明给出，来源是写这条事件的部门；代码里不写部门名。
-    # work_round 是这条记录的第几轮，deliveries 是这一版交付的摘要 → 版本（放行的记录写它，工单 #1636）
+    # work_round 是这条记录的第几轮，deliveries 是这一版交付的摘要 → 版本（放行的记录写它，工单 #1636）；
+    # edges 是这一轮事项冻结的定义里的核验声明（核验角色、被核验的角色、成果种类），
+    # 交完成那一版的去向按它取（工单 #1699）
     payload = event.payload or {}
     source = event.department or ""
     base = {
@@ -524,6 +543,20 @@ def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
                  "kind": "版本交付", "direction_from": source, "direction_to": verifier,
                  "status": "已完成", "content": payload.get("summary", "")}
                 for verifier in verifiers]
+    if event.type == EventType.ARTIFACT_ACCEPTED:
+        # 直做交完成的那一版（工单 #1699）：它是一版交付，来源是交完成的角色，去向是核验它的角色；
+        # 这个事项没有核验角色时没有去向（开环完成，记录上不写成放行）。去向按这个事项冻结的定义取
+        # （run 创建时记下的核验声明），不看进程级定义——读一件事项按它冻结的定义（父工单 #1698）
+        if payload.get("artifact_kind") != COMPLETION_KIND:
+            return []
+        issuer = payload.get("artifact_issuer") or source
+        targets = [verifier for verifier, verified, outcome in (edges or ())
+                   if verified == issuer and outcome == COMPLETION_KIND] or [None]
+        return [{**base,
+                 "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{verifier}",
+                 "kind": "版本交付", "direction_from": issuer, "direction_to": verifier,
+                 "status": "已完成", "content": payload.get("summary", "")}
+                for verifier in targets]
     if event.type == EventType.ASK_STARTED:
         return [{**base, "flow_id": payload["branch_session_id"], "kind": "询问",
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],

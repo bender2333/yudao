@@ -167,8 +167,16 @@ uv run --project tools/doc-consistency doc-consistency <命令>
 
 ## 测试
 
+整套并行运行，每条用例用自己的临时仓库，互不依赖：
+
 ```
-uv run --project tools/doc-consistency pytest tools/doc-consistency/tests
+uv run --project tools/doc-consistency --with pytest-xdist pytest tools/doc-consistency/tests -n 4
+```
+
+只改了一个模块时运行对应的测试文件，例如：
+
+```
+uv run --project tools/doc-consistency pytest tools/doc-consistency/tests/rulefacts/test_scan.py
 ```
 
 测试用真实的 git 仓库、真实的 clingo、真实的文件，图谱页面用真实的 Chrome（`channel="chrome"`，需要本机装有 Chrome）；规则事实线的测试（`tests/rulefacts/`）不用浏览器，用页面里注入的 JSON 验。工具自己的 `pyproject.toml` 配了 pytest，不会加载仓库根的 `conftest.py`。

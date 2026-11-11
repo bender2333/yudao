@@ -25,9 +25,12 @@ import { readFailureText } from "../../contract/read-failure";
 import { providerNotice } from "../../shell/provider-status";
 import type { Route } from "../../shell/routing";
 import { paths } from "../../shell/routing";
+import { AllItems, ALL_ITEMS_PICK, type AllItemsPick } from "./all-items";
 import { Empty, Loading } from "./common";
 import { Composer } from "./composer";
-import { workItemStatusText } from "./labels";
+import { interruptionFactRows } from "./floor-text";
+import { ItemPanel, ITEM_PANEL_PICK, type ItemPanelPick } from "./item-panel";
+import { ItemPicker } from "./item-picker";
 import type { DepartmentView } from "./organization";
 import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } from "./loop-graph-model";
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
@@ -41,8 +44,14 @@ import {
 } from "./thread-model";
 import { useSnapshot } from "./use-snapshot";
 
-/** 面板打开的那一个，连同它在哪件事项上打开：换了事项就收起，不在新图上留着旧的一版。 */
-type PanelState = { item: string | null; value: LoopPanelTarget };
+/**
+ * 面板打开的那一个，连同它在哪件事项上打开：换了事项就收起，不在新图上留着旧的一版。
+ * 同一个位置只开一个面板（工单 #1708）：点选事项一行里选中那件的标题开事项面板，
+ * 点节点、点箭头、点时序图的一行换成那个面板。
+ * 这里还有全部事项的分组列表（工单 #1709）：点选事项一行末尾的「全部事项」开它，
+ * 从列表里点一件时图切过去，面板换成那件事项的事项面板。
+ */
+type PanelState = { item: string | null; value: LoopPanelTarget | ItemPanelPick | AllItemsPick };
 
 export function ConversationPage(props: {
   app: ClientApp;
@@ -140,10 +149,28 @@ export function ConversationPage(props: {
     ...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows),
   ], [graph]);
   const [panel, setPanel] = useState<PanelState>({ item: null, value: null });
-  const pick: LoopPanelTarget = panel.item === itemId ? panel.value : null;
+  const pick: LoopPanelTarget | ItemPanelPick | AllItemsPick = panel.item === itemId ? panel.value : null;
   // 图上标出选中的节点或箭头：时序图上那一行在图上打开的是箭头，两处标的是同一样
-  const graphPick: LoopPanelPick = pick !== null && (pick.kind === "node" || pick.kind === "arrow") ? pick : null;
+  const graphPick: LoopPanelPick = pick === null || pick === ITEM_PANEL_PICK || pick === ALL_ITEMS_PICK
+    ? null
+    : (pick.kind === "node" || pick.kind === "arrow") ? pick : null;
   const open = (value: LoopPanelTarget): void => setPanel({ item: itemId, value });
+  // 事项面板（工单 #1708）：点选事项一行里选中那件的标题，同一个位置换成这一件事项的面板
+  const openItem = (): void => setPanel({ item: itemId, value: ITEM_PANEL_PICK });
+  // 全部事项（工单 #1709）：同一个位置换成这个项目的分组列表
+  const openAllItems = (): void => setPanel({ item: itemId, value: ALL_ITEMS_PICK });
+  // 从全部事项里点了一件：已经画着的那件直接换面板，别的那件先切过去（切过去以后才开面板）
+  const [pendingItem, setPendingItem] = useState<string | null>(null);
+  const pickFromAllItems = (workItem: string): void => {
+    if (workItem === itemId) {
+      setPanel({ item: itemId, value: ITEM_PANEL_PICK });
+      return;
+    }
+    setPendingItem(workItem);
+    props.onNavigate(paths.conversation(projectId, { workItem }));
+  };
+  // 有中断待恢复的事项时，选事项一行下面多一行提示（设计说明「事项面板与全部事项」）
+  const interruptions = useMemo(() => interruptionFactRows(loop.data), [loop.data]);
   // 时序图（工单 #1641）：图右上角的「看经过」展开它；展开以后才读询问（决定请求线程里一直在读）
   const [sequenceOpen, setSequenceOpen] = useState(false);
   // 展开的是哪几轮：没有点过时按模型给的默认（只展开最新一轮）；挂了哪一件事项一起记，换了事项就不留着旧选择
@@ -188,8 +215,8 @@ export function ConversationPage(props: {
       : undefined;
     open(arrow === undefined ? { kind: "row", row } : { kind: "arrow", arrow });
   };
-  // 面板上标出来的那一行：成果那一行按它找到的箭头认
-  const pickedKey = pick === null
+  // 面板上标出来的那一行：成果那一行按它找到的箭头认（事项面板与全部事项不对应图上的行）
+  const pickedKey = pick === null || pick === ITEM_PANEL_PICK || pick === ALL_ITEMS_PICK
     ? null
     : pick.kind === "row" ? pick.row.key : pick.kind === "arrow" ? pick.arrow.key : null;
   // 只看这两个职能的时序图（线程折叠行末尾的「在时序图里看」）：折叠行在别的事项上时先切过去
@@ -210,6 +237,14 @@ export function ConversationPage(props: {
     setSequenceOpen(true);
     setPendingSequence(null);
   }, [pendingSequence, itemId]);
+  // 从全部事项里点了一件：图切到它以后（事项编号换过来才）打开它的事项面板
+  useEffect(() => {
+    if (pendingItem === null || pendingItem !== itemId) {
+      return;
+    }
+    setPanel({ item: itemId, value: ITEM_PANEL_PICK });
+    setPendingItem(null);
+  }, [pendingItem, itemId]);
   useEffect(() => {
     if (!sequenceOpen) {
       return;
@@ -292,7 +327,13 @@ export function ConversationPage(props: {
                 items={items}
                 titles={titles}
                 selected={itemId}
+                interruptions={interruptions}
+                // 总数取项目概览的事项统计（设计说明「事项面板与全部事项」）：还没读到时入口不出现
+                total={overview.data === null ? null : overview.data.stats.total}
                 onPick={(workItem) => props.onNavigate(paths.conversation(projectId, { workItem }))}
+                onOpen={openItem}
+                onOpenAll={openAllItems}
+                onOpenRecovery={(workItem) => props.onNavigate(paths.recovery(projectId, workItem))}
               />
               {item === null ? null : item.organization == null ? (
                 <Empty text="这件事项冻结的组织不在这一版发布里，图上没有可画的节点。" />
@@ -346,25 +387,47 @@ export function ConversationPage(props: {
                       />
                     </div>
                   ) : null}
-                  {/* 面板在图的下面（时序图展开时在它下面）：点节点、点箭头与点时序图的一行都是这一个 */}
-                  {pick === null ? null : (
-                    <div ref={panelRef}>
-                      <LoopPanel
-                        app={props.app}
-                        projectId={projectId}
-                        workItemId={itemId}
-                        runId={runId}
-                        // 询问编号：询问分支的激活带着它，按第几轮找工作过程时排掉那几次（工单 #1658）
-                        branchSessions={askList.map((ask) => ask.id)}
-                        graph={graph}
-                        arrows={arrows}
-                        pick={pick}
-                        onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
-                        onClose={() => open(null)}
-                      />
-                    </div>
-                  )}
                 </>
+              )}
+              {/* 面板在图的下面（时序图展开时在它下面）：点节点、点箭头与点时序图的一行都是这一个，
+                  点选事项一行里选中那件的标题换成事项面板（工单 #1708），末尾的「全部事项」换成
+                  分组列表（工单 #1709）。这个位置在图上有没有画节点之外：事项冻结的组织不在这一版
+                  发布里时，事项面板与全部事项照样能开 */}
+              {pick === null ? null : (
+                <div ref={panelRef}>
+                  {pick === ALL_ITEMS_PICK ? (
+                    <AllItems
+                      state={overview}
+                      selected={itemId}
+                      onPick={pickFromAllItems}
+                      onClose={() => open(null)}
+                    />
+                  ) : pick === ITEM_PANEL_PICK ? (
+                    <ItemPanel
+                      app={props.app}
+                      projectId={projectId}
+                      workItemId={itemId}
+                      loop={loop}
+                      overview={overview}
+                      onClose={() => open(null)}
+                      onNavigate={props.onNavigate}
+                    />
+                  ) : (
+                    <LoopPanel
+                      app={props.app}
+                      projectId={projectId}
+                      workItemId={itemId}
+                      runId={runId}
+                      // 询问编号：询问分支的激活带着它，按第几轮找工作过程时排掉那几次（工单 #1658）
+                      branchSessions={askList.map((ask) => ask.id)}
+                      graph={graph}
+                      arrows={arrows}
+                      pick={pick}
+                      onPickArrow={(arrow) => open({ kind: "arrow", arrow })}
+                      onClose={() => open(null)}
+                    />
+                  )}
+                </div>
               )}
               {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}
               {materials.error === null ? null : <Empty text={readFailureText(materials.error)} />}
@@ -411,41 +474,3 @@ export function ConversationPage(props: {
   );
 }
 
-/** 图上方一行选事项：默认最近在跑的那一件，点别的切过去；只有一件事项时不出现这一行。 */
-function ItemPicker(props: {
-  items: LoopItemView[];
-  titles: Record<string, string>;
-  selected: string;
-  onPick: (workItem: string) => void;
-}) {
-  const only = props.items[0];
-  if (only === undefined) {
-    return null;
-  }
-  if (props.items.length < 2) {
-    return (
-      <p className="y10-cv-only" data-testid="item-picker">
-        图上画「{props.titles[only.work_item_id] ?? only.work_item_id}」
-        {only.round === 0 ? null : <span className="y10-muted"> · 第 {only.round} 轮</span>}
-      </p>
-    );
-  }
-  return (
-    <div className="y10-cv-pick" role="tablist" aria-label="选事项" data-testid="item-picker">
-      <span className="y10-muted">图上画</span>
-      {props.items.map((item) => (
-        <button
-          key={item.work_item_id}
-          type="button"
-          role="tab"
-          aria-selected={item.work_item_id === props.selected}
-          className={`y10-cv-pick-btn${item.work_item_id === props.selected ? " is-on" : ""}`}
-          onClick={() => props.onPick(item.work_item_id)}
-        >
-          {props.titles[item.work_item_id] ?? item.work_item_id}
-          <small> {workItemStatusText(item)}</small>
-        </button>
-      ))}
-    </div>
-  );
-}
