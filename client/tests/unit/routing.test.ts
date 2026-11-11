@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { attemptBackPath, parseRoute, paths, withScope } from "../../src/renderer/src/shell/routing.ts";
+import { attemptBackPath, parseRoute, pathLabel, paths, withScope } from "../../src/renderer/src/shell/routing.ts";
 import { EMPTY_FILTERS, type Filters } from "../../src/renderer/src/views/project/observe-filter.ts";
 
 test("正式路径照旧解析：home、sys、项目页面；图鉴与已删除的连接页都落到未找到", () => {
@@ -110,4 +110,24 @@ test("直接输入请求详情地址：返回观测页的请求记录，与没�
   assert.equal(back.hash, "#/p/demo/observe?w=w1&dept=engineering");
   // 认不出的来处按没有来处处理，不当成设置页或对话页
   assert.equal(parseRoute("#/p/demo/observe/a1?from=elsewhere").attemptOrigin, null);
+});
+
+// 职能详情（工单 #1713）：从节点面板的「职能详情」进，路径上写职能名，事项范围写在 ?w= 里；
+// 关闭回到同一事项的对话页，切事项范围时仍留在这个职能上。
+test("职能详情的地址往返：路径上写职能名，事项范围写在 ?w= 里", () => {
+  assert.equal(paths.departmentDetail("demo", "engineering"), "#/p/demo/dept-detail/engineering");
+  const hash = paths.departmentDetail("demo", "engineering", { workItem: "w1" });
+  assert.equal(hash, "#/p/demo/dept-detail/engineering?w=w1");
+  const route = parseRoute(hash);
+  assert.equal(route.name, "dept-detail");
+  assert.equal(route.projectId, "demo");
+  assert.equal(route.department, "engineering");
+  assert.equal(route.workItemId, "w1");
+  // 自己加的职能同样进得去：路径上就是组织里的那个标识
+  assert.equal(parseRoute(paths.departmentDetail("demo", "analysis")).department, "analysis");
+  // 职能名照旧译成中文，路径上仍写标识
+  assert.equal(pathLabel(route, [{ project_id: "demo", name: "演示项目" }]), "演示项目 / 工程");
+  // 关闭回到同一事项的对话页；切事项范围仍留在这个职能上
+  assert.equal(paths.conversation("demo", { workItem: "w1" }), "#/p/demo/conversation?w=w1");
+  assert.equal(withScope(route, "w2"), "#/p/demo/dept-detail/engineering?w=w2");
 });

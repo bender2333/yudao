@@ -92,9 +92,13 @@ test("给画面用的卡片内容带上决定版本、项目与事项、链接�
   assert.equal(card.work_item_id, "w1");
   assert.equal(card.where, "文本工具 · 实现逐行处理");
   assert.equal(card.waited, "已等待 60 秒");
-  // 「前往本项目的职能设置」落在设置页的职能设置那一节（工单 #1161）：路径带上节名，文字用职能的说法
-  assert.deepEqual(card.links.map((link) => link.href), ["#/sys/models", "#/p/p1/settings?section=departments"]);
-  assert.deepEqual(card.links.map((link) => link.label), ["前往模型管理", "前往本项目的职能设置"]);
+  // 「前往本项目的职能详情」落在那个部门的详情页上（工单 #1161、#1713）：
+  // 设置页不再有「职能设置」一节，模型与 Prompt 在职能详情页改
+  assert.deepEqual(card.links.map((link) => link.href), [
+    "#/sys/models",
+    "#/p/p1/dept-detail/engineering?w=w1",
+  ]);
+  assert.deepEqual(card.links.map((link) => link.label), ["前往模型管理", "前往本项目的职能详情"]);
   assert.equal(card.options[0].note_required, true);
   // 没有给出名称时只写项目名，不写事项标识（工单 #802）
   const bare = face(decision(), now);

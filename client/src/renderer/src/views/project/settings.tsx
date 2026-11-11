@@ -1,18 +1,18 @@
-// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、形态、部门设置与登记的源目录。
+// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、形态、登记的源目录与底部几节。
 // 数据全部来自 project.settings；每项修改提交对应的命令，基准版本取快照里的 version，
-// 过期时拒绝并提示重新读取（工单验收第 3 条）。部门设置里的模型与档位由 #95 加入，
+// 过期时拒绝并提示重新读取（工单验收第 3 条）。
 // 机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
 // 「形态」一节由 #1403 加入：现在用哪一份、换一份、改回与历史，数据来自 project.organization。
+// 「职能设置」一节由 #1713 搬到职能详情页（模型、推理档位与职能 Prompt 在那里改）。
 
 import { useEffect, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { Catalog, ProjectSettingsResult } from "../../api/generated/types.gen";
+import type { ProjectSettingsResult } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
 import {
   CommandFeedback, Empty, KeyValue, Loading, Section, SubmitButton, Table, TextArea, TextInput,
-  hasCommand, list, pageKey, text, useDraft,
+  hasCommand, pageKey, useDraft,
 } from "./common";
-import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
 import { FormSection } from "./form-section";
 import { McpServersSection } from "./mcp-servers";
 import type { DepartmentView } from "./organization";
@@ -21,11 +21,9 @@ import { WritebackSection } from "./writeback";
 import {
   CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsText, sourceDirectoryPayload, sourceWritebackText,
 } from "./writeback-text";
-import { departmentName, itemSource } from "./labels";
 import { PageHead } from "../../shell/kit";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
-import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
 export function SettingsPage(props: { app: ClientApp; route: Route; departments: DepartmentView[] }) {
   const projectId = props.route.projectId ?? "";
@@ -51,7 +49,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route; departments:
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、形态、职能设置、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、形态、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {settings.error !== null ? (
@@ -62,7 +60,6 @@ export function SettingsPage(props: { app: ClientApp; route: Route; departments:
         <>
           <Basics app={props.app} data={data} command={command} />
           <FormSection app={props.app} projectId={projectId} />
-          <Departments app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
           <McpServersSection app={props.app} data={data} departments={props.departments} />
           <WritebackSection app={props.app} projectId={projectId} />
@@ -192,116 +189,8 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
   );
 }
 
-// 部门设置（7.5 节第 2 项）：各部门的项目部门设置，内容同部门设置弹窗（第 9.2 节）。
-// 模型、推理档位与部门 Prompt 三项一起保存；模型与档位由 #95 加入，
-// 读取与保存的版本由 project.settings 给出，部门默认来自 catalog 的 bindings，
-// 生效模型的跟随说明与建议能力提醒按第 5.3、5.6 节计算
-function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
-  const { data } = props;
-  const entries = Object.entries(data.departments);
-  const [editing, setEditing] = useState<string | null>(null);
-  const catalog = useSnapshot<Catalog>(props.app, "page.settings.catalog", "catalog", {});
-  // 生效模型的说明与档位声明：项目设置写入了模型就用它，否则用部门默认（catalog 的 bindings）
-  const bindings = catalog.data?.bindings ?? {};
-  const models = catalog.data?.models ?? [];
-
-  return (
-    // id 是这一节的路径参数取值：决定卡片上的「前往本项目的部门设置」按它滚到这里（工单 #1161）
-    <Section id="departments" title="职能设置" note="本项目各职能的项目职能设置：模型、推理档位与职能 Prompt">
-      {entries.length === 0 ? <Empty text="没有登记职能设置" /> : null}
-      {entries.map(([key, setting]) => {
-        const effectiveId = mergedModelId(setting.model_id, key, bindings);
-        const model = modelById(models, effectiveId);
-        const followText = followDepartmentLabel(model?.model ?? (effectiveId ? effectiveId : ""));
-        const reminders = data.department_reminders[key] ?? [];
-        return (
-          <div className="y10-set-dept sub-card" key={key}>
-            <div className="y10-block-head section-head">
-              <h3>
-                {departmentName(key)}（{key}）
-              </h3>
-              <p className="y10-note note">第 {setting.version} 版</p>
-            </div>
-            {/* 来源按项说：模型、档位与职能 Prompt 各自有没有由本项目写入（工单 #741） */}
-            <p className="y10-note note">
-              模型与档位：{setting.model_id
-                ? `${model?.model ?? setting.model_id}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`
-                : `${followText}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`}
-              ；模型来源 {itemSource(Boolean(setting.model_id), "跟随职能默认")}
-              ；档位来源 {itemSource(Boolean(setting.requested_tier), "跟随")}
-            </p>
-            <p className="y10-note note" data-testid={`settings-prompt-source-${key}`}>
-              职能 Prompt 来源：{itemSource(promptWritten(setting.department_setting_configured, setting.text), "内置默认")}
-            </p>
-            <ReminderList items={reminders} testId={`settings-reminder-${key}`} />
-            <pre className="y10-pre raw department-setting-text">{setting.text || "（没有职能 Prompt 文字）"}</pre>
-            {editing === key ? (
-              <DepartmentSettingsForm app={props.app} data={data} department={key} onClose={() => setEditing(null)} />
-            ) : (
-              <button type="button" onClick={() => setEditing(key)}>
-                修改职能设置
-              </button>
-            )}
-          </div>
-        );
-      })}
-    </Section>
-  );
-}
-
-function DepartmentSettingsForm(props: {
-  app: ClientApp;
-  data: ProjectSettingsResult;
-  department: string;
-  onClose: () => void;
-}) {
-  const { data } = props;
-  const setting = data.departments[props.department];
-  const [draft, setDraft, saved] = useDepartmentDraft(setting ?? null);
-  const command = useCommand(props.app, pageKey([setting?.version, draft.model, draft.tier, draft.text]));
-  const catalog = useSnapshot<Catalog>(props.app, `page.settings.catalog.${props.department}`, "catalog", {});
-  const bindings = catalog.data?.bindings ?? {};
-  const models = catalog.data?.models ?? [];
-  const reminders = data.department_reminders[props.department] ?? [];
-  const savedReminders = list(command.accepted?.reminders).map((item) => text(item)).filter((item) => item !== "");
-
-  if (setting === undefined) {
-    return <Empty text={`没有 ${departmentName(props.department)} 的职能设置`} />;
-  }
-
-  // 生效模型的说明：项目设置写入了模型就用它，否则用部门默认（跟随部门默认的当前值）
-  const effectiveId = mergedModelId(setting.model_id, props.department, bindings);
-  const effectiveModel = modelById(models, effectiveId);
-  const followName = effectiveModel?.model ?? (effectiveId ? effectiveId : "");
-
-  return (
-    <div className="y10-set-form form">
-      <DepartmentSettingsFields
-        app={props.app}
-        projectId={data.project_id}
-        department={props.department}
-        draft={draft}
-        onDraft={setDraft}
-        effective={{
-          state: effectiveId ? "effective" : "unset",
-          model: followName,
-        }}
-        reminders={[...reminders, ...savedReminders]}
-        saved={saved}
-      />
-      <DepartmentSettingsSave
-        projectId={data.project_id}
-        department={props.department}
-        setting={setting}
-        draft={draft}
-        command={command}
-        onSaved={props.onClose}
-      />
-      <button type="button" onClick={props.onClose}>取消</button>
-      <CommandFeedback submitted={command.submitted} problem={command.problem} />
-    </div>
-  );
-}
+// 部门设置（7.5 节第 2 项）已搬到职能详情页（工单 #1713）：设置页不再有「职能设置」一节，
+// 模型、推理档位与职能 Prompt 在那一页改，内容与保存命令不变。
 
 // 登记的源目录（7.5 节第 1 项，3.2A）：接入已有项目时填写的源目录在这里查看与修改。
 // 工单 #74 登记了 source_directory.save；没有登记时不显示这一节

@@ -1,6 +1,7 @@
 /* 项目页收成两页这一组的样式（父工单 #1707，本文件从工单 #1711 起用）。
-   这里排箭头面板里的各段（#1711）与节点面板里的各段（#1712）；面板本体（.y10-cv-panel）
-   与循环图的画法仍在 v10-project.css，旧资料页（v10-project.css 里 .y10-mt- 那一组）不删不改。 */
+   这里排箭头面板里的各段（#1711）、节点面板里的各段（#1712）与职能详情页（#1713）；
+   面板本体（.y10-cv-panel）与循环图的画法仍在 v10-project.css，旧资料页（v10-project.css
+   里 .y10-mt- 那一组）不删不改。 */
 
 .v20-arrow-panel { display: grid; gap: 8px; }
 .v20-arrow-panel > * { min-width: 0; }
@@ -55,3 +56,17 @@
 /* 底部两个入口：职能详情、本职能的模型请求 */
 .v20-node-entries { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
 .v20-node-entries .y10-btn { text-decoration: none; }
+
+/* 职能详情页（#1713）：职责、由谁做、权限三组只读，模型与 Prompt 一组可改；
+   分组沿用 .y10-block，这里只补这一页自己的几处间距与只读的写法。 */
+.y10-dept-detail .y10-block { margin-top: 14px; }
+.y10-dept-detail .y10-block:first-of-type { margin-top: 16px; }
+.y10-dept-detail .y10-kv { margin: 0; }
+
+/* 模型与 Prompt 一组：当前生效的一行、逐项来源、可改的表单、提醒与保存按这个顺序排 */
+.y10-dept-detail-model { display: grid; gap: 12px; }
+.y10-dept-detail-model .y10-kv { font-size: 12.5px; }
+
+/* 「本职能的模型请求」这一句是这一组底下的入口，与正文分开一点 */
+.y10-dept-detail-model + .y10-note,
+.y10-dept-detail .y10-block-body > .y10-note:last-child { margin-top: 12px; }

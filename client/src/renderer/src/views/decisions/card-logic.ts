@@ -3,6 +3,7 @@
 // 材料按决定种类从决定请求携带的事实里读出。这里是纯函数，界面与单元测试都直接调用。
 
 import type { DecisionView } from "../../api/generated/types.gen";
+import { paths } from "../../shell/routing.ts";
 import { DECISION_KIND, DECISION_REASON, STOP_REASON, label } from "../project/labels.ts";
 
 export type MaterialRow = { term: string; value: string };
@@ -195,12 +196,17 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
 export function decisionLinks(decision: DecisionView): MaterialLink[] {
   const request = (decision.request ?? {}) as Payload;
   const links: MaterialLink[] = [];
-  // 待恢复的决定：前往模型管理与本项目的部门设置（原型 v8 第 6 节的材料表）。
-  // 部门设置落在设置页的那一节上（工单 #1161）：路径带上节名，设置页据此滚到部门设置
+  // 待恢复的决定：前往模型管理与本项目的职能详情（工单 #1161、#1713）。
+  // #1713 起「职能设置」一节不再在设置页上，模型与 Prompt 在职能详情页改：
+  // 请求给出了部门就落到那个部门的详情页，没有部门时落到对话页（这一页始终有）
   if (decision.kind === "model_unavailable") {
     links.push({ label: "前往模型管理", href: "#/sys/models" });
     if (decision.project_id) {
-      links.push({ label: "前往本项目的职能设置", href: `#/p/${decision.project_id}/settings?section=departments` });
+      const department = typeof request.department === "string" ? request.department : "";
+      const href = department === ""
+        ? paths.conversation(decision.project_id, { workItem: decision.work_item_id })
+        : paths.departmentDetail(decision.project_id, department, { workItem: decision.work_item_id });
+      links.push({ label: "前往本项目的职能详情", href });
     }
   }
   // 初始 PRD 的两个工件：PRD.md 与 STRUCTURE.md 指向资料页，资料页按轮展示的正是这两个工件的内容
