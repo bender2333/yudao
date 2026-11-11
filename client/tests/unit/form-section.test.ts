@@ -6,32 +6,44 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
+  DraftDepartment,
   DraftOrganization,
   FormChange,
   FormChoice,
   ProjectOrganizationResult,
 } from "../../src/renderer/src/api/generated/types.gen.ts";
+import type { CommandProblem } from "../../src/renderer/src/contract/command-problem.ts";
 import {
   FORM_CHANGE_HINT,
   NO_REASON,
   OPEN_LOOP_SENTENCE,
+  ORGANIZATION_CHANGE_HINT,
+  ORGANIZATION_NOT_READ,
   adoptPayload,
   actorText,
+  canAddVerifier,
   canAdopt,
   canChangeBack,
+  canRemoveVerifier,
   changeBackPayload,
   choiceView,
   currentFormText,
+  discardedLines,
   formChoices,
   historyRow,
   historyRows,
+  needsRefresh,
+  organizationLine,
   otherChoices,
   reasonText,
+  switchNeedsConfirm,
   versionText,
+  verifierPayload,
 } from "../../src/renderer/src/views/project/form-section-logic.ts";
 
 const THREE = "three_departments";
 const SINGLE = "single_role";
+const SEVERAL = "several_roles_direct";
 
 // 发布带的一份形态：字段与生成的 FormChoice 合同一致
 // 工单 #1647 给 FormChoice 加了五样（轮转、结束方式、卡上的一句话与合成结果），这一节只读形态名、
@@ -251,4 +263,116 @@ test("谁改的：认得的写成页面上的说法，认不出的照实写", ()
 
 test("提示一句：改动只对之后新建的事项生效，正在跑的事项按原来的形态跑完（验收第 4 条）", () => {
   assert.equal(FORM_CHANGE_HINT, "改动只对之后新建的事项生效，正在跑的事项按原来的形态跑完。");
+});
+
+// ---------------------------------------------------------------- 组织一行与两个按钮（工单 #1649）
+
+/** 合成结果里的一个职能：只写这一节读的那几栏，其余按空值。 */
+function department(fields: Partial<DraftDepartment> & Pick<DraftDepartment, "id" | "label">): DraftDepartment {
+  return {
+    target: "", evidence: "", work: "", watched: [], outcomes: [], verifier: false, write_scope: "",
+    ...fields,
+  };
+}
+
+/** 一个项目现在的组织：只有一个职能、没有核验（「工程」）。 */
+function singleOrganization(overrides: Partial<ProjectOrganizationResult> = {}): ProjectOrganizationResult {
+  return organization({
+    form: SINGLE,
+    label: "工程",
+    version: "sha256:single",
+    organization: draft({
+      version: "sha256:single", form: SINGLE, routing: "direct", routing_label: "直做",
+      departments: [department({ id: "engineering", label: "工程" })],
+    }),
+    ...overrides,
+  });
+}
+
+/** 产品 · 工程 · 质检：质检核验工程交出的那一版。 */
+function threeOrganization(): ProjectOrganizationResult {
+  return organization({
+    organization: draft({
+      departments: [
+        department({ id: "product", label: "产品", outcomes: ["product_spec"] }),
+        department({ id: "engineering", label: "工程", watched: ["product_spec"], outcomes: ["delivery_spec"] }),
+        department({ id: "quality", label: "质检", verifier: true, watched: ["delivery_spec"] }),
+      ],
+    }),
+  });
+}
+
+test("组织一行：只有一个职能、没有核验时写没有人核验，并写明加独立核验以后会等它放行", () => {
+  assert.equal(organizationLine(singleOrganization()), "工程，只有一个职能，没有人核验；加独立核验就会等它放行");
+});
+
+test("组织一行：有核验角色时写谁核验后放行与轮转方式，都由合成结果写出", () => {
+  assert.equal(organizationLine(threeOrganization()), "产品 · 工程 · 质检，质检核验后放行，轮转是成果驱动");
+});
+
+test("组织一行：两个职能、没有核验角色时照实写没有核验角色、开环完成", () => {
+  const two = organization({
+    form: SEVERAL,
+    organization: draft({
+      form: SEVERAL, routing: "direct", routing_label: "直做",
+      departments: [department({ id: "product", label: "产品" }), department({ id: "engineering", label: "工程" })],
+    }),
+  });
+  assert.equal(organizationLine(two), "产品 · 工程，没有核验角色，开环完成；加独立核验就会等它放行");
+});
+
+test("合成结果读不出来时照实写明，不编一个职能清单", () => {
+  assert.equal(organizationLine(organization()), ORGANIZATION_NOT_READ);
+});
+
+test("加独立核验：查询给了那份改动就一次点击生效，理由不写，带上页面看到的组织版本", () => {
+  const changes = { add_departments: { quality: { label: "质检" } } };
+  assert.equal(canAddVerifier(singleOrganization({ add_verifier: changes })), true);
+  assert.equal(canAddVerifier(singleOrganization()), false);
+  assert.deepEqual(
+    verifierPayload({ projectId: "p-1", form: SINGLE, changes, baseVersion: "sha256:single" }), {
+      project_id: "p-1",
+      form: SINGLE,
+      changes,
+      reason: "",
+      base_version: "sha256:single",
+      mode: "verifier",
+    });
+});
+
+test("去掉独立核验在同一处：用的是查询给的那份改动，命令还是同一条", () => {
+  const changes = { remove_departments: ["quality"] };
+  const adopted = singleOrganization({ label: "工程 · 质检", remove_verifier: changes });
+  assert.equal(canRemoveVerifier(adopted), true);
+  assert.equal(canRemoveVerifier(singleOrganization()), false);
+  assert.equal(verifierPayload({ projectId: "p-1", form: SINGLE, changes, baseVersion: "sha256:x" }).mode, "verifier");
+});
+
+test("换形态：本项目没有改动时点卡一步生效；有改动时先确认一次，列出会丢掉哪些", () => {
+  assert.equal(switchNeedsConfirm(organization()), false);
+  assert.equal(switchNeedsConfirm(organization({ changes: { departments: { quality: { label: "质检组" } } } })), true);
+  // 查询给的空句子不排进确认清单里
+  assert.deepEqual(discardedLines(["质检的提示", "", "   ", "工程的写范围"]), ["质检的提示", "工程的写范围"]);
+});
+
+test("换形态的提交带上页面看到的组织版本；版本对不上时刷新页面并照实写明", () => {
+  assert.deepEqual(adoptPayload({ projectId: "p-1", form: SINGLE, reason: "", baseVersion: "sha256:three" }), {
+    project_id: "p-1",
+    form: SINGLE,
+    changes: {},
+    reason: "",
+    base_version: "sha256:three",
+  });
+  const stale: CommandProblem = {
+    kind: "rejected",
+    rejection: { command_id: "c-1", reason: "stale_base", message: "组织改过了", current_version: "sha256:new" },
+  };
+  assert.equal(needsRefresh(stale), true);
+  assert.equal(needsRefresh({ kind: "rejected",
+    rejection: { command_id: "c-2", reason: "not_allowed", message: "不认这份改动" } }), false);
+  assert.equal(needsRefresh(null), false);
+});
+
+test("组织一行下面那一句：只对之后新建的事项生效，正在跑的事项按原来的组织做完", () => {
+  assert.equal(ORGANIZATION_CHANGE_HINT, "改动只对之后新建的事项生效，正在跑的事项按原来的组织做完。");
 });

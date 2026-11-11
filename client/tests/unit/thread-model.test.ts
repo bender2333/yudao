@@ -12,10 +12,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  LONG_TEXT_LIMIT, afterSend, chosenRecipient, decisionsForItem, defaultRecipient, draftChanged,
-  isLongText, itemThread, projectDecisions, receiverOf, recipientHint, recipientOptions, shortText,
+  LONG_TEXT_LIMIT, ORGANIZATION_CHANGE_NOTE, afterSend, chosenRecipient, decisionsForItem,
+  defaultRecipient, draftChanged, isLongText, itemThread, organizationChangeAfter, projectDecisions,
+  receiverOf, recipientHint, recipientOptions, shortText,
   type ComposerInput, type ComposerState, type ThreadAsk, type ThreadDecision, type ThreadFlowRecord,
-  type ThreadItemView, type ThreadOrganization,
+  type ThreadItemView, type ThreadOrganization, type ThreadOrganizationChange,
 } from "../../src/renderer/src/views/project/thread-model.ts";
 
 /** 产品 · 工程 · 质检（与发布里的三部门形态同一个结构）。 */
@@ -402,4 +403,58 @@ test("要你决定的气泡按事项取；项目层面的那条不在任何事�
   ];
   assert.deepEqual(decisionsForItem(decisions, "w1").map((entry) => entry.decision_id), ["d1"]);
   assert.deepEqual(projectDecisions(decisions).map((entry) => entry.decision_id), ["d2"]);
+});
+
+// ---------------------------------------------------------------- 组织改过以后的这一句（工单 #1649）
+
+test("组织改过以后，线程里写一句话：之后新建的事项按现在的组织走，这件事项按原来的组织做完", () => {
+  const running = item({ work_item_id: "w1", started_at: at(0) });
+  const entries = itemThread({
+    item: running, flow: [], asks: [], decisions: [], titles: { w1: "做导出" }, expanded: true,
+    organizationChanges: [{ at: at(5), form: "single_role_direct" }],
+  });
+  const notes = entries.filter((entry) => entry.kind === "notice");
+  assert.equal(notes.length, 1);
+  assert.equal((notes[0] as { text: string }).text, ORGANIZATION_CHANGE_NOTE);
+  assert.equal(ORGANIZATION_CHANGE_NOTE, "之后新建的事项按现在的组织走，这件事项按原来的组织做完");
+  assert.deepEqual(entries.map((entry) => entry.kind), ["sep", "notice"]);
+});
+
+test("这一句排在那次改动的时间上，不排到线程最前面", () => {
+  const running = item({ work_item_id: "w1", started_at: at(0) });
+  const entries = itemThread({
+    item: running, flow: [rec({ flow_id: "in1", kind: "你的输入", position: 1, round: 0, content: "把订单导出成 CSV" })],
+    asks: [], decisions: [], expanded: true,
+    organizationChanges: [{ at: at(30), form: "several_roles_direct" }],
+  });
+  const order = entries
+    .filter((entry) => entry.kind !== "sep")
+    .map((entry) => `${entry.kind}:${(entry as { at: string }).at}`);
+  assert.deepEqual(order, [`you:${at(1)}`, `notice:${at(30)}`]);
+});
+
+test("没有改过组织、或事项已经结束：线程里不写这一句", () => {
+  const running = item({ work_item_id: "w1", started_at: at(0) });
+  assert.equal(itemThread({ item: running, flow: [], asks: [], decisions: [], expanded: true })
+    .filter((entry) => entry.kind === "notice").length, 0);
+  // 改动发生在事项开始之前：不算这件事项跑的时候改过
+  assert.equal(itemThread({
+    item: running, flow: [], asks: [], decisions: [], expanded: true,
+    organizationChanges: [{ at: at(-5), form: "single_role_direct" }],
+  }).filter((entry) => entry.kind === "notice").length, 0);
+  // 已经做完的那件按原来的组织做完，不再写这一句
+  const ended = item({ work_item_id: "w1", status: "adopted", stop_reason: "open_loop" });
+  assert.equal(itemThread({
+    item: ended, flow: [], asks: [], decisions: [], expanded: true,
+    organizationChanges: [{ at: at(5), form: "single_role_direct" }],
+  }).filter((entry) => entry.kind === "notice").length, 0);
+});
+
+test("组织改过的这一句只按事项开始以后的改动取，结束的那件与没有改过的不写", () => {
+  const running = item({ work_item_id: "w1", started_at: at(0) });
+  const change: ThreadOrganizationChange = { at: at(5), form: "single_role_direct" };
+  assert.deepEqual(organizationChangeAfter(running, [change]), change);
+  assert.equal(organizationChangeAfter(item({ work_item_id: "w2", status: "adopted", stop_reason: "open_loop" }), [change]), null);
+  assert.equal(organizationChangeAfter(running, []), null);
+  assert.equal(organizationChangeAfter(running, undefined), null);
 });
