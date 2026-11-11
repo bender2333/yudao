@@ -6,7 +6,7 @@
 
 ```powershell
 node .claude/skills/trial/scripts/readout.mjs <导出...> --json
-node .claude/skills/trial/scripts/report.mjs --init <归档>/result.json --task-set trial-tasks@4 --material scenario-3@2 --commit <实际提交> F1=<F1导出> R1=<R1导出>
+node .claude/skills/trial/scripts/report.mjs --init <归档>/result.json --task-set trial-tasks@4 --material <材料版本，读材料清单的 material_version> --commit <实际提交> F1=<F1导出> R1=<R1导出>
 node .claude/skills/trial/scripts/report.mjs --check <归档>/result.json --json --render <归档>/facts.md
 ```
 
@@ -55,7 +55,7 @@ Copy-Item -LiteralPath <控制清单> -Destination <归档>/instances/f1.json
 {
   "schema_version": 1,
   "task_set": "trial-tasks@4",
-  "material_version": "scenario-3@2",
+  "material_version": "<材料清单里的值，例如 scenario-3@3>",
   "tested_commit": "<实际提交>",
   "title": "<本轮事实>",
   "instances": ["instances/f1.json", "instances/r1.json"],
