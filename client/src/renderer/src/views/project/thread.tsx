@@ -16,6 +16,7 @@ import { DECISION_KIND, formatTime, label } from "./labels";
 import {
   isEnded, isLongText, itemThread, projectDecisions, shortText,
   type ThreadDecision, type ThreadEntry, type ThreadFlowRecord, type ThreadItemView, type ThreadMessage,
+  type ThreadOrganizationChange,
 } from "./thread-model";
 import { useCommand, useSnapshot } from "./use-snapshot";
 
@@ -27,6 +28,8 @@ export function ThreadView(props: {
   flow: readonly ThreadFlowRecord[];
   decisions: readonly ThreadDecision[];
   labels: Record<string, string>;
+  /** 项目现在的组织改过的历史：事项跑的时候改过，线程里写一句（工单 #1649） */
+  organizationChanges?: readonly ThreadOrganizationChange[];
   selected: string;
   /** 已经展开对话的那几件结束事项 */
   opened: Record<string, boolean>;
@@ -93,6 +96,7 @@ export function ThreadView(props: {
           decisions={decisionsByItem.get(item.work_item_id) ?? []}
           titles={props.titles}
           labels={props.labels}
+          organizationChanges={props.organizationChanges}
           queuedBehind={item.status === "not_started" && runnable !== null && runnable.work_item_id !== item.work_item_id
             ? props.titles[runnable.work_item_id] ?? "另一件事项" : null}
           onToggle={() => props.onToggleItem(item.work_item_id)}
@@ -123,6 +127,7 @@ function ThreadItem(props: {
   decisions: readonly ThreadDecision[];
   titles: Record<string, string>;
   labels: Record<string, string>;
+  organizationChanges?: readonly ThreadOrganizationChange[];
   queuedBehind: string | null;
   onToggle: () => void;
   onSelect: () => void;
@@ -143,9 +148,11 @@ function ThreadItem(props: {
     decisions: props.decisions,
     titles: props.titles,
     labels: props.labels,
+    organizationChanges: props.organizationChanges,
     queuedBehind: props.queuedBehind,
     expanded: props.expanded,
-  }), [props.item, props.flow, props.decisions, props.titles, props.labels, props.queuedBehind, props.expanded, asks.data]);
+  }), [props.item, props.flow, props.decisions, props.titles, props.labels, props.organizationChanges,
+    props.queuedBehind, props.expanded, asks.data]);
 
   return (
     <div className="y10-th-item" data-testid={`thread-item-${props.item.work_item_id}`}>

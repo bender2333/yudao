@@ -871,3 +871,17 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
 .v20-form-card-line, .v20-form-card-note { margin: 0; font-size: 12.5px; color: var(--muted); }
 .v20-form-card-graph { overflow: hidden; }
 .v20-new-project-dir > summary { font-size: 12.5px; color: var(--muted); cursor: pointer; }
+
+/* 组织刚改过、在跑的事项还按旧组织时，图下面那一行小图（工单 #1649，项目的组织设计说明 4.15）：
+   与新建项目的形态卡同一种画法，缩一号；写一句「之后新建的事项按现在的组织走」 */
+.y10-cv-next {
+  display: grid; gap: 4px; margin-top: 8px; padding: 8px 10px;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface-2);
+}
+.y10-cv-next .y10-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.y10-cv-next .y10-cv-wrap { padding: 8px 8px 6px; border: 0; background: none; }
+.y10-cv-next .y10-cv-cell { gap: 2px; }
+
+/* 设置页「组织」一节的确认清单（换形态时列出会丢掉哪些改动） */
+.y10-confirm { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.y10-list { margin: 0; padding-left: 18px; font-size: 13px; }

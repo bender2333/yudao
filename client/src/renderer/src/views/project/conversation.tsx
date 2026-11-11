@@ -32,6 +32,7 @@ import { interruptionFactRows } from "./floor-text";
 import { ItemPanel, ITEM_PANEL_PICK, type ItemPanelPick } from "./item-panel";
 import { ItemPicker } from "./item-picker";
 import type { DepartmentView } from "./organization";
+import { frozenOrganizationOf } from "./form-cards-model";
 import { graphOf, otherCounts, pickItem, type LoopArrow, type LoopItemView } from "./loop-graph-model";
 import { LoopGraphView, type LoopPanelPick } from "./loop-graph";
 import { LoopPanel, type LoopPanelTarget } from "./loop-panel";
@@ -39,6 +40,7 @@ import { ProjectTimeBar } from "./project-head";
 import { SequenceView } from "./sequence";
 import { hasSequence, sequenceOf, type SequenceRow } from "./sequence-model";
 import { ThreadView } from "./thread";
+import { organizationChangeAfter, type ThreadOrganizationChange } from "./thread-model";
 import {
   receiverOf, runningItem, workingRoleOf, type ComposerInput,
 } from "./thread-model";
@@ -144,6 +146,29 @@ export function ConversationPage(props: {
     asks: askList,
     accumulated,
   }), [item, itemFlow, materials.data, labels, current, currentRoles, others, askList, accumulated]);
+  // 项目现在这份组织改过的历史（设置页加独立核验、换形态，工单 #1649）：线程里一句话，
+  // 图下面一行小图（设计说明 4.15 最后一条：在跑的事项还按旧组织时，图仍画在跑的那件）
+  const organizationChanges = useMemo<ThreadOrganizationChange[]>(
+    () => (props.organization?.history ?? []).map((change) => ({ at: change.at, form: change.form })),
+    [props.organization]);
+  const organizationChange = useMemo(
+    () => (item === null ? null : organizationChangeAfter(item, organizationChanges)),
+    [item, organizationChanges]);
+  const nextGraph = useMemo(() => {
+    const currentOrganization = props.organization?.organization ?? null;
+    if (organizationChange === null || currentOrganization === null) {
+      return null;
+    }
+    // 与新建项目的形态卡同一种画法（form-cards-model 的 frozenOrganizationOf 与 loop-graph-model 的 graphOf）
+    const frozen = frozenOrganizationOf(currentOrganization);
+    return graphOf({
+      item: { work_item_id: "", status: "not_started", organization: frozen },
+      flow: [],
+      materials: null,
+      current: { form: frozen.form, sources: currentOrganization.sources },
+      currentRoles: frozen.roles.map((role) => role.id),
+    });
+  }, [organizationChange, props.organization]);
   // 同一个面板里逐版看：按出现顺序排的箭头
   const arrows = useMemo<LoopArrow[]>(() => [
     ...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows),
@@ -372,6 +397,19 @@ export function ConversationPage(props: {
                     // 点询问线（开着的或累计的）只看这两个职能的时序图（设计说明 4.14 第 2 层）
                     onPickAsk={(from, to) => showPair(itemId, [from, to])}
                   />
+                  {/* 组织刚改过、在跑的事项还按旧组织：图下面多一行小图，写「之后新建的事项按现在的组织走」 */}
+                  {nextGraph === null ? null : (
+                    <div className="y10-cv-next" data-testid="next-organization">
+                      <p className="y10-note">之后新建的事项按现在的组织走</p>
+                      <LoopGraphView
+                        graph={nextGraph}
+                        pick={null}
+                        onPickNode={() => undefined}
+                        onPickArrow={() => undefined}
+                        onPickAsk={() => undefined}
+                      />
+                    </div>
+                  )}
                   {/* 询问读不出来时在图上说一句：不静默少画线（图上的虚线、节点的往来都与时序图读同一份查询） */}
                   {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
                   {/* 时序图展开在循环图下面，不是单独的页，也不盖住线程 */}
@@ -449,6 +487,7 @@ export function ConversationPage(props: {
               flow={records}
               decisions={decisionList}
               labels={labels}
+              organizationChanges={organizationChanges}
               selected={itemId}
               opened={opened}
               onToggleItem={(workItem) => setOpened((previous) => ({ ...previous, [workItem]: !previous[workItem] }))}

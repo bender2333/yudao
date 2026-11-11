@@ -13,6 +13,7 @@
 import type {
   FormChange, FormChoice, ProjectOrganizationResult,
 } from "../../api/generated/types.gen";
+import type { CommandProblem } from "../../contract/command-problem";
 import { departmentName } from "./labels.ts";
 
 // 没有核验角色的那一份在页面上另写的一句（工单验收第 3 条）：事项以开环完成结束，不经过放行。
@@ -186,4 +187,85 @@ export function actorText(actor: string): string {
     return departmentName(value);
   }
   return actor;
+}
+
+// ---------------------------------------------------------------- 组织一行与两个按钮（工单 #1649）
+//
+// 设计说明「形态一键选用」行 337：换组织是选另一张卡，一步生效，理由可以不写；
+// 4.15：设置页的组织一行例如「工程，只有一个职能，没有人核验」，旁边两个按钮「加独立核验」「换形态」。
+// 这一节只回答四件事，组件只负责摆位置：
+//   1. 组织一行：现在这份合成的组织有几个职能、谁核验谁、轮转是什么；
+//   2. 加独立核验与去掉独立核验：用查询给的那一份改动，一次点击生效；
+//   3. 换形态：本项目没有改动时点卡一步生效，有改动时先确认一次，列出会丢掉哪些；
+//   4. 版本对不上时刷新页面：服务端拒绝以后照实写明，不悄悄覆盖。
+
+// 合成结果读不出来时照实写明：不拿发布带的那一份顶替，也不编一个职能清单
+export const ORGANIZATION_NOT_READ = "现在这份组织没有读出来，刷新页面以后再看";
+
+// 组织一行下面那一句：改动只对之后新建的事项生效（工单验收第 4 条）
+export const ORGANIZATION_CHANGE_HINT = "改动只对之后新建的事项生效，正在跑的事项按原来的组织做完。";
+
+// 没有核验角色时写在组织一行末尾的提议：加了独立核验以后就会等它放行
+const VERIFIER_OFFER = "；加独立核验就会等它放行";
+
+// 组织一行：职能名与核验关系都由合成结果写出，页面不另写一句
+export function organizationLine(organization: ProjectOrganizationResult): string {
+  const current = organization.organization;
+  if (current === null || current === undefined) {
+    return ORGANIZATION_NOT_READ;
+  }
+  const names = current.departments.map((department) => department.label).join(" · ");
+  const verifiers = current.departments
+    .filter((department) => department.verifier)
+    .map((department) => department.label);
+  if (verifiers.length === 0) {
+    // 只有一个职能时写只有一个职能，不止一个时写没有核验角色、开环完成
+    if (current.departments.length === 1) {
+      return `${names}，只有一个职能，没有人核验${VERIFIER_OFFER}`;
+    }
+    return `${names}，没有核验角色，开环完成${VERIFIER_OFFER}`;
+  }
+  return `${names}，${verifiers.join("、")}核验后放行，轮转是${current.routing_label}`;
+}
+
+// 能不能加独立核验：查询给了那份改动才有这一项（后端没有核验角色时给）
+export function canAddVerifier(organization: ProjectOrganizationResult): boolean {
+  return Object.keys(organization.add_verifier ?? {}).length > 0;
+}
+
+// 能不能去掉独立核验：查询给了要撤掉的那一份改动才有这一项（只撤本项目加进来的那个核验角色）
+export function canRemoveVerifier(organization: ProjectOrganizationResult): boolean {
+  return Object.keys(organization.remove_verifier ?? {}).length > 0;
+}
+
+// 加独立核验 / 去掉独立核验：同一条命令，理由不写；改动用查询给的那一份，不在这里拼部门定义
+export function verifierPayload(props: {
+  projectId: string;
+  form: string;
+  changes: Record<string, unknown>;
+  baseVersion: string | null;
+}): Record<string, unknown> {
+  return {
+    project_id: props.projectId,
+    form: props.form,
+    changes: props.changes,
+    reason: "",
+    base_version: props.baseVersion,
+    mode: "verifier",
+  };
+}
+
+// 换形态要不要先确认一次：本项目改过组织（职能、定义、写范围等）才要
+export function switchNeedsConfirm(organization: ProjectOrganizationResult): boolean {
+  return Object.keys(organization.changes ?? {}).length > 0;
+}
+
+// 确认时列出会丢掉哪些：用查询（organization.draft）给的句子，空句子不排进来
+export function discardedLines(lines: readonly string[]): string[] {
+  return lines.map((line) => line.trim()).filter((line) => line !== "");
+}
+
+// 版本对不上：服务端拒绝了这一条以后刷新页面，照实写明，不悄悄覆盖别处刚改过的组织
+export function needsRefresh(problem: CommandProblem | null): boolean {
+  return problem !== null && problem.kind === "rejected" && problem.rejection.reason === "stale_base";
 }
