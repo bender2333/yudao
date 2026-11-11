@@ -713,8 +713,6 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
 # v8/v13 的设计说明。与 client/ 下声明了原型的文件同一个结论，只是没有写在文件开头。
 PROTO_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/src/renderer/src/pixel/floor/render.ts", "原型 v10 floor.js 的绘制部分"),
-    ("client/src/renderer/src/views/project/floor-screen.tsx", "回放到过去的时间点时不显示决定请求"),
-    ("client/src/renderer/src/views/project/floor-screen.tsx", "回到那个位置的概览回放"),
 )
 
 # 工单 #1411 正文点名的几行：那里的第 12 节是已删去的「从现有代码过去的路径」，

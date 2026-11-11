@@ -7,7 +7,7 @@
 //
 // 各段的文字与结构由 arrow-panel-model.ts 算，这里只按它画。复用的三处：逐条结论的表与截图缩略图
 // 在 criteria-table.tsx，试用用例的步骤与截图（点开看原尺寸）在 trials.tsx，下载用的 data URL
-// 在 materials-download.ts。旧资料页 materials.tsx 不删不改，两块面板并存。
+// 在 materials-download.ts。旧资料页已随工单 #1716 删掉，这三处只由这里与逐条结论表面板用。
 //
 // 外部来源的原文沿用同一块面板下面工作过程里那一步的「查看外部来源」（work-process.tsx）：设计说明
 // 「项目页上的内容在哪里看」把外部来源的原文放在工作过程那一步的原始数据里。

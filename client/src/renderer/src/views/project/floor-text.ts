@@ -21,25 +21,6 @@ import { DEPARTMENT_STATE, RECOVERY_STATE, departmentName, formatDuration, label
 // 颜色
 
 /**
- * 资料页事项卡片的颜色（原来取自 pixel/registry.ts 的 ITEM_COLORS）：六种，按事项序号轮换，
- * 卡片左侧的色条与画面上的成果同一个颜色。画面上另一份色板（pixel/world/floor.ts）是画布用的，
- * 两者取值不同，页面上这份照原样留。
- */
-export const ITEM_COLORS: readonly string[] = Object.freeze([
-  "#e8505b", "#f7c948", "#3fc1e8", "#f27ec2", "#8fd14f", "#b98558",
-]);
-
-/** 事项列表色点用的色板（原来取自 pixel/world/floor.ts 的 ITEM_COLORS）：与门口小旗、包裹同一种颜色。 */
-const DOT_COLORS: readonly string[] = Object.freeze([
-  "#d9534f", "#4a90d9", "#5cb85c", "#f0ad4e", "#9b59b6", "#e67e22",
-]);
-
-/** 事项的颜色序号到色点：序号超出色板时轮换（原来取自 pixel/world/floor.ts 的 itemColor）。 */
-export function itemColor(item: { color_index?: number }): string {
-  return DOT_COLORS[(Number(item.color_index) || 0) % DOT_COLORS.length];
-}
-
-/**
  * 首页楼下列表的楼层状态词与配色（原来取自 pixel/building/status-text.ts 的 BUILDING_STATUS）：
  * 状态灯的取值就是画面合同 FLOOR_SIGNS 的八个，取值不在表里时调用处按原样写。
  */

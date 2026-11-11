@@ -12,7 +12,6 @@ import type { FactRef, FlowRecord, ProjectLoopResult, ProjectRow, WorkItemLoop }
 import {
   EVENT_KIND_LABELS, factElementRows, flowPairRows, projectDoingText, projectItemsByDepartmentText, projectSlotText,
 } from "../../src/renderer/src/views/project/floor-text.ts";
-import { flowSegmentsOf } from "../../src/renderer/src/views/project/flow-segments.ts";
 
 function project(overrides: Partial<ProjectRow> & { project_id: string }): ProjectRow {
   return {
@@ -174,10 +173,6 @@ test("流转表遇到新的流转种类不报错：你的输入、指导与放�
     { from: "没有", to: "产品", count: 1, rework: 0, kinds: "你的输入 1" },
     { from: "没有", to: "工程", count: 1, rework: 0, kinds: "指导 1" },
     { from: "质检", to: "工程", count: 1, rework: 0, kinds: "放行 1" },
-  ]);
-  // 覆盖层的分段只收有方向的那一条：另外两条没有来源部门，不画成某两个部门之间的流转
-  assert.deepEqual(flowSegmentsOf(records).map((segment) => [segment.from, segment.to, segment.kind]), [
-    ["quality", "engineering", "放行"],
   ]);
 });
 

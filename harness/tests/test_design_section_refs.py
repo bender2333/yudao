@@ -119,8 +119,6 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
 # （与转换脚本的 PROTO_AS_IS 一致）
 PROTO_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/src/renderer/src/pixel/floor/render.ts", "原型 v10 floor.js 的绘制部分"),
-    ("client/src/renderer/src/views/project/floor-screen.tsx", "回放到过去的时间点时不显示决定请求"),
-    ("client/src/renderer/src/views/project/floor-screen.tsx", "回到那个位置的概览回放"),
 )
 
 # 判断「前面是不是写了别的文档」时，往回看这么多字

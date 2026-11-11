@@ -27,7 +27,7 @@ import { scopeName } from "./scope-name";
 
 const PAGE_SIZE = 50;
 
-// 页头的计数说法要的几个数（attempts-summary.ts 用它们写副标题）
+// 页头的计数说法要的几个数
 export type RequestsSummary = {
   inFlight: number;
   total: number | null;
