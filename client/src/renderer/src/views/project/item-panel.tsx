@@ -1,5 +1,5 @@
 /**
- * 事项面板（工单 #1708，docs/design/project-organization.md 4.14「事项面板与全部事项」）。
+ * 事项面板（工单 #1708，docs/design/project-organization.md「事项面板与全部事项」）。
  *
  * 与节点面板、箭头面板同一个位置，一次只开一个：点选事项一行里选中那件事项的标题开它，点节点或箭头换成那个面板。
  * 面板从上到下一共五段，每段写的都是查询给的事实（模型在 item-panel-model.ts）：

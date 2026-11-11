@@ -1,5 +1,5 @@
 /**
- * 事项面板的模型（工单 #1708，docs/design/project-organization.md 4.14「事项面板与全部事项」）。
+ * 事项面板的模型（工单 #1708，docs/design/project-organization.md「事项面板与全部事项」）。
  *
  * 面板回答三件事：这件事走到哪、为什么停、接下来能做什么。三样都照查询给的事实写，页面不自己判：
  * 状态、第几轮、已用时间取 project.loop；停止原因与说明取 project.overview；循环停在哪一层、凭什么判取

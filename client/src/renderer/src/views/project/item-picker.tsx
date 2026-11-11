@@ -1,5 +1,5 @@
 /**
- * 图上画哪一件事项（工单 #1708，docs/design/project-organization.md 4.14「事项面板与全部事项」）。
+ * 图上画哪一件事项（工单 #1708，docs/design/project-organization.md「事项面板与全部事项」）。
  *
  * 这一行在对话上方、循环图的正上方，从 conversation.tsx 搬出来：
  *   - 只有一件事项时也照样有这一行，选中那件的标题可以点，点开它的事项面板；
