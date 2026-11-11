@@ -8,13 +8,13 @@
 import asyncio
 import json
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import Callable
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
-from harness.models import ArtifactRef, EventType, json_dumps
+from harness.models import ArtifactRef, Event, EventType, json_dumps
 from harness.projection import saved_decisions
 from harness.proposals import (
     answer_turn,
@@ -27,10 +27,10 @@ from harness.proposals import (
     review,
     review_turn,
 )
-from harness.providers.call import ModelCall, ModelResponse, ModelStreamEvent
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import guidance_reply, python_snippet, quality_turns
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.signals import Signals, SignallingAdapter
 
 CHECKS = {"smoke": {"command": python_snippet("print('smoke ok')")}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
@@ -38,96 +38,28 @@ TEST_FILE = f"{QA_TESTS_DIR}/test_echo.py"
 TEST_CONTENT = "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"
 
 # 同时进行的部门之间谁先谁后由事件决定（工单 #1431，测试分层设计说明「测试的写法」）：假模型的某次调用
-# 可以标上「先等一个信号」，信号来自本次运行提交的事件。等待的上限只用来防止测试一直等（与 #1248 同口径，
-# 见 harness/tests/wait_limits.py），到点以写明在等什么的失败结束。
+# 可以标上「先等一个信号」，信号来自本次运行提交的事件；发信号与等信号的做法见 harness/tests/signals.py。
 _SIGNAL_DESCRIPTIONS = {
     "departments_working": "工程与质检各自进入一轮工作（两条 model_requested 事件）",
     "decision_recorded": "产品的补充决定记下（product_decision_accepted 事件）",
 }
 
 
-class _Signals:
-    """事件日志里的信号：订阅提交的事件，等到某个信号的那次模型调用被放行（工单 #1431）。"""
+def _signalling(signals: Signals) -> Callable[[Event], None]:
+    """这两个信号各由哪些提交决定：工程与质检都进入一轮工作，产品的补充决定被接纳（工单 #1431）。"""
+    started: set[str] = set()
 
-    def __init__(self) -> None:
-        self._fired: set[str] = set()
-        self._started: set[str] = set()
-        self._waiters: dict[str, asyncio.Event] = {}
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self.failures: list[str] = []
-
-    def watch(self, system: LoopSystem) -> None:
-        system.store.subscribe(self._committed)
-
-    def _committed(self, events) -> None:
+    def committed(event: Event) -> None:
         # 订阅方在提交这条事件的一方所在的线程里被调用
-        for event in events:
-            department = getattr(event, "department", None)
-            if event.type == EventType.MODEL_REQUESTED and department in ("engineering", "quality"):
-                self._started.add(department)
-                if {"engineering", "quality"} <= self._started:
-                    self._fire("departments_working")
-            elif event.type == EventType.PRODUCT_DECISION_ACCEPTED:
-                self._fire("decision_recorded")
+        department = getattr(event, "department", None)
+        if event.type == EventType.MODEL_REQUESTED and department in ("engineering", "quality"):
+            started.add(department)
+            if {"engineering", "quality"} <= started:
+                signals.fire("departments_working")
+        elif event.type == EventType.PRODUCT_DECISION_ACCEPTED:
+            signals.fire("decision_recorded")
 
-    def _fire(self, name: str) -> None:
-        self._fired.add(name)
-        waiter = self._waiters.get(name)
-        if waiter is None:
-            return
-        try:
-            running = asyncio.get_running_loop()
-        except RuntimeError:
-            running = None
-        if self._loop is not None and running is not self._loop:
-            self._loop.call_soon_threadsafe(waiter.set)
-        else:
-            waiter.set()
-
-    async def wait(self, name: str) -> None:
-        if name in self._fired:
-            return
-        self._loop = asyncio.get_running_loop()
-        waiter = self._waiters.setdefault(name, asyncio.Event())
-        if name in self._fired:
-            return
-        try:
-            await asyncio.wait_for(waiter.wait(), WAIT_FOR_HOST_WORK_SEC)
-        except TimeoutError:
-            message = f"等不到信号「{name}」：{_SIGNAL_DESCRIPTIONS.get(name, name)}"
-            self.failures.append(message)
-            raise AssertionError(message) from None
-
-
-class _SignallingAdapter(FakeAdapter):
-    """按事件日志里的信号放行的假模型（工单 #1431）。
-
-    waits 的键是（部门，这个部门第几次模型调用，从 0 起）：这一次调用先等键里的信号再交出回答。
-    这个用例的会话都是各部门的主线（没有询问分支），按部门数第几次调用就够。
-    """
-
-    def __init__(self, script, *, waits: dict[tuple[str, int], str] | None = None, **kwargs) -> None:
-        super().__init__(script, **kwargs)
-        self._waits = dict(waits or {})
-        self._calls: dict[str, int] = {}
-        self.signals = _Signals()
-
-    def watch(self, system: LoopSystem) -> None:
-        self.signals.watch(system)
-
-    @property
-    def wait_failures(self) -> list[str]:
-        return self.signals.failures
-
-    async def stream(self, call: ModelCall) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
-        index = self._calls.get(call.department, 0)
-        self._calls[call.department] = index + 1
-        signal = self._waits.get((call.department, index))
-        if signal is not None:
-            await self.signals.wait(signal)
-        async for item in super().stream(call):
-            yield item
-
+    return committed
 
 def _call(identity: str, name: str, arguments: dict) -> dict:
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
@@ -549,7 +481,7 @@ def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path:
         seen["product"] = prompt_part(call, "work_notification")
         return guidance_reply()(call)
 
-    adapter = _SignallingAdapter({
+    adapter = SignallingAdapter({
         "product": [product_spec(), decide_while_the_others_work, product_after_the_decision],
         "engineering": [engineering_keeps_working, engineering_delivers],
         "quality": [quality_keeps_working, quality_explores, *([quality_reviews] * 10)],
@@ -557,7 +489,7 @@ def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path:
               ("engineering", 0): "decision_recorded",
               ("quality", 0): "decision_recorded"})
     system = LoopSystem.for_testing(tmp_path, adapter)
-    adapter.watch(system)
+    adapter.watch(system, _signalling(adapter.signals))
     holder["system"] = system
     run_id = system.create_run("build an echo CLI")
     system.activate_once(run_id)
