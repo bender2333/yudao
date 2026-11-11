@@ -224,6 +224,47 @@ export function projectDecisions(decisions: readonly ThreadDecision[]): ThreadDe
   return decisions.filter((decision) => decision.work_item_id === null && decision.status !== "withdrawn");
 }
 
+/** 项目现在的组织改过（project.organization 的历史）：换形态或加独立核验的那一次改动。 */
+export interface ThreadOrganizationChange {
+  /** 改动发生的时刻 */
+  at: string;
+  /** 改动以后的形态标识（不写到页面上） */
+  form?: string | null;
+}
+
+/**
+ * 组织改过、这件事项还按原来那一份在跑时线程里写的一句（设计说明 4.14 第 5 条：
+ * 升级不走对话框，只对之后的事项生效，线程里一句话说明）。
+ */
+export const ORGANIZATION_CHANGE_NOTE = "之后新建的事项按现在的组织走，这件事项按原来的组织做完";
+
+/**
+ * 这件事项跑的时候项目改过组织吗：只看还没结束的事项，取开始以后最近的那一条改动。
+ * 开始时刻没有时返回 null（照实不写这一句，不拿别的时间顶）。
+ */
+export function organizationChangeAfter(
+  item: { status: string; started_at?: string | null },
+  changes: readonly ThreadOrganizationChange[] | undefined,
+): ThreadOrganizationChange | null {
+  // 已经结束的事项按原来那一份做完了，不再写这一句
+  if (DONE_STATUS.has(item.status)) {
+    return null;
+  }
+  const started = typeof item.started_at === "string" && item.started_at !== ""
+    ? Date.parse(item.started_at)
+    : Number.NaN;
+  if (Number.isNaN(started)) {
+    return null;
+  }
+  for (const change of changes ?? []) {
+    const at = Date.parse(change.at);
+    if (!Number.isNaN(at) && at > started) {
+      return change;
+    }
+  }
+  return null;
+}
+
 export interface ItemThreadInput {
   item: ThreadItemView;
   flow: readonly ThreadFlowRecord[];
@@ -235,6 +276,8 @@ export interface ItemThreadInput {
   labels?: Record<string, string>;
   /** 这件事项在排队时排在谁后面（有事项在做时新开的那一件）；没有时为空 */
   queuedBehind?: string | null;
+  /** 项目现在的组织改过的历史（project.organization 的 history）；这件事项跑的时候改过就写一句 */
+  organizationChanges?: readonly ThreadOrganizationChange[];
   /** 已结束的事项要展开才看完整的；默认收起 */
   expanded?: boolean;
 }
@@ -447,6 +490,16 @@ export function itemThread(input: ItemThreadInput): ThreadEntry[] {
     atoms.push({
       kind: "entry", time, at, order: order++,
       entry: { kind: "notice", key: `queue:${itemId}`, item: itemId, at, text: `排在「${input.queuedBehind}」后面，它做完才开始` },
+    });
+  }
+
+  // 组织在这次事项跑的时候改过：线程里一句话写明之后新建的事项按新组织走、这件事项按原来的做完
+  const changed = organizationChangeAfter(item, input.organizationChanges);
+  if (changed !== null) {
+    const { at, time } = stamp(changed.at, 0);
+    atoms.push({
+      kind: "entry", time, at, order: order++,
+      entry: { kind: "notice", key: `org:${itemId}`, item: itemId, at, text: ORGANIZATION_CHANGE_NOTE },
     });
   }
 
