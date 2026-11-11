@@ -347,8 +347,9 @@ export function WorkLineItem(props: {
                   type="button"
                   className="y10-link"
                   onClick={() => {
+                    // 从工作过程进请求详情（工单 #1710）：写明来处，返回时回到这一事项的对话页
                     window.location.hash = paths.observeDetail(props.projectId, attempt.id, {
-                      workItem: props.workItemId, runId: props.runId, department: props.department,
+                      workItem: props.workItemId, runId: props.runId, department: props.department, from: "conversation",
                     });
                   }}
                 >
