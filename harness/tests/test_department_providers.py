@@ -224,14 +224,37 @@ def _provider_server(provider: str, key: str, responder: Responder) -> Iterator[
         server.server_close()
         worker.join(timeout=2)
 
-def _connections_kept_alive(captures: list[dict[str, Any]]) -> list[tuple[int, int]]:
+def _kept_alive_pairs(captures: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     # Responses 的连接池使用 SDK 的默认连接限制（DEFAULT_CONNECTION_LIMITS），空闲超过保持时限的连接关闭。
-    # 相邻两次请求之间，服务端开始送出回复到收到下一次请求的时间不短于客户端连接的空闲时间；这段时间短于
-    # 保持时限时，两次请求必须使用同一个连接。运行按顺序发出请求，两次请求不会同时进行。返回这些相邻请求的端口
+    # 服务端开始送出回复到收到下一次请求的时间不短于客户端连接的空闲时间；这段时间短于保持时限时，服务端
+    # 收到下一次请求那一刻，上一条连接一定还在池里空闲着。返回这样的相邻两次请求
     keepalive = DEFAULT_CONNECTION_LIMITS.keepalive_expiry
-    return [(earlier["client_port"], later["client_port"])
+    return [(earlier, later)
             for earlier, later in zip(captures, captures[1:])
             if 0 <= later["arrived"] - earlier["replied"] < keepalive]
+
+def _reuse_violations(captures: list[dict[str, Any]]) -> list[str]:
+    # 连接复用：池里有连接空闲着时，下一次请求沿用其中一条，不新开一条（工单 #1673）。
+    # 一个职能按顺序发出请求，读完回复才发下一次；同一个职能在服务端相邻的两次请求中间没有别的职能的请求
+    # 到达时，前一次在后一次发出之前已经结束，它的连接回到了池里。两次的间隔又短于保持时限，这条连接没有
+    # 过期，后一次却用了没见过的端口，就是新开了一条，复用没有发生。别的相邻对不比较：产品与质检共用一个
+    # 池，前一次请求的回复还在客户端读时（服务端只看得到「开始送出回复」）另一个职能的请求不等它，池里没有
+    # 空闲连接，新开一条是正常的复用行为（工单 #1673 失败的 timeline 就是这一种）
+    keepalive = DEFAULT_CONNECTION_LIMITS.keepalive_expiry
+    violations = []
+    used: set[int] = set()
+    for earlier, later in zip(captures, captures[1:]):
+        used.add(earlier["client_port"])
+        if _department(earlier["body"]) != _department(later["body"]):
+            continue
+        if not 0 <= later["arrived"] - earlier["replied"] < keepalive:
+            continue
+        if later["client_port"] not in used:
+            violations.append(
+                f"{_department(later['body'])} 在 {round(later['arrived'], 2)} 用了新连接 "
+                f"{later['client_port']}：同一个职能上一次请求的回复在 {round(earlier['replied'], 2)} 已经送出，"
+                f"连接回到了池里，池里的连接 {sorted(used)} 还空闲着")
+    return violations
 
 def _part(body: dict[str, Any], name: str) -> str | None:
     # Work requests open with the pinned department material; tool-less compaction requests
@@ -439,11 +462,19 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
             department = _department(item["body"])
             assert item["body"]["model"] == ("a-product" if department == "product" else "a-quality")
         assert {item["body"]["model"] for item in captures_b} == {"b-engineering"}
-        timeline = [(item["client_port"], round(item["arrived"], 2), round(item["replied"], 2))
+        timeline = [(item["client_port"], round(item["arrived"], 2), round(item["replied"], 2),
+                     _department(item["body"]))
                     for item in captures_a + captures_b]
-        kept_alive = _connections_kept_alive(captures_a) + _connections_kept_alive(captures_b)
-        assert kept_alive, timeline
-        assert all(earlier == later for earlier, later in kept_alive), timeline
+        # 连接复用：没有重叠的相邻两次请求用同一个连接（工单 #1673）。provider-b 只有工程一个职能在取用，
+        # 它的相邻两次请求按顺序发生，后一次必须沿用前一次的连接
+        engineering_pairs = _kept_alive_pairs(captures_b)
+        assert engineering_pairs, timeline
+        assert all(earlier["client_port"] == later["client_port"]
+                   for earlier, later in engineering_pairs), timeline
+        # provider-a 由产品与质检共用：被接纳以后两个职能同时工作，重叠的两个请求各自占一条连接，所以只在
+        # 能排除重叠的相邻对上比较端口；另外守住池里确实有连接被沿用，不是每次请求新开一条
+        assert _reuse_violations(captures_a) == [], timeline
+        assert len({item["client_port"] for item in captures_a}) < len(captures_a), timeline
         assert {item["client_port"] for item in captures_a}.isdisjoint(
             item["client_port"] for item in captures_b
         )
