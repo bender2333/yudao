@@ -1,3 +1,4 @@
+import json
 import time
 import uuid
 
@@ -6,11 +7,13 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.demo import demo_script
+from harness.direct import SINGLE_ROLE_DIRECT
 from harness.models import EventType, ProjectEventType, Usage
 from harness.projection import project_run
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import running_api
+from harness.tests.api_helpers import catalog_model, catalog_provider, running_api
+from harness.tests.protocol_helpers import serve, stub_stream
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 from harness.tests.helpers import quality_turns
 
@@ -288,3 +291,90 @@ def test_startup_settles_pending_and_query_does_not_settle(data_dir):
         overview = client.get(f"/api/queries/project.overview?project_id={project_id}")
         assert overview.status_code == 200
         assert opened.store.end_position() == position
+
+
+class _ChosenDepartments:
+    # 真实目录文件与真实 .env：只有给定的部门选了模型；模型回答由测试内启动的本机服务按 Responses 协议给出。
+    # 就绪检查这一段在假适配器下整段跳过，所以这里不用假适配器（工单 #1700）
+    def __init__(self, tmp_path, base_url: str, *, departments: tuple[str, ...]) -> None:
+        self.data_dir = tmp_path / "data"
+        self.config = tmp_path / "providers.json"
+        self.dotenv = tmp_path / ".env"
+        self.base_url = base_url
+        self.departments = departments
+        self.applications: list[Application] = []
+
+    def __call__(self) -> Application:
+        document = {
+            "providers": [catalog_provider("provider-a", self.base_url, "KEY_A")],
+            "models": [catalog_model("model-a", "provider-a", "upstream-a")],
+            "bindings": {department: {"provider_id": "provider-a", "model_id": "model-a"}
+                         for department in self.departments},
+        }
+        self.config.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+        self.dotenv.write_text("KEY_A=issue1700-key-a\n", encoding="utf-8")
+        application = Application.open(self.data_dir, provider_config=self.config, dotenv=self.dotenv)
+        self.applications.append(application)
+        return application
+
+    @property
+    def system(self) -> LoopSystem:
+        return self.applications[-1].system
+
+    def admit(self) -> None:
+        self.system.facade.record_admission("provider-a", "model-a", admitted_model="upstream-a")
+
+
+def _wait_task(system, run_id: str) -> None:
+    deadline = time.monotonic() + WAIT_FOR_HOST_WORK_SEC
+    while time.monotonic() < deadline:
+        task = system.orchestrator.work_item_execution(run_id)
+        if task is None or task.done():
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"事项 {run_id} 没有停下来")
+
+
+def _settle(client, system, refs: dict) -> None:
+    # 让这个事项停在这里：还在进行时取消，已经结束就不再取消；随后等执行任务结束，留出执行槽位
+    if project_run(system.store, refs["run_id"]).status not in ("done", "failed"):
+        cancelled = _post(client, "work_item.cancel", base_version=0, work_item_id=refs["work_item_id"])
+        assert cancelled.status_code == 200, cancelled.text
+    _wait_task(system, refs["run_id"])
+
+
+def test_readiness_for_a_new_work_item_only_checks_the_item_organization(tmp_path):
+    # 工单 #1700（形态与核验角色设计说明「形态随事项冻结」）：新建事项前的模型就绪只看这件事项要冻结的那份
+    # 组织里的职能。只给工程选了模型时，「工程」的项目能新建事项；默认形态的项目被拒绝，说明写明是哪个职能
+    server, _capture, base_url = serve(lambda _body: (200, "text/event-stream", [stub_stream()]))
+    try:
+        opened = _ChosenDepartments(tmp_path, base_url, departments=("engineering",))
+        with running_api(opened) as client:
+            opened.admit()
+            single = _post(client, "project.create", name="工程形态", goal="只给工程选模型",
+                           form=SINGLE_ROLE_DIRECT)
+            assert single.status_code == 200, single.text
+            single_project = single.json()["refs"]["project_id"]
+            started = _post(client, "work_item.create", project_id=single_project, text="工程的事项")
+            assert started.status_code == 200, started.text
+            _settle(client, opened.system, started.json()["refs"])
+
+            default = _post(client, "project.create", name="默认形态", goal="三个职能都要模型")
+            assert default.status_code == 200, default.text
+            default_project = default.json()["refs"]["project_id"]
+            rejected = _post(client, "work_item.create", project_id=default_project, text="默认形态的事项")
+            assert rejected.status_code == 409, rejected.text
+            assert rejected.json()["reason"] == "provider_unavailable"
+            message = rejected.json()["message"]
+            # 说明写明是哪个职能没有可用的模型，不只写「不可用」
+            assert "产品" in message and "质检" in message, message
+            assert "工程部门还没有选择模型" not in message, message
+
+            # 新建事项时临时选「工程」：按工程这一份组织的职能核对，能开始
+            temporary = _post(client, "work_item.create", project_id=default_project, text="临时选工程",
+                              form=SINGLE_ROLE_DIRECT)
+            assert temporary.status_code == 200, temporary.text
+            _settle(client, opened.system, temporary.json()["refs"])
+    finally:
+        server.shutdown()
+        server.server_close()

@@ -9,9 +9,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..event_store import Command
-from ..definitions import DEFINITIONS
+from ..definitions import DEFINITIONS, Definitions
 from ..models import DEPARTMENTS, TERMINAL_STATUSES, Event, ProjectEvent
 from ..interactions import RunTerminalError
+from ..organization_compose import current_organization
+from ..project_projection import ProjectProjection
 from ..projection import RunNotFoundError
 from ..providers.errors import CatalogValidationError
 from ..providers.selection import ModelSelection
@@ -215,11 +217,18 @@ async def _create_work_item(application: "Application", command: Command, reques
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝
     if system.orchestrator.busy():
         raise Rejection("busy", "已有事项正在执行，等它结束以后才能新建")
-    status = system.provider_status()
+    # 模型就绪只看这件事项要冻结的那份组织里的职能（工单 #1700，形态与核验角色设计说明「形态随事项冻结」）：
+    # 「工程」的项目只要工程有可用的模型就能开始，别的职能没有模型不挡它。假适配器在激活时按 fake 协议
+    # 登记目标，仍按原来的整体就绪问
+    departments = _item_departments(application, project, request, forms)
+    if system.orchestrator.test_adapter_factory is not None:
+        status = system.provider_status()
+    else:
+        status = system.facade.describe_readiness(departments)
     if not status.get("available", False):
         raise Rejection("provider_unavailable", status.get("message") or "模型调用目标不可用")
-    # 新建事项前按该项目的设置对三个部门解析：任何一个无法解析时拒绝，说明部门与具体项
-    failure = _unresolved_department(application, request.project_id)
+    # 再按该项目的设置对这些职能逐个解析（项目里的部门设置覆盖系统默认）：任何一个无法解析时拒绝，说明职能与具体项
+    failure = _unresolved_department(application, request.project_id, departments)
     if failure is not None:
         department, item, message = failure
         raise Rejection("provider_unavailable", f"部门 {department} 的{item}无法解析：{message}")
@@ -239,14 +248,28 @@ async def _create_work_item(application: "Application", command: Command, reques
     system.orchestrator.start_work_item(run_id)
 
 
-def _unresolved_department(application: "Application", project_id: str) -> tuple[str, str, str] | None:
-    # 按该项目的设置解析三个部门（模型访问定义与请求档位分别继承），返回第一个无法解析的部门与具体项。
+def _item_departments(application: "Application", project: ProjectProjection, request: WorkItemCreate,
+                      forms: dict[str, Definitions]) -> tuple[str, ...]:
+    # 这件事项要冻结的那份组织里的职能（工单 #1700，项目的组织设计说明「冻结与升级」）：临时选一份形态时
+    # 用形态本身（不带本项目的改动，与 Projects._item_organization 同一个口径），否则用项目现在的形态加本项目
+    # 的改动。合不到一起时交回三个默认职能，原因由 start_work_item 的 OrganizationRejectedError 写明
+    form_name = request.form or project.form_name
+    changes = {} if request.form is not None else dict(project.organization_changes)
+    definitions, _issues = current_organization(forms, form_name, changes, store=application.system.store)
+    if definitions is None:
+        return DEPARTMENTS
+    return tuple(str(department.id) for department in definitions.organization.departments)
+
+
+def _unresolved_department(application: "Application", project_id: str,
+                           departments: tuple[str, ...]) -> tuple[str, str, str] | None:
+    # 按该项目的设置解析这份组织里的职能（模型访问定义与请求档位分别继承），返回第一个无法解析的职能与具体项。
     # 没有写入任何项目部门设置的项目按部门默认检查（最后一段）
     system = application.system
     if system.orchestrator.test_adapter_factory is not None:
         # 确定性测试与演示的适配器在激活时按 fake 协议登记目标，这里不重复解析目录（#45 答复第 6 条）
         return None
-    for department in DEPARTMENTS:
+    for department in departments:
         setting = system.projects.read_projection_setting(project_id, department)
         project_selection = ModelSelection(
             provider_id=None if setting is None else setting.provider_id,
