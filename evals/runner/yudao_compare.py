@@ -27,9 +27,21 @@ def compare(current, baseline):
 
     返回的 verdict 是 "improved" / "no_difference" / "regressed" / "blocked" 之一；
     blocked 时保留已算的逐任务差值。配对按运行序号（`runs` 数组的位置，从 1 起）。
+    指定形态的运行单独列出，不进版本比较（工单 #1705）。
     """
     material = current.get("material_version")
     scorer = current.get("scorer_version")
+    form = current.get("form") or baseline.get("form")
+    if form:
+        return {"compared": False,
+                "block_reason": "指定形态的运行不进版本比较：" + str(form),
+                "verdict": "blocked",
+                "material_version": material, "scorer_version": scorer,
+                "paired_tasks": [], "unpaired": {"current": [], "baseline": []},
+                "noise": None,
+                "primary": {"metric": PRIMARY_METRIC, "current": None, "baseline": None,
+                            "difference": None},
+                "secondary": []}
     if material != baseline.get("material_version") or scorer != baseline.get("scorer_version"):
         return {"compared": False,
                 "block_reason": ("材料版本或评分器版本不同："
@@ -184,9 +196,23 @@ def compare_sides(yudao_result, opencode_result):
     2 次运行里，质检在时间上限以内给出结论、最终交付比本次第一次交付多通过至少 1 条
     隐藏检查；第一次交付已经全部通过的运行不计入；每一次运行都没有质检误放行。
     逐次并排的表只报告，不单独据此判定。
+    指定形态的运行单独列出，不进与单个 agent 的对照（工单 #1705）。
     """
     material = yudao_result.get("material_version")
     scorer = yudao_result.get("scorer_version")
+    form_block = None
+    if yudao_result.get("form"):
+        form_block = ("指定形态的运行不进与单个 agent 的对照："
+                      + str(yudao_result.get("form")))
+    if form_block is not None:
+        return {"compared": False, "verdict": "blocked", "verdict_label": VERDICT_LABELS["blocked"],
+                "block_reason": form_block,
+                "scenario": yudao_result.get("scenario"),
+                "material_version": material, "scorer_version": scorer,
+                "yudao": _side_summary(yudao_result, "yudao_commit"),
+                "opencode": _side_summary(opencode_result, "opencode_version"),
+                "criterion": None, "pairs": [],
+                "unpaired": {"yudao": [], "opencode": []}}
     version_block = None
     if material != opencode_result.get("material_version") \
             or scorer != opencode_result.get("scorer_version"):

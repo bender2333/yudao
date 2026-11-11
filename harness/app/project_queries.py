@@ -3442,17 +3442,23 @@ def _mcp_credential_status(application: Application,
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
     store = application.system.store
     state = _project(application, request.project_id, include_history=False)
-    settings = {
-        department: DepartmentSetting(
-            department=department, version=state.department_settings[department].version,
-            text=state.department_settings[department].text,
-            source=state.department_settings[department].source,
-            provider_id=state.department_settings[department].provider_id,
-            model_id=state.department_settings[department].model_id,
-            requested_tier=state.department_settings[department].requested_tier,
-            department_setting_configured=state.department_settings[department].configured_prompt)
-        for department in DEPARTMENTS
-    }
+    # 职能清单与默认 Prompt 按项目现在的组织给（工单 #1701，形态与核验角色设计说明「形态随事项冻结」）：
+    # 只列这份组织里的职能，每行没写职能 Prompt 时显示这份组织里那个职能的那一份；组织里没有的不出现
+    definitions = application.system.projects.current_definitions(request.project_id)
+    settings: dict[str, DepartmentSetting] = {}
+    for department in definitions.departments:
+        configured = state.department_settings.get(department)
+        default_text = definitions.role(department).prompt
+        settings[department] = DepartmentSetting(
+            department=department,
+            version=0 if configured is None else configured.version,
+            text=default_text if configured is None or not configured.configured_prompt else configured.text,
+            source="default" if configured is None else configured.source,
+            provider_id=None if configured is None else configured.provider_id,
+            model_id=None if configured is None else configured.model_id,
+            requested_tier=None if configured is None else configured.requested_tier,
+            department_setting_configured=False if configured is None else configured.configured_prompt,
+        )
     from ..parameters import effective_parameter_version
     return Snapshot[ProjectSettingsResult](
         position=store.end_position(),

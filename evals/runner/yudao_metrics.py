@@ -19,6 +19,11 @@ TIME_LIMIT = "time_limit"
 # 都不能通过「放行」这一项；放行等于 `status == "done"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
 RELEASE_STATUSES = frozenset({"done"})
+# 没有核验角色的形态以开环完成结束（harness/models.py 的 OPEN_LOOP_STOP_REASON）：这五项检查点对它不适用
+OPEN_LOOP_STOP_REASON = "open_loop"
+OPEN_LOOP_NOT_APPLICABLE = "不适用：这份形态没有核验角色"
+CHECKPOINT_KEYS = ("ended_within_limit", "quality_release_bound_to_delivery", "replay_consistent",
+                   "no_false_release", "release_coverage")
 
 # 用量字段：模型未上报时为未知，进度时按 `notes[].reason` 写明原因
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens",
@@ -35,6 +40,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
     status, reason = _end_state(projection, outcome, model_service_failure)
     checkpoints = checkpoints_of(events, status, replay, outcome, parameters_version,
                                  model_service_failure)
+    open_loop = recorded_open_loop(events)
 
     return {
         "end_status": status,
@@ -58,6 +64,8 @@ def collect(export, outcome, replay=None, parameters_version=None):
         "timed_out": bool(outcome["timed_out"]),
         "model_service_failure": model_service_failure,
         "empty_model_responses": _empty_responses(export),
+        "open_loop": open_loop,
+        "open_loop_readings": open_loop_readings(events) if open_loop else None,
         "checkpoints": checkpoints,
     }
 
@@ -240,7 +248,15 @@ def _qa_improvement(first, final, concluded):
 
 def checkpoints_of(events, status, replay, outcome, parameters_version=None,
                    model_service_failure=False):
-    """的五项过程检查点：三项同检 + recheck_ratio + 覆盖比例。"""
+    """的五项过程检查点：三项同检 + recheck_ratio + 覆盖比例。
+
+    没有核验角色的形态（`run_created` 事件记着 `open_loop`）本来就以开环完成结束，这五项
+    是对有放行的运行定的，对它不适用：五项都写「不适用」，另读两样
+    （docs/design/evaluation-scenarios.md「Yudao 的过程检查点」）。
+    """
+    if recorded_open_loop(events):
+        return {key: {"passed": None, "applicable": False,
+                      "detail": OPEN_LOOP_NOT_APPLICABLE} for key in CHECKPOINT_KEYS}
     released = status == "released"
     return {
         "ended_within_limit": _check_release_and_limit(events, outcome, status, parameters_version,
@@ -250,6 +266,30 @@ def checkpoints_of(events, status, replay, outcome, parameters_version=None,
         "no_false_release": _check_false_release(released, outcome),
         "release_coverage": _check_release_coverage(events, released),
     }
+
+
+def recorded_open_loop(events):
+    """这次运行是不是在没有核验角色的形态下：`run_created` 事件记着 `open_loop`（服务在创建时记下的事实）。"""
+    for event in events:
+        if event.get("type") == "run_created":
+            return bool((event.get("payload") or {}).get("open_loop"))
+    return False
+
+
+def open_loop_readings(events):
+    """没有核验角色的形态只读两样：是否以开环完成结束、记录上有没有写成放行。写成放行算没过。"""
+    status = _status_from_events(events)
+    stop_reason = _stop_reason_from_events(events)
+    ended = status in RELEASE_STATUSES and stop_reason == OPEN_LOOP_STOP_REASON
+    released = stop_reason in RELEASE_STOP_REASONS or _latest_qa_release(events) is not None
+    if released:
+        detail = "记录上写成了放行：这份形态没有核验角色，不该有放行"
+    elif ended:
+        detail = "以开环完成结束，记录上没有写成放行"
+    else:
+        detail = "没有以开环完成结束（结束原因 " + str(stop_reason or status or "未知") + "）"
+    return {"ended_open_loop": ended, "recorded_as_release": released,
+            "passed": ended and not released, "detail": detail}
 
 
 def _check_release_and_limit(events, outcome, status, parameters_version,
