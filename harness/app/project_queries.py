@@ -3611,6 +3611,9 @@ def recovery_status(application: Application) -> RecoveryStatus:
 PROJECT_EVENT_KINDS: tuple[str, ...] = (
     ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
     ProjectEventType.PROJECT_GOAL_CHANGED, ProjectEventType.PROJECT_PINNED,
+    # 形态改动（工单 #1647）：项目列表里的职能数按项目现在的组织读，采用以后组织版本与职能数都变，
+    # 所以这一种事件也要让读项目流版本的查询重查
+    ProjectEventType.PROJECT_FORM_SET,
     ProjectEventType.PROJECT_ARCHIVED, ProjectEventType.PROJECT_RESTORED,
     ProjectEventType.WORK_ITEM_CREATED, ProjectEventType.WORK_ITEM_START_FAILED,
     ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
