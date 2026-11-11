@@ -8,7 +8,7 @@
 
 ## F1 固定任务：评测场景 3
 
-**材料**：`evals/scenarios/scenario-3`，材料版本 `scenario-3@2`（以 `materials/manifest.json` 的 `material_version` 为准，写进读数）。
+**材料**：`evals/scenarios/scenario-3`，材料版本读 `materials/manifest.json` 的 `material_version`，写进读数。
 
 **准备**（试用者在新手段开始前做，新手段不读这些文件）：
 

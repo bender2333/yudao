@@ -1,15 +1,15 @@
 {
 "schema":1,
 "path":"docs/program-roadmap.md",
-"hash":"d75982b2ff5b276d",
+"hash":"3c6c4db3a13db887",
 "nodes":[
-{"hash":"d75982b2ff5b276d","id":"docs/program-roadmap.md","kind":"file","title":"docs/program-roadmap.md"},
+{"hash":"3c6c4db3a13db887","id":"docs/program-roadmap.md","kind":"file","title":"docs/program-roadmap.md"},
 {"hash":"9fdd19627eefe229","id":"docs/program-roadmap.md#Yudao 总体路线图","kind":"section","parent":"docs/program-roadmap.md","title":"Yudao 总体路线图"},
 {"hash":"56efab19610cb6c7","id":"docs/program-roadmap.md#Yudao 总体路线图 > 1. 怎么推进","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"1. 怎么推进"},
-{"hash":"fb6a4381900be056","id":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"2. 三圈与七个阶段"},
+{"hash":"829ff9afca7a3474","id":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"2. 三圈与七个阶段"},
 {"hash":"866a8aa00f6f8acd","id":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段 > 谁等谁","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","title":"谁等谁"},
-{"hash":"1f8a4a216e6edb93","id":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段 > 不排队的事","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","title":"不排队的事"},
-{"hash":"ed8ef8329aaf9d35","id":"docs/program-roadmap.md#Yudao 总体路线图 > 3. 十条内容道","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"3. 十条内容道"},
+{"hash":"67230883682d2e2e","id":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段 > 不排队的事","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","title":"不排队的事"},
+{"hash":"f879f23fffd54c85","id":"docs/program-roadmap.md#Yudao 总体路线图 > 3. 十条内容道","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"3. 十条内容道"},
 {"hash":"c0c4ce9380995e0e","id":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"4. 画面自己的阶段：楼、机房、城"},
 {"hash":"1c585af4298bdb84","id":"docs/program-roadmap.md#Yudao 总体路线图 > 5. 五条判据","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"5. 五条判据"}
 ],

@@ -40,7 +40,7 @@
 {"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"03c60cf298c2dd35","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 4. 后台推进期间维护规格"},
 {"dst":"docs/agents/workflow.md#工作方式 > 8. 独立审查","kind":"link","raws":["workflow.md"],"seen":"de63e29217dbff90","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 4. 后台推进期间维护规格"},
 {"dst":".claude/skills/milestone-retro/SKILL.md","kind":"link","raws":["../../.claude/skills/milestone-retro/SKILL.md"],"seen":"16d6d99031db4f93","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭"},
-{"dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"link","raws":["../../.claude/skills/trial-intake/SKILL.md"],"seen":"0a628d6766736909","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭"},
+{"dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"link","raws":["../../.claude/skills/trial-intake/SKILL.md"],"seen":"8da243bee0082d49","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭"},
 {"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../../.claude/skills/trial/SKILL.md"],"seen":"da08ce6a15d7a6c2","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"0294c084f33a947a","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"9fa31c0c59a42dbb","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭"},
