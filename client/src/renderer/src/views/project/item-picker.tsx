@@ -6,6 +6,8 @@
  *   - 有几件事项时点一件切到那一件（图与时序图跟着换），选中那件的标题可以点，点开它的事项面板；
  *   - 停了的在状态旁写一句停止原因，以开环完成结束的写「开环完成：没有人核验」（item-panel-model.ts）；
  *   - 有中断待恢复的事项时，这一行下面多一行提示，点进那个事项的恢复详情。
+ * 末尾是这个项目全部事项的入口（工单 #1709）：写总数，点开分组列表（all-items.tsx）；
+ * 没有事项时这一行本身就不出现，入口也跟着没有。
  * 页面不在这里判状态与原因：话由 pickStatusText 给，中断的事项由 floor-text 的 interruptionFactRows 给。
  */
 
@@ -20,10 +22,14 @@ export function ItemPicker(props: {
   selected: string;
   /** 中断或者待恢复的事项，一行一个 */
   interruptions: InterruptionFactView[];
+  /** 这个项目的事项总数（project.overview 的 stats.total）；还没读到时为 null，入口不出现 */
+  total: number | null;
   /** 切到另一件事项 */
   onPick: (workItem: string) => void;
   /** 打开选中那件事项的面板 */
   onOpen: () => void;
+  /** 打开全部事项的分组列表 */
+  onOpenAll: () => void;
   /** 点进某件事项的恢复详情 */
   onOpenRecovery: (workItem: string) => void;
 }) {
@@ -36,48 +42,57 @@ export function ItemPicker(props: {
   }
   return (
     <>
-      {props.items.length < 2 ? (
-        <p className="y10-cv-only" data-testid="item-picker">
-          图上画「
-          <button type="button" className="y10-link link v20-items-title" data-testid="item-picker-open" onClick={props.onOpen}>
-            {title(only)}
-          </button>
-          」
-          <span className="y10-muted" data-testid="item-picker-status"> · {status(only)}</span>
-          {only.round === 0 ? null : <span className="y10-muted"> · 第 {only.round} 轮</span>}
-        </p>
-      ) : (
-        <div className="y10-cv-pick" role="tablist" aria-label="选事项" data-testid="item-picker">
-          <span className="y10-muted">图上画</span>
-          {props.items.map((item) => (
-            item.work_item_id === props.selected ? (
-              <span key={item.work_item_id} className="y10-cv-pick-btn is-on" role="tab" aria-selected>
+      <div className="v20-items-row">
+        {props.items.length < 2 ? (
+          <p className="y10-cv-only" data-testid="item-picker">
+            图上画「
+            <button type="button" className="y10-link link v20-items-title" data-testid="item-picker-open" onClick={props.onOpen}>
+              {title(only)}
+            </button>
+            」
+            <span className="y10-muted" data-testid="item-picker-status"> · {status(only)}</span>
+            {only.round === 0 ? null : <span className="y10-muted"> · 第 {only.round} 轮</span>}
+          </p>
+        ) : (
+          <div className="y10-cv-pick" role="tablist" aria-label="选事项" data-testid="item-picker">
+            <span className="y10-muted">图上画</span>
+            {props.items.map((item) => (
+              item.work_item_id === props.selected ? (
+                <span key={item.work_item_id} className="y10-cv-pick-btn is-on" role="tab" aria-selected>
+                  <button
+                    type="button"
+                    className="y10-link link v20-items-title"
+                    data-testid="item-picker-open"
+                    onClick={props.onOpen}
+                  >
+                    {title(item)}
+                  </button>
+                  <small> {status(item)}</small>
+                </span>
+              ) : (
                 <button
+                  key={item.work_item_id}
                   type="button"
-                  className="y10-link link v20-items-title"
-                  data-testid="item-picker-open"
-                  onClick={props.onOpen}
+                  role="tab"
+                  aria-selected={false}
+                  className="y10-cv-pick-btn"
+                  onClick={() => props.onPick(item.work_item_id)}
                 >
                   {title(item)}
+                  <small> {status(item)}</small>
                 </button>
-                <small> {status(item)}</small>
-              </span>
-            ) : (
-              <button
-                key={item.work_item_id}
-                type="button"
-                role="tab"
-                aria-selected={false}
-                className="y10-cv-pick-btn"
-                onClick={() => props.onPick(item.work_item_id)}
-              >
-                {title(item)}
-                <small> {status(item)}</small>
-              </button>
-            )
-          ))}
-        </div>
-      )}
+              )
+            ))}
+          </div>
+        )}
+        {props.total === null ? null : (
+          <button
+            type="button" className="y10-link link v20-items-all" data-testid="item-picker-all" onClick={props.onOpenAll}
+          >
+            全部事项（{props.total}）
+          </button>
+        )}
+      </div>
       {props.interruptions.map((row) => (
         <p key={row.itemId} className="v20-items-interrupted" data-testid="item-interrupted">
           <span>「{row.itemTitle}」{row.state}</span>
