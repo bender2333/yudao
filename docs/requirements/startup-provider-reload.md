@@ -1,6 +1,6 @@
 # D22 启动与 Provider 热生效设计
 
-状态：有效。依据：[总图](../architecture.html)第四节「模型」的缝（每次请求解析一次调用目标，凭据只在控制主机，不进事实与导出）；设计：[模型管理设计说明](../design/model-management.md)第 5.4 节、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 3.3 节。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 06 模型与判定点（多协议无状态调用与凭据隔离），阶段一。
+状态：有效。依据：[总图](../architecture.html)第四节「模型」的缝（每次请求解析一次调用目标，凭据只在控制主机，不进事实与导出）；设计：[模型管理设计说明](../design/model-management.md)第 5.4 节、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 3.3 节。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 06 模型与判定点（多协议无状态调用与凭据隔离），「职能之间：转实」。
 
 启动方式：类似 openclaw，不带其他参数就能启动；在 Yudao 的 Provider 配置中或修改过程中，都可以重新生效。统一 Provider 层见 [D23](provider-layer.md)。已确认的选择：无参启动、缺文件空目录、页面填 Key；目录、职能默认、项目职能设置与凭据的修改从相关职能的下一次模型请求起生效，包括进行中的事项（[D24 模型管理](model-management.md)与[模型管理设计说明](../design/model-management.md)第 5.4 节）。与 D09、D17 的关系：次数与超时规则不变；一次请求内的重试沿用该请求的调用目标。
 

@@ -1,6 +1,6 @@
 # D02 产品 · 工程 · 质检的 prompt 展示与修改
 
-状态：有效。依据：[总图](../architecture.html)第二节「定义」方框（内置默认 Prompt 属于带版本的定义，项目内的修改属项目职能设置）；设计：[模型管理设计说明](../design/model-management.md)、[总体架构](../design/architecture/overall-architecture.md)第 3 节。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」。
+状态：有效。依据：[总图](../architecture.html)第二节「定义」方框（内置默认 Prompt 属于带版本的定义，项目内的修改属项目职能设置）；设计：[模型管理设计说明](../design/model-management.md)、[总体架构](../design/architecture/overall-architecture.md)第 3 节。路线位置：[总体路线图](../program-roadmap.md)「职能之间：转实」。
 
 ## 已确认
 

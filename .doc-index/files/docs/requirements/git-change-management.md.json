@@ -1,18 +1,18 @@
 {
 "schema":1,
 "path":"docs/requirements/git-change-management.md",
-"hash":"19a71028410ddcce",
+"hash":"8013d9e1a0885181",
 "nodes":[
-{"hash":"19a71028410ddcce","id":"docs/requirements/git-change-management.md","kind":"file","title":"docs/requirements/git-change-management.md"},
-{"hash":"c210cdebfa1dbe3a","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","kind":"section","parent":"docs/requirements/git-change-management.md","title":"D16 使用 Git 管理任务内变化"},
+{"hash":"8013d9e1a0885181","id":"docs/requirements/git-change-management.md","kind":"file","title":"docs/requirements/git-change-management.md"},
+{"hash":"9935733cf45def09","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","kind":"section","parent":"docs/requirements/git-change-management.md","title":"D16 使用 Git 管理任务内变化"},
 {"hash":"e9d5df2ee4583198","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 范围","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"范围"},
 {"hash":"b783ba993d5477e5","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 有效设计","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"有效设计"},
 {"hash":"9394f9fb6b23f617","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 验收","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"验收"}
 ],
 "edges":[
 {"dst":"docs/adr/0024-git-in-process-with-pygit2.md","kind":"link","raws":["../adr/0024-git-in-process-with-pygit2.md"],"seen":"123eb22123adb887","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"},
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"35e4ecd5be5ddb3d","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"cc9397dfaf732c1e","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"}
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"}
 ]
 }

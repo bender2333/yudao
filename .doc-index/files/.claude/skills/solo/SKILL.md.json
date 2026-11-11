@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/solo/SKILL.md",
-"hash":"db3629beb4504fd6",
+"hash":"8f0f483683613652",
 "nodes":[
-{"hash":"db3629beb4504fd6","id":".claude/skills/solo/SKILL.md","kind":"file","title":".claude/skills/solo/SKILL.md"},
+{"hash":"8f0f483683613652","id":".claude/skills/solo/SKILL.md","kind":"file","title":".claude/skills/solo/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/solo/SKILL.md#(开头)","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"(开头)"},
 {"hash":"48e036e342a90da5","id":".claude/skills/solo/SKILL.md#name: solodescription: 以 solo 模式把一组工单做完：自己领取、实现、自测、开 PR、发交付说明、自我核对、合并；每一轮都在一个全新的子代理上下文里执行，轮与轮之间只靠 .ralph/<循环>/ 的账本传递。范围与并发都是参数，范围按外部工单每轮重算（工单会进出里程碑，里程碑会改名）；一轮最多并发 N 张，每张一个 worktree，带 @exclusive 标记的互斥（touches-core 不互斥）。设计问题与连续三轮失败交回架构师（needs-triage），执行环境挡住转用户（ready-for-human）。argument-hint: \"[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--并发 N] [--互斥 N] [--续 <循环名>]\"","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"name: solodescription: 以 solo 模式把一组工单做完：自己领取、实现、自测、开 PR、发交付说明、自我核对、合并；每一轮都在一个全新的子代理上下文里执行，轮与轮之间只靠 .ralph/<循环>/ 的账本传递。范围与并发都是参数，范围按外部工单每轮重算（工单会进出里程碑，里程碑会改名）；一轮最多并发 N 张，每张一个 worktree，带 @exclusive 标记的互斥（touches-core 不互斥）。设计问题与连续三轮失败交回架构师（needs-triage），执行环境挡住转用户（ready-for-human）。argument-hint: \"[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--并发 N] [--互斥 N] [--续 <循环名>]\""},
 {"hash":"0caf501b5e4c42c6","id":".claude/skills/solo/SKILL.md#solo","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"solo"},
@@ -44,7 +44,7 @@
 {"hash":"4e1bfeb2d3639be4","id":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次） > 表1 > 依赖","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次）","title":"依赖"},
 {"hash":"2c241fb1f5cf04cd","id":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次） > 表1 > 账本保护","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次）","title":"账本保护"},
 {"hash":"17bb375f67014c0d","id":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环","kind":"section","parent":".claude/skills/solo/SKILL.md#solo","title":"起一个循环，或者接一个循环"},
-{"hash":"9dbd84d8d530d663","id":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环 > 表1 > 「把阶段一的工单做完」","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环","title":"「把阶段一的工单做完」"},
+{"hash":"1afaf0498af6983c","id":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环 > 表1 > 「把「职能之间：转实」的工单做完」","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环","title":"「把「职能之间：转实」的工单做完」"},
 {"hash":"d8f545ae8d92e112","id":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环 > 表1 > 「带 bug 标签的」","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环","title":"「带 bug 标签的」"},
 {"hash":"9df8fa428b5f0572","id":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环 > 表1 > 「[路由的缝] 开头的」","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环","title":"「[路由的缝] 开头的」"},
 {"hash":"5452cd07253001e0","id":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环 > 表1 > 「都做」/ 没说范围","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 起一个循环，或者接一个循环","title":"「都做」/ 没说范围"},

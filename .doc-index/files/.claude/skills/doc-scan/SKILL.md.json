@@ -1,16 +1,16 @@
 {
 "schema":1,
 "path":".claude/skills/doc-scan/SKILL.md",
-"hash":"94b9d2ab8fca90de",
+"hash":"81b9c544a19e3cde",
 "nodes":[
-{"hash":"94b9d2ab8fca90de","id":".claude/skills/doc-scan/SKILL.md","kind":"file","title":".claude/skills/doc-scan/SKILL.md"},
+{"hash":"81b9c544a19e3cde","id":".claude/skills/doc-scan/SKILL.md","kind":"file","title":".claude/skills/doc-scan/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/doc-scan/SKILL.md#(开头)","kind":"section","parent":".claude/skills/doc-scan/SKILL.md","title":"(开头)"},
 {"hash":"0d3fcf1e9cc825d1","id":".claude/skills/doc-scan/SKILL.md#name: doc-scandescription: 全量扫描 docs 与根目录文档，核对与总图、路线图、术语表、规则是否一致，产出带位置与改法的报告。argument-hint: \"[范围：全部 | docs/design | docs/requirements | <路径>]，省略时扫全部\"disable-model-invocation: true","kind":"section","parent":".claude/skills/doc-scan/SKILL.md","title":"name: doc-scandescription: 全量扫描 docs 与根目录文档，核对与总图、路线图、术语表、规则是否一致，产出带位置与改法的报告。argument-hint: \"[范围：全部 | docs/design | docs/requirements | <路径>]，省略时扫全部\"disable-model-invocation: true"},
 {"hash":"d89f6e6adefa0123","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描","kind":"section","parent":".claude/skills/doc-scan/SKILL.md","title":"文档与设计扫描"},
 {"hash":"949a2286ff0f2efc","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 什么时候用","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描","title":"什么时候用"},
 {"hash":"a38364f03307412a","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描","title":"扫描六步"},
 {"hash":"f2b03bd93e132890","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 1 划定范围","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","title":"1 划定范围"},
-{"hash":"3335ea02de7597ca","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","title":"2 读正本，写核对清单"},
+{"hash":"853b1b9ab822791c","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","title":"2 读正本，写核对清单"},
 {"hash":"1296f9449032683d","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 3 分组并发派发","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","title":"3 分组并发派发"},
 {"hash":"37da1352cab8f2e8","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 4 机器核对","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","title":"4 机器核对"},
 {"hash":"6759c084a383263e","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 5 合并与抽查","kind":"section","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步","title":"5 合并与抽查"},
@@ -23,11 +23,11 @@
 {"hash":"dd1aecb25cc2a86e","id":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 脚本 > 表1 > merge-findings.ps1","kind":"row","parent":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 脚本","title":"merge-findings.ps1"}
 ],
 "edges":[
-{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"3155c298b5de85f1","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
-{"dst":"docs/agents/shared-rules.md","kind":"code-path","raws":["docs/agents/shared-rules.md"],"seen":"73ca8ef06569fe54","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"4e71ff6d7d16d1ed","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"d4d037f30ea0010e","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
+{"dst":"docs/agents/shared-rules.md","kind":"code-path","raws":["docs/agents/shared-rules.md"],"seen":"2e68d59a7b0b034d","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"35e4ecd5be5ddb3d","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
 {"dst":"docs/foundation-rules.md","kind":"code-path","raws":["docs/foundation-rules.md"],"seen":"7359eb9a655048af","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
-{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
+{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"18f01ebed8e76a55","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 2 读正本，写核对清单"},
 {"dst":".claude/skills/doc-scan/scripts/merge-findings.ps1","kind":"code-path","raws":["scripts/merge-findings.ps1"],"seen":"6ad30964fde132e2","src":".claude/skills/doc-scan/SKILL.md#文档与设计扫描 > 扫描六步 > 3 分组并发派发"}
 ]
 }

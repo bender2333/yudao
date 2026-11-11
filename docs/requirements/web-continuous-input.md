@@ -1,6 +1,6 @@
 # D01 Web 持续输入任务与命令
 
-状态：有效。依据：[总图](../architecture.html)第一节「页面」方框与第四节「接口」的缝；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」。
+状态：有效。依据：[总图](../architecture.html)第一节「页面」方框与第四节「接口」的缝；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)。路线位置：[总体路线图](../program-roadmap.md)「职能之间：转实」。
 
 ## 已确认
 
