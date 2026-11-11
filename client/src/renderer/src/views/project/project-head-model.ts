@@ -12,12 +12,15 @@
 // 页面上的文字按设计说明的两个词写：轮转方式是「直做」「按成果」；结束是有核验角色时写核验角色的显示名，
 // 没有时写开环完成。
 
-import type { ProjectOrganizationResult } from "../../api/generated/types.gen";
+import type {
+  AdoptionView, ProjectOrganizationResult, ProjectOverviewResult, ProjectWritebackResult, WritebackRecordView,
+} from "../../api/generated/types.gen";
 import {
   CANCEL_CONFIRM_CANCEL, CANCEL_CONFIRM_CONFIRM, cancelConfirmLines, cancelConfirmTitle,
   type CancelRequest,
 } from "./cancel-text.ts";
-import { formatDuration, OPEN_LOOP_STATUS_TEXT } from "./labels.ts";
+import { formatDuration, formatTime, OPEN_LOOP_STATUS_TEXT } from "./labels.ts";
+import { WRITEBACK_STATUS, writebackText } from "./writeback-text.ts";
 
 /** 这一份不在这一版发布里（取不到形态名与合成结果）：照实写明，不拿发布带里的标识顶替。 */
 export const OUT_OF_RELEASE = "这一份不在这一版发布里";
@@ -206,6 +209,120 @@ export function stopConfirm(request: CancelRequest): StopConfirm {
     confirm: CANCEL_CONFIRM_CONFIRM,
     cancel: CANCEL_CONFIRM_CANCEL,
   };
+}
+
+// ---------------------------------------------------------------- 当前成果（工单 #1714）
+
+/** 面板里的一行：标签与值；值是清单时按「、」连起来 */
+export type OutcomeRow = { label: string; value: string };
+
+/** 当前成果一行与它的面板（工单 #1714）：一行写当前成果是哪一版、是不是建档基线、写回到了哪一步。 */
+export type OutcomeHead = {
+  /** 这一行写的那一句 */
+  text: string;
+  /** 这一行的调子：写回已经做完时 ok；还没有写回时 open，让用户看得出还差这一步；其余 plain */
+  tone: "ok" | "open" | "plain";
+  /** 面板里的各行：点开这一行以后写全 */
+  rows: OutcomeRow[];
+};
+
+const NO_ADOPTION = "还没有成果";
+const NO_ADOPTION_ROW = "这个项目还没有采纳过成果";
+const WRITEBACK_NOT_NEEDED = "建档基线不写回";
+const WRITEBACK_NONE = "还没有写回";
+const BASELINE_NOTE = "当前成果来自接入的代码快照：下面的来源与缺陷数按快照采集时的原样显示";
+// 写回已经做完的三种结果：这一行写 ok
+const WRITEBACK_DONE: ReadonlySet<string> = new Set(["completed", "verified", "not_needed"]);
+
+/** 写回那一句的短名：建档基线不写回、还没有写回、五种写回结果的中文名；全句由 writeback-text.ts 给。 */
+export function writebackLine(record: WritebackRecordView | null, onboardingBaseline: boolean): string {
+  if (onboardingBaseline) {
+    return WRITEBACK_NOT_NEEDED;
+  }
+  if (record === null) {
+    return WRITEBACK_NONE;
+  }
+  return WRITEBACK_STATUS[record.status] ?? record.status;
+}
+
+/**
+ * 当前成果一行（工单 #1714）：读 project.overview 的当前成果与 project.writeback 里这一次采纳的记录，
+ * 写当前成果是哪一版、是不是建档基线、写回到了哪一步。概览或写回记录还没有读到时返回 null：
+ * 这一行先不出现，不写一半。
+ */
+export function outcomeHead(
+  overview: ProjectOverviewResult | null | undefined,
+  writeback: ProjectWritebackResult | null | undefined,
+): OutcomeHead | null {
+  if (overview === null || overview === undefined || writeback === null || writeback === undefined) {
+    return null;
+  }
+  const adoption = overview.current_adoption;
+  if (adoption === null) {
+    return { text: NO_ADOPTION, tone: "plain", rows: [{ label: "当前成果", value: NO_ADOPTION_ROW }] };
+  }
+  const baseline = adoption.onboarding_baseline;
+  const written = recordOf(writeback.records, adoption.adoption_id);
+  const line = writebackLine(written, baseline);
+  const parts = [`当前成果 ${shown(adoption.summary, "没有摘要")}（采纳于 ${formatTime(adoption.adopted_at)}）`];
+  if (baseline) {
+    parts.push("建档基线");
+  }
+  parts.push(`写回：${line}`);
+  return { text: parts.join(" · "), tone: outcomeTone(written, baseline), rows: outcomeRows(adoption, written, line) };
+}
+
+// 写回记录按这一次采纳找：别的采纳的记录不拿来顶替
+function recordOf(records: readonly WritebackRecordView[], adoptionId: string): WritebackRecordView | null {
+  return records.find((item) => item.adoption_id === adoptionId) ?? null;
+}
+
+function outcomeTone(record: WritebackRecordView | null, baseline: boolean): "ok" | "open" | "plain" {
+  if (baseline) {
+    return "plain";
+  }
+  if (record === null) {
+    return "open";
+  }
+  return WRITEBACK_DONE.has(record.status) ? "ok" : "plain";
+}
+
+// 面板里写全：当前成果与它的清单；建档基线的那几项照快照采集时的原样；写回写全句
+function outcomeRows(adoption: AdoptionView, record: WritebackRecordView | null, line: string): OutcomeRow[] {
+  const rows: OutcomeRow[] = [
+    { label: "当前成果", value: `${shown(adoption.summary, "没有摘要")}（采纳于 ${formatTime(adoption.adopted_at)}）` },
+    { label: "文件", value: listText(adoption.files, "没有报到文件") },
+    { label: "检查", value: listText(adoption.check_names, "没有检查") },
+    { label: "已知风险", value: listText(adoption.known_risks, "没有已知风险") },
+  ];
+  if (adoption.onboarding_baseline) {
+    rows.push({ label: "建档基线", value: BASELINE_NOTE });
+    rows.push({ label: "快照来源", value: shown(adoption.snapshot_source, "未上报") });
+    rows.push({ label: "快照提交", value: provenanceText(adoption.snapshot_provenance) });
+    rows.push({ label: "现有缺陷", value: `现有缺陷 ${adoption.existing_defect_count} 项` });
+  }
+  rows.push({ label: "写回", value: record === null ? line : writebackText(record) });
+  return rows;
+}
+
+// 快照的提交：与旧概览页同一份说法（没有 git 仓库时写明是目录内容）
+function provenanceText(value: { [key: string]: unknown } | null | undefined): string {
+  const source = record(value);
+  const commit = named(source.commit);
+  if (commit === "") {
+    return "没有 git 仓库，快照采集时的目录内容";
+  }
+  const branch = named(source.branch) === "" ? "未知" : named(source.branch);
+  const dirty = source.dirty === true ? "有未提交的修改" : "没有未提交的修改";
+  return `git 提交 ${commit}（分支 ${branch}，${dirty}）`;
+}
+
+function listText(values: readonly string[], empty: string): string {
+  return values.length === 0 ? empty : `${values.length} 项：${values.join("、")}`;
+}
+
+function shown(value: string | null | undefined, fallback: string): string {
+  return value === null || value === undefined || value === "" ? fallback : value;
 }
 
 // ---------------------------------------------------------------- 取值
