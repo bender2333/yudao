@@ -12,7 +12,7 @@ import { optionalRead } from "./contract/read-failure.ts";
 import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./shell/notifications";
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
-import { parseRoute, pathLabel, paths, type Route } from "./shell/routing";
+import { attemptBackPath, parseRoute, pathLabel, paths, type Route } from "./shell/routing";
 import { HomePage } from "./views/home/page";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
@@ -24,7 +24,8 @@ import { ToolsPage } from "./views/system/tools";
 import { ConversationPage } from "./views/project/conversation";
 import { DepartmentPage } from "./views/project/department";
 import { MaterialsPage } from "./views/project/materials";
-import { ObserveDetailPage, ObservePage } from "./views/project/observe";
+import { AttemptDetailPage } from "./views/project/attempt-detail";
+import { ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
 import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
@@ -435,9 +436,12 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
     case "materials":
       return <MaterialsPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     case "observe":
-      return <ObservePage app={props.app} route={route} />;
+      // 观测页（工单 #80、#1710）：请求记录与用量统计是设置页那一节的同一份部件；
+      // 职能清单取自项目现在的组织，部门页签与这一页的职能下拉用同一份
+      return <ObservePage app={props.app} route={route} departments={props.departments} />;
     case "observe-detail":
-      return <ObserveDetailPage app={props.app} route={route} />;
+      // 请求详情（工单 #1710）：返回的去处按进来时的地址决定（设置页那一节或对话页的工作过程）
+      return <AttemptDetailPage app={props.app} route={route} back={attemptBackPath(route)} />;
     case "settings":
       return <SettingsPage app={props.app} route={route} departments={props.departments} />;
     case "recovery":

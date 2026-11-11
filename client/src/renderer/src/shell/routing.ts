@@ -1,7 +1,8 @@
 // 页面路径（原型 v8 设计说明第 3.3 节）：首页 #/home、机器页 #/sys/machines 等。
 // 本工单建立外壳与路径；首页、项目页面与像素画面由各自的工单实现。
 
-import { DEPARTMENTS, departmentName } from "../views/project/labels.ts";
+import { departmentName } from "../views/project/labels.ts";
+import { EMPTY_FILTERS, filtersFromQuery, filtersQuery, type Filters } from "../views/project/observe-filter.ts";
 
 export type Route = {
   name: string;
@@ -23,8 +24,20 @@ export type Route = {
   /**
    * 设置页要滚到的那一节（工单 #1161，写在 ?section= 中）：决定卡片上的「前往本项目的部门设置」
    * 落到部门设置那一节，不停在设置页的顶部；没有指定时是 null。
+   * 设置页底部「模型请求与用量」这一节的展开状态也用它（工单 #1710）：section=requests 表示展开。
    */
   settingsSection: string | null;
+  /**
+   * 「模型请求与用量」这一节的筛选条件（工单 #1710）：写在 ?dept=、?status=、?provider=、
+   * ?model=、?model_returned=、?q= 中，页面从地址读回来、写回地址。
+   * 观测页只用到其中的职能（?dept=，工单 #801）：其余几格按空值读回，不写进地址。
+   */
+  requestFilters: Filters;
+  /**
+   * 请求详情的来处（工单 #1710，写在 ?from= 中）：从设置页这一节、从对话页的工作过程点进来时
+   * 返回对应的那一页；没有写或认不出时是 null，页面显示原来的「返回请求记录」。
+   */
+  attemptOrigin: "settings" | "conversation" | null;
 };
 
 const SYSTEM_PAGES: Record<string, string> = {
@@ -81,7 +94,7 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), round: parseRound(query), settingsSection: sectionOf(query) };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), round: parseRound(query), settingsSection: sectionOf(query), requestFilters: filtersFromQuery(query), attemptOrigin: attemptOrigin(query) };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
@@ -137,14 +150,22 @@ function parseRound(query: URLSearchParams): number | null {
   return Number(text);
 }
 
-// 路径参数里的部门筛选条件（工单 #801）：只有已知的部门才认，
-// 未知取值按没有筛选处理，不把无效的部门发给服务端
+// 路径参数里的部门筛选条件（工单 #801）：按原样读出来，认不认它由页面拿项目的职能清单去对
+// （工单 #1710：项目的职能清单可能与默认的三个不同，地址里不带白名单以外的一律丢掉就会被吃掉）。
+// 空串按没有筛选处理，地址里不留空的 ?dept=
 function departmentFilter(query: URLSearchParams): string | null {
   const text = query.get("dept");
-  if (text === null || !Object.keys(DEPARTMENTS).includes(text)) {
+  if (text === null || text.trim() === "") {
     return null;
   }
-  return text;
+  return text.trim();
+}
+
+// 请求详情的来处（工单 #1710）：从设置页这一节、从对话页的工作过程点进来时写在 ?from= 中，
+// 返回时回到那一页的那一节；认不出的取值按没有来处处理
+function attemptOrigin(query: URLSearchParams): "settings" | "conversation" | null {
+  const text = query.get("from");
+  return text === "settings" || text === "conversation" ? text : null;
 }
 
 // 路径参数里的设置页节名（工单 #1161）：按原样读出来，由设置页决定认不认它；
@@ -152,6 +173,17 @@ function departmentFilter(query: URLSearchParams): string | null {
 function sectionOf(query: URLSearchParams): string | null {
   const text = query.get("section");
   return text === null || text.trim() === "" ? null : text.trim();
+}
+
+// 设置页底部「模型请求与用量」这一节的名字（工单 #1710）：地址里写 ?section=requests 时它是展开的，
+// 请求详情的「返回模型请求与用量」也落回这一节
+export const REQUESTS_SECTION = "requests";
+
+// 一组筛选条件写进地址参数（工单 #1710）：先写的参数位置不变，值以后写的为准
+function appendFilters(query: URLSearchParams, filters: Filters | undefined): void {
+  for (const [name, value] of filtersQuery(filters ?? EMPTY_FILTERS)) {
+    query.set(name, value);
+  }
 }
 
 // 事项范围（作用域）：项目内的一份，写在路径参数 ?w= 中（原型第 3.3 节）。
@@ -203,8 +235,9 @@ export const paths = {
     return `#/p/${projectId}/observe${suffix ? `?${suffix}` : ""}`;
   },
   // 请求详情：事项范围（w）、run 标识（r）与部门筛选条件（dept）都写在参数里，
-  // 刷新、后退与直接输入路径都能读回
-  observeDetail: (projectId: string, attemptId: string, options: { workItem?: string | null; runId?: string | null; department?: string | null } = {}) => {
+  // 刷新、后退与直接输入路径都能读回。from 是来处（设置页这一节或对话页的工作过程，工单 #1710），
+  // requests 是设置页这一节的筛选条件：返回时按它们回到原来的样子
+  observeDetail: (projectId: string, attemptId: string, options: { workItem?: string | null; runId?: string | null; department?: string | null; from?: "settings" | "conversation" | null; requests?: Filters } = {}) => {
     const query = new URLSearchParams();
     if (options.workItem) {
       query.set("w", options.workItem);
@@ -215,6 +248,10 @@ export const paths = {
     if (options.department) {
       query.set("dept", options.department);
     }
+    if (options.from) {
+      query.set("from", options.from);
+    }
+    appendFilters(query, options.requests);
     const suffix = query.toString();
     return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
   },
@@ -231,7 +268,7 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/overview${suffix ? `?${suffix}` : ""}`;
   },
-  settings: (projectId: string, options: { workItem?: string | null; section?: string | null } = {}) => {
+  settings: (projectId: string, options: { workItem?: string | null; section?: string | null; requests?: Filters } = {}) => {
     const query = new URLSearchParams();
     if (options.workItem) {
       query.set("w", options.workItem);
@@ -240,6 +277,8 @@ export const paths = {
     if (options.section) {
       query.set("section", options.section);
     }
+    // 「模型请求与用量」这一节的筛选条件（工单 #1710）：与展开状态一起写在地址里
+    appendFilters(query, options.requests);
     const suffix = query.toString();
     return `#/p/${projectId}/settings${suffix ? `?${suffix}` : ""}`;
   },
@@ -274,9 +313,32 @@ export function withScope(route: Route, workItemId: string | null, defaultDepart
     case "recovery":
       return workItemId === null ? paths.overview(projectId) : paths.recovery(projectId, workItemId);
     case "settings":
-      // 要滚到的那一节跟着留着：换范围不动这一页落在哪一节（工单 #1161）
-      return paths.settings(projectId, { workItem: workItemId, section: route.settingsSection });
+      // 要滚到的那一节跟着留着：换范围不动这一页落在哪一节（工单 #1161）；
+      // 「模型请求与用量」这一节的筛选条件也留着（工单 #1710）：换范围是换哪些事项的请求，
+      // 不动职能、状态与模型这几格
+      return paths.settings(projectId, { workItem: workItemId, section: route.settingsSection, requests: route.requestFilters });
     default:
       return paths.overview(projectId, { workItem: workItemId });
   }
+}
+
+// 请求详情的返回去处与文案（工单 #1710）：按进来时的来处决定回哪一页、哪一节。
+// 设置页这一节：回到这一节并保持展开（section=requests）与同一组筛选；
+// 对话页的工作过程：回到同一事项范围的对话页；
+// 没有来处（直接输入地址、旧链接）：回到观测页的请求记录，与原来一样。
+export function attemptBackPath(route: Route): { label: string; hash: string } {
+  const projectId = route.projectId ?? "";
+  if (route.attemptOrigin === "settings") {
+    return {
+      label: "返回模型请求与用量",
+      hash: paths.settings(projectId, { workItem: route.workItemId, section: REQUESTS_SECTION, requests: route.requestFilters }),
+    };
+  }
+  if (route.attemptOrigin === "conversation") {
+    return { label: "返回对话", hash: paths.conversation(projectId, { workItem: route.workItemId }) };
+  }
+  return {
+    label: "返回请求记录",
+    hash: paths.observe(projectId, { workItem: route.workItemId, department: route.departmentFilter }),
+  };
 }
