@@ -18,13 +18,18 @@ from pathlib import Path
 from typing import Any
 
 from harness import routing_contract, watched_outputs
+from harness.adapters.fake import FakeAdapter
 from harness.app import project_queries, read_models
-from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, load_definitions
+from harness.app.application import Application
+from harness.app.project_queries import ProjectFlow, ProjectLoop
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.kernel_events import Event
 from harness.models import (
     ArtifactRef, DeliverySpec, DepartmentGuidance, EffectiveContract, EventType, ProductSpec, RunProjection,
     SessionRecord, UserInput,
 )
+from harness.runtime import LoopSystem
+from harness.tests.helpers import delivery_turn, product_spec, quality_turns
 from harness.tightening import WATCHED_OUTPUTS, pending_product_input
 from harness.validation import TightenRequest
 
@@ -191,14 +196,13 @@ def test_the_projection_names_a_department_only_as_the_default_issuer_of_an_old_
 # 核验角色改名：部门状态、流转记录与放行判断都认改名后的部门
 
 
-def test_the_department_state_names_the_renamed_verifier(tmp_path, monkeypatch):
+def test_the_department_state_names_the_renamed_verifier(tmp_path):
     # 验收第 2 条前半：核验角色改名以后，部门状态的「核验中」与原因写改名后的部门
     renamed = _renamed_definitions(tmp_path, {"quality": RENAMED_VERIFIER})
-    monkeypatch.setattr(project_queries, "DEFINITIONS", renamed)
     projection = _projection(verifier=RENAMED_VERIFIER)
     progress = project_queries._work_item_progress(projection)
 
-    states = project_queries._departments(projection, progress, None, {})
+    states = project_queries._departments(projection, progress, None, {}, renamed)
 
     assert states["engineering"].state == "verifying"
     assert states["engineering"].note == f"等{RENAMED_LABELS[RENAMED_VERIFIER]}核验交付 r1"
@@ -206,25 +210,25 @@ def test_the_department_state_names_the_renamed_verifier(tmp_path, monkeypatch):
     assert states[RENAMED_VERIFIER].state == "waiting"
 
 
-def test_the_flow_records_send_work_to_the_renamed_verifier(tmp_path, monkeypatch):
+def test_the_flow_records_send_work_to_the_renamed_verifier(tmp_path):
     # 验收第 2 条中段：流转记录的去向写改名后的部门（交付送到谁、返工回到谁、PRD 新版本送到谁）
     renamed = _renamed_definitions(tmp_path, {"quality": RENAMED_VERIFIER})
-    monkeypatch.setattr(read_models, "DEFINITIONS", renamed)
 
     delivery = read_models.flow_rows(_event(
-        EventType.DELIVERY_ACCEPTED, department="engineering", payload={"summary": "implemented"}))
+        EventType.DELIVERY_ACCEPTED, department="engineering", payload={"summary": "implemented"}),
+        definitions=renamed)
     assert [(row["direction_from"], row["direction_to"]) for row in delivery] == [
         ("engineering", RENAMED_VERIFIER)]
     assert delivery[0]["flow_id"] == "evt-1"
 
     rework = read_models.flow_rows(_event(
         EventType.QA_SUBMITTED, department=RENAMED_VERIFIER,
-        payload={"verdict": "rework_engineering", "rationale": "缺少检查"}))
+        payload={"verdict": "rework_engineering", "rationale": "缺少检查"}), definitions=renamed)
     assert [(row["direction_from"], row["direction_to"]) for row in rework] == [
         (RENAMED_VERIFIER, "engineering")]
 
     spec = read_models.flow_rows(_event(
-        EventType.SPEC_ACCEPTED, department="product", payload={"revision": 1}))
+        EventType.SPEC_ACCEPTED, department="product", payload={"revision": 1}), definitions=renamed)
     assert [(row["direction_from"], row["direction_to"]) for row in spec] == [
         ("product", "engineering"), ("product", RENAMED_VERIFIER)]
 
@@ -355,24 +359,87 @@ def _in_branch(projection: RunProjection) -> RunProjection:
 
 
 def test_the_flow_records_and_the_states_under_a_fully_renamed_definition_use_the_renamed_departments(
-        tmp_path, monkeypatch):
+        tmp_path):
     # 验收第 3 条后半：三个部门都改名时，流转记录的去向与部门状态写改名后的部门
     renamed = _all_renamed(tmp_path)
-    monkeypatch.setattr(read_models, "DEFINITIONS", renamed)
-    monkeypatch.setattr(project_queries, "DEFINITIONS", renamed)
 
     delivery = read_models.flow_rows(_event(
-        EventType.DELIVERY_ACCEPTED, department=RENAMED_ENGINEERING, payload={"summary": "implemented"}))
+        EventType.DELIVERY_ACCEPTED, department=RENAMED_ENGINEERING, payload={"summary": "implemented"}),
+        definitions=renamed)
     assert [(row["direction_from"], row["direction_to"]) for row in delivery] == [
         (RENAMED_ENGINEERING, RENAMED_VERIFIER)]
 
     spec = read_models.flow_rows(_event(
-        EventType.SPEC_ACCEPTED, department=RENAMED_PRODUCT, payload={"revision": 1}))
+        EventType.SPEC_ACCEPTED, department=RENAMED_PRODUCT, payload={"revision": 1}), definitions=renamed)
     assert [(row["direction_from"], row["direction_to"]) for row in spec] == [
         (RENAMED_PRODUCT, RENAMED_ENGINEERING), (RENAMED_PRODUCT, RENAMED_VERIFIER)]
 
     projection = _projection(RENAMED_PRODUCT, RENAMED_ENGINEERING, RENAMED_VERIFIER)
     states = project_queries._departments(
-        projection, project_queries._work_item_progress(projection), None, {})
+        projection, project_queries._work_item_progress(projection), None, {}, renamed)
     assert states[RENAMED_ENGINEERING].state == "verifying"
     assert states[RENAMED_ENGINEERING].note == f"等{RENAMED_LABELS[RENAMED_VERIFIER]}核验交付 r1"
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1703：事项的职能状态、「你的输入」的去向按这个事项冻结的定义取
+
+
+def test_a_renamed_definition_gives_its_own_departments_through_the_queries(tmp_path):
+    # 验收第 5 条：三职能改名的定义经同一个口子读，部门与标签、「你的输入」的去向都是改名后的
+    renamed = _all_renamed(tmp_path)
+    system = LoopSystem.for_testing(
+        tmp_path / "loop", FakeAdapter({
+            RENAMED_PRODUCT: [product_spec()],
+            RENAMED_ENGINEERING: [delivery_turn()],
+            RENAMED_VERIFIER: quality_turns("release", "看过了"),
+        }), forms={DEFAULT_FORM: (renamed, WATCHED_OUTPUTS)}, resume_on_startup=False)
+    application = Application(system)
+    project_id = system.projects.register("改名的定义", "做一个逐行打印的 CLI。")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+
+    first = application.query("project.flow", ProjectFlow(
+        project_id=project_id, work_item=work_item_id)).data.records[0]
+    assert (first.kind, first.direction_to) == ("你的输入", RENAMED_PRODUCT)
+    assert system.run_until_stop(run_id).stop_reason == "released"
+
+    delivery = next(record for record in application.query("project.flow", ProjectFlow(
+        project_id=project_id, work_item=work_item_id)).data.records if record.kind == "版本交付")
+    assert (delivery.direction_from, delivery.direction_to) == (RENAMED_ENGINEERING, RENAMED_VERIFIER)
+
+    # 跑到一半时读到的部门是改名后的这三个，标签跟着定义
+    activated = next(event.position for event in system.store.list_events(run_id)
+                     if event.type == EventType.DEPARTMENT_ACTIVATED)
+    during = application.query("project.loop", ProjectLoop(
+        project_id=project_id, work_item=work_item_id, at=activated)).data.work_items[0]
+    assert list(during.departments) == [RENAMED_PRODUCT, RENAMED_ENGINEERING, RENAMED_VERIFIER]
+    labels = {role.id: role.label for role in during.organization.roles}
+    assert labels[RENAMED_PRODUCT] == RENAMED_LABELS[RENAMED_PRODUCT]
+    system.close()
+
+
+# 这两个文件里读进程加载的定义的地方：没有事项可依的读取，按行登记（工单 #1703 的验收第 6 条）
+REGISTERED_DEFINITION_READS = {
+    "harness/app/project_queries.py": ("return DEFINITIONS",),
+    "harness/app/read_models.py": ("DEFAULT_DEFINITIONS = DEFINITIONS",),
+}
+
+
+def _definition_reads(source: str) -> list[tuple[int, str]]:
+    # 读进程加载的定义的行：整个对象被读（`return DEFINITIONS`、赋值），或者读按职能、按核验的那几个属性。
+    # 只用来取一个与部门无关的东西（事件来源、版本号这类）不算；导入那几行也不算
+    pattern = re.compile(
+        r"(?<![\w.])(?:DEFINITIONS\b(?!\s*\.)"
+        r"|DEFINITIONS\.(?:departments|department_labels|verifiers_of|rejection_edges|verified_by"
+        r"|verification_pairs|is_verifier|is_open_loop|input_department|source_department"
+        r"|watched_outputs|verification)\b)")
+    return [(number, line.strip()) for number, line in enumerate(source.splitlines(), start=1)
+            if pattern.search(line) and not line.lstrip().startswith(("from ", "import ", "#"))]
+
+
+def test_the_two_files_read_the_loaded_definition_only_where_registered():
+    # 验收第 6 条：按事项取定义以后，这两个文件里按职能、按核验读进程加载的定义的地方只剩登记过的几行
+    for relative, registered in REGISTERED_DEFINITION_READS.items():
+        reads = _definition_reads(_source(relative))
+        assert tuple(line for _number, line in reads) == registered, (
+            f"{relative} 里读进程加载的定义的地方变了（工单 #1703）：{reads}")
