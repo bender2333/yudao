@@ -1,8 +1,9 @@
-// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、形态、登记的源目录与底部几节。
+// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、组织、登记的源目录与底部几节。
 // 数据全部来自 project.settings；每项修改提交对应的命令，基准版本取快照里的 version，
 // 过期时拒绝并提示重新读取（工单验收第 3 条）。
 // 机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
-// 「形态」一节由 #1403 加入：现在用哪一份、换一份、改回与历史，数据来自 project.organization。
+// 「组织」一节由 #1403 加入、#1649 改成一行组织与两个按钮（加或去掉独立核验、换形态）：数据来自 project.organization；
+// 改回与历史在「高级」（#1650）。
 // 「职能设置」一节由 #1713 搬到职能详情页（模型、推理档位与职能 Prompt 在那里改）。
 
 import { useEffect, useState } from "react";
@@ -49,7 +50,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route; departments:
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、形态、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、组织、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {settings.error !== null ? (
