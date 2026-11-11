@@ -1,0 +1,44 @@
+/* 项目页 · 选事项一行与事项面板（工单 #1708，项目的组织设计说明 4.14「事项面板与全部事项」）。
+   这一份只写这张工单新增的结构：面板的壳（.y10-cv-panel）、键值行（.y10-kv）、按钮（.y10-btn）、
+   列表与折叠块（.y10-list、.y10-details）都沿用已有的样式，别处正在改的那份样式文件不动。 */
+
+/* 选事项一行：选中那件事项的标题可以点，点开它的事项面板；文字与四周同一号字，只是一条链接 */
+.v20-items-title {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+
+.v20-items-title:hover { color: var(--green); text-decoration: underline; }
+
+/* 选中的那一个不是按钮：标题是里面那条链接，状态那一截跟别的按钮一样淡 */
+.y10-cv-pick-btn > .v20-items-title { font-weight: 600; }
+
+/* 有一件事项中断待恢复时，选事项一行下面的一行提示 */
+.v20-items-interrupted {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin: 6px 0 0; padding: 4px 10px;
+  font-size: 12px; color: var(--amber); background: var(--amber-bg); border-radius: 999px;
+}
+
+/* 面板里的每条事实：一句话后面跟着它的「来源」 */
+.v20-item-fact { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.v20-item-source { font-size: 12px; }
+
+/* 点开「来源」以后按位置读回来的那条原始事件：原文里读到的四项，加上全文入口 */
+.v20-item-source-detail {
+  display: grid; gap: 4px; padding: 8px 12px; background: var(--soft);
+  border: 1px solid var(--line); border-radius: var(--radius); font-size: 12.5px;
+}
+
+.v20-item-source-detail .y10-h3 { margin: 0; }
+
+/* 循环的每一层一行：层名、状态、已用量与上限排在一行，点开看判定依据 */
+.v20-item-layer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.v20-item-layer { padding: 6px 10px; }
+.v20-item-layer > summary { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 12.5px; }
+.v20-item-layer[open] > summary { margin-bottom: 4px; }
+.v20-item-layer-name { font-weight: 600; }
+.v20-item-layer-used { font-family: var(--mono); font-size: 12px; }
+.v20-item-layer .y10-list { margin: 0; font-size: 12px; color: var(--muted); }
+
+/* 用量到上限的那几项、等执行槽位的那一句、三个操作 */
+.v20-item-panel .v20-item-slots { margin: 0; }
+.v20-item-actions { flex-wrap: wrap; }
