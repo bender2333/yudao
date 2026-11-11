@@ -111,7 +111,7 @@ uv run python evals/scorer/scorer.py --delivery <交付目录> --result <评分�
 
 协调者按 [records.md](method/records.md) 把实例、任务、发现、独立复现、裁决及缺项写进本轮 `result.json`。报告事实表从同一记录和原始导出生成，专家分析与观感保留原始引用。
 
-用 `report.mjs --init <result.json> --task-set trial-tasks@4 --material scenario-3@2 --commit <提交> F1=<导出> R1=<导出>` 初始化，再用 `report.mjs --check <result.json> --json --render <facts.md>` 核对并生成事实表。身份错误、数字与来源矛盾、坏引用或明文凭据必须先处理；评分、复现和覆盖的明确缺项允许形成部分完成报告。核对自由叙述是否有来源，不能用手工抄数改写机器表。
+用 `report.mjs --init <result.json> --task-set trial-tasks@4 --material <材料版本> --commit <提交> F1=<导出> R1=<导出>` 初始化，再用 `report.mjs --check <result.json> --json --render <facts.md>` 核对并生成事实表。`<材料版本>` 读 `evals/scenarios/scenario-3/materials/manifest.json` 的 `material_version`，不凭记忆写。身份错误、数字与来源矛盾、坏引用或明文凭据必须先处理；评分、复现和覆盖的明确缺项允许形成部分完成报告。核对自由叙述是否有来源，不能用手工抄数改写机器表。
 
 正文顺序：环境与前提（含实际包、模型、任务版本和完成程度）、交付与评分、新手段、专家与覆盖、问题、建议、观察及第一眼、历史裁决回查。每条问题显式列出复现和裁决状态；未测到的内容逐项写原因。
 
