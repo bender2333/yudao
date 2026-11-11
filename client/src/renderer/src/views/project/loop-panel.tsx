@@ -1,7 +1,8 @@
 // 循环图与时序图共用的面板（工单 #1638、#1640、#1643，项目的组织设计说明 4.14）：
 //   - 点节点：这个职能在做什么、它的状态与原因、它的标记（核验、只在旧组织里），以及它的往来
 //     （开着的询问在前，标「还没回答」；答完的排在后面，和节点上的字出自同一份状态与事实）；
-//   - 点箭头：那一版与差异（改了的文件、那一版的一句话），同一种成果能逐版看；
+//   - 点箭头：那一版与差异（改了的文件、那一版的一句话），同一种成果能逐版看；面板里的各段
+//     （结论与逐条结论、文件下载、输入各版与进度、建档各轮、开环完成）见 arrow-panel.tsx（工单 #1711）；
 //   - 点时序图上的一行：成果走同一条箭头（那一版与差异），问答与你的话是全文，
 //     询问里又问的写明是回答哪一次时问的，工程回答质检的分事实与解释。
 // 面板只有一种，只显示模型给出的事实与本页读到的成果材料，不另存一份。
@@ -16,6 +17,7 @@ import { readFailureText } from "../../contract/read-failure";
 import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
 import { askStateText, nameOf, versionsOf } from "./loop-graph-model";
 import { arrowText, type LoopPanelPick } from "./loop-graph";
+import { ArrowSections } from "./arrow-panel.tsx";
 import { formatTime } from "./labels";
 import type { SequenceDetail, SequenceRow } from "./sequence-model";
 import { useSnapshot } from "./use-snapshot";
@@ -105,20 +107,17 @@ function ArrowPanel(props: WorkSource & {
           ) : null}
         </p>
       ) : null}
-      {arrow.verdict === null ? null : (
-        <p className={`y10-cv-verdict-line is-${arrow.verdict.tone}`}>
-          {arrow.verdict.tone === "reject" ? `${arrow.verdict.by}打回这一版` : `${arrow.verdict.by}放行这一版`}
-        </p>
-      )}
-      {arrow.text === "" ? null : <p className="y10-cv-panel-text">{arrow.text}</p>}
-      {arrow.files.length === 0 ? null : (
-        <div className="y10-cv-files">
-          <b>改了的文件</b>
-          <ul className="y10-list">
-            {arrow.files.map((file) => <li key={file}><span className="y10-pp-mono">{file}</span></li>)}
-          </ul>
-        </div>
-      )}
+      {/* 面板里的各段（工单 #1711）：结论、逐条结论与证据、这一版与文件下载、输入各版、建档各轮、
+          开环完成一句。各段按箭头是哪一种成果出现，由 arrow-panel-model.ts 给。 */}
+      <ArrowSections
+        app={props.app}
+        projectId={props.projectId}
+        workItemId={props.workItemId}
+        runId={props.runId}
+        graph={props.graph}
+        arrow={arrow}
+        versions={versions}
+      />
       <WorkEntry app={props.app} projectId={props.projectId} workItemId={props.workItemId} runId={props.runId}
                  branchSessions={props.branchSessions}
                  sourceKey={arrow.key}
