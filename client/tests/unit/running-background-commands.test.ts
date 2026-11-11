@@ -30,7 +30,7 @@ require.extensions[".tsx"] = loader;
 require.extensions[".ts"] = loader;
 
 const { renderToStaticMarkup } = require("react-dom/server");
-const { RunningBackgroundCommands } = require("../../src/renderer/src/views/project/department.tsx");
+const { RunningBackgroundCommands } = require("../../src/renderer/src/views/project/department-parts.tsx");
 import type { BackgroundCommandView } from "../../src/renderer/src/api/generated/types.gen";
 
 

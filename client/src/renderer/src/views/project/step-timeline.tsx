@@ -19,7 +19,7 @@ import type {
 import { readFailureText } from "../../contract/read-failure";
 import { actionKind, actionRow, toolOutput, type ActionRowView, type ExternalSourceRefView } from "./action-table.ts";
 import { Empty, EventDetail, Modal, Tag } from "./common";
-import { RunningBackgroundCommands } from "./department.tsx";
+import { RunningBackgroundCommands } from "./department-parts.tsx";
 import { ExternalSource } from "./external-source.tsx";
 import { formatTime } from "./labels";
 import { useSnapshot } from "./use-snapshot";
