@@ -2098,6 +2098,22 @@ def test_the_report_lists_a_form_run_apart_from_the_default_form(tmp_path):
     assert "| 停止原因 | open_loop |" not in text
 
 
+def test_a_form_run_stays_out_of_the_version_comparison():
+    """指定形态的运行不进版本比较：结论「受阻」并写明原因（验收④）。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1", false_release=False)]
+    current = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                        runs, form=FORM)
+
+    comparison = yudao_compare.compare(current, current)
+
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert "不进版本比较" in comparison["block_reason"]
+    assert FORM in comparison["block_reason"]
+
+
 def test_a_form_run_stays_out_of_the_single_agent_comparison():
     """指定形态的运行不进与单个 agent 的对照：结论「受阻」并写明原因（验收④）。"""
     import yudao_compare
