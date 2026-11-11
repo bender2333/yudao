@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"62ea175cb1e08c66",
+"hash":"1743191019dc8933",
 "nodes":[
-{"hash":"62ea175cb1e08c66","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"1743191019dc8933","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"078b471bfa891ff7","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"3d895ce193426210","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -38,7 +38,7 @@
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"a3bc50edde9feef5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"4882a9976309e8ac","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md#Yudao Loop System > 当前状态","kind":"section-ref","raws":["README.md"],"seen":"21a5a85634da9e34","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"60594bdd598f15d2","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"6b244e05e8380ff0","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/README.md","kind":"code-path","raws":["client/README.md"],"seen":"65ba0f28c0354bd6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/adr/0040-design-implementation-separation.md","kind":"code-path","raws":["docs/adr/0040-design-implementation-separation.md"],"seen":"e13e2bc72a154c3b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/adr/0045-project-organization-form-plus-changes.md","kind":"code-path","raws":["adr/0045-project-organization-form-plus-changes.md"],"seen":"35577a59515a54b7","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -62,7 +62,7 @@
 {"dst":"docs/archive/current-baseline-2026-10-29.md","kind":"code-path","raws":["docs/archive/current-baseline-2026-10-29.md"],"seen":"9e4a89c32b73cba5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/consistency-scan-2026-11-03.md","kind":"code-path","raws":["consistency-scan-2026-11-03.md","docs/consistency-scan-2026-11-03.md"],"seen":"33cc4b05e042e29d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/current-baseline.md","kind":"code-path","raws":["current-baseline.md","docs/current-baseline.md"],"seen":"497d52ac9b3abf04","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md","docs/decision.md"],"seen":"f87d5b36b2289a1c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md","docs/decision.md"],"seen":"63399292dc0d3bce","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-02 - 组织设定：五份形态两个层做目录，事项的来源进定义，用户脚本做正本","kind":"section-ref","raws":["docs/decision.md"],"seen":"dc95142753b0be44","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-03 - 组织设定：交互骨架是一条线程加看得见的收件人，v19 画三级","kind":"section-ref","raws":["decision.md"],"seen":"e12274a555219cff","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-03 - 组织设定：最低一级就是对话，成果库折进对话","kind":"section-ref","raws":["decision.md"],"seen":"3e2c23d756a1d549","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
