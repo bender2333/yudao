@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/agents/acceptance-evidence.md",
-"hash":"3f5ba145f131452e",
+"hash":"351f3e5633e888ed",
 "nodes":[
-{"hash":"3f5ba145f131452e","id":"docs/agents/acceptance-evidence.md","kind":"file","title":"docs/agents/acceptance-evidence.md"},
+{"hash":"351f3e5633e888ed","id":"docs/agents/acceptance-evidence.md","kind":"file","title":"docs/agents/acceptance-evidence.md"},
 {"hash":"a81e54cd37608d49","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据","kind":"section","parent":"docs/agents/acceptance-evidence.md","title":"交付、审查与阶段验收的证据"},
 {"hash":"a99ad5bdf3884ed5","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 1. 记录身份与结论","kind":"section","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据","title":"1. 记录身份与结论"},
 {"hash":"0cff5568fc87237a","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 1. 记录身份与结论 > 表1 > 实现完成","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 1. 记录身份与结论","title":"实现完成"},
@@ -24,15 +24,15 @@
 {"hash":"f91fe5f9ee187030","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","kind":"section","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据","title":"5. 试用工单与里程碑的关闭"},
 {"hash":"76bdf842d664a6e8","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","kind":"section","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据","title":"6. 阶段的结束与进入"},
 {"hash":"478f0ef4f61b0e5f","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表1 > 1 进入条件","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"1 进入条件"},
-{"hash":"796f46a780d8d9b8","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表1 > 2 阶段工单","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"2 阶段工单"},
+{"hash":"9c0f27684ffd33b3","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表1 > 2 阶段工单","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"2 阶段工单"},
 {"hash":"e8ffbbca54f644ce","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表1 > 3 薄片","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"3 薄片"},
-{"hash":"2fbbca864791b440","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之间：转实","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"职能之间：转实"},
-{"hash":"45463c7ec8006324","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之间：真实项目","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"职能之间：真实项目"},
-{"hash":"3e93f1801edc26f0","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之间：自己转一周","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"职能之间：自己转一周"},
-{"hash":"57f9d26a7ed41f79","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之内：转起来","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"职能之内：转起来"},
-{"hash":"58bd71f838ff2b09","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之内：用起来","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"职能之内：用起来"},
-{"hash":"778409dcdde7eca5","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 看着循环","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"看着循环"},
-{"hash":"fa7d63dc349032db","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 修改循环","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"修改循环"}
+{"hash":"56db53b1fd66e90e","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 1.1 职能之间：转实","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"1.1 职能之间：转实"},
+{"hash":"1ac6ad935b085d72","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 1.2 职能之间：真实项目","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"1.2 职能之间：真实项目"},
+{"hash":"8c6e0c03ec8464df","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 1.3 职能之间：自己转一周","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"1.3 职能之间：自己转一周"},
+{"hash":"3d6f9cf06cac2b8e","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 2.1 职能之内：转起来","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"2.1 职能之内：转起来"},
+{"hash":"fcaeb9c182eece79","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 2.2 职能之内：用起来","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"2.2 职能之内：用起来"},
+{"hash":"571f6cb9931261fc","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 3.1 看着循环","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"3.1 看着循环"},
+{"hash":"aa52417c909a1309","id":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 3.2 修改循环","kind":"row","parent":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","title":"3.2 修改循环"}
 ],
 "edges":[
 {"dst":"docs/agents/workflow.md#工作方式 > 8. 独立审查","kind":"link","raws":["workflow.md"],"seen":"de63e29217dbff90","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据"},
@@ -58,8 +58,8 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"a8c6892a917172d5","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"d4d037f30ea0010e","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入"},
 {"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"09a39937fa7ab141","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"3a2388972a6d25d6","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 修改循环"},
-{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"7b7029ff4fb1ad98","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之间：自己转一周"},
-{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"452174d475741d3e","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 职能之间：自己转一周"}
+{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"f87d5b36b2289a1c","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 1.3 职能之间：自己转一周"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"452174d475741d3e","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 1.3 职能之间：自己转一周"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"3a2388972a6d25d6","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入 > 表2 > 3.2 修改循环"}
 ]
 }

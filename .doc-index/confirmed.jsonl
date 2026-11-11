@@ -523,3 +523,9 @@
 {"down":"4e27d5c8c4b8c6b5","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","src":"docs/design/visualization.md#画面与播放设计说明","up":"c0c4ce9380995e0e"}
 {"down":"0ac6cd359ca6ffbd","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","src":"docs/design/visualization.md#画面与播放设计说明 > 11. 画面跟着定义伸缩 > 11.1 输入","up":"c0c4ce9380995e0e"}
 {"down":"b5c07471d328449c","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","up":"c0c4ce9380995e0e"}
+{"down":"e3c77a24f6ad7dd9","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"ed741be891bcedb5"}
+{"down":"4c653cb4540ff5b4","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 3","up":"8da243bee0082d49"}
+{"down":"f91fe5f9ee187030","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"8da243bee0082d49"}
+{"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"8da243bee0082d49"}
+{"down":"3c539202fc2d546a","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","up":"fb6a4381900be056"}
+{"down":"e1cef7120c8744fb","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","up":"fb6a4381900be056"}

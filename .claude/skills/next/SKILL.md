@@ -1,6 +1,6 @@
 ---
 name: next
-description: 子架构师在用户在场时的入口：从 GitHub 读整个项目的状态，按固定顺序找到第一件能做的事（等用户的事、交接点、达到的薄片、设计未写的桶、等拆的父工单、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论，一次做一件、先出一张等用户的卡。交接点（到期的 waiting、needs-triage、解除阻塞的 ready-for-human、子工单全关的父工单）按架构师循环技能做。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。
+description: 子架构师在用户在场时的入口：从 GitHub 读整个项目的状态，按固定顺序找到第一件能做的事（等用户的事、交接点、达到的薄片、设计未写的桶、等拆的父工单、前提已成立的不排队的事、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论，一次做一件、先出一张等用户的卡。交接点（到期的 waiting、needs-triage、解除阻塞的 ready-for-human、子工单全关的父工单）按架构师循环技能做。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。
 argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部]"
 ---
 
@@ -50,7 +50,8 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部]"
 | 3 | 薄片推进 | 薄片里除试用工单以外都已关闭、没有「设计未写」的行，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
 | 4 | 设计未写的桶 | 阶段工单的薄片清单里写着「设计未写」的行 | [`/to-design`](../to-design/SKILL.md) |
 | 5 | 还没拆的父工单 | `parent`，没有子工单 | [`/to-children`](../to-children/SKILL.md) |
-| 6 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
+| 6 | 不排队的事 | 「围绕循环与阶段总览」里标 `waiting`、最后一条 `WAITING:` 评论写的前提（读数、机器、别的工单）在当时的 main 与 GitHub 上已经成立 | 核对前提，写一条不带日期的 `WAITING:` 评论说明成立的证据，改回 `ready-for-agent`；要人来跑的转 `ready-for-human` |
+| 7 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
 
 ```bash
 gh issue list --state open --limit 300 --json number,title,labels,milestone \
