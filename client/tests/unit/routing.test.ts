@@ -5,7 +5,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { attemptBackPath, parseRoute, pathLabel, paths, withScope } from "../../src/renderer/src/shell/routing.ts";
+import {
+  attemptBackPath, parseRoute, pathLabel, paths, projectTabs, withScope,
+} from "../../src/renderer/src/shell/routing.ts";
 import { EMPTY_FILTERS, type Filters } from "../../src/renderer/src/views/project/observe-filter.ts";
 
 test("正式路径照旧解析：home、sys、项目页面；图鉴与已删除的连接页都落到未找到", () => {
@@ -14,8 +16,7 @@ test("正式路径照旧解析：home、sys、项目页面；图鉴与已删除�
   assert.equal(parseRoute("#/connect").name, "not-found");
   assert.equal(parseRoute("#/gallery").name, "not-found");
   assert.equal(parseRoute("#/sys/machines").name, "sys-machines");
-  assert.equal(parseRoute("#/p/demo/overview").name, "overview");
-  assert.equal(parseRoute("#/p/demo/dept/product").name, "dept");
+  assert.equal(parseRoute("#/p/demo/conversation").name, "conversation");
   assert.equal(parseRoute("#/nope").name, "not-found");
 });
 
@@ -24,7 +25,8 @@ test("路径表里没有图鉴：页签与侧栏取不到它", () => {
   assert.ok(!Object.values(paths).some((p) => String(p).includes("gallery")), "正式路径不应指向图鉴");
 });
 
-// 工单 #1638：项目页先是对话（上面带循环图），打开项目时落在这一页；概览等页先留着
+// 工单 #1638：项目页先是对话（上面带循环图），打开项目时落在这一页；
+// 工单 #1715：概览、资料、观测与职能页的地址不再有页面，打开时落到对话并保留地址里的事项。
 test("打开项目落在对话页，事项范围写在 ?w= 里", () => {
   assert.equal(parseRoute("#/p/demo").name, "conversation");
   assert.equal(parseRoute("#/p/demo/conversation").name, "conversation");
@@ -32,9 +34,37 @@ test("打开项目落在对话页，事项范围写在 ?w= 里", () => {
   assert.equal(parseRoute("#/p/demo/conversation?w=").workItemId, null);
   assert.equal(paths.conversation("demo"), "#/p/demo/conversation");
   assert.equal(paths.conversation("demo", { workItem: "w1" }), "#/p/demo/conversation?w=w1");
-  // 已有的页面照旧
-  assert.equal(parseRoute("#/p/demo/overview").name, "overview");
-  assert.equal(paths.overview("demo"), "#/p/demo/overview");
+});
+
+test("收进对话的旧页地址落到对话页，保留地址里的事项", () => {
+  for (const page of ["overview", "materials", "observe"]) {
+    assert.equal(parseRoute(`#/p/demo/${page}?w=w1`).name, "conversation", `${page} 页应收进对话`);
+    assert.equal(parseRoute(`#/p/demo/${page}?w=w1`).workItemId, "w1", `${page} 页的地址保留事项`);
+    assert.equal(parseRoute(`#/p/demo/${page}`).name, "conversation", `${page} 页没有事项时也落到对话`);
+  }
+  // 职能页（路径上写部门名的那种）同样落到对话，部门那一段不再有页面
+  const dept = parseRoute("#/p/demo/dept/product?w=w1");
+  assert.equal(dept.name, "conversation");
+  assert.equal(dept.department, "product");
+  assert.equal(dept.workItemId, "w1");
+  // 详情页的地址照旧可用（工单 #1713、#1710）
+  assert.equal(parseRoute("#/p/demo/dept-detail/engineering?w=w1").name, "dept-detail");
+  assert.equal(parseRoute("#/p/demo/observe/a1?w=w1").name, "observe-detail");
+  assert.equal(parseRoute("#/p/demo/w/w1/recovery").name, "recovery");
+});
+
+// 工单 #1715：项目页的页签只有对话与设置两项，任何组织下都一样（部门不再各占一个页签）。
+test("项目页的页签只有对话与设置两项", () => {
+  assert.deepEqual(projectTabs("demo", null), [
+    { label: "对话", hash: "#/p/demo/conversation", query: "project.loop" },
+    { label: "设置", hash: "#/p/demo/settings", query: "project.settings" },
+  ]);
+  assert.deepEqual(projectTabs("demo", "w1"), [
+    { label: "对话", hash: "#/p/demo/conversation?w=w1", query: "project.loop" },
+    { label: "设置", hash: "#/p/demo/settings?w=w1", query: "project.settings" },
+  ]);
+  // 空的范围与没有范围一样，不拼一个 ?w=
+  assert.equal(projectTabs("demo", "")[0].hash, "#/p/demo/conversation");
 });
 
 // 设置页底部「模型请求与用量」这一节（工单 #1710）：展开状态（section=requests）与筛选条件
@@ -102,14 +132,33 @@ test("从工作过程进请求详情：返回到同一事项的对话页", () =>
   assert.equal(back.hash, "#/p/demo/conversation?w=w1");
 });
 
-test("直接输入请求详情地址：返回观测页的请求记录，与没有这一节时一样", () => {
+// 工单 #1715：请求原来的列表页（观测）收进设置页的「模型请求与用量」；
+// 直接输入请求详情的地址时回到这一节，与从这一节进来一样。
+test("直接输入请求详情地址：返回设置页的「模型请求与用量」那一节", () => {
   const route = parseRoute("#/p/demo/observe/a1?w=w1&r=r1&dept=engineering");
   assert.equal(route.attemptOrigin, null);
   const back = attemptBackPath(route);
-  assert.equal(back.label, "返回请求记录");
-  assert.equal(back.hash, "#/p/demo/observe?w=w1&dept=engineering");
+  assert.equal(back.label, "返回模型请求与用量");
+  assert.equal(back.hash, "#/p/demo/settings?w=w1&section=requests&dept=engineering");
   // 认不出的来处按没有来处处理，不当成设置页或对话页
   assert.equal(parseRoute("#/p/demo/observe/a1?from=elsewhere").attemptOrigin, null);
+});
+
+// 换事项范围时请求详情不再留在详情上（它的内容属于某一个请求），回到请求所在的列表：
+// 设置页的「模型请求与用量」那一节，筛选跟着留着。
+test("在请求详情上切事项范围：回到设置页这一节，筛选跟着留着", () => {
+  const route = parseRoute("#/p/demo/observe/a1?w=w1&r=r1&dept=engineering&status=failed");
+  assert.equal(route.name, "observe-detail");
+  assert.equal(withScope(route, "w2"), "#/p/demo/settings?w=w2&section=requests&dept=engineering&status=failed");
+});
+
+// 工单 #1715：恢复详情清掉范围（原来那个页面收进对话以后没有概览页可回）时回到对话页；
+// 换一个范围时按新的事项打开同一页。
+test("在恢复详情上清掉范围：回到对话页；换范围时按新事项打开", () => {
+  const route = parseRoute("#/p/demo/w/w1/recovery");
+  assert.equal(route.name, "recovery");
+  assert.equal(withScope(route, "w2"), "#/p/demo/w/w2/recovery");
+  assert.equal(withScope(route, null), "#/p/demo/conversation");
 });
 
 // 职能详情（工单 #1713）：从节点面板的「职能详情」进，路径上写职能名，事项范围写在 ?w= 里；

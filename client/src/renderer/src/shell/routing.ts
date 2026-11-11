@@ -89,8 +89,12 @@ export function pathLabel(route: Route, projects: { project_id: string; name: st
 }
 
 // 打开一个项目时落在哪一页（工单 #1638，项目的组织设计说明 4.14）：项目页先是对话，
-// 循环图在对话上面；概览、资料这些页先留着，收成对话与设置两页另行处理
+// 循环图在对话上面（工单 #1715：页签只剩对话与设置）。
 export const DEFAULT_PROJECT_PAGE = "conversation";
+
+// 收进对话页的旧页（工单 #1715，设计说明「项目页只有两页」）：概览、资料、观测与各职能页不再有页签，
+// 旧地址打开时落到对话，保留地址里的事项；请求详情、恢复详情与职能详情是点进去的详情页，地址照旧可用。
+const RETIRED_PAGES: ReadonlySet<string> = new Set(["overview", "materials", "observe", "dept"]);
 
 export function parseRoute(hash: string): Route {
   const text = (hash || "").replace(/^#/, "");
@@ -119,7 +123,8 @@ export function parseRoute(hash: string): Route {
       return route;
     }
     if (segments[2] === "dept" && segments[3]) {
-      route.name = "dept";
+      // 职能页收进了对话（工单 #1715）：地址照读，写职能的那一段不再有页面，落到对话
+      route.name = "conversation";
       route.department = segments[3];
       return route;
     }
@@ -136,6 +141,10 @@ export function parseRoute(hash: string): Route {
       return route;
     }
     route.name = segments[2] ?? DEFAULT_PROJECT_PAGE;
+    // 旧页的地址落到对话（工单 #1715）：保留地址里的事项（w），不带旧页的名字
+    if (RETIRED_PAGES.has(route.name)) {
+      route.name = "conversation";
+    }
     return route;
   }
   route.name = "not-found";
@@ -208,6 +217,12 @@ function scopeQuery(workItem: string | null | undefined): string {
 }
 
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
+//
+// 页签收成对话与设置以后（工单 #1715，设计说明「项目页只有两页」），页面代码里只有下面这一节
+// 与对话、设置、职能详情、请求详情、恢复详情、系统页的地址在用。overview、dept、materials、observe、
+// overviewAt 这五个构造函数只剩工单 #1716 要删的旧页面（views/project/overview.tsx、department.tsx、
+// materials.tsx、observe.tsx）在用：它们不再有页签，地址打开时由 parseRoute 落到对话。旧页面删掉时
+// 一并删这五个构造函数。
 export const paths = {
   home: () => "#/home",
   // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；事项范围写在 ?w= 里
@@ -215,14 +230,17 @@ export const paths = {
     `#/p/${projectId}/conversation${scopeQuery(options.workItem)}`,
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
+  // 只给工单 #1716 要删的概览页用（工单 #1715）
   overview: (projectId: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/overview${scopeQuery(options.workItem)}`,
+  // 只给工单 #1716 要删的职能页用（工单 #1715）
   dept: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/dept/${department}${scopeQuery(options.workItem)}`,
   // 职能详情（工单 #1713）：从节点面板的「职能详情」进来，关闭时按 ?w= 回到原来的事项
   departmentDetail: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/dept-detail/${department}${scopeQuery(options.workItem)}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
+  // 只给工单 #1716 要删的资料页用（工单 #1715）
   materials: (projectId: string, options: { workItem?: string | null; round?: number | null } = {}) => {
     const query = new URLSearchParams();
     if (options.workItem) {
@@ -234,8 +252,7 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/materials${suffix ? `?${suffix}` : ""}`;
   },
-  // 观测页：事项范围（w）与部门筛选条件（dept）都写在参数里。
-  // 范围是作用域，部门是筛选条件：两者各写各的，不混在一处（工单 #801）
+  // 只给工单 #1716 要删的观测页用（工单 #1715）；请求原来的列表并进了设置页的「模型请求与用量」
   observe: (projectId: string, options: { workItem?: string | null; department?: string | null } = {}) => {
     const query = new URLSearchParams();
     if (options.workItem) {
@@ -268,6 +285,7 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
   },
+  // 只给工单 #1716 要删的概览页用（工单 #1715）。
   // 概览页的回放位置写在 ?at= 中，与首页共用同一个参数名；回到现在时路径不带 at。
   // 事项范围（w）与回放位置一起带着：换回放位置不丢掉所选范围。
   overviewAt: (projectId: string, at: number | null, options: { workItem?: string | null } = {}) => {
@@ -298,25 +316,30 @@ export const paths = {
   sys: (page: string) => `#/sys/${page}`,
 };
 
+// 项目页的页签（工单 #1715，设计说明「项目页只有两页」）：只有对话与设置两项，任何组织下都一样。
+// 页签上带的那条查询由 app.tsx 按服务端能给的查询筛：取不到时这个页签不出现（与原来一样）。
+export type ProjectTab = { label: string; hash: string; query: string };
+
+export function projectTabs(projectId: string, workItemId: string | null): ProjectTab[] {
+  const workItem = workItemId === "" ? null : workItemId;
+  return [
+    { label: "对话", hash: paths.conversation(projectId, { workItem }), query: "project.loop" },
+    { label: "设置", hash: paths.settings(projectId, { workItem }), query: "project.settings" },
+  ];
+}
+
 // 换一个事项范围，仍在当前页（原型 v10 的 Y10.paths.withScope，工单 #746）。
 // 范围是项目级的一份，写在 ?w= 里；换范围只改这一个参数，页面本身不变。
-// 请求详情页回到请求记录页（详情页的内容属于某一个请求，不随范围变化）；
-// 恢复页按新的事项打开，没有范围时回到概览页（恢复页按事项看，没有事项就没有内容）。
-// 观测页的部门筛选条件（?dept=）跟着留着：换范围是换「哪些事项的请求」，
-// 不动「哪个部门的请求」（工单 #801）
-// defaultDepartment 是项目现在组织里的第一个部门（工单 #1457）：部门页没写部门时用它，不写死 product
+// 页签收成对话与设置以后（工单 #1715），当前页只剩对话、设置与几个详情页：
+//   - 收进对话的旧页（概览、资料、观测、职能页）换范围时落到对话；
+//   - 请求详情换范围时回到请求所在的列表：设置页的「模型请求与用量」那一节（原来的观测页并进了它），
+//     详情页的内容属于某一个请求，不随范围变化；
+//   - 恢复页按新的事项打开，没有范围时回到对话页；
+//   - 设置页的节与筛选条件跟着留着（工单 #1161、#1710）。
+// defaultDepartment 是项目现在组织里的第一个部门（工单 #1457）：职能详情没写职能时用它，不写死 product
 export function withScope(route: Route, workItemId: string | null, defaultDepartment = ""): string {
   const projectId = route.projectId ?? "";
   switch (route.name) {
-    case "conversation":
-      return paths.conversation(projectId, { workItem: workItemId });
-    case "dept": {
-      // 部门页没有写部门、项目现在组织里也没有部门时回概览：不拼一个空的部门路径
-      const department = route.department ?? defaultDepartment;
-      return department === ""
-        ? paths.overview(projectId, { workItem: workItemId })
-        : paths.dept(projectId, department, { workItem: workItemId });
-    }
     case "dept-detail": {
       // 职能详情（工单 #1713）跟着事项范围走：换范围留在同一个职能的这一页
       const department = route.department ?? defaultDepartment;
@@ -324,41 +347,36 @@ export function withScope(route: Route, workItemId: string | null, defaultDepart
         ? paths.conversation(projectId, { workItem: workItemId })
         : paths.departmentDetail(projectId, department, { workItem: workItemId });
     }
-    case "materials":
-      return paths.materials(projectId, { workItem: workItemId });
-    case "observe":
-      return paths.observe(projectId, { workItem: workItemId, department: route.departmentFilter });
     case "observe-detail":
-      return paths.observe(projectId, { workItem: workItemId, department: route.departmentFilter });
+      return paths.settings(projectId, {
+        workItem: workItemId,
+        section: REQUESTS_SECTION,
+        requests: route.requestFilters,
+      });
     case "recovery":
-      return workItemId === null ? paths.overview(projectId) : paths.recovery(projectId, workItemId);
+      return workItemId === null ? paths.conversation(projectId) : paths.recovery(projectId, workItemId);
     case "settings":
       // 要滚到的那一节跟着留着：换范围不动这一页落在哪一节（工单 #1161）；
       // 「模型请求与用量」这一节的筛选条件也留着（工单 #1710）：换范围是换哪些事项的请求，
       // 不动职能、状态与模型这几格
       return paths.settings(projectId, { workItem: workItemId, section: route.settingsSection, requests: route.requestFilters });
     default:
-      return paths.overview(projectId, { workItem: workItemId });
+      // 对话页，以及收进对话的旧页（overview、materials、observe、dept）
+      return paths.conversation(projectId, { workItem: workItemId });
   }
 }
 
-// 请求详情的返回去处与文案（工单 #1710）：按进来时的来处决定回哪一页、哪一节。
-// 设置页这一节：回到这一节并保持展开（section=requests）与同一组筛选；
-// 对话页的工作过程：回到同一事项范围的对话页；
-// 没有来处（直接输入地址、旧链接）：回到观测页的请求记录，与原来一样。
+// 请求详情的返回去处与文案（工单 #1710；收页签以后的去处见工单 #1715）：
+// 从设置页这一节进来：回到这一节并保持展开（section=requests）与同一组筛选；
+// 从对话页的工作过程进来：回到同一事项范围的对话页；
+// 没有来处（直接输入地址、旧链接）：回到设置页的「模型请求与用量」——请求原来的列表页已经并进这一节。
 export function attemptBackPath(route: Route): { label: string; hash: string } {
   const projectId = route.projectId ?? "";
-  if (route.attemptOrigin === "settings") {
-    return {
-      label: "返回模型请求与用量",
-      hash: paths.settings(projectId, { workItem: route.workItemId, section: REQUESTS_SECTION, requests: route.requestFilters }),
-    };
-  }
   if (route.attemptOrigin === "conversation") {
     return { label: "返回对话", hash: paths.conversation(projectId, { workItem: route.workItemId }) };
   }
   return {
-    label: "返回请求记录",
-    hash: paths.observe(projectId, { workItem: route.workItemId, department: route.departmentFilter }),
+    label: "返回模型请求与用量",
+    hash: paths.settings(projectId, { workItem: route.workItemId, section: REQUESTS_SECTION, requests: route.requestFilters }),
   };
 }

@@ -238,8 +238,8 @@ test("收敛明细按结构化字段写事项标题、中文层名与前后状�
     "示例项目 / 实现回声工具 · 部门之间的循环：无法判定 → 收敛中",
     "示例项目 / 实现回声工具 · 步骤：收敛中 → 停滞",
   ]);
-  // 事项标识与项目标识在字段里，整行是回到这个事项概览的链接
-  assert.equal(rows[0].href, `#/p/${PROJECT}/overview?w=${ITEM}`);
+  // 事项标识与项目标识在字段里，整行是回到这个事项对话页的链接（工单 #1715：概览页收进对话）
+  assert.equal(rows[0].href, `#/p/${PROJECT}/conversation?w=${ITEM}`);
   // 不是这一项、缺少层或状态的行不列
   assert.deepEqual(convergenceRows({ ...CONVERGENCE, id: "open_release" }, {}, {}), []);
   assert.deepEqual(convergenceRows({
@@ -256,10 +256,11 @@ test("收敛明细的文字里没有事项标识与 run 标识", () => {
   assert.ok(text.includes("未命名事项"), text);
 });
 
-test("「跳到逐条结论表」的链接在逐条结论表交付以后出现（#154）", () => {
-  // 资料页已经有这张表：默认就给出链接，落到这个事项的资料页
+test("「跳到逐条结论表」的链接在逐条结论表交付以后出现（#154、#1715）", () => {
+  // 逐条结论表与检验覆盖在标着放行或打回的那一版的箭头面板里（工单 #1711）；
+  // 资料页收进对话以后链接落到那件事项的对话页
   assert.equal(CRITERIA_TABLE_READY, true);
-  assert.equal(openReleaseRows(lookup())[0].href, `#/p/${PROJECT}/materials?w=${ITEM}`);
+  assert.equal(openReleaseRows(lookup())[0].href, `#/p/${PROJECT}/conversation?w=${ITEM}`);
   // 读不出检验覆盖的那一行不给链接：没有条数可对照的表不看
   const unreadable = openReleaseRows(lookup({ criteriaTableReady: true, coverage: { [ITEM]: null } }));
   assert.equal(unreadable[0].href, null);

@@ -272,9 +272,11 @@ export function openReleaseRows(lookup: OpenReleaseLookup): OpenReleaseRow[] {
       : coverage === null
         ? OPEN_CRITERIA_UNREADABLE
         : openCriteriaText(coverage.numbers.open, coverage.open_criteria);
-    // 逐条结论表在资料页（#154）；读不出检验覆盖的那一行没有条数可对照，不给链接
+    // 逐条结论与检验覆盖在标着放行或打回的那一版的箭头面板里（工单 #1711、#1715）：
+    // 资料页收进对话以后，链接落到那件事项的对话页，箭头面板在那一页的循环图上；
+    // 读不出检验覆盖的那一行没有条数可对照，不给链接
     const href = ready && coverage !== null && coverage !== undefined
-      ? paths.materials(target.projectId, { workItem: target.workItemId })
+      ? paths.conversation(target.projectId, { workItem: target.workItemId })
       : null;
     return { position: target.position, at: target.at, where, text, state, href };
   });
@@ -287,7 +289,7 @@ export interface ConvergenceRowView {
   where: string;
   /** 层名与前后两种状态，例如「部门之间的循环：无法判定 → 收敛中」 */
   change: string;
-  /** 回到事项概览的链接；缺项目或事项标识时为空 */
+  /** 回到事项所在对话页的链接（工单 #1715：概览页收进对话）；缺项目或事项标识时为空 */
   href: string | null;
 }
 
@@ -311,7 +313,7 @@ export function convergenceRows(
     const title = entry.work_item_id == null ? "" : titles[entry.work_item_id] ?? "";
     const where = [projectName, title === "" ? WORK_ITEM_UNNAMED : title].filter((part) => part !== "").join(" / ");
     const href = entry.project_id != null && entry.work_item_id != null
-      ? paths.overview(entry.project_id, { workItem: entry.work_item_id })
+      ? paths.conversation(entry.project_id, { workItem: entry.work_item_id })
       : null;
     return [{
       key: `${item.id}.${index}`,

@@ -209,11 +209,12 @@ export function decisionLinks(decision: DecisionView): MaterialLink[] {
       links.push({ label: "前往本项目的职能详情", href });
     }
   }
-  // 初始 PRD 的两个工件：PRD.md 与 STRUCTURE.md 指向资料页，资料页按轮展示的正是这两个工件的内容
-  const materials = decision.kind === "initial_prd" ? materialsHref(decision) : null;
-  if (materials !== null) {
+  // 初始 PRD 的两个工件：资料页收进对话以后（工单 #1715），PRD.md 与 STRUCTURE.md 落在建档事项的对话页——
+  // 建档各轮的初始 PRD 与结构说明在「建档事项的初始 PRD」那条箭头的面板里逐轮看
+  const prd = decision.kind === "initial_prd" ? initialPrdHref(decision) : null;
+  if (prd !== null) {
     for (const fileName of ["PRD.md", "STRUCTURE.md"]) {
-      links.push({ label: fileName, href: materials });
+      links.push({ label: fileName, href: prd });
     }
   }
   // 请求显式给出的页面（合同以后增加时也生效）
@@ -224,27 +225,19 @@ export function decisionLinks(decision: DecisionView): MaterialLink[] {
   return links;
 }
 
-// 初始 PRD 决定所属项目的资料页：资料页按轮列出初始 PRD 与结构说明的原文，
-// 带上卡片的轮次供资料页定位（工单 #573）
-function materialsHref(decision: DecisionView): string | null {
+// 初始 PRD 决定所属事项的对话页（工单 #1715）：资料页并进对话以后，建档的工件在箭头面板里看，
+// 链接落到事项范围的对话页；请求里写了事项就用它，没有时用决定自己的事项。
+function initialPrdHref(decision: DecisionView): string | null {
   const request = (decision.request ?? {}) as Payload;
   if (decision.project_id === null) {
     return null;
   }
   const workItem = typeof request.work_item_id === "string" ? request.work_item_id : decision.work_item_id;
-  const round = typeof request.round === "number" ? request.round : null;
-  const query = new URLSearchParams();
-  if (workItem !== null && workItem !== "") {
-    query.set("w", workItem);
-  }
-  if (round !== null) {
-    query.set("round", String(round));
-  }
-  const suffix = query.toString();
-  return `#/p/${decision.project_id}/materials${suffix ? `?${suffix}` : ""}`;
+  return paths.conversation(decision.project_id, { workItem: workItem === "" ? null : workItem });
 }
 
-// 「在项目中查看」的目标：请求给出 view 时用它；结果未知的动作落到恢复页；其余落到项目概览
+// 「在项目中查看」的目标：请求给出 view 时用它；结果未知的动作落到恢复页；其余落到那件事项的对话页
+// （工单 #1715：概览页收进对话，没有事项时落到项目的对话页）
 export function viewHref(decision: DecisionView): string | null {
   const request = (decision.request ?? {}) as Payload;
   if (typeof request.view === "string" && request.view !== "") {
@@ -253,14 +246,14 @@ export function viewHref(decision: DecisionView): string | null {
   if (decision.project_id === null) {
     return null;
   }
-  // 初始 PRD 的确认：资料页按轮列出各轮的初始 PRD 与确认记录（工单 #138）
+  // 初始 PRD 的确认：各轮的初始 PRD 与确认记录在建档事项的对话页、那条箭头的面板里（工单 #138、#1715）
   if (decision.kind === "initial_prd") {
-    return materialsHref(decision);
+    return initialPrdHref(decision);
   }
   if (decision.work_item_id !== null) {
     return `#/p/${decision.project_id}/w/${decision.work_item_id}/recovery`;
   }
-  return `#/p/${decision.project_id}/overview`;
+  return paths.conversation(decision.project_id);
 }
 
 // 挡住了什么：被阻塞的事项，以及同一项目中排在它后面的事项数量（v8 第 6 节）。
