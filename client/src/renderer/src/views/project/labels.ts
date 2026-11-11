@@ -546,7 +546,7 @@ export const WORK_ITEM_UNNAMED = "未命名事项";
 
 // 「跳到逐条结论表」的链接（工单 #401）：逐条结论表在资料页（工单 #154）。软依赖，不等 #154——
 // 那张表还没有的时候链接不出现（点不到一张不存在的表）。#154 合并以后这一行是 true，
-// 链接跟着出现在每条开环明细后面；链接的地址与页名由调用处按 paths.materials 给出。
+// 链接跟着出现在每条开环明细后面；地址由调用处给（资料页随工单 #1716 删掉，链接改指对话页）。
 export const CRITERIA_TABLE_READY = true;
 export const CRITERIA_TABLE_LINK = "跳到逐条结论表";
 

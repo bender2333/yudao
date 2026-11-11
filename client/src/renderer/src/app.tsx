@@ -22,12 +22,8 @@ import { RulesPage } from "./views/system/rules";
 import { RuntimePage } from "./views/system/runtime";
 import { ToolsPage } from "./views/system/tools";
 import { ConversationPage } from "./views/project/conversation";
-import { DepartmentPage } from "./views/project/department";
 import { DepartmentDetailPage } from "./views/project/department-detail";
-import { MaterialsPage } from "./views/project/materials";
 import { AttemptDetailPage } from "./views/project/attempt-detail";
-import { ObservePage } from "./views/project/observe";
-import { OverviewPage } from "./views/project/overview";
 import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
@@ -435,7 +431,8 @@ function TokenGate(props: { onSubmit: (token: string) => void }) {
 }
 
 // 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
-// 概览、部门工作间、资料、观测、设置与恢复由本工单实现；未实现的系统页显示占位，写明由哪个工单填入。
+// 项目页只有对话与设置两页（工单 #1715，设计说明「项目页只有两页」）：概览、各职能页、资料与观测
+// 已经删掉（工单 #1716），它们的地址由 parseRoute 落到对话页。
 function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null;
   departments: DepartmentView[]; organization: ProjectOrganizationResult | null;
   onNavigate: (hash: string) => void }) {
@@ -445,23 +442,13 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
   }
   switch (route.name) {
     case "conversation":
-      // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；概览等页先留着
+      // 对话页（工单 #1638）：项目页先是对话，循环图在它上面
       return <ConversationPage app={props.app} route={props.route} departments={props.departments}
         organization={props.organization} onNavigate={props.onNavigate} />;
-    case "overview":
-      return <OverviewPage app={props.app} route={route} departments={props.departments} onNavigate={props.onNavigate} />;
-    case "dept":
-      return <DepartmentPage app={props.app} route={route} departments={props.departments} />;
     case "dept-detail":
       // 职能详情（工单 #1713）：职责与权限取自项目现在的组织，模型与 Prompt 写本项目的职能设置
       return <DepartmentDetailPage app={props.app} route={route} organization={props.organization}
         departments={props.departments} />;
-    case "materials":
-      return <MaterialsPage app={props.app} route={route} onNavigate={props.onNavigate} />;
-    case "observe":
-      // 观测页（工单 #80、#1710）：请求记录与用量统计是设置页那一节的同一份部件；
-      // 职能清单取自项目现在的组织，部门页签与这一页的职能下拉用同一份
-      return <ObservePage app={props.app} route={route} departments={props.departments} />;
     case "observe-detail":
       // 请求详情（工单 #1710）：返回的去处按进来时的地址决定（设置页那一节或对话页的工作过程）
       return <AttemptDetailPage app={props.app} route={route} back={attemptBackPath(route)} />;

@@ -290,8 +290,7 @@ export interface RoundLike {
   decisions?: readonly DecisionLike[];
 }
 
-// 与 materials.tsx 的 CONCLUSION_NAMES、ONBOARDING_DECISION_OPTIONS 同一组词：旧资料页不删不改，
-// 这两张表在两处各留一份
+// 逐条结论的结论用词（原来资料页也有一份同名表，随旧资料页在工单 #1716 删掉，现在只剩这一份）
 const BASELINE_CONCLUSION_NAMES: Record<string, string> = {
   verified: "已核实",
   read_only: "只读",

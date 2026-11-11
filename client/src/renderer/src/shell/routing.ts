@@ -19,8 +19,6 @@ export type Route = {
   // 回放位置（全局位置，设计说明第 3.3 节写在 ?at= 中）：刷新、后退与分享链接都回到同一位置；
   // 为 null 时是实时画面
   at: number | null;
-  // 资料页选中的建档轮次（工单 #573，设计第 3.4 节写在 ?round= 中）：进入资料页时滚到对应轮次
-  round: number | null;
   /**
    * 设置页要滚到的那一节（工单 #1161，写在 ?section= 中）：决定卡片上的「前往本项目的部门设置」
    * 落到部门设置那一节，不停在设置页的顶部；没有指定时是 null。
@@ -54,9 +52,6 @@ const SYSTEM_PAGES: Record<string, string> = {
 const PAGE_LABELS: Record<string, string> = {
   // 对话页是打开项目时的那一页（工单 #1638）：上面是循环图，线程与时序图由后面的工单接上
   conversation: "对话",
-  overview: "概览",
-  materials: "资料",
-  observe: "观测",
   "observe-detail": "请求详情",
   // 职能详情（工单 #1713）：从节点面板的「职能详情」进，路径上写职能名，见 pathLabel
   "dept-detail": "职能详情",
@@ -94,6 +89,7 @@ export const DEFAULT_PROJECT_PAGE = "conversation";
 
 // 收进对话页的旧页（工单 #1715，设计说明「项目页只有两页」）：概览、资料、观测与各职能页不再有页签，
 // 旧地址打开时落到对话，保留地址里的事项；请求详情、恢复详情与职能详情是点进去的详情页，地址照旧可用。
+// 这些页面的代码已经删掉（工单 #1716），这里留着是为了旧地址与已分享的链接还能打开。
 const RETIRED_PAGES: ReadonlySet<string> = new Set(["overview", "materials", "observe", "dept"]);
 
 export function parseRoute(hash: string): Route {
@@ -101,7 +97,7 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), round: parseRound(query), settingsSection: sectionOf(query), requestFilters: filtersFromQuery(query), attemptOrigin: attemptOrigin(query) };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), settingsSection: sectionOf(query), requestFilters: filtersFromQuery(query), attemptOrigin: attemptOrigin(query) };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
@@ -160,15 +156,6 @@ function replayPosition(query: URLSearchParams): number | null {
   return Number(text);
 }
 
-// 路径参数里的建档轮次：正整数才认
-function parseRound(query: URLSearchParams): number | null {
-  const text = query.get("round");
-  if (text === null || !/^[1-9]\d*$/.test(text)) {
-    return null;
-  }
-  return Number(text);
-}
-
 // 路径参数里的部门筛选条件（工单 #801）：按原样读出来，认不认它由页面拿项目的职能清单去对
 // （工单 #1710：项目的职能清单可能与默认的三个不同，地址里不带白名单以外的一律丢掉就会被吃掉）。
 // 空串按没有筛选处理，地址里不留空的 ?dept=
@@ -219,10 +206,8 @@ function scopeQuery(workItem: string | null | undefined): string {
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
 //
 // 页签收成对话与设置以后（工单 #1715，设计说明「项目页只有两页」），页面代码里只有下面这一节
-// 与对话、设置、职能详情、请求详情、恢复详情、系统页的地址在用。overview、dept、materials、observe、
-// overviewAt 这五个构造函数只剩工单 #1716 要删的旧页面（views/project/overview.tsx、department.tsx、
-// materials.tsx、observe.tsx）在用：它们不再有页签，地址打开时由 parseRoute 落到对话。旧页面删掉时
-// 一并删这五个构造函数。
+// 与对话、设置、职能详情、请求详情、恢复详情、系统页的地址在用。概览、各职能页、资料与观测的
+// 构造函数随旧页面一起删掉（工单 #1716）：它们的地址由 parseRoute 落到对话。
 export const paths = {
   home: () => "#/home",
   // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；事项范围写在 ?w= 里
@@ -230,40 +215,10 @@ export const paths = {
     `#/p/${projectId}/conversation${scopeQuery(options.workItem)}`,
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
-  // 只给工单 #1716 要删的概览页用（工单 #1715）
-  overview: (projectId: string, options: { workItem?: string | null } = {}) =>
-    `#/p/${projectId}/overview${scopeQuery(options.workItem)}`,
-  // 只给工单 #1716 要删的职能页用（工单 #1715）
-  dept: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
-    `#/p/${projectId}/dept/${department}${scopeQuery(options.workItem)}`,
   // 职能详情（工单 #1713）：从节点面板的「职能详情」进来，关闭时按 ?w= 回到原来的事项
   departmentDetail: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/dept-detail/${department}${scopeQuery(options.workItem)}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
-  // 只给工单 #1716 要删的资料页用（工单 #1715）
-  materials: (projectId: string, options: { workItem?: string | null; round?: number | null } = {}) => {
-    const query = new URLSearchParams();
-    if (options.workItem) {
-      query.set("w", options.workItem);
-    }
-    if (options.round) {
-      query.set("round", String(options.round));
-    }
-    const suffix = query.toString();
-    return `#/p/${projectId}/materials${suffix ? `?${suffix}` : ""}`;
-  },
-  // 只给工单 #1716 要删的观测页用（工单 #1715）；请求原来的列表并进了设置页的「模型请求与用量」
-  observe: (projectId: string, options: { workItem?: string | null; department?: string | null } = {}) => {
-    const query = new URLSearchParams();
-    if (options.workItem) {
-      query.set("w", options.workItem);
-    }
-    if (options.department) {
-      query.set("dept", options.department);
-    }
-    const suffix = query.toString();
-    return `#/p/${projectId}/observe${suffix ? `?${suffix}` : ""}`;
-  },
   // 请求详情：事项范围（w）、run 标识（r）与部门筛选条件（dept）都写在参数里，
   // 刷新、后退与直接输入路径都能读回。from 是来处（设置页这一节或对话页的工作过程，工单 #1710），
   // requests 是设置页这一节的筛选条件：返回时按它们回到原来的样子
@@ -284,20 +239,6 @@ export const paths = {
     appendFilters(query, options.requests);
     const suffix = query.toString();
     return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
-  },
-  // 只给工单 #1716 要删的概览页用（工单 #1715）。
-  // 概览页的回放位置写在 ?at= 中，与首页共用同一个参数名；回到现在时路径不带 at。
-  // 事项范围（w）与回放位置一起带着：换回放位置不丢掉所选范围。
-  overviewAt: (projectId: string, at: number | null, options: { workItem?: string | null } = {}) => {
-    const query = new URLSearchParams();
-    if (at !== null) {
-      query.set("at", String(at));
-    }
-    if (options.workItem) {
-      query.set("w", options.workItem);
-    }
-    const suffix = query.toString();
-    return `#/p/${projectId}/overview${suffix ? `?${suffix}` : ""}`;
   },
   settings: (projectId: string, options: { workItem?: string | null; section?: string | null; requests?: Filters } = {}) => {
     const query = new URLSearchParams();
@@ -361,7 +302,7 @@ export function withScope(route: Route, workItemId: string | null, defaultDepart
       // 不动职能、状态与模型这几格
       return paths.settings(projectId, { workItem: workItemId, section: route.settingsSection, requests: route.requestFilters });
     default:
-      // 对话页，以及收进对话的旧页（overview、materials、observe、dept）
+      // 对话页，以及收进对话的旧页（overview、materials、observe、dept；页面已随工单 #1716 删掉）
       return paths.conversation(projectId, { workItem: workItemId });
   }
 }

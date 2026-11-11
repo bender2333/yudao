@@ -133,15 +133,3 @@ export function useCommand(app: ClientApp | null, dataKey: string): CommandState
 
   return { busy, submitted, problem, accepted, submit };
 }
-
-// 命令被拒绝以后给用户的去处（工单 #319 第 6 项）：部门没有选模型时给两个地方，
-// 一处是全系统的部门默认，一处是这个项目的部门设置；其余拒绝原因不给去处
-export function rejectionLinks(problem: CommandProblem | null, projectId: string): { label: string; hash: string }[] {
-  if (problem === null || problem.kind !== "rejected" || problem.rejection.reason !== "provider_unavailable") {
-    return [];
-  }
-  return [
-    { label: "去模型管理页设置职能默认", hash: "/sys/models" },
-    { label: "在本项目的设置页选择模型", hash: `/p/${projectId}/settings` },
-  ];
-}
