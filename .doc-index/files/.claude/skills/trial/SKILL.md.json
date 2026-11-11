@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/trial/SKILL.md",
-"hash":"da08ce6a15d7a6c2",
+"hash":"85c92eaca9c6afa4",
 "nodes":[
-{"hash":"da08ce6a15d7a6c2","id":".claude/skills/trial/SKILL.md","kind":"file","title":".claude/skills/trial/SKILL.md"},
+{"hash":"85c92eaca9c6afa4","id":".claude/skills/trial/SKILL.md","kind":"file","title":".claude/skills/trial/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/trial/SKILL.md#(开头)","kind":"section","parent":".claude/skills/trial/SKILL.md","title":"(开头)"},
 {"hash":"d59be8b87eb42e5d","id":".claude/skills/trial/SKILL.md#name: trialdescription: 用从 main 打包安装的 Yudao 执行固定用户任务与独立探索，保留新手体验、运行证据、复现状态和明确缺项，形成试用报告。用于 agent 试用及薄片发布前走查。argument-hint: \"[试用工单号] [备注，例如「只跑固定任务」]\"","kind":"section","parent":".claude/skills/trial/SKILL.md","title":"name: trialdescription: 用从 main 打包安装的 Yudao 执行固定用户任务与独立探索，保留新手体验、运行证据、复现状态和明确缺项，形成试用报告。用于 agent 试用及薄片发布前走查。argument-hint: \"[试用工单号] [备注，例如「只跑固定任务」]\""},
 {"hash":"dd20342d18638946","id":".claude/skills/trial/SKILL.md#试用","kind":"section","parent":".claude/skills/trial/SKILL.md","title":"试用"},
@@ -21,7 +21,7 @@
 {"hash":"2480b0c61c755c15","id":".claude/skills/trial/SKILL.md#试用 > 6. 读数与评分","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"6. 读数与评分"},
 {"hash":"ec590d13b89ee76d","id":".claude/skills/trial/SKILL.md#试用 > 7. 问题、复核与独立复现","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"7. 问题、复核与独立复现"},
 {"hash":"739804adcdcbfa5d","id":".claude/skills/trial/SKILL.md#试用 > 8. 建议","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"8. 建议"},
-{"hash":"c6ef8ff25e7e4d00","id":".claude/skills/trial/SKILL.md#试用 > 9. 记录、检查与发帖","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"9. 记录、检查与发帖"},
+{"hash":"2dc14bbc615b3c96","id":".claude/skills/trial/SKILL.md#试用 > 9. 记录、检查与发帖","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"9. 记录、检查与发帖"},
 {"hash":"37a956747219b8ce","id":".claude/skills/trial/SKILL.md#试用 > 10. 问题裁决、回查与命中率","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"10. 问题裁决、回查与命中率"},
 {"hash":"82ab88ea0f2c6b06","id":".claude/skills/trial/SKILL.md#试用 > 11. 归档与收尾","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"11. 归档与收尾"},
 {"hash":"f4b657477e59baf4","id":".claude/skills/trial/SKILL.md#试用 > 12. 断点续跑","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"12. 断点续跑"},
@@ -50,6 +50,7 @@
 {"dst":".claude/skills/trial/method/expert.md","kind":"link","raws":["method/expert.md"],"seen":"6ac68b298dbbb912","src":".claude/skills/trial/SKILL.md#试用 > 5. 专家、覆盖与探索"},
 {"dst":".claude/skills/trial/method/probes.md","kind":"link","raws":["method/probes.md"],"seen":"85698fffc1639d8f","src":".claude/skills/trial/SKILL.md#试用 > 5. 专家、覆盖与探索"},
 {"dst":".claude/skills/trial/method/reproduce.md","kind":"link","raws":["method/reproduce.md"],"seen":"81717b8959cfbb52","src":".claude/skills/trial/SKILL.md#试用 > 7. 问题、复核与独立复现"},
-{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["method/records.md"],"seen":"4cfb9c95d3ffbb3b","src":".claude/skills/trial/SKILL.md#试用 > 9. 记录、检查与发帖"}
+{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["method/records.md"],"seen":"8a61e62a6e744143","src":".claude/skills/trial/SKILL.md#试用 > 9. 记录、检查与发帖"},
+{"dst":"evals/scenarios/scenario-3/materials/manifest.json","kind":"code-path","raws":["evals/scenarios/scenario-3/materials/manifest.json"],"seen":"fa28928a2e88da5b","src":".claude/skills/trial/SKILL.md#试用 > 9. 记录、检查与发帖"}
 ]
 }

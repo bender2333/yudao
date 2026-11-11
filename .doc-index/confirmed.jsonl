@@ -529,3 +529,27 @@
 {"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"8da243bee0082d49"}
 {"down":"3c539202fc2d546a","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","up":"fb6a4381900be056"}
 {"down":"e1cef7120c8744fb","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","up":"fb6a4381900be056"}
+{"down":"e3c77a24f6ad7dd9","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"cba078312e3014c7"}
+{"down":"cc73c8fbc9b1af5e","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/app-and-interface.md#应用层与接口层设计说明","up":"202f1781f91186a3"}
+{"down":"3c539202fc2d546a","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","up":"829ff9afca7a3474"}
+{"down":"d1aa18394662658a","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户","up":"5f846e4e9b633577"}
+{"down":"e1cef7120c8744fb","dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 三圈与七个阶段","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","up":"829ff9afca7a3474"}
+{"down":"7284d605a5ee3141","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","src":"docs/design/department-guidance.md#职能指导的处理设计","up":"712b08c48843e347"}
+{"down":"a2bbd4eb98c67c44","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行 > 3.2 同时运行的条件","up":"5f846e4e9b633577"}
+{"down":"db1ffe5381078445","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.7 模型与 Prompt 设置","up":"202f1781f91186a3"}
+{"down":"f978dc748b3eea6f","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.8 与已有结构的对应","up":"202f1781f91186a3"}
+{"down":"16bc60d3a816d7e4","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.1 总体","up":"5f846e4e9b633577"}
+{"down":"bfe107abac284d7a","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前","up":"5f846e4e9b633577"}
+{"down":"5405f7e186dc5619","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程","up":"5f846e4e9b633577"}
+{"down":"99c232b470382afb","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 7. 容纳变化的判据 > 7.1 组成的变化","up":"5f846e4e9b633577"}
+{"down":"e53a39b042dd8132","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 职能详情里的模型与 Prompt","up":"202f1781f91186a3"}
+{"down":"66c67177e25677b4","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/outsourced-roles.md#外包角色设计说明","up":"5f846e4e9b633577"}
+{"down":"57fb2d8494ccda20","dst":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 5. 界面与评测","up":"eedeb4407e9b31df"}
+{"down":"4b300625aaa3f1db","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.13 新建的入口","up":"5f846e4e9b633577"}
+{"down":"25ca4c2a86227247","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话 > 项目页上的内容在哪里看","up":"58122c68e1292ae2"}
+{"down":"e3a1745f0729a7a6","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.15 循环图跟着组织长","up":"5f846e4e9b633577"}
+{"down":"496d6b371a50abab","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/project-organization.md#项目的组织设计说明 > 6. 未决问题","up":"5f846e4e9b633577"}
+{"down":"06a7edec0fbfc345","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","up":"5f846e4e9b633577"}
+{"down":"d63786b3eaa47df8","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/visualization.md#画面与播放设计说明 > 12. 开环完成与放行","up":"5f846e4e9b633577"}
+{"down":"9ed1a930474bb409","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式","up":"5f846e4e9b633577"}
+{"down":"020521dcc0127276","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明","up":"58122c68e1292ae2"}
