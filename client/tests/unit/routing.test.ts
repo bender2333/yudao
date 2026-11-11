@@ -152,6 +152,15 @@ test("在请求详情上切事项范围：回到设置页这一节，筛选跟�
   assert.equal(withScope(route, "w2"), "#/p/demo/settings?w=w2&section=requests&dept=engineering&status=failed");
 });
 
+// 工单 #1715：恢复详情清掉范围（原来那个页面收进对话以后没有概览页可回）时回到对话页；
+// 换一个范围时按新的事项打开同一页。
+test("在恢复详情上清掉范围：回到对话页；换范围时按新事项打开", () => {
+  const route = parseRoute("#/p/demo/w/w1/recovery");
+  assert.equal(route.name, "recovery");
+  assert.equal(withScope(route, "w2"), "#/p/demo/w/w2/recovery");
+  assert.equal(withScope(route, null), "#/p/demo/conversation");
+});
+
 // 职能详情（工单 #1713）：从节点面板的「职能详情」进，路径上写职能名，事项范围写在 ?w= 里；
 // 关闭回到同一事项的对话页，切事项范围时仍留在这个职能上。
 test("职能详情的地址往返：路径上写职能名，事项范围写在 ?w= 里", () => {

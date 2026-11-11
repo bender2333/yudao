@@ -217,6 +217,12 @@ function scopeQuery(workItem: string | null | undefined): string {
 }
 
 // 每个页面的路径（原型 v8 设计说明第 3.3 节）
+//
+// 页签收成对话与设置以后（工单 #1715，设计说明「项目页只有两页」），页面代码里只有下面这一节
+// 与对话、设置、职能详情、请求详情、恢复详情、系统页的地址在用。overview、dept、materials、observe、
+// overviewAt 这五个构造函数只剩工单 #1716 要删的旧页面（views/project/overview.tsx、department.tsx、
+// materials.tsx、observe.tsx）在用：它们不再有页签，地址打开时由 parseRoute 落到对话。旧页面删掉时
+// 一并删这五个构造函数。
 export const paths = {
   home: () => "#/home",
   // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；事项范围写在 ?w= 里
@@ -224,14 +230,17 @@ export const paths = {
     `#/p/${projectId}/conversation${scopeQuery(options.workItem)}`,
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
+  // 只给工单 #1716 要删的概览页用（工单 #1715）
   overview: (projectId: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/overview${scopeQuery(options.workItem)}`,
+  // 只给工单 #1716 要删的职能页用（工单 #1715）
   dept: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/dept/${department}${scopeQuery(options.workItem)}`,
   // 职能详情（工单 #1713）：从节点面板的「职能详情」进来，关闭时按 ?w= 回到原来的事项
   departmentDetail: (projectId: string, department: string, options: { workItem?: string | null } = {}) =>
     `#/p/${projectId}/dept-detail/${department}${scopeQuery(options.workItem)}`,
   recovery: (projectId: string, workItemId: string) => `#/p/${projectId}/w/${workItemId}/recovery`,
+  // 只给工单 #1716 要删的资料页用（工单 #1715）
   materials: (projectId: string, options: { workItem?: string | null; round?: number | null } = {}) => {
     const query = new URLSearchParams();
     if (options.workItem) {
@@ -243,8 +252,7 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/materials${suffix ? `?${suffix}` : ""}`;
   },
-  // 观测页：事项范围（w）与部门筛选条件（dept）都写在参数里。
-  // 范围是作用域，部门是筛选条件：两者各写各的，不混在一处（工单 #801）
+  // 只给工单 #1716 要删的观测页用（工单 #1715）；请求原来的列表并进了设置页的「模型请求与用量」
   observe: (projectId: string, options: { workItem?: string | null; department?: string | null } = {}) => {
     const query = new URLSearchParams();
     if (options.workItem) {
@@ -277,6 +285,7 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/observe/${attemptId}${suffix ? `?${suffix}` : ""}`;
   },
+  // 只给工单 #1716 要删的概览页用（工单 #1715）。
   // 概览页的回放位置写在 ?at= 中，与首页共用同一个参数名；回到现在时路径不带 at。
   // 事项范围（w）与回放位置一起带着：换回放位置不丢掉所选范围。
   overviewAt: (projectId: string, at: number | null, options: { workItem?: string | null } = {}) => {
