@@ -155,8 +155,12 @@ test("模型与 Prompt 每项写明跟随发布还是本项目写入，按这一
   const written = rows(setting({ requested_tier: "高", text: "先写测试" }));
   assert.equal(value(written, "推理档位"), OWN_SOURCE);
   assert.equal(value(written, "职能 Prompt"), OWN_SOURCE);
+  // 有设置记录但没写职能 Prompt：文字是内置默认 Prompt（工单 #1701 以后服务端会填上），仍写跟随发布
+  const defaultPrompt = rows(setting({ text: "内置默认的工程 Prompt", department_setting_configured: false }));
+  assert.equal(value(defaultPrompt, "职能 Prompt"), FOLLOW_SOURCE);
   // 没有设置记录时按没写处理，仍写跟随发布
   assert.equal(value(rows(null), "模型"), FOLLOW_SOURCE);
+  assert.equal(value(rows(null), "职能 Prompt"), FOLLOW_SOURCE);
   assert.equal(sourceText(true), OWN_SOURCE);
   assert.equal(sourceText(false), FOLLOW_SOURCE);
 });

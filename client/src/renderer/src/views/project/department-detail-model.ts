@@ -104,12 +104,22 @@ export function scopeRows(organization: DraftOrganization | null, department: st
   return [{ label: "写入范围", value: writeScopeText(item?.write_scope ?? "") }];
 }
 
+// 职能 Prompt 有没有由本项目写入：服务端用 department_setting_configured 分清
+// （有设置记录但没写这一段时，这一段仍是内置默认 Prompt，见工单 #1701）；
+// 没有这个字段的旧服务端按已写入处理，不因为缺一个字段就把写的那一段说成跟随发布
+export function promptWrittenInProject(setting: DepartmentSetting | null): boolean {
+  if (setting?.department_setting_configured === false) {
+    return false;
+  }
+  return Boolean(setting?.text);
+}
+
 // 模型与 Prompt 三項的来源（工单验收第 1 条）：按这一项有没有写入判断，不按设置记录有没有判断
 export function settingSourceRows(setting: DepartmentSetting | null): DetailRow[] {
   return [
     { label: "模型", value: sourceText(Boolean(setting?.model_id)) },
     { label: "推理档位", value: sourceText(Boolean(setting?.requested_tier)) },
-    { label: "职能 Prompt", value: sourceText(Boolean(setting?.text)) },
+    { label: "职能 Prompt", value: sourceText(promptWrittenInProject(setting)) },
   ];
 }
 
