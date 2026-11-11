@@ -1,0 +1,24 @@
+/* 设置页底部「模型请求与用量」这一节（工单 #1710）。
+   原型 v20 里这一节是可折叠的一段（details / summary），卡片本身沿用 v10 的 .y10-block 与 .card；
+   这里只补折叠件的样子：去掉浏览器自带的三角标记、标题与说明排成一行一段、
+   展开以后的正文有自己的上边距。观测页用的不是这一段（那边是普通卡片），不受影响。 */
+
+.y20-req { padding: 0; }
+.y20-req-details { display: block; }
+.y20-req-summary {
+  display: block;
+  padding: 16px 18px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius);
+}
+.y20-req-summary::-webkit-details-marker { display: none; }
+.y20-req-summary:hover { background: var(--surface-2); }
+.y20-req-summary:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.y20-req-title { display: block; font-weight: 600; }
+.y20-req-sub { display: block; margin: 4px 0 0; }
+.y20-req-details[open] > .y20-req-summary { border-bottom: 1px solid var(--line); border-radius: var(--radius) var(--radius) 0 0; }
+.y20-req-details > .y10-block-body { padding: 14px 18px 18px; }
+/* 这一节里的筛选栏比观测页多两格（事项与请求的模型），窄屏时仍按行折 */
+.y20-req .y10-obs-filter { max-width: 200px; }
+.y20-req-scope { margin: 0 0 12px; }
