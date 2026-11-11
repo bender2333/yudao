@@ -19,6 +19,11 @@ AGGREGATED_METRICS = ("cycles", "rework", "collaboration", "model_requests",
                       "cost", "elapsed_seconds")
 # 评分器给出的两项：来自 run["score"]，与上面的指标一起进汇总
 SCORED_METRICS = ("completion", "correctness")
+# 没有核验角色的形态以开环完成结束（harness/models.py 的 OPEN_LOOP_STOP_REASON，与
+# yudao_metrics.OPEN_LOOP_STOP_REASON 同一个值）：报告的停止原因写「开环完成」，不写成放行
+OPEN_LOOP_STOP_REASON = "open_loop"
+OPEN_LOOP_END_TEXT = "开环完成"
+
 
 METRIC_LABELS = {
     "cycles": "循环次数",
@@ -91,8 +96,13 @@ def _aggregate_one(values, total, unknown_reason):
 
 
 def build_result(scenario, material_version, scorer_version, model, runs, model_capacity=None,
-                 notes=(), comparison=None):
-    """一份结果：每次运行的指标与失败条目、逐次的提交号、模型的容量与来源。"""
+                 notes=(), comparison=None, form=None):
+    """一份结果：每次运行的指标与失败条目、逐次的提交号、模型的容量与来源。
+
+    `form` 是这次运行用的形态标识（工单 #1705）：指定形态的运行在结果里标明形态、单独列出，
+    不并入默认形态的次数，也不进与单个 agent 的对照（docs/design/evaluation-scenarios.md
+    「两边的运行条件」「形态」）。
+    """
     counted = [run for run in runs
                if not run.get("void") and not run["metrics"].get("model_service_failure")]
     commits = _run_commits(runs)
@@ -106,6 +116,8 @@ def build_result(scenario, material_version, scorer_version, model, runs, model_
         "scorer_version": scorer_version,
         "side": "yudao",
         "model": model,
+        "form": form,
+        "counts_toward_default": form is None,
         "yudao_commit": distinct[0] if len(distinct) == 1 else None,
         "yudao_commits": commits,
         "yudao_commit_mismatch": distinct if len(distinct) > 1 else [],
@@ -361,6 +373,7 @@ def _basic_section(result):
     lines.append("| 材料版本 | " + str(result["material_version"]) + " |")
     lines.append("| 评分器版本 | " + _scored_text(result.get("scorer_version")) + " |")
     lines.append("| 被测模型 | " + str(result["model"]) + " |")
+    lines.append("| 形态 | " + _form_text(result.get("form")) + " |")
     lines.append("| Yudao 提交号 | " + _commit_text(result) + " |")
     if result.get("model_capacity"):
         lines.append("| 模型的容量 | " + model_service.describe(result["model_capacity"]) + " |")
@@ -380,6 +393,25 @@ def _basic_section(result):
 def _scored_text(value):
     """只在评分时才有的字段（评分器版本这类）：作废的运行写「未评分」，不写 None。"""
     return str(value) if value not in (None, "") else "未评分"
+
+
+def _form_text(form):
+    """形态一栏：不给形态时用发布的默认形态，给了时写明这次运行单独列出（工单 #1705）。"""
+    if not form:
+        return "默认形态（没有指定）"
+    return (str(form) + "（指定形态的运行：指标与分数单独列出，不并入默认形态的次数，"
+                        "也不进与单个 agent 的对照）")
+
+
+def _reason_text(value):
+    """结束原因与停止原因：开环完成写成「开环完成」，不写成放行（工单 #1705）。
+
+    docs/design/evaluation-scenarios.md「Yudao 的过程检查点」第 1 项：开环完成不通过这一项，
+    结果与报告的停止原因写「开环完成」，不写成放行。
+    """
+    if value == OPEN_LOOP_STOP_REASON:
+        return OPEN_LOOP_END_TEXT
+    return str(value)
 
 
 def _void_reason_text(run):
@@ -437,12 +469,19 @@ def _checkpoints_section(result):
         for key, label in CHECKPOINT_LABELS.items():
             checkpoint = run["metrics"]["checkpoints"].get(key, {})
             lines.append("- " + label + "：" + str(checkpoint.get("detail", "")))
+        readings = run["metrics"].get("open_loop_readings")
+        if readings:
+            lines.append("- 没有核验角色的形态只读两样：" + str(readings.get("detail", "")))
         lines.append("")
     return lines
 
 
 def _summary_section(result):
     lines = ["## 五、指标汇总", ""]
+    if result.get("form"):
+        lines.append("这份结果是一次指定形态的运行：下面的指标与分数单独列出，"
+                     "不并入默认形态的次数，也不进与单个 agent 的对照。")
+        lines.append("")
     summary = result["summary"]
     if result["run_count"] == 0:
         # 作废或模型服务故障的运行不进汇总：评分与噪声范围写「未评分」（工单 #1350）
@@ -507,6 +546,9 @@ def _onboarding_section(result):
 
 
 def _checkpoint_cell(checkpoint):
+    if checkpoint.get("applicable") is False:
+        # 没有核验角色的形态：这五项对它不适用（工单 #1705）
+        return str(checkpoint.get("detail") or "不适用")
     if checkpoint.get("passed") is None:
         return "未核实"
     return "通过" if checkpoint.get("passed") else "未通过"
@@ -568,8 +610,8 @@ def run_section(run, scores):
     lines.append("| 项目 | 取值 |")
     lines.append("| --- | --- |")
     lines.append("| 结束状态 | " + str(metrics["end_status"]) + " |")
-    lines.append("| 结束原因 | " + str(metrics["end_reason"]) + " |")
-    lines.append("| 停止原因 | " + str(metrics["stop_reason"]) + " |")
+    lines.append("| 结束原因 | " + _reason_text(metrics["end_reason"]) + " |")
+    lines.append("| 停止原因 | " + _reason_text(metrics["stop_reason"]) + " |")
     if run.get("yudao_commit"):
         lines.append("| Yudao 提交号 | " + str(run["yudao_commit"]) + " |")
     lines.append("| 定义版本 | " + _version_text(run.get("definitions_version")) + " |")
