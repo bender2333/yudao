@@ -1,17 +1,17 @@
 {
 "schema":1,
 "path":"docs/requirements/domain-completion.md",
-"hash":"863f7c1619aa8a60",
+"hash":"3ed107b2ecc630c6",
 "nodes":[
-{"hash":"863f7c1619aa8a60","id":"docs/requirements/domain-completion.md","kind":"file","title":"docs/requirements/domain-completion.md"},
-{"hash":"c7718e644c9aba5b","id":"docs/requirements/domain-completion.md#D12 职能的专业补全","kind":"section","parent":"docs/requirements/domain-completion.md","title":"D12 职能的专业补全"},
+{"hash":"3ed107b2ecc630c6","id":"docs/requirements/domain-completion.md","kind":"file","title":"docs/requirements/domain-completion.md"},
+{"hash":"1f875e4d0daf5180","id":"docs/requirements/domain-completion.md#D12 职能的专业补全","kind":"section","parent":"docs/requirements/domain-completion.md","title":"D12 职能的专业补全"},
 {"hash":"3d628ffde009b469","id":"docs/requirements/domain-completion.md#D12 职能的专业补全 > 有效规则","kind":"section","parent":"docs/requirements/domain-completion.md#D12 职能的专业补全","title":"有效规则"},
 {"hash":"d8ef8659639acba0","id":"docs/requirements/domain-completion.md#D12 职能的专业补全 > 验收","kind":"section","parent":"docs/requirements/domain-completion.md#D12 职能的专业补全","title":"验收"}
 ],
 "edges":[
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/domain-completion.md#D12 职能的专业补全"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"35e4ecd5be5ddb3d","src":"docs/requirements/domain-completion.md#D12 职能的专业补全"},
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"09f0ecd94c074a4a","src":"docs/requirements/domain-completion.md#D12 职能的专业补全"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/domain-completion.md#D12 职能的专业补全"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"docs/requirements/domain-completion.md#D12 职能的专业补全"},
 {"dst":"docs/requirements/expert-ask-react.md","kind":"link","raws":["expert-ask-react.md"],"seen":"40429c6eedbcdadf","src":"docs/requirements/domain-completion.md#D12 职能的专业补全 > 有效规则"}
 ]
 }

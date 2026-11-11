@@ -1,6 +1,6 @@
 # D16 使用 Git 管理任务内变化
 
-状态：有效。依据：[总图](../architecture.html)第一节「一份事实」方框与第四节「写入口」的缝；设计：[ADR-0024](../adr/0024-git-in-process-with-pygit2.md)、[恢复契约与故障矩阵](../design/recovery-contract-and-fault-matrix.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」。
+状态：有效。依据：[总图](../architecture.html)第一节「一份事实」方框与第四节「写入口」的缝；设计：[ADR-0024](../adr/0024-git-in-process-with-pygit2.md)、[恢复契约与故障矩阵](../design/recovery-contract-and-fault-matrix.md)。路线位置：[总体路线图](../program-roadmap.md)「职能之间：转实」。
 
 ## 范围
 

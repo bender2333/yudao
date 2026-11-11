@@ -1,6 +1,6 @@
 # D06 运行中追加输入的处理时机
 
-状态：有效。依据：[总图](../architecture.html)第三节「你中途的指导」那条规矩与内环每步的安全节点；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)第 6 节。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」。
+状态：有效。依据：[总图](../architecture.html)第三节「你中途的指导」那条规矩与内环每步的安全节点；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)第 6 节。路线位置：[总体路线图](../program-roadmap.md)「职能之间：转实」。
 
 ## 已确认
 

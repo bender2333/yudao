@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/current-baseline.md",
-"hash":"305d4937bcf23268",
+"hash":"497d52ac9b3abf04",
 "nodes":[
-{"hash":"305d4937bcf23268","id":"docs/current-baseline.md","kind":"file","title":"docs/current-baseline.md"},
+{"hash":"497d52ac9b3abf04","id":"docs/current-baseline.md","kind":"file","title":"docs/current-baseline.md"},
 {"hash":"a7b8a59db5796d8c","id":"docs/current-baseline.md#当前验收基线","kind":"section","parent":"docs/current-baseline.md","title":"当前验收基线"},
 {"hash":"b83542be002cf8ae","id":"docs/current-baseline.md#当前验收基线 > 1. 版本身份（当前）","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"1. 版本身份（当前）"},
 {"hash":"2e7ef83606ba1b5d","id":"docs/current-baseline.md#当前验收基线 > 2. 这条基线说明了什么","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"2. 这条基线说明了什么"},
 {"hash":"dd888dc7010cfb22","id":"docs/current-baseline.md#当前验收基线 > 3. 尚待执行的验收","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"3. 尚待执行的验收"},
-{"hash":"29f63cf4880d19fd","id":"docs/current-baseline.md#当前验收基线 > 4. 历史基线","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"4. 历史基线"}
+{"hash":"4955e841d4c82b26","id":"docs/current-baseline.md#当前验收基线 > 4. 历史基线","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"4. 历史基线"}
 ],
 "edges":[
 {"dst":"docs/archive/evaluation/2026-10-31-57835530.md","kind":"link","raws":["archive/evaluation/2026-10-31-57835530.md"],"seen":"a2591a74a9254718","src":"docs/current-baseline.md#当前验收基线"},

@@ -1,31 +1,31 @@
 {
 "schema":1,
 "path":"docs/requirements/operations-department.md",
-"hash":"4c12c638b6a815a2",
+"hash":"b6a19d7009319589",
 "nodes":[
-{"hash":"4c12c638b6a815a2","id":"docs/requirements/operations-department.md","kind":"file","title":"docs/requirements/operations-department.md"},
-{"hash":"49504421967147bf","id":"docs/requirements/operations-department.md#D27 运维","kind":"section","parent":"docs/requirements/operations-department.md","title":"D27 运维"},
-{"hash":"5b60c548fb4c85c3","id":"docs/requirements/operations-department.md#D27 运维 > 已确认","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维","title":"已确认"},
-{"hash":"74fc5a880af863ec","id":"docs/requirements/operations-department.md#D27 运维 > 长时间运行","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维","title":"长时间运行"},
-{"hash":"7e1607185ed050f4","id":"docs/requirements/operations-department.md#D27 运维 > 设计中待确定的规则","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维","title":"设计中待确定的规则"}
+{"hash":"b6a19d7009319589","id":"docs/requirements/operations-department.md","kind":"file","title":"docs/requirements/operations-department.md"},
+{"hash":"0d5940e4a9f93b07","id":"docs/requirements/operations-department.md#D27 运维","kind":"section","parent":"docs/requirements/operations-department.md","title":"D27 运维"},
+{"hash":"73b10c512ad22de6","id":"docs/requirements/operations-department.md#D27 运维 > 已确认","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维","title":"已确认"},
+{"hash":"b85a243c304d6740","id":"docs/requirements/operations-department.md#D27 运维 > 长时间运行","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维","title":"长时间运行"},
+{"hash":"39fb3e275786c3a6","id":"docs/requirements/operations-department.md#D27 运维 > 设计中待确定的规则","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维","title":"设计中待确定的规则"}
 ],
 "edges":[
-{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/requirements/operations-department.md#D27 运维"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"35e4ecd5be5ddb3d","src":"docs/requirements/operations-department.md#D27 运维"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"cc9397dfaf732c1e","src":"docs/requirements/operations-department.md#D27 运维"},
-{"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"d402dcdad54d3ef1","src":"docs/requirements/operations-department.md#D27 运维"},
-{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"e97f347021232778","src":"docs/requirements/operations-department.md#D27 运维"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/operations-department.md#D27 运维"},
+{"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"d4442d7c71888e2a","src":"docs/requirements/operations-department.md#D27 运维"},
+{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"2ddd3c639ca42511","src":"docs/requirements/operations-department.md#D27 运维"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"docs/requirements/operations-department.md#D27 运维"},
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
 {"dst":"docs/requirements/network-and-mcp.md","kind":"link","raws":["network-and-mcp.md"],"seen":"6ac217dee4c09f8b","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
 {"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"6cb344c65b218f25","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
-{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"45358e9b48ebabb7","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"1457bf379c078098","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
+{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"56d536b5f28f1ad7","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"3a2388972a6d25d6","src":"docs/requirements/operations-department.md#D27 运维 > 已确认"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"cc9397dfaf732c1e","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
-{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"2421347e78a79ffb","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
+{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"06a7edec0fbfc345","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"d697a9c7a0bdcdd7","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
-{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"5f08d4ab7b3ac69f","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"365946fd611e2dfa","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
-{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"4da4c2048d6376eb","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"}
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"e4b4cff7c7a62290","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"f1874c3d3518a7d5","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"},
+{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"8d34423f67f6b9f2","src":"docs/requirements/operations-department.md#D27 运维 > 长时间运行"}
 ]
 }

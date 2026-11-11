@@ -1,6 +1,6 @@
 # D11 产品 · 工程 · 质检循环的整体定义
 
-状态：有效。依据：[总图](../architecture.html)第一节「产品」「工程」「质检」方框与第三节外环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)第 2、3 节、[职能内多角色设计说明](../design/department-roles.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」，道 01 职能与核验。
+状态：有效。依据：[总图](../architecture.html)第一节「产品」「工程」「质检」方框与第三节外环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)第 2、3 节、[职能内多角色设计说明](../design/department-roles.md)。路线位置：[总体路线图](../program-roadmap.md)「职能之间：转实」，道 01 职能与核验。
 
 ## 已确认
 

@@ -1,6 +1,6 @@
 # D04 产品维护 PRD.md
 
-状态：有效。依据：[总图](../architecture.html)第一节「产品」方框与第三节外环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「转完一圈」，道 01 职能与核验。
+状态：有效。依据：[总图](../architecture.html)第一节「产品」方框与第三节外环；设计：[产品 · 工程 · 质检的循环结构](../design/department-loop.md)。路线位置：[总体路线图](../program-roadmap.md)「职能之间：转实」，道 01 职能与核验。
 
 ## 已确认
 

@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/requirements/web-game-frontend.md",
-"hash":"bf26c474e0f1a1ed",
+"hash":"eabedf9aa96680c2",
 "nodes":[
-{"hash":"bf26c474e0f1a1ed","id":"docs/requirements/web-game-frontend.md","kind":"file","title":"docs/requirements/web-game-frontend.md"},
+{"hash":"eabedf9aa96680c2","id":"docs/requirements/web-game-frontend.md","kind":"file","title":"docs/requirements/web-game-frontend.md"},
 {"hash":"7300ec83e6740165","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","kind":"section","parent":"docs/requirements/web-game-frontend.md","title":"D30 游戏化的 Web 界面与界面实现"},
-{"hash":"ff11a173cf6a3ce3","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"已确认"},
-{"hash":"d0081ae7c52cf36a","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 长时间运行以后的界面","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"长时间运行以后的界面"},
-{"hash":"74a62c03a10eee15","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 首页与画面的要求","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"首页与画面的要求"},
+{"hash":"6edb87005023ddec","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"已确认"},
+{"hash":"3362d413fcdc4f29","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 长时间运行以后的界面","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"长时间运行以后的界面"},
+{"hash":"4206f9db8d686773","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 首页与画面的要求","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"首页与画面的要求"},
 {"hash":"4529b0cf37655d3e","id":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 上下文的界面要求","kind":"section","parent":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现","title":"上下文的界面要求"}
 ],
 "edges":[
@@ -21,12 +21,12 @@
 {"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"0cde5154df7bf64b","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 上下文的界面要求"},
 {"dst":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"link","raws":["../adr/0021-client-pixel-view-follows-v9-structure.md"],"seen":"15afdd9d5eee1b57","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"7882970e6f0e9c97","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
-{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"9a4efda5d635772a","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
-{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"5f08d4ab7b3ac69f","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"3e4e4b64d57f7563","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"e4b4cff7c7a62290","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
 {"dst":"docs/prototypes/CHANGELOG.md","kind":"link","raws":["../prototypes/CHANGELOG.md"],"seen":"da96aa1a92d4a15d","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 已确认"},
-{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"5f08d4ab7b3ac69f","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 长时间运行以后的界面"},
-{"dst":"docs/requirements/operations-department.md","kind":"link","raws":["operations-department.md"],"seen":"4c12c638b6a815a2","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 长时间运行以后的界面"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"6ee3a4fb3fc233a9","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 首页与画面的要求"}
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"e4b4cff7c7a62290","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 长时间运行以后的界面"},
+{"dst":"docs/requirements/operations-department.md","kind":"link","raws":["operations-department.md"],"seen":"b6a19d7009319589","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 长时间运行以后的界面"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"docs/requirements/web-game-frontend.md#D30 游戏化的 Web 界面与界面实现 > 首页与画面的要求"}
 ]
 }

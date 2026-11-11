@@ -31,5 +31,5 @@
 
 ## 4. 历史基线
 
-- [current-baseline-2026-10-29.md](archive/current-baseline-2026-10-29.md)：阶段一「换骨架」为止的能力表与证据边界；其中的能力状态在本页不复制，仍以归档页为准。
+- [current-baseline-2026-10-29.md](archive/current-baseline-2026-10-29.md)：「换骨架」为止的能力表与证据边界；其中的能力状态在本页不复制，仍以归档页为准。
 - [current-baseline-3.0-contract.md](archive/current-baseline-3.0-contract.md)：3.0 合同时期的历史基线。
