@@ -1,7 +1,9 @@
 // 项目头部一行与对话上方的时间条（工单 #1653；项目的组织设计说明 4.15「循环图跟着组织长」的「其余规矩」、
 // 4.12「形态一键选用」；形态与核验角色设计说明「开环完成」）。
 //
-// 三件东西读三处事实，都不另存一份：
+// 四件东西读四处事实，都不另存一份：
+//   - 头部第一行是项目的名称与长期目标（工单 #1715，设计说明「项目页上的内容在哪里看」），只读；
+//     两样都在 project.overview 里，改仍在设置页的「基本信息」。
 //   - 头部一行标签（形态名与改过几处、轮转方式、有核验或开环）读项目现在的组织（project.organization），
 //     对话页与设置页都在。在跑的事项照它自己冻结的组织跑，这一行不随选中的事项变。
 //   - 头部「当前成果」一行（工单 #1714）读 project.overview 的当前成果与 project.writeback 里这一次采纳的
@@ -21,14 +23,14 @@ import type {
 import { cancelItemCommand, type CancelRequest } from "./cancel-text";
 import { CommandFeedback, hasCommand, Modal } from "./common";
 import {
-  outcomeHead, projectHead, STOP_LABEL, stopConfirm, timeBar, type TimeItem,
+  outcomeHead, projectHead, projectTitle, STOP_LABEL, stopConfirm, timeBar, type TimeItem,
 } from "./project-head-model";
 import { RestartOnboarding } from "./restart-onboarding";
 import { useCommand } from "./use-snapshot";
 
 /**
- * 项目头部的两行：一行标签（形态名与改过几处、轮转方式、有核验或开环），一行当前成果
- * （当前成果是哪一版、建档基线、写回状态；点开面板写全，面板里有重新建档的入口）。
+ * 项目头部的三行：名称与长期目标（只读），一行标签（形态名与改过几处、轮转方式、有核验或开环），
+ * 一行当前成果（当前成果是哪一版、建档基线、写回状态；点开面板写全，面板里有重新建档的入口）。
  * 各自的查询还没有读到时那一段不出现，不写一半。
  */
 export function ProjectHead(props: {
@@ -39,14 +41,21 @@ export function ProjectHead(props: {
   writeback: ProjectWritebackResult | null;
 }) {
   const head = projectHead(props.organization);
+  const title = projectTitle(props.overview);
   const outcome = outcomeHead(props.overview, props.writeback);
   // 面板一次只开一个位置：这一行自己收起、自己展开（节点与箭头面板不在这一层）
   const [opened, setOpened] = useState(false);
-  if (head === null && outcome === null) {
+  if (title === null && head === null && outcome === null) {
     return null;
   }
   return (
     <>
+      {title === null ? null : (
+        <div className="y10-phead" data-testid="project-head-title" aria-label="项目的名称与长期目标">
+          <span className="y10-phead-tag is-form">{title.name}</span>
+          <span className="y10-phead-tag">长期目标：{title.goal}</span>
+        </div>
+      )}
       {head === null ? null : (
         <div className="y10-phead" data-testid="project-head" aria-label="项目现在用的组织">
           {head.tags.map((tag, index) => (

@@ -20,7 +20,8 @@ import type {
   ProjectOverviewResult, ProjectWritebackResult, WritebackRecordView,
 } from "../../src/renderer/src/api/generated/types.gen.ts";
 import {
-  OUT_OF_RELEASE, outcomeHead, projectHead, stopConfirm, timeBar, writebackLine,
+  NO_GOAL_TEXT, NO_NAME_TEXT, OUT_OF_RELEASE, outcomeHead, projectHead, projectTitle, stopConfirm, timeBar,
+  writebackLine,
 } from "../../src/renderer/src/views/project/project-head-model.ts";
 import { cancelConfirmLines, cancelConfirmTitle } from "../../src/renderer/src/views/project/cancel-text.ts";
 import { OPEN_LOOP_STATUS_TEXT } from "../../src/renderer/src/views/project/labels.ts";
@@ -179,6 +180,16 @@ test("形态名用服务端给的 label，这一份不在发布里时不写英�
 
 test("查询还没有数据时头部不出现，不写一行假的", () => {
   assert.equal(projectHead(null), null);
+});
+
+test("项目头部第一行写名称与长期目标：只读，两样都取 project.overview", () => {
+  assert.deepEqual(projectTitle(overview()), { name: "项目一", goal: "把日志清理脚本补全" });
+  // 还没有填时各写一句，不写空白
+  assert.deepEqual(projectTitle(overview({ name: "", goal: "" })), {
+    name: NO_NAME_TEXT, goal: NO_GOAL_TEXT,
+  });
+  // 概览还没有读到时这一行不出现（不写一行假的）
+  assert.equal(projectTitle(null), null);
 });
 
 // ---------------------------------------------------------------- 对话上方的时间条

@@ -41,6 +41,32 @@ function changedSuffix(changed: number): string {
   return changed === 0 ? "" : `（改过 ${changed} 处）`;
 }
 
+/** 项目名称还没有写时的那一句。 */
+export const NO_NAME_TEXT = "还没有名字";
+/** 项目还没有填长期目标时的那一句（与旧概览页同一句）。 */
+export const NO_GOAL_TEXT = "没有填写";
+
+/** 项目头部的第一行：项目的名称与长期目标（设计说明「项目页上的内容在哪里看」里名称与长期目标那一格）。 */
+export type ProjectTitle = {
+  /** 项目名称 */
+  name: string;
+  /** 长期目标；没有填时写 NO_GOAL_TEXT */
+  goal: string;
+};
+
+/**
+ * 项目头部的第一行：名称与长期目标，只读显示。
+ *
+ * 两样都在 project.overview 里（name、goal），不另存一份；改仍在设置页的「基本信息」。
+ * 查询还没有读到时不写这一行，不写一行假的。
+ */
+export function projectTitle(overview: ProjectOverviewResult | null | undefined): ProjectTitle | null {
+  if (overview === null || overview === undefined) {
+    return null;
+  }
+  return { name: shown(overview.name, NO_NAME_TEXT), goal: shown(overview.goal, NO_GOAL_TEXT) };
+}
+
 /** 头部一行的几项：形态名、改过几处、轮转方式、核验角色的显示名，以及那一行标签（按显示的先后）。 */
 export type ProjectHead = {
   /** 形态名（服务端给的 label）；这一份不在发布里时为空 */

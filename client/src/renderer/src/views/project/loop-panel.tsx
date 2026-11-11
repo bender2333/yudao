@@ -12,7 +12,7 @@
 // 给出（成果按第几轮，询问与回答按询问编号对激活的会话编号）。
 
 import type { ClientApp } from "../../contract/client-app";
-import type { DepartmentWorkspaceResult, RunStepsResult } from "../../api/generated/types.gen";
+import type { DepartmentWorkspaceResult, RunAsksResult, RunStepsResult } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import type { LoopArrow, LoopGraph, LoopNode } from "./loop-graph-model";
 import { askStateText, nameOf, versionsOf } from "./loop-graph-model";
@@ -160,8 +160,18 @@ function NodePanel(props: {
     { project_id: props.projectId, department: node.id, work_item: props.workItemId === "" ? null : props.workItemId },
     props.projectId === "",
   );
+  // 等了多久（工单 #1715）：它发出、还没答的询问的开始时间在 run.asks 里，对话页读的是同一条查询
+  const asks = useSnapshot<RunAsksResult>(
+    props.app,
+    `page.cv.node.asks.${node.id}`,
+    "run.asks",
+    { run_id: props.runId },
+    props.runId === "",
+  );
   const doing = nodeDoing(steps.data, node.working);
-  const view = nodePanelView(node, workspace.data, props.projectId, props.workItemId);
+  const view = nodePanelView(
+    node, workspace.data, props.projectId, props.workItemId, asks.data?.asks ?? [], Date.now(),
+  );
   return (
     <section className="y10-cv-panel v20-node-panel" aria-label={node.label} data-testid="loop-panel-node">
       <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>×</button>
@@ -170,6 +180,9 @@ function NodePanel(props: {
         <ul className="y10-list v20-node-waiting" data-testid="node-waiting">
           {view.waiting.map((line) => <li key={line}>{line}</li>)}
         </ul>
+      )}
+      {view.waiting.length === 0 ? null : (
+        <p className="y10-note v20-node-waited" data-testid="node-waited">{view.waited}</p>
       )}
       {doing === null ? null : (
         <p className="y10-cv-doing" data-testid="node-doing">
