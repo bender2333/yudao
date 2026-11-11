@@ -871,8 +871,10 @@ class ProjectService:
         return project_definitions(self.store, project, self._project_forms())
 
     def _project_forms(self) -> dict[str, Any]:
-        # 这一版发布里的形态（工单 #1701）：合成项目现在的组织时按名字取形态
-        return {name: form.definitions for name, form in self.orchestrator.forms.items()}
+        # 这一版发布里的形态（工单 #1701）：合成项目现在的组织时按名字取形态。没有控制核心时按空的一份，
+        # 合成退回进程加载的定义（写回、回放核对这类只用项目服务读写的场景）
+        forms = getattr(self.orchestrator, "forms", None) or {}
+        return {name: form.definitions for name, form in forms.items()}
 
     def current_definitions(self, project_id: str) -> Any:
         # 项目现在的组织（工单 #1701）：应用层的读取与核对按它列职能、取默认 Prompt，拒绝时按它列出可用的
