@@ -17,6 +17,10 @@
 
 守 R3（路线图阶段二写明的「形态随事项冻结」：同一个实例里两份形态各自按自己冻结的那份定义取值）；
 R2 的两条也守：路由契约只增（旧的实现照旧被接受、不被调用）与建会话的部门清单来自定义。
+
+工单 #1701 补上项目一级的读取与核对（设计说明「形态随事项冻结」最后一段、「验收」第 16 条）：项目的职能设置
+只列这份组织里的职能，默认 Prompt 取这份组织里那个职能的；给不在这份组织里的职能保存设置或发指导被拒绝，说明里
+列出这份组织的职能。事项那边的指导仍按事项冻结的那份组织收（同一个项目换过形态以后旧事项照常收指导）。
 """
 
 from __future__ import annotations
@@ -32,15 +36,18 @@ import pytest
 from harness import proposals, routing_contract
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
-from harness.app.contracts import Accepted
+from harness.app.contracts import Accepted, Rejected
 from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import ProjectOrganization
+from harness.app.project_and_work_item_commands import DepartmentSettingsSave, GuidanceSend
+from harness.app.project_queries import ProjectSettings
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.environment import Workspaces
 from harness.kernel_events import Event
 from harness.models import EventType, RunProjection, SessionRecord
 from harness.proposals import ask_turn, delivery_turn, product_spec
-from harness.runtime import LoopSystem, load_forms
+from harness.runtime import (LoopSystem, SEVERAL_ROLES_DIRECT, SEVERAL_ROLES_DIRECT_DEFINITIONS,
+                             SINGLE_ROLE_DIRECT, SINGLE_ROLE_DIRECT_DEFINITIONS, load_forms)
 from harness.sessions import SessionFactory
 from harness.tests.helpers import quality_turns
 from harness.tightening import WATCHED_OUTPUTS
@@ -459,3 +466,121 @@ def test_an_item_continued_after_a_restart_still_routes_by_its_frozen_definition
 
     # 重启以后的轮次也按改名后的部门开工：整条事项的部门只有改名后的三个
     assert resumed == set(RENAMED_NAMES)
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1701：项目一级的职能设置与核对按项目现在的组织
+# ---------------------------------------------------------------------------
+
+
+def _settings(application: Application, project_id: str):
+    # 项目设置这一页读的那一份（工单 #1701：列哪些职能、默认 Prompt 都是项目现在的组织给的）
+    return application.query("project.settings", ProjectSettings(project_id=project_id)).data
+
+
+def _organization(application: Application, project_id: str):
+    return application.query("project.organization", ProjectOrganization(project_id=project_id)).data
+
+
+def _command(application: Application, name: str, request: Any) -> Accepted | Rejected:
+    return asyncio.run(application.command(name, request, actor="user:local"))
+
+
+def test_project_settings_list_the_departments_of_the_project_form_only(tmp_path):
+    # 验收第 1 条：项目设置只列这份组织里的职能，每行的默认 Prompt 是这份组织里那个职能的那一份；
+    # 默认形态的三行内容与现在相同
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter({}), resume_on_startup=False)
+    application = Application(system)
+    try:
+        projects = [
+            (system.projects.register("工程", GOAL, form=SINGLE_ROLE_DIRECT), SINGLE_ROLE_DIRECT_DEFINITIONS),
+            (system.projects.register("产品 · 工程", GOAL, form=SEVERAL_ROLES_DIRECT),
+             SEVERAL_ROLES_DIRECT_DEFINITIONS),
+            (system.projects.register("默认", GOAL), DEFINITIONS),
+        ]
+        for project_id, definitions in projects:
+            settings = _settings(application, project_id)
+            assert list(settings.departments) == list(definitions.departments)
+            for department in definitions.departments:
+                row = settings.departments[department]
+                assert (row.text, row.version, row.source) == (
+                    definitions.role(department).prompt, 0, "default"), (project_id, department)
+    finally:
+        application.close()
+        system.close()
+
+
+def test_settings_and_guidance_to_a_department_outside_the_project_organization_are_rejected(tmp_path):
+    # 验收第 2 条：给不在这份组织里的职能保存设置或发指导都被拒绝为 not_allowed，说明里列出的职能只有这份
+    # 组织的（工程）；两条都没有未处理的错误，也不写事件
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter({}), resume_on_startup=False)
+    application = Application(system)
+    try:
+        project_id = system.projects.register("工程", GOAL, form=SINGLE_ROLE_DIRECT)
+        item_id, _run_id = system.projects.start_work_item(project_id, "补用法一节")
+        before = system.store.end_position()
+
+        saved = _command(application, "department_settings.save", DepartmentSettingsSave(
+            command_id=str(uuid.uuid4()), project_id=project_id, department="quality", base_version=0))
+        assert isinstance(saved, Rejected), saved
+        assert saved.reason == "not_allowed", saved
+        assert "质检" not in saved.message, saved.message
+        assert "工程" in saved.message, saved.message
+
+        sent = _command(application, "guidance.send", GuidanceSend(
+            command_id=str(uuid.uuid4()), work_item_id=item_id, department="quality", text="先看一遍"))
+        assert isinstance(sent, Rejected), sent
+        assert sent.reason == "not_allowed", sent
+        assert "质检" not in sent.message, sent.message
+        assert "工程" in sent.message, sent.message
+        assert system.store.end_position() == before
+    finally:
+        application.close()
+        system.close()
+
+
+def test_a_project_that_added_a_verifier_lists_both_departments_in_its_settings(tmp_path):
+    # 验收第 3 条：采用过「加独立核验」的工程形态的项目，设置里有工程与质检两行，默认 Prompt 来自合成后的组织
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter({}), resume_on_startup=False)
+    application = Application(system)
+    try:
+        project_id = system.projects.register("工程加核验", GOAL, form=SINGLE_ROLE_DIRECT)
+        addition = _organization(application, project_id).add_verifier
+        assert addition is not None
+        adopted = _command(application, "organization.adopt", OrganizationAdopt(
+            command_id=str(uuid.uuid4()), project_id=project_id, form=SINGLE_ROLE_DIRECT,
+            changes=addition, reason="加上质检核验工程", base_version=_organization(application, project_id).version,
+            mode="verifier"))
+        assert isinstance(adopted, Accepted), adopted
+        settings = _settings(application, project_id)
+        assert list(settings.departments) == ["engineering", "quality"]
+        assert settings.departments["engineering"].text == SINGLE_ROLE_DIRECT_DEFINITIONS.role(
+            "engineering").prompt
+        added_verifier = settings.departments["quality"]
+        assert (added_verifier.version, added_verifier.source) == (0, "default")
+        # 加上的核验角色的默认 Prompt 取合成后的这份组织里的那一份（不是进程加载的那份）
+        composed = system.projects.current_definitions(project_id)
+        assert added_verifier.text == composed.role("quality").prompt
+        assert added_verifier.text != DEFINITIONS.role("quality").prompt
+    finally:
+        application.close()
+        system.close()
+
+
+def test_guidance_follows_the_frozen_organization_of_the_item_after_the_project_changes(tmp_path):
+    # 验收第 4 条：事项按旧组织（三个部门）在跑，项目换成工程形态以后，旧组织里的质检仍能收到指导；
+    # 项目一级的设置这时只有工程
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter(_script(DEFAULT_NAMES)),
+                                    resume_on_startup=False)
+    application = Application(system)
+    try:
+        project_id = system.projects.register("换成工程", GOAL)
+        item_id, _run_id = system.projects.start_work_item(project_id, "补用法一节")
+        _adopt(application, project_id, SINGLE_ROLE_DIRECT)
+        assert list(_settings(application, project_id).departments) == ["engineering"]
+        sent = _command(application, "guidance.send", GuidanceSend(
+            command_id=str(uuid.uuid4()), work_item_id=item_id, department="quality", text="先看一遍"))
+        assert isinstance(sent, Accepted), sent
+    finally:
+        application.close()
+        system.close()

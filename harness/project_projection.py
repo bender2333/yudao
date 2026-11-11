@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from .definitions import DEFAULT_FORM, DEFINITIONS
+from .definitions import DEFAULT_FORM
 from .event_store import EventStore, SavedProjection, is_catalog_stream, is_run_stream, project_stream
 from .models import CatalogEvent, CatalogEventType, ProjectEvent, ProjectEventType, json_dumps
 from .projection import StreamHandler, run_handler
@@ -444,7 +444,9 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         else:
             configured_prompt = payload.get("text")
             prompt_ref = payload.get("prompt_ref")
-        text = configured_prompt if configured_prompt is not None else DEFINITIONS.role(department).prompt
+        # 没写职能 Prompt 时留空（工单 #1701）：默认 Prompt 由读取模型按项目现在的组织填（projects._default_settings），
+        # 不在这里按进程加载的那一份臆测
+        text = configured_prompt if configured_prompt is not None else ""
         setting = DepartmentSetting(
             department=department, version=int(payload["version"]), text=text, source="configured",
             provider_id=payload.get("provider_id"), model_id=payload.get("model_id"),
