@@ -14,6 +14,8 @@ import { emptyOrFailureText } from "../contract/read-failure";
 import { Icon, StatusMark } from "./kit";
 import { projectEntryNote, projectFormNote } from "./new-project-text";
 import { onboardingProblemText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
+import { FormCards } from "../views/project/form-cards";
+import { FORM_NAME_HINT, cardPickProblem, projectEntryBody } from "../views/project/form-cards-model";
 
 export type SidebarProps = {
   app: ClientApp;
@@ -133,6 +135,7 @@ export function Sidebar(props: SidebarProps) {
         </div>
         {creating ? (
           <NewProject
+            app={props.app}
             mode={creating}
             busy={command.busy}
             submitted={command.submitted}
@@ -241,31 +244,31 @@ function receiptId(accepted: Record<string, unknown> | null, key: string): strin
   return typeof value === "string" ? value : "";
 }
 
-// 新建项目：名称与长期目标必填；从想法新建可以另填一个起始文件夹（留空则从空项目开始），
-// 接入已有项目另登记源目录的名称与路径。说明照原型 v13（工单 #1160）：起始文件夹是一份快照，
-// 新建项目不调用模型；新建成功以后转到新项目的概览（原型 v13 的 shell.createProject）。
-// 表单里「需求材料在下一步作为事项输入提交」的那一段见 new-project-text.ts（工单 #1240）。
+// 新建与接入都选形态卡（工单 #1648，docs/design/project-organization.md「形态一键选用」「新建的入口」）：
+// 只填名字、选一张卡，点卡就建好；名字还空着就点卡时不发命令，提示先写名字。起始文件夹收在「选起始文件夹」
+// 小入口里，长期目标不在这里填（可选，在设置页写）。接入已有项目另登记源目录的名称与路径。
+// 说明照 new-project-text.ts（工单 #1240）：建档与需求材料都不在选形态时提交。
 function NewProject(props: {
+  app: ClientApp | null;
   mode: "idea" | "existing";
   busy: boolean;
   submitted: boolean;
   problem: CommandProblem | null;
-  /** 最近一次被接受的受理回执：新建成功以后从它的 refs.project_id 转到新项目 */
+  /** 最近一次被接受的受理回执：新建成功以后从它的 refs.project_id 转到新项目的对话 */
   accepted: Record<string, unknown> | null;
   onClose: () => void;
   onNavigate: (hash: string) => void;
   onSubmit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
-  const [goal, setGoal] = useState("");
   const [sourceName, setSourceName] = useState("");
   const [sourcePath, setSourcePath] = useState("");
   const [initialDirectory, setInitialDirectory] = useState("");
-  const ready = name.trim() !== "" && goal.trim() !== "" && (props.mode === "idea" || (sourceName.trim() !== "" && sourcePath.trim() !== ""));
+  const [hint, setHint] = useState<string | null>(null);
   const commandName = props.mode === "idea" ? "project.create" : "project.onboard";
 
   // 本次提交被接受以后等事件到达：项目列表由事件到达时重新查询，列表出现新内容以后「已提交」消失，
-  // 这时关闭表单，各字段随表单一起清空（工单 #295 第 1 项），并转到新项目的概览（工单 #1160）。
+  // 这时关闭表单，各字段随表单一起清空（工单 #295 第 1 项），并转到新项目的对话（工单 #1160）。
   // 被拒绝时 submit 返回假，表单保留已填字段并显示原因；等待只记在这一次挂载上，
   // 取消以后重新打开的表单不会因为上一次提交的余波自己关闭
   const [waitingWrite, setWaitingWrite] = useState(false);
@@ -279,19 +282,34 @@ function NewProject(props: {
     }
   }, [waitingWrite, props.submitted]);
 
+  // 点卡：名字空着、或接入时缺源目录都不发命令，把那句话写在卡片上方
+  const pickForm = (form: string): void => {
+    if (props.busy) {
+      return;
+    }
+    const input = { mode: props.mode, name, sourceName, sourcePath };
+    const problem = cardPickProblem(input);
+    if (problem !== null) {
+      setHint(problem);
+      return;
+    }
+    const body = projectEntryBody({ ...input, form, initialDirectory });
+    if (body === null) {
+      return;
+    }
+    setHint(null);
+    void props.onSubmit(commandName, body).then((ok) => setWaitingWrite(ok));
+  };
+
   return (
     <form
-      className="y10-block is-compact card inline-form"
+      className="y10-block is-compact card inline-form v20-new-project"
       onSubmit={(event) => {
+        // 提交靠点卡：回车只核对名字，不发命令
         event.preventDefault();
-        if (!ready) {
-          return;
+        if (name.trim() === "") {
+          setHint(FORM_NAME_HINT);
         }
-        const directory = initialDirectory.trim();
-        void props.onSubmit(commandName, props.mode === "idea"
-          ? { name: name.trim(), goal: goal.trim(), ...(directory === "" ? {} : { initial_directory: directory }) }
-          : { name: name.trim(), goal: goal.trim(), source_name: sourceName.trim(), source_path: sourcePath.trim() })
-          .then((ok) => setWaitingWrite(ok));
       }}
     >
       <header className="y10-block-head form-head">
@@ -309,24 +327,6 @@ function NewProject(props: {
           <span>项目名称</span>
           <input className="y10-input" type="text" value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
-        <label className="y10-field field">
-          <span>长期目标</span>
-          <textarea className="y10-textarea" rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} required />
-        </label>
-        {props.mode === "idea" ? (
-          <label className="y10-field field">
-            <span>起始文件夹（可选）</span>
-            <input
-              className="y10-input"
-              type="text"
-              value={initialDirectory}
-              placeholder="控制主机上的文件夹路径，留空则从空项目开始"
-              onChange={(event) => setInitialDirectory(event.target.value)}
-            />
-            {/* 起始文件夹是一份快照（项目的起始文件夹 docs/design/project-initial-files.md「界面与评测」）：原型 v13 的说明，工单 #1160 */}
-            <small className="y10-muted">填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。</small>
-          </label>
-        ) : null}
         {props.mode === "existing" ? (
           <>
             <label className="y10-field field">
@@ -340,14 +340,28 @@ function NewProject(props: {
             <p className="y10-note note">接入以后会登记源目录、采集代码快照并开始建档事项（3.8）。</p>
           </>
         ) : null}
+        {/* 形态卡：一份形态一张卡，点卡就建好（发不发命令由名字与源目录决定） */}
+        <FormCards app={props.app} hint={hint} onPick={pickForm} />
+        {props.mode === "idea" ? (
+          // 起始文件夹是可选的一份快照，收在小入口里（原型 v13 的说明，工单 #1160）
+          <details className="y10-details v20-new-project-dir">
+            <summary>选起始文件夹（可选）</summary>
+            <label className="y10-field field">
+              <span>起始文件夹</span>
+              <input
+                className="y10-input"
+                type="text"
+                value={initialDirectory}
+                placeholder="控制主机上的文件夹路径，留空则从空项目开始"
+                onChange={(event) => setInitialDirectory(event.target.value)}
+              />
+              <small className="y10-muted">填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。</small>
+            </label>
+          </details>
+        ) : null}
         {props.mode === "idea" ? (
           <p className="y10-note note">{projectFormNote("idea")}</p>
         ) : null}
-        <div className="y10-row">
-          <button type="submit" className="y10-btn primary" disabled={props.busy || !ready}>
-            {props.busy ? "正在提交" : props.mode === "idea" ? "新建项目" : "接入项目"}
-          </button>
-        </div>
         {props.problem ? (
           <div className="rejection" role="status">
             <p className="error">
@@ -358,6 +372,7 @@ function NewProject(props: {
             </ul>
           </div>
         ) : null}
+        {props.busy ? <p className="y10-muted hint" role="status">正在提交</p> : null}
         {props.submitted ? <p className="y10-muted hint" role="status">已提交，等待写入结果</p> : null}
       </div>
     </form>

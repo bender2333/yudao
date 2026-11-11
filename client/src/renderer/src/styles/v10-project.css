@@ -839,3 +839,35 @@ button.y10-sq-item:hover, button.y10-sq-item.is-on { background: var(--tint); }
   /* 原始数据在窄屏不再缩进：面板本身已经很窄，再缩就只剩几个字一行 */
   .y10-wp-raw { margin-left: 0; }
 }
+
+/* 形态卡与小循环图（工单 #1648，项目的组织设计说明「形态一键选用」「新建的入口」）：新建与接入都选卡，
+   卡上写形态名、轮转与结束两个标记、一句话与一张小图；发布带里没有的那一份灰着，写「发布带还没有」。
+   小图用项目页同一种画法（loop-graph.tsx），这里只管卡片的排布与留白。 */
+.v20-form-cards { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.v20-form-cards-hint { margin: 0; font-size: 12.5px; color: var(--amber); }
+.v20-form-card {
+  display: grid; gap: 6px; align-content: start; min-width: 0;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--surface-2); cursor: pointer;
+}
+.v20-form-card:hover { border-color: var(--green); background: var(--tint); }
+.v20-form-card.is-default { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+.v20-form-card.is-missing { cursor: not-allowed; background: var(--surface); border-style: dashed; opacity: 0.7; }
+.v20-form-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.v20-form-card-pick {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 14px; font-weight: 600;
+  color: var(--text); text-align: left; cursor: pointer;
+}
+.v20-form-card-pick:hover { color: var(--green); text-decoration: underline; }
+.v20-form-card-default {
+  padding: 1px 7px; border-radius: 999px; font-size: 11.5px; color: var(--green);
+  background: var(--tint); border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+}
+.v20-form-card-markers { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.v20-form-card-marker {
+  padding: 1px 7px; border-radius: 999px; font-size: 11.5px; color: var(--muted);
+  border: 1px solid var(--line-strong); background: var(--surface);
+}
+.v20-form-card-line, .v20-form-card-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.v20-form-card-graph { overflow: hidden; }
+.v20-new-project-dir > summary { font-size: 12.5px; color: var(--muted); cursor: pointer; }
