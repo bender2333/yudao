@@ -20,6 +20,7 @@ export const ROOM_KINDS: Readonly<Record<string, RoomKind>> = {
   answer_letter: k("key", 2600),
   stamp_valid: k("key", 3200),
   seal: k("key", 3200),
+  stamp_open_loop: k("key", 2600),
   stamp_release: k("key", 3200),
   stamp_rework: k("key", 2400),
   paused: k("key", 1200),

@@ -57,8 +57,15 @@ export interface CharFrame {
 // ---------------------------------------------------------------------------
 // 角色配色：逐字对应 sprites.js 的 rolePalette
 
+/** 未在场景声明登记专属外观的角色使用的中性灰米工装配色（工单 #1385）。 */
+const GENERIC_CHAR_DEPT = {
+  main: "#8b8578",
+  shade: "#666055",
+  light: "#dcd6c8",
+} as const;
+
 export function rolePalette(dept: string, kind: string, itemIndex: number | null): RolePalette {
-  const d = DEPTS[dept];
+  const d = dept === "generic" ? GENERIC_CHAR_DEPT : DEPTS[dept];
   const r = ROLE_KINDS[kind];
   if (!d) throw new Error(`未知部门：${dept}`);
   if (!r) throw new Error(`未知角色种类：${kind}`);
@@ -154,6 +161,7 @@ const ITEM_ALIAS: Record<string, [string, ColorMap]> = {
   stamp_green: ["stamp", { X: PAL.green2 }],
   stamp_red: ["stamp", { X: PAL.red2 }],
   stamp_seal: ["stamp", { X: PAL.blue2 }],
+  stamp_amber: ["stamp", { X: "#8a5a1e" }],
   card_task: ["card", { X: PAL.yellow2 }],
 };
 
