@@ -3,6 +3,7 @@
 # 测试按层与时机运行（docs/design/test-pyramid.md docs/design/test-pyramid.md「各角色运行哪一层」）：
 #   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端、工作台脚本、内核检查六个作业并行，check 汇总六项的结果
 #     并在运行摘要里写出各层的表；PR 上另有「用例变化」，列出合并前后各层用例的增减，只显示，不挡合并
+#   画面（view/ 或接口描述改了，以及手动触发）：单独运行画面的单元测试、类型检查、构建、端到端测试与生成类型核对，不在 check 的 needs 里，不挡合并
 #   合并以后（main 的推送与手动触发）：③ 集成层，不挡合并
 #   发布之前（架构师手动运行，不在 CI 中）：真实模型冒烟与桌面测试
 # 本文件由用户在场时的架构师维护，solo 执行者与架构师循环不修改。
@@ -35,31 +36,53 @@ concurrency:
 
 jobs:
   # PR 只改了文档、日记与规则文件时 code 为 false，六个测试作业与「用例变化」跳过，check 直接通过。
-  # 其他触发方式一律为 true。清单与上面 push 的 paths-ignore 相同，只少 tools/（工具改了要跑它自己的测试）
+  # 其他触发方式 code 一律为 true。清单与上面 push 的 paths-ignore 相同，只少 tools/（工具改了要跑它自己的测试）。
+  # view 只在改动涉及 view/ 或接口描述（harness/tests/openapi/openapi.json）时为 true，手动触发也为 true。
   scope:
     name: 范围
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      view: ${{ steps.diff.outputs.view }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - id: diff
-        name: 改动有没有碰到文档以外的文件
+        name: 判断改动范围
         env:
           EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
         run: |
           code=true
+          view=true
           if [ "$EVENT" = pull_request ]; then
             # PR 的检出是合并提交，第一个父提交是合并前的 main
-            other=$(git -c core.quotepath=false diff --name-only HEAD^1 HEAD | grep -Ev '^(docs/|agents_jour/|\.doc-index/|claude_jour\.md$|CLAUDE\.md$|AGENTS\.md$|CONTEXT\.md$|README\.md$|\.claude/skills/.*\.md$)' || true)
+            changed=$(git -c core.quotepath=false diff --name-only HEAD^1 HEAD)
+            other=$(echo "$changed" | grep -Ev '^(docs/|agents_jour/|\.doc-index/|claude_jour\.md$|CLAUDE\.md$|AGENTS\.md$|CONTEXT\.md$|README\.md$|\.claude/skills/.*\.md$)' || true)
             if [ -z "$other" ]; then code=false; else echo "$other" | head -n 20; fi
+            if echo "$changed" | grep -Eq '^(view/|harness/tests/openapi/openapi\.json$)'; then
+              view=true
+            else
+              view=false
+            fi
+          elif [ "$EVENT" = push ]; then
+            if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              changed=$(git -c core.quotepath=false diff --name-only "$BEFORE" HEAD)
+            else
+              changed=$(git -c core.quotepath=false diff --name-only HEAD^1 HEAD)
+            fi
+            if echo "$changed" | grep -Eq '^(view/|harness/tests/openapi/openapi\.json$)'; then
+              view=true
+            else
+              view=false
+            fi
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "code=$code"
+          echo "view=$view" >> "$GITHUB_OUTPUT"
+          echo "code=$code view=$view"
 
   unit:
     name: ① 单元层
@@ -222,6 +245,62 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         run: npm run typecheck
+
+  # 画面（docs/design/visualization.md「搬出：画面成为单独的应用」的测试一节）：
+  # 只在 view/ 或接口描述改了时运行（手动触发也运行），不在 check 的 needs 里，不挡合并。
+  # 安装以后的各项检查互不依赖：前一项失败时后面的照样运行，一次给出全部结果
+  view:
+    name: 画面
+    needs: scope
+    if: ${{ needs.scope.outputs.view == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: view/package-lock.json
+
+      - name: 安装依赖
+        id: install
+        run: npm ci --prefix view
+
+      - name: 画面单元测试
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: view
+        timeout-minutes: 10
+        run: npm test
+
+      - name: 画面类型检查
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: view
+        run: npm run typecheck
+
+      - name: 画面构建
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: view
+        run: npm run build
+
+      - name: 画面端到端测试
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        working-directory: view
+        timeout-minutes: 15
+        run: |
+          npx playwright install chromium
+          npx playwright test
+
+      - name: 核对生成的接口类型与快照一致
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run generate:api --prefix view
+          git diff --exit-code -- view/src/api
 
   # 工作台的脚本：solo 循环与架构师循环用的调度脚本（.claude/skills/*/scripts），只有 Node 内置模块，不需要装依赖。
   # 这些脚本决定派哪张工单、谁在做、收账成不成立，判断一旦错整个交付队列都跟着错，所以与产品代码同样进 CI

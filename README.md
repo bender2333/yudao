@@ -6,7 +6,8 @@
 
 | 时机 | CI 作业 | 挡什么 |
 | --- | --- | --- |
-| 每次推送到 PR | ① 单元层、② 模块层、评测工具、客户端（并行），`check` 汇总 | 挡合并 |
+| 每次推送到 PR | ① 单元层、② 模块层、评测工具、客户端、工作台脚本、内核检查（并行），`check` 汇总 | 挡合并 |
+| 改动 `view/` 或接口描述时 | 画面 | 不挡；失败归画面的工单 |
 | 每次合并到 main 以后 | ③ 集成层 | 不挡；失败交回引入它的工单 |
 | 里程碑发布之前 | 不在 CI：真实模型冒烟、桌面测试 | 挡发布 |
 
@@ -215,7 +216,7 @@ uv run python -m pytest -m "unit or module"
 uv run python -m pytest harness/tests/<本次改动或新增的集成层文件>
 ```
 
-客户端的检查在 `client/` 中运行：单元用 `cd client && npm test`。
+客户端的检查在 `client/` 中运行：单元测试用 `cd client && npm test`。画面的检查在 `view/` 中运行：单元测试用 `cd view && npm test`，端到端测试用 `npm run test:e2e`。
 
 应用接口的 OpenAPI 快照（`harness/tests/openapi/openapi.json`）由 `test_openapi_snapshot.py` 与运行中的服务比较；由快照生成 TypeScript 接口类型并编译：
 

@@ -731,3 +731,8 @@ claude-fable-5-2（架构师，用户在场） / 2026-11-11 05:40 UTC / 用户�
 ⑤ 留给后面的一件：`tools/doc-consistency/tests/rulefacts/test_planted.py` 从 11 月 7 日起失败，`planted.json` 的 S06 锚在 `/next` 技能里的一句话，那句话在架构师循环拆成单独技能时搬走了。这是测试数据的事，已告诉用户，这次没有动。
 
 claude-fable-5-2（架构师，用户在场） / 2026-11-11 06:20 UTC / 用户同意修 `test_planted`。`planted.json` 的 S06 锚点改成「仓库是公开的，只采信用户、执行者与架构师的评论」，这是原来那一段留在 `/next` 技能「权限」一节里的后半句，位置与原先相同，在文件里只出现一次。`test_planted` 通过，整套 98 条全过。这条用例自己要跑 172 秒，所以整套用 4 个进程是 264 秒；之前量到的 150 秒是它在准备阶段就失败时的数字。整套单进程的时长这次没有重新量。
+
+gemini-3.1-pro（总架构师，用户指定） / 2026-11-14 08:30 / 用户指定我作为总架构师接管仓库并派出子架构师自行推进。
+① 启动例行核对：`origin/main` 在 `e2d8326d`，最近一周豁免合并的 12 个提交均对应 solo 执行者的 PR（其中 #1736、#1732 末尾署名为 `solo-deepseek-v4.1-flash`）；本机用户级环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL` 均已就绪；`C:/w/architect/.ralph/architect/config.json` 仍写着改名前的旧里程碑名，已更新为 `1.1 职能之间：转实`、`0 围绕循环与阶段总览（非发布）`、`1.2 职能之间：真实项目`。
+② 直接处理唯一的 `architecture` 工单 #1682：在 `.github/workflows/ci.yml` 的 `scope` 作业增加 `view` 输出，新增不进 `check.needs` 的「画面」作业（覆盖单元测试、类型检查、构建、Playwright 端到端测试与 `view/src/api` 生成类型核对），同步更新 `AGENTS.md`、`docs/agents/autopilot-runtime.md`、`README.md` 与 `docs/trial/stage-1-guide.md`。`view/src/api` 从接口版本 15 同步到当前快照属于 `view/` 代码改动，交子架构师在 #1413 下建子工单由 solo 执行者完成，合并后自然验证 main 上的「画面」作业并收尾 #1413。
+③ 盘点全局队列后并行派出子代理推进：子架构师一负责阶段 `1.1 职能之间：转实`（验收父工单 #1698、#1707，推进薄片 ① #994、薄片 ② #1706、薄片 ③ #1717 的达到核对、复盘、真实模型评测与试用）；子架构师二负责里程碑 `0 围绕循环与阶段总览`（建 #1413 的接口类型同步子工单、复核 #1480、分诊未回复的 Ideas 讨论、清理已关闭工单遗留工作树）；solo 执行者负责 #1503（内核 `minimal_projection.py` 质量开关，配独立审查）与新建的画面接口同步子工单。

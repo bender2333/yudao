@@ -783,3 +783,13 @@
   3. 评测的运行照运行器现在的做法经命令配模型，每次从干净的数据目录开始；起服务换成装了 wheel 的环境的解释器。「在页面上配好模型就能用」由 agent 试用与模型管理的真实走通记录回答。理由：评测接到手工配好的实例上会让几次运行共用状态。
   4. 试用技能与任务集不写死材料版本，读材料清单。
 - 记录：评测场景设计第 3 节加「形态」一行、第 5.1 节加一段；运行配置第 4 节加一条；`/trial` 技能与 `docs/trial/tasks.md`；#1702 关闭，#1705 放出。
+
+## 2026-11-14 - CI 的「画面」作业：覆盖单元、类型、构建、端到端与接口类型核对，不进合并门
+
+- 事实：子架构师在 #1413 验收中开出 `architecture` 工单 #1682：`.github/workflows/ci.yml` 没有 `view/` 的作业，画面导入方向与翻译表覆盖测试在 main 上没有自动运行，同时 `view/src/api/interface-version.ts` 停在 15、落后于接口快照的 16；#1575 另把 `AGENTS.md` 的画面测试命令与试用指南里的 `/view/` 地址交给总架构师。
+- 决定：
+  1. `ci.yml` 的 `scope` 作业增加 `view` 输出：手动触发，或 PR 与 main 推送改动到 `view/**`、`harness/tests/openapi/openapi.json` 时为 `true`，其余情况为 `false`。
+  2. 新增「画面」作业（`view`），不在 `check` 的 `needs` 里，不挡合并；安装依赖以后互不依赖地运行单元测试、类型检查、构建、端到端测试（Playwright Chromium，读录制夹具，不起 Yudao）以及生成接口类型一致核对（`npm run generate:api --prefix view` 后核对 `view/src/api` 无差异），一次运行给出全部结果。理由：端到端测试只读静态录制夹具、耗时短，放进同一作业才能守住搬出验收第 4 条；接口类型核对放在不挡合并的画面作业里，基础部分改接口快照的 PR 照常合并，同时画面作业直接标出接口类型待同步。
+  3. 同步 `view/src/api/` 属于改 `view/` 代码，派子架构师在 #1413 下建一张子工单由执行者完成，合并推送到 main 时同时实测通过新增的「画面」作业，随后复核关闭 #1413。
+  4. `AGENTS.md`、`README.md`、`docs/agents/autopilot-runtime.md` 补上画面测试命令与 CI 作业说明，`docs/trial/stage-1-guide.md` 补上 `/view/` 地址并把模型请求记录的位置改到项目设置页。
+- 记录：`.github/workflows/ci.yml`、`AGENTS.md`、`README.md`、`docs/agents/autopilot-runtime.md`、`docs/trial/stage-1-guide.md`；#1682 评论结论并关闭。
