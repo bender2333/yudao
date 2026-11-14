@@ -42,10 +42,17 @@ const TUBE_D = "#3f86b0";
 
 const noSource = (refs?: Record<string, unknown> | null, key?: string): boolean => Boolean(refs) && Boolean(key) && !refs![key!];
 
-/** 画面上一个事实元素的位置（工单 #398）：覆盖层「来源」按它描边，点它打开来源卡片。 */
+const factPos = (refs?: Record<string, unknown> | null, key?: string): number | null => {
+  if (!refs || !key) return null;
+  const entry = refs[key] as { position?: unknown } | null | undefined;
+  return entry && typeof entry.position === "number" && Number.isFinite(entry.position) ? entry.position : null;
+};
+
+/** 画面上一个事实元素的位置（工单 #398、#1382）：覆盖层「来源」按它描边，点它高亮并交出点开回链回调。 */
 export interface FactRect {
   work_item_id: string;
   element: FactElement;
+  position: number | null;
   x: number;
   y: number;
   w: number;
@@ -118,8 +125,10 @@ export class FloorRenderer {
   overlay: { id: string | null; data: Record<string, unknown> | null } = { id: null, data: null };
   /** 最近一帧画出的覆盖层标签的矩形（画面逻辑坐标），供端到端测试核对标签互不遮挡（工单 #415）。 */
   overlayLabels: { x: number; y: number; w: number; h: number; key: string }[] = [];
-  /** 最近一帧画出的事实元素的位置（工单 #398）：覆盖层「来源」按它描边，点它打开来源卡片。 */
+  /** 最近一帧画出的事实元素的位置（工单 #398、#1382）：覆盖层「来源」按它描边，点它高亮并交出点开回链回调。 */
   factRects: FactRect[] = [];
+  /** 当前点选的事实元件：在楼层画布上画出外围高亮框（工单 #1382）。 */
+  selectedFact: { work_item_id: string; element: FactElement } | null = null;
   /** 世界里的决定卡片：打开时画在最上层（工单 #179）。 */
   card: { draw: (c: CanvasRenderingContext2D) => void } | null = null;
 
@@ -152,6 +161,7 @@ export class FloorRenderer {
     this.arrows(c);
     this.overlayLayer(c);
     this.infoBar(c);
+    this.selectedHighlight(c);
     this.card?.draw(c);
   }
 
@@ -490,10 +500,13 @@ export class FloorRenderer {
     const shown = adopted.slice(-per);
     shown.forEach((v, i) => {
       const bx = r.x + 20 + i * 18;
-      // 成果库的箱子的位置：覆盖层「来源」按它描边，点它打开来源卡片（工单 #398）
+      // 成果库的箱子的位置：覆盖层「来源」按它描边，点它交出回链回调（工单 #398、#1382）
       const item = this.driver.model.items.find((it) => it.work_item_id === v) ?? null;
-      const missing = Boolean(item) && noSource(item!.refs as Record<string, unknown> | undefined, "box");
-      this.factRects.push({ work_item_id: v, element: "box", x: bx - 1, y: 115, w: 15, h: 23, drawn: !missing });
+      const refs = item?.refs as Record<string, unknown> | undefined;
+      const missing = Boolean(item) && noSource(refs, "box");
+      this.factRects.push({
+        work_item_id: v, element: "box", position: factPos(refs, "box"), x: bx - 1, y: 115, w: 15, h: 23, drawn: !missing,
+      });
       drawBitmap(c, "box_sealed", bx, 117);
       RB(c, bx + 1, 130, 13, 7, PAL.white);
       drawText(c, v, bx + 7.5, 133.8, { size: 6, weight: 800, align: "center", color: PAL.green3, max: 13 });
@@ -622,9 +635,13 @@ export class FloorRenderer {
       const here = this.itemsIn(r.id);
       here.forEach((it, i) => {
         const fx = r.door - 22 - i * 9;
-        const missing = noSource(it.refs as Record<string, unknown> | undefined, "parcel");
+        const refs = it.refs as Record<string, unknown> | undefined;
+        const missing = noSource(refs, "parcel");
         // 包裹（门口的小旗）的位置：缺来源时画面上没有它，覆盖层「来源」仍按这个位置标出（工单 #398）
-        this.factRects.push({ work_item_id: it.work_item_id, element: "parcel", x: fx - 1, y: 216, w: 9, h: 12, drawn: !missing });
+        this.factRects.push({
+          work_item_id: it.work_item_id, element: "parcel", position: factPos(refs, "parcel"),
+          x: fx - 1, y: 216, w: 9, h: 12, drawn: !missing,
+        });
         if (missing) return;
         c.globalAlpha = this.dimFor(it.work_item_id);
         drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !this.scene.reduced ? "flag2" : "flag", fx, 218, {
@@ -638,10 +655,12 @@ export class FloorRenderer {
         const ss = signStyle(it.sign);
         const maxW = r.w - 6;
         const w = Math.min(maxW, Math.max(18, measure(c, it.sign, 6, 600) + 8));
-        const missing = noSource(it.refs as Record<string, unknown> | undefined, "sign");
+        const refs = it.refs as Record<string, unknown> | undefined;
+        const missing = noSource(refs, "sign");
         // 门牌的位置：缺来源时画面上没有它，覆盖层「来源」仍按这个位置标出（工单 #398）
         this.factRects.push({
-          work_item_id: it.work_item_id, element: "sign", x: r.door + 12 + w / 2 - 20 - w / 2, y: 232 + row * 12,
+          work_item_id: it.work_item_id, element: "sign", position: factPos(refs, "sign"),
+          x: r.door + 12 + w / 2 - 20 - w / 2, y: 232 + row * 12,
           w, h: 10, drawn: !missing,
         });
         if (missing) return;
@@ -651,6 +670,45 @@ export class FloorRenderer {
         row += 1;
       });
     }
+    this.stamps(c);
+  }
+
+  /** 质检屋里盖章台旁的实心放行章（工单 #1382）：随放行到来，登记进事实元件命中矩形。 */
+  private stamps(c: CanvasRenderingContext2D): void {
+    const qRoom = roomOf(this.driver.world, "quality");
+    if (!qRoom) return;
+    const stamped = this.driver.model.items.filter(
+      (it) => Boolean(it.refs?.stamp) || it.status === "done" || it.status === "adopted",
+    );
+    stamped.forEach((it, idx) => {
+      const refs = it.refs as Record<string, unknown> | undefined;
+      const missing = noSource(refs, "stamp");
+      const sw = 22;
+      const sh = 9;
+      const sx = qRoom.x + qRoom.w - 36;
+      const sy = 190 - idx * 12;
+      this.factRects.push({
+        work_item_id: it.work_item_id,
+        element: "stamp",
+        position: factPos(refs, "stamp"),
+        x: sx - 1,
+        y: sy - 1,
+        w: sw + 2,
+        h: sh + 2,
+        drawn: !missing,
+      });
+      if (missing) return;
+      c.globalAlpha = this.dimFor(it.work_item_id);
+      RB(c, sx, sy, sw, sh, PAL.green2, PAL.green3);
+      drawText(c, "放行", sx + sw / 2, sy + sh / 2 + 0.5, {
+        size: 5.5,
+        weight: 800,
+        align: "center",
+        color: PAL.white,
+        max: sw - 2,
+      });
+      c.globalAlpha = 1;
+    });
   }
 
   /** 头顶的对话框：说话气泡是正在做的任务，思考气泡是队列里的下一项。 */
@@ -863,9 +921,10 @@ export class FloorRenderer {
     const roundStart = x;
     if (it.round) chip(`第 ${it.round} 轮`, PAL.paper);
     if (it.round) {
-      // 轮次的位置：信息条上的这一块（工单 #398 的覆盖层「来源」与来源卡片按它定位）
+      // 轮次的位置：信息条上的这一块（工单 #398、#1382 的覆盖层「来源」与点开回链按它定位）
       this.factRects.push({
-        work_item_id: it.work_item_id, element: "round", x: roundStart, y: 4, w: Math.max(10, x - roundStart - 4), h: 10,
+        work_item_id: it.work_item_id, element: "round", position: factPos(refs, "round"),
+        x: roundStart, y: 4, w: Math.max(10, x - roundStart - 4), h: 10,
         drawn: !noSource(refs, "round"),
       });
     }
@@ -891,12 +950,40 @@ export class FloorRenderer {
         c.fillStyle = PAL.grey1;
         for (let i = 0; i < ww; i += 3) c.fillRect(bx + 1 + ew + i, 6 + (i % 6 < 3 ? 0 : 3), 1, 3);
       }
-      // 已用时间的位置：信息条右边的这一块（工单 #398）
+      // 已用时间的位置：信息条右边的这一块（工单 #398、#1382）
       this.factRects.push({
-        work_item_id: it.work_item_id, element: "elapsed", x: bx - 116, y: 3, w: 110, h: 11,
+        work_item_id: it.work_item_id, element: "elapsed", position: factPos(refs, "elapsed"),
+        x: bx - 116, y: 3, w: 110, h: 11,
         drawn: !noSource(refs, "elapsed"),
       });
     }
+  }
+
+  /** 在被点选的事实元件外围画出像素高亮框（工单 #1382）。 */
+  private selectedHighlight(c: CanvasRenderingContext2D): void {
+    const sel = this.selectedFact;
+    if (!sel) return;
+    const rect = this.factRects.find(
+      (item) => item.drawn && item.work_item_id === sel.work_item_id && item.element === sel.element,
+    );
+    if (!rect) return;
+    const hx = Math.max(0, Math.round(rect.x) - 2);
+    const hy = Math.max(0, Math.round(rect.y) - 2);
+    const hw = Math.min(W - hx, Math.round(rect.w) + 4);
+    const hh = Math.min(H - hy, Math.round(rect.h) + 4);
+    c.fillStyle = "rgba(247, 224, 122, 0.24)";
+    c.fillRect(hx, hy, hw, hh);
+    const ox = Math.max(0, hx - 1);
+    const oy = Math.max(0, hy - 1);
+    const ow = Math.min(W - ox, hw + 2);
+    R(c, ox, oy, ow, 1, PAL.ink);
+    R(c, ox, Math.min(H - 1, hy + hh), ow, 1, PAL.ink);
+    R(c, ox, hy, 1, hh, PAL.ink);
+    R(c, Math.min(W - 1, hx + hw), hy, 1, hh, PAL.ink);
+    R(c, hx, hy, hw, 2, PAL.yellow2);
+    R(c, hx, hy + hh - 2, hw, 2, PAL.yellow2);
+    R(c, hx, hy, 2, hh, PAL.yellow2);
+    R(c, hx + hw - 2, hy, 2, hh, PAL.yellow2);
   }
 
   // -------------------------------------------------------------------------

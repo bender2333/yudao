@@ -37,13 +37,13 @@ export type RoomStatus = (typeof ROOM_STATES)[number];
 export const ROLE_STATES = ["idle", "assigned", "working", "returned", "failed", "away"] as const;
 export type RoleState = (typeof ROLE_STATES)[number];
 
-/** 事实元素的来源种类（覆盖层「来源」与来源卡片）。 */
+/** 事实元素的来源种类（覆盖层「来源」用）。 */
 export const SOURCES = ["rule", "host_measurement", "user", "role_statement", "decision_model"] as const;
 export type Source = (typeof SOURCES)[number];
 
 /**
- * 楼层上画出来的事实元素（工单 #398）：键与 `project.loop` 的 `refs` 一致（工单 #396）。
- * 画面上有对应物的是门牌、包裹、成果库的箱子、信息条上的轮次与已用时间；盖章随质检的放行到来。
+ * 楼层上画出来的事实元素（工单 #398、#1382）：键与 `project.loop` 的 `refs` 一致（工单 #396）。
+ * 六个元素对应门牌、包裹、质检盖章台上的放行章、成果库的箱子、信息条上的轮次与已用时间。
  */
 export const FACT_ELEMENTS = ["sign", "parcel", "stamp", "box", "round", "elapsed"] as const;
 export type FactElement = (typeof FACT_ELEMENTS)[number];
@@ -98,33 +98,15 @@ export interface SourceOverlayData {
   legend: SourceLegendRow[];
 }
 
-/**
- * 来源卡片的内容（工单 #398；文字全部由翻译层写好，画面层不写页面文字）：
- * 点开的元素、它的来源种类、来源事件（说明、种类、时间、提出者与位置）与一段上下文摘要。
- */
-export interface SourceCardFace {
-  work_item_id: string;
+/** 点开回链回调携带的定位信息：被点中的事实元件种类、来源事件的全局位置与事项标识（工单 #1382）。 */
+export interface SourceLink {
   element: FactElement;
-  /** 元素的中文名（门牌、轮次……）。 */
-  element_label: string;
-  source: Source;
-  /** 来源种类的中文名（确定规则、主机测量……）。 */
-  source_label: string;
-  /** 来源事件的全局位置。 */
-  position: number;
-  /** 原始事件的中文说明；取不到时为空，卡片显示 note。 */
-  event_label: string | null;
-  /** 事件种类的中文名。 */
-  kind_label: string | null;
-  /** 事件的时间（ISO 写法，画面按时间写法显示）。 */
-  at: string | null;
-  /** 提出者（部门名、用户、主机或模型）。 */
-  actor_label: string | null;
-  /** 上下文摘要或真实的差异：术语与取值，画面按两列画。 */
-  detail: { term: string; value: string }[];
-  /** 取不到原始事件时的一行说明（页面不出现英文内部标识，这里由翻译层写好）。 */
-  note: string | null;
+  position: number | null;
+  workItemId: string;
 }
+
+/** 点画布上的事实元件时交出的「点开回链」回调签名（工单 #1382）。 */
+export type OpenSourceCallback = (link: SourceLink) => void;
 
 /** 收敛状态（覆盖层「循环」）。原型 v13 只有取值表，没有校验入口：覆盖层的数据由翻译层写好。 */
 export const LOOP_STATES = ["converging", "stalled", "oscillating", "drifting", "at_bound", "not_judged"] as const;
@@ -158,8 +140,9 @@ export interface PixelAction {
   [key: string]: unknown;
 }
 
-/** 事实元素带来源：来源种类取 SOURCES 里的一种（没有来源时不给）。 */
+/** 事实元素带来源：来源种类取 SOURCES 里的一种，位置记来源事件的全局位置（没有来源时不给）。 */
 export interface SourceRef {
+  position?: number | null;
   source?: Source | null;
   [key: string]: unknown;
 }

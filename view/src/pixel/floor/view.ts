@@ -14,11 +14,11 @@ import { buildCatalog } from "./../world/floor-decl.ts";
 import { ACTIVE, IN_ROOM, busyItems, createFloorDriver, createFloorState, itemColor, type FloorDriver, type FloorState } from "./../world/floor.ts";
 import { createScene } from "./../world/scene.ts";
 import { FloorRenderer, H, W, type FactRect } from "./render.ts";
-import { createDecisionCard, createSourceCard, type DecisionCard, type SourceCard } from "./card.ts";
+import { createDecisionCard, type DecisionCard } from "./card.ts";
 import { ROOM_VISUALS } from "./render-decl.ts";
 import type { DecisionAnswer, DecisionResult } from "./card.ts";
 import type { DecisionFace, FloorModel, SceneLike, TimeText } from "../world/types.ts";
-import type { FactElement, PixelAction, SourceCardFace } from "../contract.ts";
+import type { FactElement, OpenSourceCallback, PixelAction } from "../contract.ts";
 
 /** 概览页与测试共用的时间写法（原型 Y13.time）。 */
 export const FLOOR_TIME: TimeText = {
@@ -58,10 +58,6 @@ export interface FloorView {
   stream(who: { room: string | null; role?: string | null }, text: string): void;
   focus(id: string | null): void;
   setOverlay(id: string | null, data: unknown): void;
-  /** 显示一张来源卡片（内容由翻译层写好，页面在点开事实元素以后交进来；工单 #398）。 */
-  showSource(face: SourceCardFace): void;
-  /** 关上来源卡片。 */
-  closeSource(): void;
   resize(): void;
   destroy(): void;
   /**
@@ -81,10 +77,10 @@ export interface FloorView {
   boardRect(): { x: number; y: number; w: number; h: number };
   /** 打开着的决定卡片（测试与宿主读取）。 */
   card(): DecisionCard;
-  /** 打开着的来源卡片（测试与宿主读取；工单 #398）。 */
-  sourceCard(): SourceCard;
   /** 最近一帧里画出来的事实元素的位置（画面逻辑坐标）。 */
   factRects(): FactRect[];
+  /** 当前点选高亮的事实元件（测试读取；工单 #1382）。 */
+  selectedFact(): { work_item_id: string; element: FactElement } | null;
 }
 
 /**
@@ -221,14 +217,10 @@ export interface FloorTestHooks {
   /** 点一个选项（端到端测试在真实画布上点章，这里给直接入口）。 */
   answer: (option: string) => Promise<void>;
   resync: () => void;
-  /** 画面上画出来的事实元素：端到端按它换算页面坐标、在画布上真的点一下（工单 #398、#1612）。 */
+  /** 画面上画出来的事实元素：端到端按它换算页面坐标、在画布上真的点一下（工单 #398、#1612、#1382）。 */
   facts: () => FactRect[];
-  /** 来源卡片的状态（打开的元素与内容，工单 #398 的端到端核对）。 */
-  sourceCard: () => {
-    open: boolean;
-    face: { element: string; element_label: string; source: string; source_label: string; position: number;
-            event_label: string | null; kind_label: string | null; actor_label: string | null; note: string | null } | null;
-  };
+  /** 当前点选并画出了外围高亮框的事实元件（工单 #1382 的端到端核对）。 */
+  selectedFact: () => { work_item_id: string; element: FactElement } | null;
 }
 
 /** 建立给端到端测试用的读取入口：读的是画面里世界的当前状态。 */
@@ -285,18 +277,7 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
     answer: (option) => view.card().answer(option),
     resync: () => onResync(),
     facts: () => view.factRects(),
-    sourceCard: () => {
-      const info = view.sourceCard().inspect();
-      const face = info.face;
-      return {
-        open: view.sourceCard().isOpen(),
-        face: face === null ? null : {
-          element: face.element, element_label: face.element_label, source: face.source,
-          source_label: face.source_label, position: face.position, event_label: face.event_label,
-          kind_label: face.kind_label, actor_label: face.actor_label, note: face.note,
-        },
-      };
-    },
+    selectedFact: () => view.selectedFact(),
   };
 }
 
@@ -309,13 +290,11 @@ export interface FloorViewOptions {
   onDecide?: (payload: DecisionAnswer) => Promise<DecisionResult> | DecisionResult;
   onGo?: (target: string) => void;
   /**
-   * 点了画面上一个事实元素（工单 #398、#1612）：画面只交出哪个事项、哪个元件，不解读服务端的事件；
-   * 壳把它变成 Yudao 页面上带位置的地址并在新的标签页打开（工单 #1573），没有页面的宿主怎样处理由宿主定。
+   * 点了画面上一个事实元素（工单 #398、#1612、#1382）：画布高亮该元件并交出元件、事件位置与事项标识，
+   * 不解读服务端的事件；壳把它变成 Yudao 页面带位置的地址并在新标签页打开。
    * 画出来的元件任何时候都能点开回链，不必先打开覆盖层「来源」。
    */
-  onOpenSource?: (workItemId: string, element: FactElement) => void;
-  /** 来源卡片上点「在时间轴上查看」：跳到来源事件的全局位置。 */
-  onGoTimeline?: (position: number) => void;
+  onOpenSource?: OpenSourceCallback;
 }
 
 /** 建立一个项目楼层画面：画布按设备分辨率绘制，整数倍铺满容器宽度。 */
@@ -348,19 +327,12 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   });
   renderer.card = card;
   scene.cardStamped = (id, text) => card.stamp(id, text);
-  // 来源卡片（工单 #398）：文字由翻译层写好，页面在点开事实元素以后交进来；点「在时间轴上查看」交给页面
-  const sourceCard = createSourceCard(canvas, {
-    W,
-    H,
-    onGoto: (position) => opts.onGoTimeline?.(position),
-  });
 
   let last = opts.clock.now();
 
   function draw(): void {
     const c = surface.frame();
     renderer.draw(c);
-    sourceCard.draw(c);
   }
 
   /** 画布上的坐标换成画面逻辑坐标（画布按整数倍缩放显示）。 */
@@ -379,17 +351,29 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   const onClick = (ev: MouseEvent): void => {
     const [x, y] = worldXY(ev);
     if (card.click(x, y)) return;
-    if (sourceCard.click(x, y)) return;
     if (overBoard(x, y)) {
       card.open();
       return;
     }
     const fact = factAt(x, y);
-    if (fact) opts.onOpenSource?.(fact.work_item_id, fact.element);
+    if (fact) {
+      renderer.selectedFact = { work_item_id: fact.work_item_id, element: fact.element };
+      draw();
+      opts.onOpenSource?.({
+        element: fact.element,
+        position: fact.position,
+        workItemId: fact.work_item_id,
+      });
+      return;
+    }
+    if (renderer.selectedFact !== null) {
+      renderer.selectedFact = null;
+      draw();
+    }
   };
   const onMove = (ev: MouseEvent): void => {
     const [x, y] = worldXY(ev);
-    const pointer = card.cursor(x, y) ?? sourceCard.cursor(x, y) ?? (!card.isOpen() && overBoard(x, y) ? "pointer" : null);
+    const pointer = card.cursor(x, y) ?? (!card.isOpen() && overBoard(x, y) ? "pointer" : null);
     canvas.style.cursor = pointer ?? (factAt(x, y) ? "pointer" : "default");
   };
 
@@ -461,17 +445,6 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     },
     setOverlay(id, data) {
       renderer.overlay = { id: id ?? null, data: (data as Record<string, unknown>) ?? null };
-      // 换了覆盖层就收起来源卡片：卡片说的是上一个覆盖层里点开的那个元素
-      sourceCard.close();
-      draw();
-    },
-    showSource(face) {
-      card.close();
-      sourceCard.show(face);
-      draw();
-    },
-    closeSource() {
-      sourceCard.close();
       draw();
     },
     performance(on) {
@@ -491,14 +464,13 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       canvas.removeEventListener("click", onClick);
       canvas.removeEventListener("mousemove", onMove);
       card.destroy();
-      sourceCard.close();
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
     },
     inspect: () => ({ driver, scene, state: driver.state, renderer, card, channels: () => floorChannels(driver) }),
     boardRect: () => driver.boardRect(),
     card: () => card,
-    sourceCard: () => sourceCard,
     factRects: () => renderer.factRects.map((rect) => ({ ...rect })),
+    selectedFact: () => (renderer.selectedFact ? { ...renderer.selectedFact } : null),
   };
 }
 

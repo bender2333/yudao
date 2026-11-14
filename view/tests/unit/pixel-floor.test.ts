@@ -769,10 +769,12 @@ interface FactClickReport {
   facts: { work_item_id: string; element: string; drawn: boolean }[];
   /** 此刻的覆盖层：没有打开任何覆盖层时为 null。 */
   overlay: string | null;
-  /** 点了画出来的那个事实元件以后，回调收到的（事项、元件），按点击顺序。 */
-  drawn: { work_item_id: string; element: string }[];
-  /** 再点一下没有画出来的那个元件（缺来源）以后，回调一共收到的（事项、元件）。 */
-  missing: { work_item_id: string; element: string }[];
+  /** 点了画出来的那个事实元件以后，回调收到的（元件、位置、事项），按点击顺序。 */
+  drawn: { element: string; position: number | null; workItemId: string }[];
+  /** 点了画出来的元件以后，画面记录的高亮目标。 */
+  selectedAfterDrawn: { work_item_id: string; element: string } | null;
+  /** 再点一下没有画出来的那个元件（缺来源）以后，回调一共收到的内容。 */
+  missing: { element: string; position: number | null; workItemId: string }[];
   /** 鼠标移到画出来的元件与缺来源的元件上时，画布上的指针。 */
   cursor: { drawn: string; missing: string };
 }
@@ -786,11 +788,11 @@ async function factClick(input: { model: unknown }): Promise<FactClickReport> {
   document.body.appendChild(host);
   const clock = clockMod.createManualClock();
   // 画面交出的「点开回链」回调：只记下来，交给用例断言（壳把它变成页面地址是壳的事）
-  const seen: { work_item_id: string; element: string }[] = [];
+  const seen: { element: string; position: number | null; workItemId: string }[] = [];
   const view = await P.createFloorView({
     host,
     clock,
-    onOpenSource: (work_item_id, element) => { seen.push({ work_item_id, element }); },
+    onOpenSource: (link) => { seen.push({ ...link }); },
   });
   const advance = (ms: number): void => {
     const frames = Math.max(1, Math.round(ms / 50));
@@ -823,6 +825,7 @@ async function factClick(input: { model: unknown }): Promise<FactClickReport> {
   const cursorDrawn = moveTo(drawnFact);
   clickAt(drawnFact);
   const afterDrawn = seen.slice();
+  const selectedAfterDrawn = view.selectedFact();
   const cursorMissing = moveTo(missingFact);
   clickAt(missingFact);
   const afterMissing = seen.slice();
@@ -832,6 +835,7 @@ async function factClick(input: { model: unknown }): Promise<FactClickReport> {
     facts: facts.map((fact) => ({ work_item_id: fact.work_item_id, element: fact.element, drawn: fact.drawn })),
     overlay,
     drawn: afterDrawn,
+    selectedAfterDrawn,
     missing: afterMissing,
     cursor: { drawn: cursorDrawn, missing: cursorMissing },
   };
@@ -890,8 +894,13 @@ test("点画布上的事实元件就能点开回链：没有打开覆盖层也�
         assert.equal(report.overlay, null, "这一条用例说的是没有打开覆盖层的情形");
         assert.ok(report.facts.some((fact) => fact.drawn), `样例状态没有画出事实元素：${JSON.stringify(report.facts)}`);
         assert.ok(report.facts.some((fact) => !fact.drawn), `样例状态没有缺来源的元件：${JSON.stringify(report.facts)}`);
-        // 点画出来的事实元件：画面交出「点开回链」，带事项与元件
-        assert.deepEqual(report.drawn, [{ work_item_id: "w1", element: "sign" }], "点画出来的门牌应交出它的事项与元件");
+        // 点画出来的事实元件：画面记录高亮并交出「点开回链」，带元件、事件位置与事项标识（工单 #1612、#1382，R3：画面合同回调边界）
+        assert.deepEqual(
+          report.drawn,
+          [{ element: "sign", position: 2, workItemId: "w1" }],
+          "点画出来的门牌应交出元件、事件位置与事项标识",
+        );
+        assert.deepEqual(report.selectedAfterDrawn, { work_item_id: "w1", element: "sign" }, "点中门牌后应记录选中元件高亮");
         // 点没有画出来的那一个（缺来源）：不交出
         assert.deepEqual(report.missing, report.drawn, "缺来源的元件画面上没有它，不应交出回链");
         // 鼠标移上去照旧显示可点；缺来源的那一个不显示

@@ -1,21 +1,19 @@
-// 楼层的事实来源翻译（工单 #398）：project.loop 的 refs（工单 #396）翻成画面合同的事项 refs，
-// 事实元素与来源种类、事件种类、覆盖层的中文名，覆盖层「来源」的数据与来源卡片的内容。
+// 楼层的事实来源翻译（工单 #398、#1382）：project.loop 的 refs（工单 #396）翻成画面合同的事项 refs，
+// 事实元素与来源种类、覆盖层的中文名，以及覆盖层「来源」的数据。
 //
 // 覆盖：六个元素的位置与来源种类都翻过去；没有来源的元素不出现在结果里（画面按缺来源处理，覆盖层「来源」据它标出）；
 // 元素名有中文名、页面不出现内部标识；翻出来的楼层状态通过画面合同的校验；
-// 覆盖层「来源」列出画出来的元素、标出缺来源的元素并给出图例计数；来源卡片写原件事件的说明、种类、提出者与摘要。
+// 覆盖层「来源」列出画出来的元素、标出缺来源的元素并给出图例计数。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  DRAWN_FACT_ELEMENTS, EVENT_KIND_LABELS, FACT_LABELS, SOURCE_LABELS, actorLabel, eventKindLabel, factRefs, floorState,
-  sourceCard, sourceEventOf, sourceOverlay,
+  DRAWN_FACT_ELEMENTS, FACT_LABELS, SOURCE_LABELS, factRefs, floorState, sourceOverlay,
 } from "../../src/translate/floor.ts";
-import { COVERAGE, OVERLAY_LABELS, SCENES, checkMethodProblems, classOf, overlayProblems } from "../../src/translate/coverage.ts";
+import { OVERLAY_LABELS, checkMethodProblems, overlayProblems } from "../../src/translate/coverage.ts";
 import { floorState as checkFloorState, SOURCES } from "../../src/pixel/contract.ts";
 import type { ProjectLoopResult } from "../../src/api/generated/types.gen.ts";
-import { eventTypesFromInterface } from "./interface-description.ts";
 
 const ELEMENTS = ["sign", "round", "elapsed", "parcel", "stamp", "box"] as const;
 
@@ -72,29 +70,12 @@ test("来源：带来源的楼层状态通过画面合同的校验", () => {
   assert.deepEqual(state.items[0].refs?.sign, { position: 2, source: "user" });
 });
 
-test("来源：五种来源与画面画出来的每种事件种类都有中文名", () => {
-  // 五种来源各有一行中文名（覆盖层的图例与来源卡片按它显示）
+test("来源：五种来源都有中文名，页面不出现内部标识", () => {
+  // 五种来源各有一行中文名（覆盖层的图例按它显示）
   assert.deepEqual(Object.keys(SOURCE_LABELS).sort(), [...SOURCES].sort());
   for (const [key, label] of Object.entries(SOURCE_LABELS)) {
     assert.match(label, /[\u4e00-\u9fa5]/, `${key} 的来源名要有中文`);
     assert.doesNotMatch(label, /[A-Za-z]/, `${key} 的来源名不出现英文内部标识`);
-  }
-  // 画面画出来或转交实时内容的事件种类才会出现在来源卡片上：这些各有一行中文名。
-  // 事件种类取自接口描述；还没归类的事件列在缺口清单里，不要求有中文名（新增一种事件不连累测试，工单 #1419）
-  const types = eventTypesFromInterface();
-  const shown = types.filter((type) => SCENES.some((scene) => {
-    const cls = classOf(COVERAGE, scene, type);
-    return cls === "drawn" || cls === "realtime";
-  }));
-  assert.ok(shown.length > 0, "画面没有画出来或转交实时内容的事件");
-  assert.deepEqual(shown.filter((type) => eventKindLabel(type) === null), []);
-  // 术语表里的拉丁字母词（部门 Prompt、初始 PRD、MCP）是产品的说法；其余出现拉丁字母的算内部标识
-  const TERMS = /^(Prompt|PRD|MCP)$/;
-  for (const [type, label] of Object.entries(EVENT_KIND_LABELS)) {
-    assert.match(label, /[\u4e00-\u9fa5]/, `${type} 的种类名要有中文`);
-    for (const word of label.match(/[A-Za-z]+/g) ?? []) {
-      assert.match(word, TERMS, `${type} 的种类名里出现内部标识：${word}`);
-    }
   }
 });
 
@@ -120,7 +101,7 @@ test("覆盖层「来源」：画出来的元素各一行，缺来源的单独�
     adoptions: [],
   } as unknown as ProjectLoopResult;
   const overlay = sourceOverlay(loop);
-  // 画面上有对应物的元素：门牌、包裹、成果库的箱子、轮次与已用时间（盖章还没有画出来的位置）
+  // 覆盖层描边与查缺的五个元素：门牌、包裹、成果库的箱子、轮次与已用时间
   assert.deepEqual(DRAWN_FACT_ELEMENTS, ["sign", "parcel", "box", "round", "elapsed"]);
   assert.deepEqual(overlay.entries.map((entry) => entry.element).sort(), ["elapsed", "round", "sign"]);
   assert.deepEqual(overlay.entries.find((entry) => entry.element === "elapsed"),
@@ -135,50 +116,4 @@ test("覆盖层「来源」：画出来的元素各一行，缺来源的单独�
   const old = sourceOverlay({ project_id: "p1", work_items: [row()], adoptions: [] } as unknown as ProjectLoopResult);
   assert.deepEqual(old.entries, []);
   assert.deepEqual(old.missing, []);
-});
-
-test("来源卡片：写原始事件的说明、种类、时间、提出者与上下文摘要", () => {
-  const target = row({ refs: { sign: refOf(2, "user") } }) as never;
-  const face = sourceCard(target, "sign", { position: 2, source: "user" }, {
-    type: "work_item_created", label: "在项目中建立了事项：测试事项", at: "2026-10-30T01:00:00+00:00",
-    actor: "department:product", position: 2, payload: { summary: "建立事项" },
-  });
-  assert.equal(face.element_label, "门牌");
-  assert.equal(face.source_label, "用户");
-  assert.equal(face.kind_label, "建立事项");
-  assert.equal(face.actor_label, "产品部门");
-  assert.equal(face.position, 2);
-  assert.equal(face.note, null);
-  assert.deepEqual(face.detail.slice(0, 2), [{ term: "事项", value: "测试事项" }, { term: "轮次", value: "第 1 轮" }]);
-  assert.deepEqual(face.detail.find((item) => item.term === "摘要"), { term: "摘要", value: "建立事项" });
-  // 原始事件取不到（这一页打开以前的事件）：写明它在时间轴上的位置，页面不出现英文内部标识
-  const missing = sourceCard(target, "sign", { position: 2, source: "user" }, null);
-  assert.equal(missing.event_label, null);
-  assert.match(missing.note ?? "", /第 2 位/);
-  assert.doesNotMatch(missing.note ?? "", /[A-Za-z]/);
-  // 提出者的三种写法
-  assert.equal(actorLabel("user:local"), "你");
-  assert.equal(actorLabel("system"), "系统");
-  assert.equal(actorLabel(null), null);
-});
-test("按位置取事件的结果：取得到时翻成来源卡片要的形状，取不到时为空", () => {
-  // 工单 #1342：来源卡片优先用 event.positions 的答案，不再只靠页面缓存
-  const items = [
-    { position: 2, status: "available" as const, type: "work_item_created", label: "在项目中建立了事项：测试事项",
-      at: "2026-10-30T01:00:00+00:00", actor: "department:product", actor_label: "产品部门",
-      payload: { summary: "建立事项" } },
-    { position: 5, status: "missing" as const, reason: "archived" },
-  ];
-  const event = sourceEventOf(items, 2);
-  assert.equal(event?.type, "work_item_created");
-  assert.equal(event?.label, "在项目中建立了事项：测试事项");
-  assert.equal(event?.actor_label, "产品部门");
-  assert.deepEqual(event?.payload, { summary: "建立事项" });
-  // 取不到（已归档、已压缩、越界、位置上是别的流的事件）与不在结果里：都为空，卡片按「取不到」写
-  assert.equal(sourceEventOf(items, 5), null);
-  assert.equal(sourceEventOf(items, 99), null);
-  // 查询给出的提出者可读名优先于按 actor 自己翻（「产品部门」不是按 department:product 翻出来的写法）
-  const face = sourceCard(row() as never, "sign", { position: 2, source: "user" },
-    event ?? null);
-  assert.equal(face.actor_label, "产品部门");
 });

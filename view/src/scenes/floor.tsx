@@ -2,7 +2,7 @@
 //
 // 画面自己的组件：建立项目楼层的像素画面（pixel/floor/view.ts），把画布容器与时钟交给壳；
 // 画面交出的回调在这里接到壳上：回答决定（变成现有的命令）、点开回链（变成 Yudao 页面的地址，
-// 在新的标签页打开）、决定卡片上的页面链接与「在时间轴上查看」。点一间屋进入房间（画面自己的场景切换）。
+// 在新的标签页打开）与决定卡片上的页面链接。点一间屋进入房间（画面自己的场景切换）。
 //
 // 页面上的文字列表、决定卡片与实时模型输出不进画面：大厅板上的是画面自己的决定卡片（画面合同「实时内容」），
 // 选项经壳发出回答决定的命令；画布以外的文字由壳写在画布外。
@@ -11,7 +11,7 @@ import { useEffect, useRef } from "react";
 import { createRafClock } from "../pixel/clock.ts";
 import { createFloorView, floorTestHooks } from "../pixel/floor/view.ts";
 import type { DecisionAnswer } from "../pixel/floor/card.ts";
-import type { DecisionFace, FactElement, FloorModel } from "../pixel/contract.ts";
+import type { DecisionFace, FloorModel, SourceLink } from "../pixel/contract.ts";
 import type { Shell, SceneSurface } from "../shell.ts";
 
 export function FloorScene(props: { shell: Shell; projectId: string; workItemId: string | null }): React.JSX.Element {
@@ -38,12 +38,10 @@ export function FloorScene(props: { shell: Shell; projectId: string; workItemId:
           : undefined,
         // 决定卡片上的页面链接（页面现有的 # 写法）：壳在新的标签页打开 Yudao 的页面
         onGo: (target: string) => shell.openPageTarget(target),
-        // 点开回链：画面只交出哪个元件、哪个事项，壳从当前状态取位置并打开页面的地址
-        onOpenSource: (workItemId: string, element: FactElement) => {
-          shell.openFactLink(workItemId, element);
+        // 点开回链：画面交出元件、事件位置与事项标识，壳得出页面的地址并在新标签页打开
+        onOpenSource: (link: SourceLink) => {
+          shell.openFactLink(link);
         },
-        // 来源卡片上的「在时间轴上查看」：按位置打开页面概览
-        onGoTimeline: (position: number) => shell.openTimelineLink(position),
       });
       // 端到端测试经这个入口读画面画出的当前状态（声明见 src/test-hooks.d.ts）；
       // 重新同步交给同步层：测试不调用 resync，这里保留入口以便以后核对断开重连
