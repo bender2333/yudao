@@ -14,7 +14,7 @@
 
 import type {
   AcceptanceCoverageResult, Capabilities, DecisionList, DecisionView, DepartmentWorkspaceResult, EventObject,
-  ProjectList, ProjectLoopResult, ProjectRow, RunAsksResult,
+  ProjectList, ProjectLoopResult, ProjectRow, RunAsksResult, WorkItemOrganization,
 } from "./api/generated/types.gen.ts";
 import type { CommandOutcome } from "./sync/connection.ts";
 import type {
@@ -583,7 +583,7 @@ export class Shell {
         surface.stream?.({ room: stream.room, role: stream.role }, stream.text);
         return;
       }
-      for (const action of floorActions(floorEvent, this.roleContext())) surface.play(action);
+      for (const action of floorActions(floorEvent, this.roleContext(floorEvent.work_item_id))) surface.play(action);
       return;
     }
     const roomEvent = room.eventOf(event, event.position);
@@ -609,15 +609,23 @@ export class Shell {
     this.notify();
   }
 
-  /** 翻译层说话时用的角色名（房间里的角色；楼层上没有角色表时返回空）。 */
-  private roleContext(): { roleName: (role: string | null) => string | null } {
+  /** 翻译层说话与动作派发上下文：房间角色名称与当前事项冻结定义的组织（工单 #1383）。 */
+  private roleContext(workItemId?: string | null): {
+    roleName: (role: string | null) => string | null;
+    organization: WorkItemOrganization | null;
+  } {
     const roles = this.workspace?.room?.roles ?? [];
+    const loop = this.loop ?? this.lastLoop;
+    const item = workItemId
+      ? loop?.work_items.find((row) => row.work_item_id === workItemId)
+      : loop?.work_items[0];
     return {
       roleName: (id: string | null): string | null => {
         if (!id) return null;
         const hit = roles.find((role) => role.id === id || role.kind === id || role.name === id);
         return hit ? hit.name : null;
       },
+      organization: item?.organization ?? null,
     };
   }
 
@@ -930,7 +938,7 @@ export class Shell {
     return row?.sign ?? "";
   }
 
-  /** 面包屑：楼 / 项目名 / 部门名；每一项都能回到那一层。 */
+  /** 面包屑：楼 / 项目名 / 职能显示名；每一项都能回到那一层。 */
   private crumbs(): { label: string; scene: SceneRef }[] {
     const items: { label: string; scene: SceneRef }[] = [{ label: "楼", scene: { kind: "building" } }];
     if (this.scene.kind === "building") return items;
@@ -939,8 +947,12 @@ export class Shell {
       scene: { kind: "floor", projectId: this.scene.projectId, workItemId: this.scene.workItemId },
     });
     if (this.scene.kind === "room") {
+      const dept = this.scene.department;
+      const orgLabel = (this.lastLoop?.work_items ?? [])
+        .flatMap((row) => row.organization?.roles ?? [])
+        .find((role) => role.id === dept)?.label;
       items.push({
-        label: DEPARTMENT_NAMES[this.scene.department] ?? this.scene.department,
+        label: orgLabel ?? DEPARTMENT_NAMES[dept] ?? dept,
         scene: this.scene,
       });
     }

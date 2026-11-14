@@ -13,16 +13,16 @@
 // 哪些事件在楼上翻成动作、哪些不画，写在 translate/coverage.ts；这个文件只实现其中楼「翻成动作」的那一组。
 
 import type { EventObject, ProjectLoopResult, ProjectRow, WorkItemLoop } from "../api/generated/types.gen.ts";
-import type { BuildingFloor, BuildingModel, FlashColor, ItemState, PixelAction } from "../pixel/contract.ts";
+import type { BuildingFloor, BuildingModel, BuildingRoomLight, FlashColor, ItemState, PixelAction } from "../pixel/contract.ts";
 import { buildingState as checkBuildingState } from "../pixel/contract.ts";
-import { busyOf } from "./floor.ts";
+import { busyOf, deriveFloorTopology } from "./floor.ts";
 import { floorSignOf, itemStateOf } from "./tables.ts";
 
 // ---------------------------------------------------------------------------
 // 状态
 
-/** 楼里画房间的四个部门（与画面上的房间顺序一致）。 */
-const DEPARTMENTS = ["product", "engineering", "quality", "operations"] as const;
+/** 旧字段 lit 兼容别名补齐用的默认四个键（工单 #1385 清理）。 */
+const LEGACY_DEPARTMENTS = new Set(["product", "engineering", "quality", "operations"]);
 
 /** 亮灯的状态：这个事项在某个部门做着（原型 scenes.js 的 ACTIVE：running、asking）。 */
 const ACTIVE: readonly ItemState[] = ["working", "asking"];
@@ -68,14 +68,24 @@ function busyOn(row: WorkItemLoop, department: string): boolean {
   return busy === "working" || busy === "answering";
 }
 
-/** 一层：一个项目的缩小楼层。 */
+/** 一层：一个项目的缩小楼层，房间列表从该层事项冻结定义的组织推出（工单 #1383）。 */
 function floorOf(project: ProjectRow, items: readonly WorkItemLoop[]): BuildingFloor {
-  const lit = { product: false, engineering: false, quality: false, operations: false };
-  for (const department of DEPARTMENTS) {
-    // 几个部门同时工作时（回答询问、预测性探索）几个房间同时亮灯
-    lit[department] = items.some((row) => ACTIVE.includes(stateOf(row))
-      && (row.department === department || busyOn(row, department)));
+  const topology = deriveFloorTopology(items);
+  const isLit = (department: string): boolean => items.some((row) => ACTIVE.includes(stateOf(row))
+    && (row.department === department || busyOn(row, department)));
+  const rooms: BuildingRoomLight[] = topology.rooms.map((room) => ({
+    id: room.id,
+    label: room.label,
+    lit: isLit(room.id),
+  }));
+  const lit: Record<string, boolean> = Object.fromEntries(rooms.map((room) => [room.id, room.lit]));
+  // 旧字段兼容别名（工单 #1385 清理）：默认职能集合下补齐四个旧键以兼容既有测试断言
+  if (rooms.length === 0 || rooms.every((room) => LEGACY_DEPARTMENTS.has(room.id))) {
+    for (const department of LEGACY_DEPARTMENTS) {
+      if (!(department in lit)) lit[department] = false;
+    }
   }
+  const hasOps = rooms.some((room) => room.id === "operations");
   const flags = items
     .map((row, index) => ({ row, index }))
     .filter(({ row }) => row.department !== null && IN_ROOM.includes(stateOf(row)))
@@ -89,9 +99,9 @@ function floorOf(project: ProjectRow, items: readonly WorkItemLoop[]): BuildingF
     name: project.name,
     // 每层的状态灯由这一层的事项推出来（tables.ts 的 floorSignOf，原来的 sceneStatus 与 floorStatus）
     status: floorSignOf(items),
+    rooms,
     lit,
-    // 客户端没有运维（机房与运行环境属于 3.2C）
-    has_ops: false,
+    has_ops: hasOps,
     flags,
     valve_closed: items.some((row) => stateOf(row) === "waiting_slot"),
     // 用着机器时通往机房的管线在流动：机房不画，管线也不画

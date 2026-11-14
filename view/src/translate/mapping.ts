@@ -48,12 +48,21 @@ type RoomChannelEntry = {
   readonly lit: boolean;
   readonly screen: string;
   readonly flags: unknown[];
+  readonly verifier?: boolean;
+  readonly exit_tray?: boolean;
+};
+
+type FloorLinksChannel = {
+  readonly handoffs: string[];
+  readonly tubes: string[];
+  readonly returns: string[];
 };
 
 type BuildingFloorChannelEntry = {
   readonly project_id: string;
   readonly name: string;
   readonly status: string;
+  readonly rooms?: { id: string; label: string; lit: boolean }[];
   readonly lit: Record<string, boolean>;
   readonly valve_closed: boolean;
   readonly decisions: number;
@@ -95,6 +104,40 @@ export const VISUAL_CHANNELS: readonly VisualChannel[] = Object.freeze([
       const rooms = (channels.rooms ?? {}) as Record<string, RoomChannelEntry>;
       return Object.fromEntries(Object.entries(rooms).map(([id, room]) => [id, { label: room.label, flags: room.flags }]));
     },
+  },
+  {
+    id: "floor.rooms.stations",
+    scene: "floor",
+    key: "rooms",
+    label: "盖章台与出口托盘在谁的屋里",
+    read: (channels) => {
+      const rooms = (channels.rooms ?? {}) as Record<string, RoomChannelEntry>;
+      return Object.fromEntries(Object.entries(rooms).map(([id, room]) => [
+        id,
+        { verifier: Boolean(room.verifier), exit_tray: Boolean(room.exit_tray) },
+      ]));
+    },
+  },
+  {
+    id: "floor.links.handoffs",
+    scene: "floor",
+    key: "links",
+    label: "楼层有哪些关注与交接管道",
+    read: (channels) => ((channels.links ?? { handoffs: [] }) as FloorLinksChannel).handoffs,
+  },
+  {
+    id: "floor.links.tubes",
+    scene: "floor",
+    key: "links",
+    label: "楼层有哪些传信管",
+    read: (channels) => ((channels.links ?? { tubes: [] }) as FloorLinksChannel).tubes,
+  },
+  {
+    id: "floor.links.returns",
+    scene: "floor",
+    key: "links",
+    label: "楼层有哪些回流管",
+    read: (channels) => ((channels.links ?? { returns: [] }) as FloorLinksChannel).returns,
   },
   {
     id: "floor.board",
@@ -193,6 +236,7 @@ export const VISUAL_CHANNELS: readonly VisualChannel[] = Object.freeze([
     label: "这一层有几间屋与哪几间亮灯",
     read: (channels) => ((channels.floors ?? []) as BuildingFloorChannelEntry[]).map((floor) => ({
       project_id: floor.project_id,
+      rooms: floor.rooms,
       lit: floor.lit,
     })),
   },
@@ -421,6 +465,7 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     operation: "无",
     meter: "覆盖层「流转」下显示管道经过次数",
     unpainted: "关注的成果的触发细则留在定义与页面",
+    visualChannels: ["floor.links.handoffs"],
   }),
   row({
     concept: "传信管",
@@ -431,7 +476,7 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     operation: "无",
     meter: "传信管口等待回答的询问封数",
     unpainted: "询问链层数参数留在定义与页面",
-    visualChannels: ["floor.tubes"],
+    visualChannels: ["floor.links.tubes", "floor.tubes"],
   }),
   row({
     concept: "回流管",
@@ -442,6 +487,7 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     operation: "无",
     meter: "覆盖层「流转」下显示打回返工次数",
     unpainted: "缺陷记录条文留在页面",
+    visualChannels: ["floor.links.returns"],
   }),
 
   // 流
@@ -493,11 +539,12 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     concept: "盖章台与交出检查",
     element: "规则",
     source: "事项冻结定义的核验角色声明与控制核心裁决；事件 proposal_rejected",
-    stateAndChange: "核验角色的房间内设盖章台作为独立核验裁决点；提案未通过交出检查时在裁决边界被退回",
+    stateAndChange: "核验角色的房间内设盖章台作为独立核验裁决点，核验或开环完成角色设出口托盘；提案未通过交出检查时在裁决边界被退回",
     spaceAndScene: "空间：楼；场景：楼层、房间",
     operation: "无",
     meter: "无",
     unpainted: "交出检查细则与拒绝理由全文留在页面",
+    visualChannels: ["floor.rooms.stations"],
     eventTypes: ["proposal_rejected"],
   }),
 
