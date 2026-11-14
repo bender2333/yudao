@@ -214,12 +214,54 @@ export interface Stamp {
   [key: string]: unknown;
 }
 
-/** 楼层（事项、部门房间的状态与原因、管道、成果库）的状态。 */
+/** 楼层拓扑里的一间职能屋（工单 #1383，docs/design/visualization.md「画面跟着定义伸缩」）。 */
+export interface FloorTopologyRoom {
+  id: string;
+  label: string;
+  /** 该角色在任一事项冻结定义里是核验角色时为 true，屋里摆盖章台。 */
+  verifier: boolean;
+  /** 该角色在任一事项冻结定义里是交完成角色时为 true，屋里摆出口托盘。 */
+  exit_tray: boolean;
+}
+
+/** 楼层拓扑里的一根交接管道（含大厅到入口角色、关注关系、核验角色或交完成角色到成果库）。 */
+export interface FloorTopologyHandoff {
+  from: string;
+  to: string;
+  valve?: boolean;
+  optional?: boolean;
+}
+
+/** 楼层拓扑里的一根传信管（询问关系）。 */
+export interface FloorTopologyAsk {
+  from: string;
+  to: string;
+}
+
+/** 楼层拓扑里的一根红色回流管（打回关系）。 */
+export interface FloorTopologyRejection {
+  from: string;
+  to: string;
+  via?: "under";
+  optional?: boolean;
+}
+
+/** 楼层状态的拓扑：由翻译层从事项冻结定义的组织推出，画面层照此摆屋与连管。 */
+export interface FloorTopology {
+  rooms: FloorTopologyRoom[];
+  handoffs: FloorTopologyHandoff[];
+  asks: FloorTopologyAsk[];
+  rejections: FloorTopologyRejection[];
+}
+
+/** 楼层（事项、职能房间的状态与原因、管道、成果库、拓扑）的状态。 */
 export interface FloorState extends PixelState {
   items: FloorItem[];
-  /** 部门 → 角色。 */
+  /** 职能 → 角色。 */
   roles?: Record<string, RoleEntry[]>;
   stamp?: Stamp;
+  /** 这一层的拓扑（工单 #1383）。 */
+  topology?: FloorTopology;
   /** 覆盖层「检验」的数据（工单 #1420）。 */
   coverage?: CoverageOverlayData | null;
 }
@@ -331,6 +373,8 @@ export interface FloorModel extends PixelState {
   decisions: DecisionFace[];
   /** 楼层的盖章（原型 v13 的 stamp）。 */
   stamp?: Stamp;
+  /** 这一层的拓扑（工单 #1383）。 */
+  topology?: FloorTopology;
   /** 覆盖层「检验」的数据（工单 #1420）。 */
   coverage?: CoverageOverlayData | null;
 }
@@ -339,6 +383,13 @@ export interface FloorModel extends PixelState {
 export const FLASH_COLORS = ["white", "green", "yellow", "red"] as const;
 export type FlashColor = (typeof FLASH_COLORS)[number];
 
+/** 楼里一层的一个房间亮灯格子（工单 #1383）。 */
+export interface BuildingRoomLight {
+  id: string;
+  label: string;
+  lit: boolean;
+}
+
 /** 楼里一层（楼的状态里的一项）：状态灯、亮灯的房间、小旗与名牌。 */
 export interface BuildingFloor {
   project_id: string;
@@ -346,9 +397,11 @@ export interface BuildingFloor {
   status: FloorSign;
   /** 项目名称（名牌上写）。 */
   name: string;
-  /** 四个部门房间的灯：亮灯表示该部门正在工作。 */
-  lit: { product: boolean; engineering: boolean; quality: boolean; operations: boolean };
-  /** 有没有运维（机房与运行环境）：客户端没有，属于 3.2C。 */
+  /** 按这一层的屋列表给出的亮灯格子（工单 #1383）。 */
+  rooms?: BuildingRoomLight[];
+  /** 兼容别名（旧测试读取，工单 #1385 清理）：房间标识 → 是否亮灯。 */
+  lit: Record<string, boolean | undefined>;
+  /** 这一层的定义里是否有运维角色。 */
   has_ops: boolean;
   /** 事项的小旗：在本层房间里的事项，按部门挂在房门口。 */
   flags: { work_item_id: string; color_index: number; department: string }[];
@@ -447,6 +500,20 @@ export function floorState(s: unknown): FloorState {
   }
   const stamp = state.stamp;
   if (stamp) ref((stamp as Loose).ref, "盖章");
+  const topology = state.topology;
+  if (topology !== undefined && topology !== null) {
+    if (typeof topology !== "object") fail("楼层的拓扑形状无效", topology);
+    const top = topology as Loose;
+    if (!Array.isArray(top.rooms) || !Array.isArray(top.handoffs) || !Array.isArray(top.asks) || !Array.isArray(top.rejections)) {
+      fail("楼层的拓扑缺少 rooms/handoffs/asks/rejections 数组", topology);
+    }
+    (top.rooms as unknown[]).forEach((raw) => {
+      const r = raw as Loose;
+      if (typeof r.id !== "string" || r.id === "" || typeof r.label !== "string" || typeof r.verifier !== "boolean" || typeof r.exit_tray !== "boolean") {
+        fail("楼层的拓扑房间形状无效", raw);
+      }
+    });
+  }
   const coverage = state.coverage;
   if (coverage !== undefined && coverage !== null) {
     if (typeof coverage !== "object") fail("检验覆盖层数据形状无效", coverage);
@@ -468,7 +535,7 @@ export function floorState(s: unknown): FloorState {
   return s as FloorState;
 }
 
-/** 楼的状态的校验（原型 v13 buildingState）：每层的状态灯。 */
+/** 楼的状态的校验（原型 v13 buildingState）：每层的状态灯与房间亮灯列表。 */
 export function buildingState(s: unknown): BuildingState {
   positionOf(s, "楼的状态");
   const state = s as Loose;
@@ -476,6 +543,15 @@ export function buildingState(s: unknown): BuildingState {
   (state.floors as unknown[]).forEach((raw) => {
     const f = raw as Loose;
     oneOf(FLOOR_SIGNS, f.status, "楼层 " + String(f.project_id) + " 的状态灯");
+    if (f.rooms !== undefined && f.rooms !== null) {
+      if (!Array.isArray(f.rooms)) fail("楼层 " + String(f.project_id) + " 的 rooms 形状无效", f.rooms);
+      (f.rooms as unknown[]).forEach((roomRaw) => {
+        const rm = roomRaw as Loose;
+        if (typeof rm.id !== "string" || rm.id === "" || typeof rm.label !== "string" || typeof rm.lit !== "boolean") {
+          fail("楼层 " + String(f.project_id) + " 的房间亮灯条目无效", roomRaw);
+        }
+      });
+    }
   });
   return s as BuildingState;
 }

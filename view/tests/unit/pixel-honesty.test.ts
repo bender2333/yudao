@@ -1,8 +1,11 @@
-// H1 与 H2 的单元测试（画面与播放 docs/design/visualization.md「画面诚实性的不变式」、docs/design/visualization.md「视觉通道表」；工单 #959）。
+// H1、H2 与 H6 的单元测试（画面与播放 docs/design/visualization.md「画面诚实性的不变式」、docs/design/visualization.md「视觉通道表」；工单 #959、#1383）。
+// 守 docs/design/test-pyramid.md「测试按三环留」的 R2（承载事实的视觉通道与楼层拓扑合同）与 R3（画面跟着事项冻结定义伸缩、空事件零轨迹元素）。
 //
 // H1 事实层是事件的函数：同一份查询结果两次翻译得到的状态相同；同一份状态两次上画面，承载事实的通道相同。
 // H2 表演层不占用承载事实的视觉通道：同一份状态上画面以后，开着表演层（待机活动与动作）与关掉它各读一次
 //    承载事实的通道，两次相同。
+// H6 固定画出的只有边界、裁决点与权威关系：事件为空时轨迹元素的数量为 0；房间的集合等于楼层上事项冻结的定义里
+//    角色的并集，连线的集合等于这些定义中的关注、询问与打回关系，盖章台只出现在核验角色的屋里。
 //
 // 三个场景各一组（楼、楼层、房间）。画面用 PixiJS 画，需要浏览器：模块由 Vite 的模块服务器提供，
 // 与逐场景回放、部门切换的测试同一方式（一张空白页、一个手动时钟、画面自己推进到固定的时刻）。
@@ -70,7 +73,7 @@ interface HonestyReport {
 }
 
 /** 在页面里跑一段核对：driver 经字符串化以后在页面里求值（只收一个参数）。 */
-async function run(driver: (...args: never[]) => Promise<HonestyReport>, input: unknown): Promise<HonestyReport> {
+async function run<R = HonestyReport>(driver: (...args: never[]) => Promise<R>, input: unknown): Promise<R> {
   const page = await browser.newPage();
   const pageErrors: string[] = [];
   page.on("pageerror", (e) => pageErrors.push(e.message));
@@ -82,7 +85,7 @@ async function run(driver: (...args: never[]) => Promise<HonestyReport>, input: 
     await page.goto(address + "honesty.html");
     const result = await page.evaluate(async (payload: { fnSource: string; input: unknown }) => {
       try {
-        const fn = (0, eval)(`(${payload.fnSource})`) as (i: unknown) => Promise<HonestyReport>;
+        const fn = (0, eval)(`(${payload.fnSource})`) as (i: unknown) => Promise<unknown>;
         return { ok: await fn(payload.input) };
       } catch (e) {
         return { failed: String((e as Error)?.stack ?? e) };
@@ -90,7 +93,7 @@ async function run(driver: (...args: never[]) => Promise<HonestyReport>, input: 
     }, { fnSource: driver.toString(), input });
     if ("failed" in result) throw new Error(`驱动失败：${String(result.failed)}`);
     assert.deepEqual(pageErrors, [], `页面不应报错：${pageErrors.join("\n")}`);
-    return result.ok as HonestyReport;
+    return result.ok as R;
   } finally {
     await page.close();
   }
@@ -448,4 +451,292 @@ test("H1/H2 楼：同一份查询结果两次翻译相同、同一份状态两�
     "H2 楼",
   );
   assert.deepEqual((report.performance[0] as { position: number }).position, BUILDING_QUERY.position);
+});
+
+// ---------------------------------------------------------------------------
+// H6：固定画出的只有边界、裁决点与权威关系（工单 #1383）
+
+interface FloorH6Readout {
+  roomOrder: string[];
+  deptBounds: Record<string, { x: number; w: number; verifier: boolean; exitTray: boolean }>;
+  channels: {
+    items: unknown[];
+    rooms: Record<string, { label: string; verifier: boolean; exit_tray: boolean }>;
+    links: { handoffs: string[]; tubes: string[]; returns: string[] };
+    board: unknown[];
+    shelf: { adopted: string[]; shown: string[] };
+    tubes: { department: string; count: number }[];
+  };
+  stamps: { work_item_id: string; x: number; w: number; drawn: boolean }[];
+  trajectories: {
+    packages: number;
+    flyers: number;
+    arrows: number;
+    remoteDots: number;
+    playing: number;
+  };
+}
+
+/** 浏览器内驱动：装载一份楼层查询快照并读取房间集合、权威连接、盖章台与轨迹元素读数。 */
+async function floorH6Driver(input: { query: Record<string, unknown> }): Promise<FloorH6Readout> {
+  const P = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+  const clockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+  const T = await import(/* @vite-ignore */ "/src/translate/floor.ts" as string) as typeof import("../../src/translate/floor.ts");
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px;z-index:9999;background:#000";
+  document.body.appendChild(host);
+  const clock = clockMod.createManualClock();
+  const view = await P.createFloorView({ host, clock });
+  const advance = (ms: number): void => {
+    const frames = Math.max(1, Math.round(ms / 50));
+    for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+  };
+  try {
+    const state = T.floorState(input.query as never);
+    view.jump(state);
+    advance(400);
+    const inspected = view.inspect();
+    const world = inspected.driver.world;
+    const deptBounds: FloorH6Readout["deptBounds"] = {};
+    for (const id of world.roomOrder) {
+      const r = world.rooms[id];
+      if (!r || r.roomKind !== "dept") continue;
+      deptBounds[id] = {
+        x: r.x,
+        w: r.w,
+        verifier: Boolean(r.def.verifier),
+        exitTray: Boolean(r.def.exitTray),
+      };
+    }
+    const stamps = view.factRects()
+      .filter((rect) => rect.element === "stamp")
+      .map((rect) => ({ work_item_id: rect.work_item_id, x: rect.x, w: rect.w, drawn: rect.drawn }));
+    return {
+      roomOrder: world.roomOrder.slice(),
+      deptBounds,
+      channels: inspected.channels() as unknown as FloorH6Readout["channels"],
+      stamps,
+      trajectories: {
+        packages: Object.keys(world.packages).length,
+        flyers: inspected.state.flyers.length,
+        arrows: inspected.state.arrows.length,
+        remoteDots: inspected.state.remoteDots.length,
+        playing: inspected.driver.inspectTimeline().playing.length,
+      },
+    };
+  } finally {
+    view.destroy();
+    host.remove();
+  }
+}
+
+const REF_POS3 = { position: 3, source: "user" } as const;
+
+// 守 R2 与 R3：房间集合等于楼层上事项冻结定义里角色的并集，连线集合等于定义关系，盖章台只在核验角色屋里。
+test("H6 楼层拓扑与盖章台：房间集合等于事项定义角色并集，管道传信管与回流管等于定义关系，盖章台只在核验角色屋里", async () => {
+  // 同一楼层并存两件冻结了不同定义的事项：旧事项用 alpha → beta（开环完成），新事项用 beta → gamma（gamma 为核验角色）
+  const unionQuery = {
+    position: 90,
+    loop: {
+      project_id: "p_union",
+      work_items: [
+        loopRow({
+          work_item_id: "w_old",
+          status: "in_progress",
+          department: "alpha",
+          run_id: "r_old",
+          organization: {
+            form: "two_roles_open",
+            routing: "watched_outputs",
+            entry: { id: "alpha", label: "草案", ref: REF_POS3 },
+            roles: [
+              { id: "alpha", label: "草案", ref: REF_POS3 },
+              { id: "beta", label: "编排", ref: REF_POS3 },
+            ],
+            verifiers: [],
+            completing: { id: "beta", label: "编排", ref: REF_POS3 },
+            watched: [{ source: "alpha", recipient: "beta", outcome: "draft_doc", ref: REF_POS3 }],
+            asks: [{ requester: "beta", recipient: "alpha", ref: REF_POS3 }],
+            rejections: [],
+          },
+        }),
+        loopRow({
+          work_item_id: "w_new",
+          status: "released_unsettled",
+          department: "gamma",
+          run_id: "r_new",
+          refs: { stamp: { position: 88, source: "role_statement" } },
+          organization: {
+            form: "two_roles_verified",
+            routing: "watched_outputs",
+            entry: { id: "beta", label: "编排", ref: REF_POS3 },
+            roles: [
+              { id: "beta", label: "编排", ref: REF_POS3 },
+              { id: "gamma", label: "把关", ref: REF_POS3 },
+            ],
+            verifiers: [
+              {
+                role: "gamma",
+                verifies: [{ role: "beta", outcomes: ["bundle_spec"] }],
+                ref: REF_POS3,
+              },
+            ],
+            completing: null,
+            watched: [{ source: "beta", recipient: "gamma", outcome: "bundle_spec", ref: REF_POS3 }],
+            asks: [{ requester: "gamma", recipient: "beta", ref: REF_POS3 }],
+            rejections: [{ verifier: "gamma", role: "beta", outcome: "bundle_spec", ref: REF_POS3 }],
+          },
+        }),
+      ],
+      adoptions: [],
+    },
+    asks: {},
+    decisions: [],
+    roles: {},
+  };
+
+  const unionRead = await run<FloorH6Readout>(floorH6Driver as never, { query: unionQuery });
+  assert.deepEqual(unionRead.roomOrder, ["hall", "alpha", "beta", "gamma", "library"]);
+  assert.deepEqual(Object.keys(unionRead.channels.rooms), ["alpha", "beta", "gamma"]);
+  assert.equal(unionRead.channels.rooms.alpha.label, "草案");
+  assert.equal(unionRead.channels.rooms.beta.label, "编排");
+  assert.equal(unionRead.channels.rooms.gamma.label, "把关");
+  assert.deepEqual(unionRead.channels.links, {
+    handoffs: ["alpha>beta", "beta>gamma", "beta>library", "gamma>library", "hall>alpha", "hall>beta"],
+    tubes: ["alpha~beta", "beta~gamma"],
+    returns: ["gamma>beta"],
+  });
+  // 盖章台只出现在核验角色 gamma 的屋里，开环完成角色 beta 只有出口托盘没有盖章台
+  assert.equal(unionRead.channels.rooms.alpha.verifier, false);
+  assert.equal(unionRead.channels.rooms.beta.verifier, false);
+  assert.equal(unionRead.channels.rooms.gamma.verifier, true);
+  assert.equal(unionRead.channels.rooms.alpha.exit_tray, false);
+  assert.equal(unionRead.channels.rooms.beta.exit_tray, true);
+  assert.equal(unionRead.channels.rooms.gamma.exit_tray, false);
+  assert.equal(unionRead.stamps.length, 1);
+  const stampCenter = unionRead.stamps[0].x + unionRead.stamps[0].w / 2;
+  const gammaBox = unionRead.deptBounds.gamma;
+  assert.ok(stampCenter >= gammaBox.x && stampCenter <= gammaBox.x + gammaBox.w, "放行章必须画在核验角色 gamma 房间内");
+
+  // 无核验角色的开环完成楼层：任何房间都没有盖章台，画布上零枚放行章
+  const openLoopQuery = {
+    position: 12,
+    loop: {
+      project_id: "p_open",
+      work_items: [
+        loopRow({
+          work_item_id: "w_open",
+          status: "released_unsettled",
+          department: "finish_role",
+          run_id: "r_open",
+          organization: {
+            form: "open_only",
+            routing: "watched_outputs",
+            entry: { id: "draft_role", label: "起草", ref: REF_POS3 },
+            roles: [
+              { id: "draft_role", label: "起草", ref: REF_POS3 },
+              { id: "finish_role", label: "收口", ref: REF_POS3 },
+            ],
+            verifiers: [],
+            completing: { id: "finish_role", label: "收口", ref: REF_POS3 },
+            watched: [{ source: "draft_role", recipient: "finish_role", outcome: "draft_doc", ref: REF_POS3 }],
+            asks: [],
+            rejections: [],
+          },
+        }),
+      ],
+      adoptions: [],
+    },
+    asks: {},
+    decisions: [],
+    roles: {},
+  };
+  const openRead = await run<FloorH6Readout>(floorH6Driver as never, { query: openLoopQuery });
+  assert.deepEqual(openRead.roomOrder, ["hall", "draft_role", "finish_role", "library"]);
+  assert.deepEqual(openRead.channels.links, {
+    handoffs: ["draft_role>finish_role", "finish_role>library", "hall>draft_role"],
+    tubes: [],
+    returns: [],
+  });
+  assert.equal(openRead.channels.rooms.draft_role.verifier, false);
+  assert.equal(openRead.channels.rooms.finish_role.verifier, false);
+  assert.equal(openRead.channels.rooms.finish_role.exit_tray, true);
+  assert.equal(openRead.stamps.length, 0, "无核验角色的楼层不设盖章台，也不画放行章");
+});
+
+// 守 R2 与 R3：事件为空时轨迹元素数量为 0；楼层无事项时固定画出的只有大厅与成果库边界。
+test("H6 空事件与空楼层：事件为空时轨迹元素数量为 0，无事项时只画大厅与成果库边界", async () => {
+  const emptyFloorQuery = {
+    position: 0,
+    loop: { project_id: "p_empty", work_items: [], adoptions: [] },
+    asks: {},
+    decisions: [],
+    roles: {},
+  };
+  const emptyRead = await run<FloorH6Readout>(floorH6Driver as never, { query: emptyFloorQuery });
+  assert.deepEqual(emptyRead.roomOrder, ["hall", "library"]);
+  assert.deepEqual(emptyRead.channels.rooms, {});
+  assert.deepEqual(emptyRead.channels.links, { handoffs: [], tubes: [], returns: [] });
+  assert.equal(emptyRead.channels.items.length, 0);
+  assert.equal(emptyRead.channels.board.length, 0);
+  assert.equal(emptyRead.channels.shelf.adopted.length, 0);
+  assert.deepEqual(emptyRead.trajectories, {
+    packages: 0,
+    flyers: 0,
+    arrows: 0,
+    remoteDots: 0,
+    playing: 0,
+  });
+
+  // 有冻结定义但尚无流转事件的初始静止状态：房间与权威管道按定义画出，轨迹与在途元素全部为 0
+  const idleDefinedQuery = {
+    position: 1,
+    loop: {
+      project_id: "p_idle",
+      work_items: [
+        loopRow({
+          work_item_id: "w_idle",
+          status: "awaiting_initial_prd",
+          department: null,
+          run_id: "r_idle",
+          organization: {
+            form: "two_roles_verified",
+            routing: "watched_outputs",
+            entry: { id: "spec_role", label: "规格", ref: REF_POS3 },
+            roles: [
+              { id: "spec_role", label: "规格", ref: REF_POS3 },
+              { id: "check_role", label: "核验", ref: REF_POS3 },
+            ],
+            verifiers: [
+              {
+                role: "check_role",
+                verifies: [{ role: "spec_role", outcomes: ["product_spec"] }],
+                ref: REF_POS3,
+              },
+            ],
+            completing: null,
+            watched: [{ source: "spec_role", recipient: "check_role", outcome: "product_spec", ref: REF_POS3 }],
+            asks: [{ requester: "check_role", recipient: "spec_role", ref: REF_POS3 }],
+            rejections: [{ verifier: "check_role", role: "spec_role", outcome: "product_spec", ref: REF_POS3 }],
+          },
+        }),
+      ],
+      adoptions: [],
+    },
+    asks: {},
+    decisions: [],
+    roles: {},
+  };
+  const idleRead = await run<FloorH6Readout>(floorH6Driver as never, { query: idleDefinedQuery });
+  assert.deepEqual(idleRead.roomOrder, ["hall", "spec_role", "check_role", "library"]);
+  assert.deepEqual(idleRead.trajectories, {
+    packages: 0,
+    flyers: 0,
+    arrows: 0,
+    remoteDots: 0,
+    playing: 0,
+  });
+  assert.equal(idleRead.channels.board.length, 0);
+  assert.equal(idleRead.channels.shelf.adopted.length, 0);
+  assert.ok(idleRead.channels.tubes.every((t) => t.count === 0));
 });
