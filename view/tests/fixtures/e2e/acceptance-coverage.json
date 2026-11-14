@@ -1,0 +1,70 @@
+{
+  "note": "覆盖层「检验」夹具（工单 #1420）：对应 demo 录制的事项 wi_8e740804ca1e45c4 与运行 run_ec54042741a24a78（位置 289），覆盖全部六种检验方式（check、trial、measure、judgement、human、open）与三种逐条结果（passed、failed、unverified）。",
+  "response": {
+    "position": 289,
+    "data": {
+      "run_id": "run_ec54042741a24a78",
+      "work_item_id": "wi_8e740804ca1e45c4",
+      "verdict": "rework",
+      "review_event_id": "evt_coverage_review_1420",
+      "revision": 1,
+      "numbers": {
+        "criteria_total": 6,
+        "executable": 3,
+        "covered": 3,
+        "coverage_ratio": 0.5,
+        "model_reading": 1,
+        "open": 3
+      },
+      "criteria": [
+        {
+          "criterion": "AC-1",
+          "method": "check",
+          "result": "passed",
+          "executable": true,
+          "open": false
+        },
+        {
+          "criterion": "AC-2",
+          "method": "trial",
+          "result": "passed",
+          "executable": true,
+          "open": false
+        },
+        {
+          "criterion": "AC-3",
+          "method": "measure",
+          "result": "passed",
+          "executable": true,
+          "open": false
+        },
+        {
+          "criterion": "AC-4",
+          "method": "judgement",
+          "result": "failed",
+          "executable": false,
+          "open": true
+        },
+        {
+          "criterion": "AC-5",
+          "method": "human",
+          "result": "unverified",
+          "executable": false,
+          "open": true
+        },
+        {
+          "criterion": "AC-6",
+          "method": "open",
+          "result": "unverified",
+          "executable": false,
+          "open": true
+        }
+      ],
+      "open_criteria": [
+        "AC-4",
+        "AC-5",
+        "AC-6"
+      ]
+    }
+  }
+}

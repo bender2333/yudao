@@ -15,7 +15,7 @@ import { polyLength, pointAt, roomOf } from "../world/declare.ts";
 import { ACTIVE, IN_ROOM, busyItems, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
-import type { FactElement, LoopsOverlayData, Source, SourceOverlayData } from "../contract.ts";
+import type { CoverageOverlayData, FactElement, LoopsOverlayData, Source, SourceOverlayData } from "../contract.ts";
 
 // 收敛状态的颜色（工单 #400）：文字与颜色同时给，五种状态与「不判定」各一种
 const LOOP_STATE_BG: Readonly<Record<string, string>> = Object.freeze({
@@ -742,7 +742,10 @@ export class FloorRenderer {
 
   private overlayLayer(c: CanvasRenderingContext2D): void {
     const overlay = this.overlay;
-    if (!overlay.id || !overlay.data) return;
+    const data = overlay.id === "coverage"
+      ? ((this.driver.model.coverage as unknown as Record<string, unknown> | null | undefined) ?? overlay.data)
+      : overlay.data;
+    if (!overlay.id || !data) return;
     this.overlayLabels = [];
     c.fillStyle = "rgba(12,14,30,0.35)";
     c.fillRect(0, BAR, W, H - BAR);
@@ -751,7 +754,6 @@ export class FloorRenderer {
       const rect = drawSign(c, x, y, text, { size: 6, bg: bg ?? PAL.white, stripe: PAL.blue2, maxW: 150 });
       this.overlayLabels.push({ ...rect, key });
     };
-    const data = overlay.data;
     if (overlay.id === "flow") {
       const segments = (data.segments ?? []) as { from: string; to: string; count: number; last_at: string; kind: string }[];
       // 同一对部门的非返工行与返工行走同一条路径（工单 #415 的分组），方向相反的两段也走同一条路径
@@ -801,6 +803,94 @@ export class FloorRenderer {
       this.sourceOverlay(c, data as unknown as SourceOverlayData);
     } else if (overlay.id === "loops") {
       this.loopsOverlay(label, data as unknown as LoopsOverlayData);
+    } else if (overlay.id === "coverage") {
+      this.coverageOverlay(c, data as unknown as CoverageOverlayData);
+    }
+  }
+
+  /**
+   * 覆盖层「检验」（工单 #1420，画面与播放 docs/design/visualization.md「七种元件与对照表」「开环完成与放行」）：
+   * 信息条下方横幅显示检验覆盖比例与开环条件条数，核验角色房间列出每条验收条件的检验方式与结果，
+   * 右上角给出通过、不通过、未核验与开环条件计数图例；文字与色带同时表达状态，不单靠颜色区分。
+   */
+  private coverageOverlay(c: CanvasRenderingContext2D, data: CoverageOverlayData): void {
+    const world = this.driver.world;
+    const summaryBg = data.bar.criteria_total === 0
+      ? PAL.paper
+      : data.bar.open === 0 && data.bar.covered === data.bar.criteria_total
+        ? PAL.green1
+        : PAL.yellow1;
+    const summaryStripe = data.bar.criteria_total === 0
+      ? PAL.grey3
+      : data.bar.open === 0 && data.bar.covered === data.bar.criteria_total
+        ? PAL.green3
+        : PAL.orange1;
+    const summaryRect = drawSign(c, 250, 35, data.bar.text, {
+      size: 6,
+      bg: summaryBg,
+      stripe: summaryStripe,
+      maxW: 460,
+    });
+    this.overlayLabels.push({ ...summaryRect, key: "coverage:summary" });
+
+    const legendStyle = (key: CoverageOverlayData["legend"][number]["key"]): { bg: string; stripe: string } => {
+      if (key === "passed") return { bg: PAL.green1, stripe: PAL.green3 };
+      if (key === "failed") return { bg: PAL.red1, stripe: PAL.red3 };
+      if (key === "open") return { bg: PAL.yellow1, stripe: PAL.orange1 };
+      return { bg: PAL.paper, stripe: PAL.grey3 };
+    };
+    data.legend.forEach((row, index) => {
+      const style = legendStyle(row.key);
+      const rect = drawSign(c, W - 58, 35 + index * 15, row.text, {
+        size: 6,
+        bg: style.bg,
+        stripe: style.stripe,
+        minW: 72,
+        maxW: 104,
+      });
+      this.overlayLabels.push({ ...rect, key: `coverage:legend:${row.key}` });
+    });
+
+    const deptIds = world.roomOrder.filter((id) => world.rooms[id]?.roomKind === "dept");
+    const verifierRoom = roomOf(world, "quality")
+      ?? (deptIds.length > 0 ? world.rooms[deptIds[deptIds.length - 1]!] : null);
+    const singleColumn = data.criteria.length <= 8;
+    const maxSlots = singleColumn ? 8 : 16;
+    const overflow = data.criteria.length > maxSlots;
+    const visible = overflow ? data.criteria.slice(0, maxSlots - 1) : data.criteria;
+    const baseCx = Math.max(128, Math.min(396, verifierRoom ? verifierRoom.x + verifierRoom.w / 2 : W / 2));
+
+    visible.forEach((entry, index) => {
+      const bg = entry.result === "passed" ? PAL.green1 : entry.result === "failed" ? PAL.red1 : PAL.paper;
+      const stripe = entry.open
+        ? PAL.orange1
+        : entry.result === "passed"
+          ? PAL.green3
+          : entry.result === "failed"
+            ? PAL.red3
+            : PAL.grey3;
+      const cx = singleColumn ? baseCx : (index % 2 === 0 ? 186 : 412);
+      const rowIndex = singleColumn ? index : Math.floor(index / 2);
+      const rect = drawSign(c, cx, 98 + rowIndex * 15, entry.text, {
+        size: 6,
+        bg,
+        stripe,
+        maxW: singleColumn ? 236 : 212,
+      });
+      this.overlayLabels.push({ ...rect, key: `coverage:criterion:${entry.criterion}` });
+    });
+
+    if (overflow) {
+      const lastIndex = maxSlots - 1;
+      const cx = singleColumn ? baseCx : (lastIndex % 2 === 0 ? 186 : 412);
+      const rowIndex = singleColumn ? lastIndex : Math.floor(lastIndex / 2);
+      const rect = drawSign(c, cx, 98 + rowIndex * 15, `其余 ${data.criteria.length - visible.length} 条见页面`, {
+        size: 6,
+        bg: PAL.paper,
+        stripe: PAL.grey3,
+        maxW: singleColumn ? 236 : 212,
+      });
+      this.overlayLabels.push({ ...rect, key: "coverage:more" });
     }
   }
 

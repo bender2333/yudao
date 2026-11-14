@@ -448,6 +448,8 @@ export const OVERLAY_LABELS: Readonly<Record<string, string>> = Object.freeze({
   sources: "来源",
   // 循环与收敛（工单 #400）：循环树的层、已用边界与收敛状态
   loops: "循环",
+  // 检验覆盖（工单 #1420）：每条验收条件的检验方式与结果、覆盖比例与开环条件条数
+  coverage: "检验",
 });
 
 /**
