@@ -14,7 +14,7 @@ from pathlib import Path
 from harness.adapters.fake import FakeAdapter
 from harness.environment import BackgroundJobTable, LocalEnvironment
 from harness.runtime import LoopSystem
-from harness.tests.helpers import action, perform, pid_alive, wait_for_file, wait_until_stopped
+from harness.tests.helpers import action, perform, pid_alive, wait_until_stopped
 from harness.workspace import Workspace
 
 
@@ -78,9 +78,31 @@ def _wait_not_listening(port: int) -> bool:
     return False
 
 
-def _read_pid(marker: Path) -> int:
-    wait_for_file(marker)
-    return int(marker.read_text(encoding="utf-8").strip())
+def _read_pid(marker: Path, *, timeout: float = 20.0) -> int:
+    # 子进程使用 write_text 写入标记文件时会先创建空文件再写入内容；在有界截止时间内循环读取并解析整数，
+    # 避免在空文件或短暂读取受阻窗口抛出异常，超时后附上最后读取内容抛出 TimeoutError。
+    deadline = time.monotonic() + timeout
+    last_detail = "文件尚未创建"
+    while True:
+        text: str | None = None
+        try:
+            text = marker.read_text(encoding="utf-8")
+            stripped = text.strip()
+            if stripped:
+                return int(stripped)
+            last_detail = f"文件内容为空（{text!r}）"
+        except FileNotFoundError:
+            last_detail = "文件不存在"
+        except OSError as exc:
+            last_detail = f"读取文件失败：{exc}"
+        except ValueError as exc:
+            if text is None:
+                last_detail = f"读取解码失败：{exc}"
+            else:
+                last_detail = f"最后读取内容为 {text!r}（{exc}）"
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"在 {timeout:g} 秒内未能从 {marker} 读取有效整数进程号；{last_detail}")
+        time.sleep(0.05)
 
 
 def test_timeout_returns_and_stops_a_command_that_leaves_a_background_child(tmp_path):
@@ -153,23 +175,25 @@ def test_stop_job_stops_a_background_service_whose_direct_child_already_exited(t
 def test_session_end_stops_a_background_service_whose_direct_child_already_exited(tmp_path):
     # 验收第 3 条下半：会话结束这条路同样让整棵树停下
     system = LoopSystem.for_testing(tmp_path / "system", FakeAdapter([]))
-    run_id = system.create_run("session end stops the tree")
-    environment = system.orchestrator._workspaces.environment_for(run_id, "engineering")
-    marker = tmp_path / "child.pid"
-    receipt = perform(environment, "bash",
-                      {"command": _leaves_a_child(marker, tail="sleep 2"), "background": True})
-    assert receipt.ok is True
-    child = _read_pid(marker)
-    job_id = receipt.output["job_id"]
-    for _ in range(200):
-        if perform(environment, "read_output", {"job_id": job_id}).output["status"] == "exited":
-            break
-        time.sleep(0.05)
-    assert pid_alive(child), "the child is still running after the direct child exited"
+    try:
+        run_id = system.create_run("session end stops the tree")
+        environment = system.orchestrator._workspaces.environment_for(run_id, "engineering")
+        marker = tmp_path / "child.pid"
+        receipt = perform(environment, "bash",
+                          {"command": _leaves_a_child(marker, tail="sleep 2"), "background": True})
+        assert receipt.ok is True
+        child = _read_pid(marker)
+        job_id = receipt.output["job_id"]
+        for _ in range(200):
+            if perform(environment, "read_output", {"job_id": job_id}).output["status"] == "exited":
+                break
+            time.sleep(0.05)
+        assert pid_alive(child), "the child is still running after the direct child exited"
 
-    system.orchestrator.sessions.close_run(run_id)
-    assert wait_until_stopped(child)
-    system.close()
+        system.orchestrator.sessions.close_run(run_id)
+        assert wait_until_stopped(child)
+    finally:
+        system.close()
 
 
 def test_a_finished_command_does_not_leave_its_children_running(tmp_path):
