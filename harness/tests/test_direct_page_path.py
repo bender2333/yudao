@@ -457,6 +457,51 @@ def test_a_direct_item_with_a_verifier_settles_with_the_release_event_id(tmp_pat
     system.close()
 
 
+def test_work_item_materials_includes_direct_completion_reviews_in_event_order(tmp_path):
+    # 保护 R3（测试分层 docs/design/test-pyramid.md「测试按三环留」）：直做加独立核验角色的事项中，
+    # 核验角色经 submit_completion_review 依次提交打回与放行后，work_item.materials 的 reviews
+    # 按事件顺序返回对应的 ReviewEntry（含事件编号、结论与理由）
+    script = {
+        ENGINEERING: [
+            FakeTurn(writes=WRITTEN, checks={}),
+            completion_turn("第一版完成"),
+            FakeTurn(writes={"src/echo.py": "import sys\nprint(sys.argv[1:])\n"}, checks={}),
+            completion_turn("第二版完成"),
+        ],
+        QUALITY: [
+            review_turn("rework", "缺少无参数保护"),
+            review_turn("release", "无参数与带参数均通过"),
+        ],
+    }
+    system = _system(tmp_path / "loop", script)
+    application = Application(system)
+    project_id = _created(application, FORM, "直做核验结论进入事项材料")
+    work_item_id, run_id = _started(application, project_id)
+    ended = system.run_until_stop(run_id)
+    assert (ended.status, ended.stop_reason) == ("done", "released")
+
+    review_events = [
+        event for event in system.store.list_events(run_id)
+        if event.type == EventType.ARTIFACT_ACCEPTED
+        and (event.payload or {}).get("artifact_kind") == direct.REVIEW_KIND
+    ]
+    assert len(review_events) == 2
+
+    reviews = application.query(
+        "work_item.materials",
+        WorkItemMaterials(project_id=project_id, work_item=work_item_id),
+    ).data.reviews
+    assert [(entry.event_id, entry.verdict, entry.rationale) for entry in reviews] == [
+        (review_events[0].event_id, "rework", "缺少无参数保护"),
+        (review_events[1].event_id, "release", "无参数与带参数均通过"),
+    ]
+    for entry in reviews:
+        assert (entry.defects, entry.checks, entry.criteria, entry.trial_cases, entry.unverified) == (
+            [], [], [], [], [],
+        )
+    system.close()
+
+
 def test_a_direct_completion_touching_a_kernel_path_requests_approval_before_adoption(tmp_path):
     # 守 R1（受控内核路径守卫对任何形态一致生效）：直做交完成改动内核清单路径时，结算发出 kernel_modification
     # 决定请求且暂不采纳；用户批准以后写入 deliverable_adopted，事项进入 adopted
