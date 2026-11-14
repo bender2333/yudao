@@ -2,7 +2,7 @@
 #
 # launch 是可选字段，需要试用的每个入口一项；五类不符合使交付被拒绝并返回字段级错误，
 # 符合时接纳、delivery_accepted 带 launch；没有 launch 的旧交付照旧接纳。
-# 跑产品与工程两轮工作、读事件，属于集成层。
+# 经单次 activate_once 推进产品与工程两轮工作并读取事件，登记为模块层（docs/design/test-pyramid.md「三层的定义」）。
 
 from pathlib import Path
 

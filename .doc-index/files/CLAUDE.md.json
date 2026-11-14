@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"CLAUDE.md",
-"hash":"a8c6892a917172d5",
+"hash":"cb81893fa24b2bc2",
 "nodes":[
-{"hash":"a8c6892a917172d5","id":"CLAUDE.md","kind":"file","title":"CLAUDE.md"},
+{"hash":"cb81893fa24b2bc2","id":"CLAUDE.md","kind":"file","title":"CLAUDE.md"},
 {"hash":"77a7638611179c4f","id":"CLAUDE.md#适用范围","kind":"section","parent":"CLAUDE.md","title":"适用范围"},
 {"hash":"2de1bcb35f12c311","id":"CLAUDE.md#角色","kind":"section","parent":"CLAUDE.md","title":"角色"},
 {"hash":"9573c1d173c0b787","id":"CLAUDE.md#角色 > 用户的参与方式","kind":"section","parent":"CLAUDE.md#角色","title":"用户的参与方式"},
@@ -18,7 +18,7 @@
 {"hash":"c26413b75974f7f1","id":"CLAUDE.md#思考模式 > 文档地址与结构 > 根目录","kind":"section","parent":"CLAUDE.md#思考模式 > 文档地址与结构","title":"根目录"},
 {"hash":"049f187ec7c72d50","id":"CLAUDE.md#思考模式 > 文档地址与结构 > docs/","kind":"section","parent":"CLAUDE.md#思考模式 > 文档地址与结构","title":"docs/"},
 {"hash":"8893a63327d5f369","id":"CLAUDE.md#思考模式 > 工单规范","kind":"section","parent":"CLAUDE.md#思考模式","title":"工单规范"},
-{"hash":"ecabaadccd7b52f9","id":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section","parent":"CLAUDE.md#思考模式","title":"文档维护与归档"}
+{"hash":"1203a2aecf34465d","id":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section","parent":"CLAUDE.md#思考模式","title":"文档维护与归档"}
 ],
 "edges":[
 {"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["docs/agents/ticket-spec.md"],"seen":"03c60cf298c2dd35","src":"CLAUDE.md#思考模式 > 工单规范"},
@@ -38,9 +38,9 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"47bedab1efdf5000","src":"CLAUDE.md#思考模式 > 文档地址与结构 > 根目录"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"2f13bdd4ac8bee5e","src":"CLAUDE.md#思考模式 > 文档地址与结构 > 根目录"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"5cd9888cf58466dc","src":"CLAUDE.md#思考模式 > 文档地址与结构 > 根目录"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b2aa537674e85242","src":"CLAUDE.md#思考模式 > 文档维护与归档"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"042973b301eb4b56","src":"CLAUDE.md#思考模式 > 文档维护与归档"},
-{"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["docs/agents/ticket-spec.md"],"seen":"3c3f6b34acdecdaf","src":"CLAUDE.md#思考模式 > 文档维护与归档"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"a3262cd1850264d9","src":"CLAUDE.md#思考模式 > 文档维护与归档"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"e5a8733239d46412","src":"CLAUDE.md#思考模式 > 文档维护与归档"},
+{"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["docs/agents/ticket-spec.md"],"seen":"cab71c876b96bd91","src":"CLAUDE.md#思考模式 > 文档维护与归档"},
 {"dst":"docs/agents/shared-rules.md","kind":"link","raws":["docs/agents/shared-rules.md"],"seen":"4dac8f4cc77b0670","src":"CLAUDE.md#思考模式 > 项目表述 > 依据"},
 {"dst":"docs/architecture-view.html","kind":"code-path","raws":["docs/architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"CLAUDE.md#思考模式 > 项目表述 > 依据"},
 {"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"CLAUDE.md#思考模式 > 项目表述 > 依据"},

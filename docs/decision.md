@@ -806,3 +806,17 @@
   1. 新增需求记录 `docs/requirements/external-ops-agent.md`（D42）与设计说明 `docs/design/external-ops-agent.md`，明确页面边界、画面独立推进、通用命令行五类网络操作（能力清单、单项合同说明、查询、幂等命令、有界事件流）、随包运维技能与三条改动通道。
   2. 同步更新 `docs/program-roadmap.md` 第 1、2 节、`CONTEXT.md`、`README.md`、`docs/design/app-and-interface.md`、`docs/design/web-interface-and-release.md`、`docs/design/architecture/overall-architecture.md` 与 `docs/design/architecture/name-map.md`。
   3. 在里程碑 `0 围绕循环与阶段总览（非发布）` 建立父工单 #1749 与两张切片子工单 #1750、#1751，交执行者实现。
+
+## 2026-11-14 - 进程外运维代理排入 1.2、奥卡姆剃刀精简高级编辑页、本体脚手架并入与排期
+
+- 背景：总架构师与用户进一步复核三项事项：一是进程外运维代理需要明确阶段排期；二是区分 `进程外运维代理` 与项目组织里的 `运维` 职能，并以奥卡姆剃刀评估 `#1453` 尚未启动的子工单，避免激进删减已规划页面；三是将另行探索分支上的 `Yudao 本体` 与阶段核对规则纳入脚手架并规划后续演进。
+- 判断：
+  1. `进程外运维代理` 由「不排队的事」（里程碑 `0`）移入 `1.2 职能之间：真实项目`：该能力直接承接项目组织高频配置的命令通道与运维试用体验，归入 `1.2` 可以获得明确排期并在阶段试用（`#992`、`#184`）中被完整验证。执行中确认子工单 `#1750`（PR `#1757`）与 `#1751`（PR `#1768`）及父工单 `#1749` 已在早些时候合并与关闭，因此直接调整所属里程碑并挂入 `#977` 子工单与 `#992` 验收。
+  2. `进程外运维代理` 与 `运维` 职能职责不同：`进程外运维代理` 处于 Yudao 服务进程外部，围绕 Yudao 自身进行组织配置、动态扩展、升级与日常维护；`运维` 职能属于项目循环内的第四个职能（`产品 · 工程 · 质检 · 运维`），负责该业务项目交付软件的线上运行监控与故障开立事项。
+  3. 对 `#1453` 下尚未启动的网页端高级编辑页面采取克制的奥卡姆剃刀策略：保留已纳入计划的 `#1650`（「高级」只读总览、定义历史与「改回这一份」一键恢复）及 `#1654`，保持普通用户在网页端可查询与回退；将尚未启动的 `#1651`（浏览器草稿表单编辑页）与 `#1652`（定义原始编辑器、从别的项目复制组织界面与按事项选形态）标记 `wontfix` 关闭，底层 `organization.draft`、`organization.adopt`、`work_item.create` 等接口能力维持在控制核心，由 `yudao` 命令行与运维代理承接。
+  4. `Yudao 本体` 分两步并入主线，避免提前合并未同步新近变更的分支干扰 `1.1` 试用收尾：第一步在 `1.1 职能之间：转实` 用户试用通过以后、进入 `1.2` 之前，把 `origin/research/yudao-ontology` 的 `docs/research/yudao-ontology-v2.md` 与 `origin/research/ontology-step1-r4` 的 `tools/yudao-ontology/`、`.claude/skills/ontology-next/SKILL.md` 及未决清单并入主线（排除 `tools/doc-consistency/` 下已作废的 clingo 试验目录），跟进到 `1.1` 结束提交、裁决未决条目并运行首轮 `1.1` 阶段结束核对；第二步在 `1.2` 建立脚手架父工单（`#1772`）承担本体细化、工具化与技能化。
+- 决定：
+  1. 将 `#1749`、`#1750`、`#1751` 的里程碑从 `0 围绕循环与阶段总览（非发布）` 调整到 `1.2 职能之间：真实项目`，并将 `#1749` 关联为 `#977` 的原生子工单，补充到 `#992` 试用条件与验收条目。
+  2. 将 `#1651`、`#1652` 标为 `wontfix` 关闭，同步更新 `#1453` 范围及 `docs/design/project-organization.md` 第 3、4、5 节；保留 `#1650` 与 `#1654` 原计划不变。
+  3. 更新 `docs/program-roadmap.md`、`CONTEXT.md`、`README.md`、`docs/requirements/external-ops-agent.md`、`docs/agents/acceptance-evidence.md`、`docs/agents/workflow.md`、`CLAUDE.md` 与 `#1683`，明确 `1.1` 结束时合并 `tools/yudao-ontology/` 与 `/ontology-next` 并运行阶段核对。
+  4. 在里程碑 `1.2 职能之间：真实项目` 创建本体脚手架父工单 `#1772` 并关联为 `#977` 原生子工单。
