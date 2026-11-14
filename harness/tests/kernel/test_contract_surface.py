@@ -139,3 +139,102 @@ def test_a_removed_or_renamed_name_needs_a_version_bump(module_name: str) -> Non
         assert version >= snapshot["version"], (
             f"{module_name} 的 CURRENT_VERSION 从 {snapshot['version']} 降到了 {version}：版本号只增"
         )
+
+
+def test_accepted_versions_returns_current_alone_or_with_previous() -> None:
+    # 守护 docs/design/test-pyramid.md「测试按三环留」的 R2（第二环合同：docs/design/skeleton-and-application.md「契约」「三道缝的契约」）：
+    # 省略上一版或显式传入空值时仅返回当前版单元素元组，给出上一版整数时按顺序返回当前版与上一版
+    assert contract_versions.accepted_versions(1) == (1,)
+    assert contract_versions.accepted_versions(3, None) == (3,)
+    assert contract_versions.accepted_versions(2, 1) == (2, 1)
+    assert contract_versions.accepted_versions(3, 2) == (3, 2)
+
+
+def test_require_version_returns_declared_int_for_current_or_previous_version() -> None:
+    # 守护 docs/design/test-pyramid.md「测试按三环留」的 R2（第二环合同：docs/design/skeleton-and-application.md「契约」「三道缝的契约」）：
+    # 薄驱动在一个发布周期内同时接受当前版与上一版实现，返回声明的精确整数版本号；公开异常继承自 RuntimeError
+    assert issubclass(contract_versions.ContractVersionError, RuntimeError)
+
+    class FirstImpl:
+        CONTRACT_VERSION = 1
+
+    accepted_default = contract_versions.require_version(FirstImpl, component="probe", current=1)
+    assert type(accepted_default) is int and accepted_default == 1
+
+    accepted_none = contract_versions.require_version(FirstImpl, component="probe", current=1, previous=None)
+    assert type(accepted_none) is int and accepted_none == 1
+
+    class CurrentImpl:
+        CONTRACT_VERSION = 3
+
+    class PreviousImpl:
+        CONTRACT_VERSION = 2
+
+    accepted_current = contract_versions.require_version(CurrentImpl, component="probe", current=3, previous=2)
+    accepted_previous = contract_versions.require_version(PreviousImpl, component="probe", current=3, previous=2)
+    assert type(accepted_current) is int and accepted_current == 3
+    assert type(accepted_previous) is int and accepted_previous == 2
+
+
+def test_require_version_rejects_missing_non_int_and_unaccepted_versions() -> None:
+    # 守护 docs/design/test-pyramid.md「测试按三环留」的 R1 与 R2（第一环不变式与第二环合同：docs/design/skeleton-and-application.md「契约」）：
+    # 缺失 CONTRACT_VERSION、声明值为非精确整数类型（含布尔值、浮点数、字符串、空值）或声明的整数不在允许集合内时抛出 ContractVersionError
+    class UndeclaredImpl:
+        pass
+
+    class NoneVersionImpl:
+        CONTRACT_VERSION = None
+
+    class TrueVersionImpl:
+        CONTRACT_VERSION = True
+
+    class FalseVersionImpl:
+        CONTRACT_VERSION = False
+
+    class FloatVersionImpl:
+        CONTRACT_VERSION = 1.0
+
+    class StringVersionImpl:
+        CONTRACT_VERSION = "1"
+
+    class BlankVersionImpl:
+        CONTRACT_VERSION = " "
+
+    for invalid_impl in (
+        UndeclaredImpl,
+        NoneVersionImpl,
+        TrueVersionImpl,
+        FalseVersionImpl,
+        FloatVersionImpl,
+        StringVersionImpl,
+        BlankVersionImpl,
+    ):
+        with pytest.raises(contract_versions.ContractVersionError):
+            contract_versions.require_version(invalid_impl, component="probe", current=1)
+        with pytest.raises(contract_versions.ContractVersionError):
+            contract_versions.require_version(invalid_impl, component="probe", current=1, previous=0)
+
+    class ZeroVersionImpl:
+        CONTRACT_VERSION = 0
+
+    class NegativeVersionImpl:
+        CONTRACT_VERSION = -1
+
+    class OldVersionImpl:
+        CONTRACT_VERSION = 1
+
+    class FutureVersionImpl:
+        CONTRACT_VERSION = 3
+
+    for unaccepted_when_no_previous in (ZeroVersionImpl, NegativeVersionImpl, OldVersionImpl, FutureVersionImpl):
+        with pytest.raises(contract_versions.ContractVersionError):
+            contract_versions.require_version(unaccepted_when_no_previous, component="probe", current=2)
+        with pytest.raises(contract_versions.ContractVersionError):
+            contract_versions.require_version(
+                unaccepted_when_no_previous, component="probe", current=2, previous=None
+            )
+
+    for unaccepted_with_previous in (ZeroVersionImpl, NegativeVersionImpl, FutureVersionImpl):
+        with pytest.raises(contract_versions.ContractVersionError):
+            contract_versions.require_version(unaccepted_with_previous, component="probe", current=2, previous=1)
+
