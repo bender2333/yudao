@@ -132,6 +132,13 @@ export const VISUAL_CHANNELS: readonly VisualChannel[] = Object.freeze([
     read: (channels) => channels.roles,
   },
   {
+    id: "floor.coverage",
+    scene: "floor",
+    key: "coverage",
+    label: "覆盖层「检验」的覆盖比例、开环条件条数与逐条检验方式和结果",
+    read: (channels) => channels.coverage,
+  },
+  {
     id: "room.status",
     scene: "room",
     key: "status",
@@ -660,6 +667,18 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     meter: "收敛中、停滞、震荡、漂移、达到边界与不判定图例",
     unpainted: "振荡信号的依据事件明细留在页面",
     overlays: ["loops"],
+  }),
+  row({
+    concept: "覆盖层：检验",
+    element: "仪表",
+    source: "能力清单覆盖层 coverage 与查询 acceptance.coverage",
+    stateAndChange: "开启后在楼层顶部横幅显示检验覆盖比例与开环条件条数，在核验角色房间列出每条验收条件的检验方式与结果，并在右上角显示结果与开环条件计数图例",
+    spaceAndScene: "空间：楼；场景：楼层",
+    operation: "切换顶栏「检验」覆盖层按钮",
+    meter: "检验覆盖比例、开环条件条数及通过、不通过、未核验计数图例",
+    unpainted: "逐条命令输出、试用步骤明细与判定参照材料原文留在页面",
+    visualChannels: ["floor.coverage"],
+    overlays: ["coverage"],
   }),
 ]);
 

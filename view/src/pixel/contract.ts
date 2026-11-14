@@ -92,6 +92,49 @@ export interface LoopsOverlayData {
   legend: { state: string; label: string }[];
 }
 
+/** 覆盖层「检验」里单条验收条件的核验结果取值（工单 #1420）。 */
+export const COVERAGE_RESULTS = ["passed", "failed", "unverified"] as const;
+export type CoverageResult = (typeof COVERAGE_RESULTS)[number];
+
+/** 覆盖层「检验」里的一条验收条件（工单 #1420）：编号、检验方式中文名、结果与开环条件标记。 */
+export interface CoverageOverlayCriterion {
+  criterion: string;
+  method: string;
+  method_label: string;
+  result: CoverageResult;
+  result_label: string;
+  executable: boolean;
+  open: boolean;
+  text: string;
+}
+
+/** 覆盖层「检验」右上角图例的一行（工单 #1420）：三种结果与开环条件计数。 */
+export interface CoverageLegendRow {
+  key: "passed" | "failed" | "unverified" | "open";
+  label: string;
+  count: number;
+  text: string;
+}
+
+/**
+ * 覆盖层「检验」的数据（工单 #1420，画面与播放 docs/design/visualization.md「七种元件与对照表」「开环完成与放行」）：
+ * 顶部汇总横幅显示检验覆盖比例与开环条件条数，核验角色房间列出每条验收条件的检验方式与结果，右上角给出计数图例。
+ * 文字与图例写「开环条件」与「开环 N 条」，与事项结束方式的记号分开。
+ */
+export interface CoverageOverlayData {
+  bar: {
+    text: string;
+    coverage_ratio: number;
+    covered: number;
+    criteria_total: number;
+    executable: number;
+    open: number;
+    model_reading: number;
+  };
+  criteria: CoverageOverlayCriterion[];
+  legend: CoverageLegendRow[];
+}
+
 export interface SourceOverlayData {
   entries: SourceOverlayEntry[];
   missing: SourceMissingEntry[];
@@ -177,6 +220,8 @@ export interface FloorState extends PixelState {
   /** 部门 → 角色。 */
   roles?: Record<string, RoleEntry[]>;
   stamp?: Stamp;
+  /** 覆盖层「检验」的数据（工单 #1420）。 */
+  coverage?: CoverageOverlayData | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +331,8 @@ export interface FloorModel extends PixelState {
   decisions: DecisionFace[];
   /** 楼层的盖章（原型 v13 的 stamp）。 */
   stamp?: Stamp;
+  /** 覆盖层「检验」的数据（工单 #1420）。 */
+  coverage?: CoverageOverlayData | null;
 }
 
 /** 楼里闪光的颜色名（动作的 color 上写的就是这几种；不在表里的按白光画）。 */
@@ -400,6 +447,24 @@ export function floorState(s: unknown): FloorState {
   }
   const stamp = state.stamp;
   if (stamp) ref((stamp as Loose).ref, "盖章");
+  const coverage = state.coverage;
+  if (coverage !== undefined && coverage !== null) {
+    if (typeof coverage !== "object") fail("检验覆盖层数据形状无效", coverage);
+    const cov = coverage as Loose;
+    const bar = cov.bar as Loose | undefined;
+    if (!bar || typeof bar.text !== "string" || !Number.isFinite(bar.coverage_ratio)
+      || !Number.isFinite(bar.covered) || !Number.isFinite(bar.criteria_total)
+      || !Number.isFinite(bar.open)) {
+      fail("检验覆盖层缺少有效的汇总数字", cov.bar);
+    }
+    if (!Array.isArray(cov.criteria)) fail("检验覆盖层缺少 criteria", cov.criteria);
+    (cov.criteria as unknown[]).forEach((raw) => {
+      const cr = raw as Loose;
+      oneOf(COVERAGE_RESULTS, cr.result, "验收条件 " + String(cr.criterion) + " 的结果");
+      if (typeof cr.open !== "boolean") fail("验收条件 " + String(cr.criterion) + " 的开环标记无效", cr.open);
+    });
+    if (!Array.isArray(cov.legend)) fail("检验覆盖层缺少 legend", cov.legend);
+  }
   return s as FloorState;
 }
 

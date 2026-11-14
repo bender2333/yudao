@@ -13,14 +13,16 @@
 // 说话的话术用 translate/say.ts（画面 2 的成果）。
 
 import type {
-  AskView, DecisionView, EventObject, LoopActivation, LoopLayer, ProjectLoopResult, RunLoopsResult,
-  WorkItemLoop,
+  AcceptanceCoverageResult, AskView, DecisionView, EventObject, LoopActivation, LoopLayer, ProjectLoopResult,
+  RunLoopsResult, WorkItemLoop,
 } from "../api/generated/types.gen.ts";
 import type {
-  Artifact, BusyState, DecisionFace, FactElement, FloorModel, ItemState, LoopItem, LoopsOverlayData, MachineView,
+  Artifact, BusyState, CoverageLegendRow, CoverageOverlayCriterion, CoverageOverlayData, CoverageResult,
+  DecisionFace, FactElement, FloorModel, ItemState, LoopItem, LoopsOverlayData, MachineView,
   OpenRequest, OpsView, PixelAction, RoleInfo, Source, SourceOverlayData, SourceRef, WaitingProvider,
 } from "../pixel/contract.ts";
-import { floorState as checkFloorState, SOURCES } from "../pixel/contract.ts";
+import { COVERAGE_RESULTS, floorState as checkFloorState, SOURCES } from "../pixel/contract.ts";
+import { CHECK_METHODS } from "./coverage.ts";
 import { face, label, STOP_REASON } from "./face.ts";
 import { cut, say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 import { itemStateOf, roleStatus } from "./tables.ts";
@@ -65,6 +67,8 @@ export interface FloorStateInput {
   machines?: MachineView[] | null;
   waiting_provider?: WaitingProvider[] | null;
   interrupted?: boolean;
+  /** 当前运行或聚焦事项的检验覆盖结果（查询 acceptance.coverage；未打开「检验」覆盖层时不传）。 */
+  coverage?: AcceptanceCoverageResult | null;
 }
 
 /**
@@ -228,6 +232,7 @@ export function floorState(input: FloorStateInput): FloorModel {
     roles: rolesOf(input),
     decisions: [],
     ...(input.focus ? { focus_id: input.focus } : {}),
+    ...(input.coverage !== undefined ? { coverage: coverageOverlay(input.coverage) } : {}),
   };
   return checkFloorState(model) as unknown as FloorModel;
 }
@@ -551,4 +556,101 @@ export function loopsOverlay(loops: RunLoopsResult | null): LoopsOverlayData {
     step_text: `步骤 ${workSteps(activation)} 步 · ${loopStateLabel(stepLayer?.state ?? "undetermined")}`,
   }));
   return { bar: { text: `运行 · ${loopStateLabel(state)}${stopped}`, state }, rooms, legend };
+}
+
+// ---------------------------------------------------------------------------
+// 检验覆盖（工单 #1420，画面与播放 docs/design/visualization.md「七种元件与对照表」「开环完成与放行」、
+// 验证的独立性 docs/design/independent-verification.md「口径」）：
+// 把 acceptance.coverage 的结果翻成覆盖层「检验」的数据。
+// 覆盖比例、可执行条数、已覆盖条数、模型阅读条数与开环条件条数原样读取查询的 numbers，翻译层不重新计算。
+// 验收条件一级的未核验项写「开环条件」与「开环 N 条」，与事项结束方式的记号分开。
+
+/** 单条验收条件核验结果的中文名。 */
+export const COVERAGE_RESULT_LABELS: Readonly<Record<CoverageResult, string>> = Object.freeze({
+  passed: "通过",
+  failed: "不通过",
+  unverified: "未核验",
+});
+
+export function coverageResultLabel(result: string): string {
+  return (COVERAGE_RESULT_LABELS as Readonly<Record<string, string>>)[result] ?? result;
+}
+
+export function checkMethodLabel(method: string): string {
+  return CHECK_METHODS[method]?.label ?? method;
+}
+
+/** 覆盖层「检验」的数据：顶部横幅写检验覆盖比例与开环条件条数，逐条写检验方式与结果，右上角写计数图例。 */
+export function coverageOverlay(coverage: AcceptanceCoverageResult | null): CoverageOverlayData {
+  if (coverage === null) {
+    const legend: CoverageLegendRow[] = [
+      ...COVERAGE_RESULTS.map((result) => ({
+        key: result,
+        label: COVERAGE_RESULT_LABELS[result],
+        count: 0,
+        text: `${COVERAGE_RESULT_LABELS[result]} 0`,
+      })),
+      { key: "open", label: "开环条件", count: 0, text: "开环 0 条" },
+    ];
+    return {
+      bar: {
+        text: "还没有检验覆盖记录",
+        coverage_ratio: 0,
+        covered: 0,
+        criteria_total: 0,
+        executable: 0,
+        open: 0,
+        model_reading: 0,
+      },
+      criteria: [],
+      legend,
+    };
+  }
+  const numbers = coverage.numbers;
+  const pct = Math.round(numbers.coverage_ratio * 100);
+  const modelReadingNote = numbers.model_reading > 0 ? `（含模型阅读 ${numbers.model_reading} 条）` : "";
+  const barText = `检验覆盖 ${pct}%（${numbers.covered}/${numbers.criteria_total}）· 开环条件 ${numbers.open} 条${modelReadingNote}`;
+  const openSet = new Set(coverage.open_criteria ?? []);
+  const criteria: CoverageOverlayCriterion[] = coverage.criteria.map((row) => {
+    const methodLabel = checkMethodLabel(row.method);
+    const resultLabel = coverageResultLabel(row.result);
+    const isOpen = row.open || openSet.has(row.criterion);
+    const openSuffix = isOpen ? " · 开环条件" : "";
+    return {
+      criterion: row.criterion,
+      method: row.method,
+      method_label: methodLabel,
+      result: row.result,
+      result_label: resultLabel,
+      executable: row.executable && !openSet.has(row.criterion),
+      open: isOpen,
+      text: `${row.criterion} · ${methodLabel} · ${resultLabel}${openSuffix}`,
+    };
+  });
+  const legend: CoverageLegendRow[] = [
+    ...COVERAGE_RESULTS.map((result) => {
+      const labelText = COVERAGE_RESULT_LABELS[result];
+      const count = criteria.filter((item) => item.result === result).length;
+      return { key: result, label: labelText, count, text: `${labelText} ${count}` };
+    }),
+    {
+      key: "open",
+      label: "开环条件",
+      count: numbers.open,
+      text: `开环 ${numbers.open} 条`,
+    },
+  ];
+  return {
+    bar: {
+      text: barText,
+      coverage_ratio: numbers.coverage_ratio,
+      covered: numbers.covered,
+      criteria_total: numbers.criteria_total,
+      executable: numbers.executable,
+      open: numbers.open,
+      model_reading: numbers.model_reading,
+    },
+    criteria,
+    legend,
+  };
 }
