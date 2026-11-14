@@ -1,0 +1,1642 @@
+{
+  "scenario": "scenario-3",
+  "material_version": "scenario-3@3",
+  "scorer_version": "scorer-3@3",
+  "side": "yudao",
+  "model": "gemini-3.8-flash-n",
+  "form": null,
+  "counts_toward_default": true,
+  "yudao_commit": "988be2ad",
+  "yudao_commits": [
+    {
+      "run_id": "s11-def-988be2ad-1",
+      "yudao_commit": "988be2ad"
+    },
+    {
+      "run_id": "s11-def-988be2ad-2",
+      "yudao_commit": "988be2ad"
+    },
+    {
+      "run_id": "s11-def-988be2ad-3",
+      "yudao_commit": "988be2ad"
+    }
+  ],
+  "yudao_commit_mismatch": [],
+  "model_capacity": {
+    "context_window": 1048576,
+    "context_window_source": "model_list",
+    "max_output_tokens": 65536,
+    "max_output_tokens_source": "model_list"
+  },
+  "network": {
+    "allowed": false,
+    "note": "被测的 Yudao 以关闭取回的启动参数（--no-fetch）启动，三个部门的请求里没有取回工具（fetch_url、read_external_source）；评测项目也不设置 MCP 服务器，运行中没有这两类工具的调用。"
+  },
+  "host_environment": {
+    "system": "Windows 11 (AMD64)",
+    "python": "3.13.16",
+    "uv": "uv 0.13.4 (7456b60bc 2026-10-20 x86_64-pc-windows-msvc)",
+    "node": "v24.13.1",
+    "opencode": "1.19.3",
+    "git": "git version 2.49.0.windows.1"
+  },
+  "run_count": 3,
+  "void_runs": [],
+  "model_service_failures": [],
+  "notes": [],
+  "summary": {
+    "cycles": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 8.0,
+      "min": 7.0,
+      "max": 9.0,
+      "spread": 2.0
+    },
+    "rework": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "spread": 0.0
+    },
+    "collaboration": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 0.3333333333333333,
+      "min": 0.0,
+      "max": 1.0,
+      "spread": 1.0
+    },
+    "model_requests": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 177.66666666666666,
+      "min": 74.0,
+      "max": 246.0,
+      "spread": 172.0
+    },
+    "input_tokens": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 11234302.0,
+      "min": 4495383.0,
+      "max": 15372966.0,
+      "spread": 10877583.0
+    },
+    "output_tokens": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 113830.66666666667,
+      "min": 84084.0,
+      "max": 132393.0,
+      "spread": 48309.0
+    },
+    "total_tokens": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 11348132.666666666,
+      "min": 4579467.0,
+      "max": 15497981.0,
+      "spread": 10918514.0
+    },
+    "cost": {
+      "count": 3,
+      "unknown": 3,
+      "unknown_reason": "模型服务未上报费用，或材料版本未登记单价"
+    },
+    "elapsed_seconds": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 1808.1000000000001,
+      "min": 1686.6,
+      "max": 1887.7,
+      "spread": 201.10000000000014
+    },
+    "completion": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 0.7534391534391535,
+      "min": 0.546031746031746,
+      "max": 0.8571428571428571,
+      "spread": 0.3111111111111111
+    },
+    "correctness": {
+      "count": 3,
+      "unknown": 0,
+      "mean": 0.9722222222222223,
+      "min": 0.9583333333333334,
+      "max": 1.0,
+      "spread": 0.04166666666666663
+    }
+  },
+  "runs": [
+    {
+      "run_id": "s11-def-988be2ad-1",
+      "form": null,
+      "yudao_run_id": "run_1ed664e8723c4123",
+      "yudao_commit": "988be2ad",
+      "served_model": "gemini-3.8-flash-n",
+      "data_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-def-988be2ad-1\\data",
+      "start_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-def-988be2ad-1\\start",
+      "evidence_dir": "C:\\w\\arch-stage-1-1\\.yudao\\evals\\scenario-3\\yudao\\s11-def-988be2ad-1",
+      "metrics": {
+        "end_status": "released",
+        "end_reason": "released",
+        "outcome": "done",
+        "stop_reason": "released",
+        "status": "done",
+        "cycles": 7,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 246,
+        "input_tokens": 15372966,
+        "output_tokens": 125015,
+        "cache_read_tokens": 8788580,
+        "cache_write_tokens": null,
+        "total_tokens": 15497981,
+        "cost": null,
+        "model_latency_ms": 2519938,
+        "elapsed_seconds": 1850.0,
+        "timed_out": false,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "open_loop": false,
+        "open_loop_readings": null,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": true,
+            "detail": "运行在冻结限额内以放行结束：状态 done、停止原因 released、质检已放行、用量未超限额"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": null,
+            "detail": "质检本次激活中已取回 2/2 条回执（参数版本为 593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376，比例未在导出中给出）",
+            "recheck_ratio": null,
+            "recheck_ratio_status": "frozen",
+            "recheck_ratio_note": "参数版本为 593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376，比例未在导出中给出",
+            "self_run": 2,
+            "checks_total": 2
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": false,
+            "detail": "质检误放行，失败的隐藏检查：unit_2_5"
+          },
+          "release_coverage": {
+            "passed": null,
+            "applicable": true,
+            "covered_ratio": null,
+            "model_read_count": null,
+            "open_loop_count": null,
+            "detail": "放行记录中没有逐条覆盖数据（未核实）"
+          }
+        }
+      },
+      "delivery": {
+        "first": {
+          "delivered": true,
+          "completion": 0.8571428571428571,
+          "correctness": 0.9583333333333334,
+          "passed_checks": 23,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "final": {
+          "delivered": true,
+          "completion": 0.8571428571428571,
+          "correctness": 0.9583333333333334,
+          "passed_checks": 23,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "qa_within_limit": true,
+        "qa_improvement": {
+          "status": "none",
+          "passed_gain": 0,
+          "detail": "最终交付没有比第一次交付多通过隐藏检查（0 条）"
+        }
+      },
+      "delivery_files": 8,
+      "first_delivery_files": 0,
+      "definitions_version": "sha256:d18283bd183f50714b774cd1d10896bc710b38fb03a1052934044302f714e89a",
+      "parameters_version": "593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376",
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "not_done",
+          "detail": "the delivery has no src/subway_data.json"
+        }
+      },
+      "first_score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "not_done",
+          "detail": "the delivery has no src/subway_data.json"
+        }
+      }
+    },
+    {
+      "run_id": "s11-def-988be2ad-2",
+      "form": null,
+      "yudao_run_id": "run_cc762e1005554edf",
+      "yudao_commit": "988be2ad",
+      "served_model": "gemini-3.8-flash-n",
+      "data_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-def-988be2ad-2\\data",
+      "start_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-def-988be2ad-2\\start",
+      "evidence_dir": "C:\\w\\arch-stage-1-1\\.yudao\\evals\\scenario-3\\yudao\\s11-def-988be2ad-2",
+      "metrics": {
+        "end_status": "released",
+        "end_reason": "released",
+        "outcome": "done",
+        "stop_reason": "released",
+        "status": "done",
+        "cycles": 8,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 74,
+        "input_tokens": 4495383,
+        "output_tokens": 84084,
+        "cache_read_tokens": 3628507,
+        "cache_write_tokens": null,
+        "total_tokens": 4579467,
+        "cost": null,
+        "model_latency_ms": 1078911,
+        "elapsed_seconds": 1686.6,
+        "timed_out": false,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "open_loop": false,
+        "open_loop_readings": null,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": true,
+            "detail": "运行在冻结限额内以放行结束：状态 done、停止原因 released、质检已放行、用量未超限额"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": null,
+            "detail": "质检本次激活中已取回 2/2 条回执（参数版本为 593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376，比例未在导出中给出）",
+            "recheck_ratio": null,
+            "recheck_ratio_status": "frozen",
+            "recheck_ratio_note": "参数版本为 593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376，比例未在导出中给出",
+            "self_run": 2,
+            "checks_total": 2
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": false,
+            "detail": "质检误放行，失败的隐藏检查：unit_12_1、unit_2_3、unit_2_4、unit_2_5、unit_5_2、unit_8_2、unit_9_1"
+          },
+          "release_coverage": {
+            "passed": null,
+            "applicable": true,
+            "covered_ratio": null,
+            "model_read_count": null,
+            "open_loop_count": null,
+            "detail": "放行记录中没有逐条覆盖数据（未核实）"
+          }
+        }
+      },
+      "delivery": {
+        "first": {
+          "delivered": true,
+          "completion": 0.546031746031746,
+          "correctness": 1.0,
+          "passed_checks": 17,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "final": {
+          "delivered": true,
+          "completion": 0.546031746031746,
+          "correctness": 1.0,
+          "passed_checks": 17,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "qa_within_limit": true,
+        "qa_improvement": {
+          "status": "none",
+          "passed_gain": 0,
+          "detail": "最终交付没有比第一次交付多通过隐藏检查（0 条）"
+        }
+      },
+      "delivery_files": 9,
+      "first_delivery_files": 0,
+      "definitions_version": "sha256:d18283bd183f50714b774cd1d10896bc710b38fb03a1052934044302f714e89a",
+      "parameters_version": "593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376",
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.546031746031746,
+        "correctness": 1.0,
+        "not_done_count": 7,
+        "wrong_count": 0,
+        "not_done": [
+          "unit_12_1",
+          "unit_2_3",
+          "unit_2_4",
+          "unit_2_5",
+          "unit_5_2",
+          "unit_8_2",
+          "unit_9_1"
+        ],
+        "wrong": [],
+        "requirements": {
+          "R1": {
+            "passed": 3,
+            "total": 5,
+            "score": 0.6
+          },
+          "R2": {
+            "passed": 1,
+            "total": 3,
+            "score": 0.3333333333333333
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 8,
+            "total": 9,
+            "score": 0.8888888888888888
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "pass",
+          "detail": "all 292 station names and 19 line names come from the material; 292 of the material's 292 stations are in the delivery"
+        }
+      },
+      "first_score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.546031746031746,
+        "correctness": 1.0,
+        "not_done_count": 7,
+        "wrong_count": 0,
+        "not_done": [
+          "unit_12_1",
+          "unit_2_3",
+          "unit_2_4",
+          "unit_2_5",
+          "unit_5_2",
+          "unit_8_2",
+          "unit_9_1"
+        ],
+        "wrong": [],
+        "requirements": {
+          "R1": {
+            "passed": 3,
+            "total": 5,
+            "score": 0.6
+          },
+          "R2": {
+            "passed": 1,
+            "total": 3,
+            "score": 0.3333333333333333
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 8,
+            "total": 9,
+            "score": 0.8888888888888888
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "not_done",
+            "detail": "missing symbol: pathfinding"
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "pass",
+          "detail": "all 292 station names and 19 line names come from the material; 292 of the material's 292 stations are in the delivery"
+        }
+      }
+    },
+    {
+      "run_id": "s11-def-988be2ad-3",
+      "form": null,
+      "yudao_run_id": "run_ec32092d426f4da6",
+      "yudao_commit": "988be2ad",
+      "served_model": "gemini-3.8-flash-n",
+      "data_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-def-988be2ad-3\\data",
+      "start_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-def-988be2ad-3\\start",
+      "evidence_dir": "C:\\w\\arch-stage-1-1\\.yudao\\evals\\scenario-3\\yudao\\s11-def-988be2ad-3",
+      "metrics": {
+        "end_status": "released",
+        "end_reason": "released",
+        "outcome": "done",
+        "stop_reason": "released",
+        "status": "done",
+        "cycles": 9,
+        "rework": 0,
+        "collaboration": 1,
+        "model_requests": 213,
+        "input_tokens": 13834557,
+        "output_tokens": 132393,
+        "cache_read_tokens": 7756043,
+        "cache_write_tokens": null,
+        "total_tokens": 13966950,
+        "cost": null,
+        "model_latency_ms": 2114505,
+        "elapsed_seconds": 1887.7,
+        "timed_out": false,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "open_loop": false,
+        "open_loop_readings": null,
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": true,
+            "detail": "运行在冻结限额内以放行结束：状态 done、停止原因 released、质检已放行、用量未超限额"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": null,
+            "detail": "质检本次激活中已取回 1/1 条回执（参数版本为 593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376，比例未在导出中给出）",
+            "recheck_ratio": null,
+            "recheck_ratio_status": "frozen",
+            "recheck_ratio_note": "参数版本为 593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376，比例未在导出中给出",
+            "self_run": 1,
+            "checks_total": 1
+          },
+          "replay_consistent": {
+            "passed": true,
+            "detail": "重放结果与记录一致"
+          },
+          "no_false_release": {
+            "passed": false,
+            "detail": "质检误放行，失败的隐藏检查：unit_2_5"
+          },
+          "release_coverage": {
+            "passed": null,
+            "applicable": true,
+            "covered_ratio": null,
+            "model_read_count": null,
+            "open_loop_count": null,
+            "detail": "放行记录中没有逐条覆盖数据（未核实）"
+          }
+        }
+      },
+      "delivery": {
+        "first": {
+          "delivered": true,
+          "completion": 0.8571428571428571,
+          "correctness": 0.9583333333333334,
+          "passed_checks": 23,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "final": {
+          "delivered": true,
+          "completion": 0.8571428571428571,
+          "correctness": 0.9583333333333334,
+          "passed_checks": 23,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "qa_within_limit": true,
+        "qa_improvement": {
+          "status": "none",
+          "passed_gain": 0,
+          "detail": "最终交付没有比第一次交付多通过隐藏检查（0 条）"
+        }
+      },
+      "delivery_files": 7,
+      "first_delivery_files": 0,
+      "definitions_version": "sha256:d18283bd183f50714b774cd1d10896bc710b38fb03a1052934044302f714e89a",
+      "parameters_version": "593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376",
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "not_done",
+          "detail": "the delivery has no src/subway_data.json"
+        }
+      },
+      "first_score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']; Fengtai East Street->Xidan preferred ['Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']; Fengtai East Street->Xidan preferred ['Line 2', 'Line 4']: path does not run on Line 4: ['Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 9', 'Line 1', 'Line 1', 'Line 1', 'Line 1']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "not_done",
+          "detail": "the delivery has no src/subway_data.json"
+        }
+      }
+    }
+  ]
+}

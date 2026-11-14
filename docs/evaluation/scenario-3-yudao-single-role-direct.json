@@ -1,0 +1,627 @@
+{
+  "scenario": "scenario-3",
+  "material_version": "scenario-3@3",
+  "scorer_version": "scorer-3@3",
+  "side": "yudao",
+  "model": "gemini-3.8-flash-n",
+  "form": "single_role_direct",
+  "counts_toward_default": false,
+  "yudao_commit": "988be2ad",
+  "yudao_commits": [
+    {
+      "run_id": "s11-single-988be2ad-1",
+      "yudao_commit": "988be2ad"
+    }
+  ],
+  "yudao_commit_mismatch": [],
+  "model_capacity": {
+    "context_window": 1048576,
+    "context_window_source": "model_list",
+    "max_output_tokens": 65536,
+    "max_output_tokens_source": "model_list"
+  },
+  "network": {
+    "allowed": false,
+    "note": "被测的 Yudao 以关闭取回的启动参数（--no-fetch）启动，三个部门的请求里没有取回工具（fetch_url、read_external_source）；评测项目也不设置 MCP 服务器，运行中没有这两类工具的调用。"
+  },
+  "host_environment": {
+    "system": "Windows 11 (AMD64)",
+    "python": "3.13.16",
+    "uv": "uv 0.13.4 (7456b60bc 2026-10-20 x86_64-pc-windows-msvc)",
+    "node": "v24.13.1",
+    "opencode": "1.19.3",
+    "git": "git version 2.49.0.windows.1"
+  },
+  "run_count": 1,
+  "void_runs": [],
+  "model_service_failures": [],
+  "notes": [],
+  "summary": {
+    "cycles": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 1.0,
+      "min": 1.0,
+      "max": 1.0,
+      "spread": null
+    },
+    "rework": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "spread": null
+    },
+    "collaboration": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "spread": null
+    },
+    "model_requests": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 54.0,
+      "min": 54.0,
+      "max": 54.0,
+      "spread": null
+    },
+    "input_tokens": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 3589894.0,
+      "min": 3589894.0,
+      "max": 3589894.0,
+      "spread": null
+    },
+    "output_tokens": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 78353.0,
+      "min": 78353.0,
+      "max": 78353.0,
+      "spread": null
+    },
+    "total_tokens": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 3668247.0,
+      "min": 3668247.0,
+      "max": 3668247.0,
+      "spread": null
+    },
+    "cost": {
+      "count": 1,
+      "unknown": 1,
+      "unknown_reason": "模型服务未上报费用，或材料版本未登记单价"
+    },
+    "elapsed_seconds": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 992.0,
+      "min": 992.0,
+      "max": 992.0,
+      "spread": null
+    },
+    "completion": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 0.8571428571428571,
+      "min": 0.8571428571428571,
+      "max": 0.8571428571428571,
+      "spread": null
+    },
+    "correctness": {
+      "count": 1,
+      "unknown": 0,
+      "mean": 0.9583333333333334,
+      "min": 0.9583333333333334,
+      "max": 0.9583333333333334,
+      "spread": null
+    }
+  },
+  "runs": [
+    {
+      "run_id": "s11-single-988be2ad-1",
+      "form": "single_role_direct",
+      "yudao_run_id": "run_419c174ae37f4682",
+      "yudao_commit": "988be2ad",
+      "served_model": "gemini-3.8-flash-n",
+      "data_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-single-988be2ad-1\\data",
+      "start_dir": "C:\\w\\.tmp\\eval-021-runs\\s11-single-988be2ad-1\\start",
+      "evidence_dir": "C:\\w\\arch-stage-1-1\\.yudao\\evals\\scenario-3\\yudao\\s11-single-988be2ad-1",
+      "metrics": {
+        "end_status": "ended",
+        "end_reason": "open_loop",
+        "outcome": "done",
+        "stop_reason": "open_loop",
+        "status": "done",
+        "cycles": 1,
+        "rework": 0,
+        "collaboration": 0,
+        "model_requests": 54,
+        "input_tokens": 3589894,
+        "output_tokens": 78353,
+        "cache_read_tokens": 2441290,
+        "cache_write_tokens": null,
+        "total_tokens": 3668247,
+        "cost": null,
+        "model_latency_ms": 963475,
+        "elapsed_seconds": 992.0,
+        "timed_out": false,
+        "model_service_failure": false,
+        "empty_model_responses": 0,
+        "open_loop": true,
+        "open_loop_readings": {
+          "ended_open_loop": true,
+          "recorded_as_release": false,
+          "passed": true,
+          "detail": "以开环完成结束，记录上没有写成放行"
+        },
+        "checkpoints": {
+          "ended_within_limit": {
+            "passed": null,
+            "applicable": false,
+            "detail": "不适用：这份形态没有核验角色"
+          },
+          "quality_release_bound_to_delivery": {
+            "passed": null,
+            "applicable": false,
+            "detail": "不适用：这份形态没有核验角色"
+          },
+          "replay_consistent": {
+            "passed": null,
+            "applicable": false,
+            "detail": "不适用：这份形态没有核验角色"
+          },
+          "no_false_release": {
+            "passed": null,
+            "applicable": false,
+            "detail": "不适用：这份形态没有核验角色"
+          },
+          "release_coverage": {
+            "passed": null,
+            "applicable": false,
+            "detail": "不适用：这份形态没有核验角色"
+          }
+        }
+      },
+      "delivery": {
+        "first": {
+          "delivered": true,
+          "completion": 0.8571428571428571,
+          "correctness": 0.9583333333333334,
+          "passed_checks": 23,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "final": {
+          "delivered": true,
+          "completion": 0.8571428571428571,
+          "correctness": 0.9583333333333334,
+          "passed_checks": 23,
+          "total_checks": 24,
+          "all_passed": false
+        },
+        "qa_within_limit": false,
+        "qa_improvement": {
+          "status": "no_conclusion",
+          "passed_gain": null,
+          "detail": "导出中没有质检提交（qa_submitted）：质检没有给出结论"
+        }
+      },
+      "delivery_files": 9,
+      "first_delivery_files": 0,
+      "definitions_version": "sha256:6a4df4e7bc8974c83ed9cd6e6ccfb924fdb3e1e5e1b4169551f7b2af950d8ac2",
+      "parameters_version": "593c26ac8959a0e65a8244680a054b5c2de68deb0e483eca9012e3bfd4b7d376",
+      "void": false,
+      "void_reason": "",
+      "model_service_failure": false,
+      "score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "pass",
+          "detail": "all 292 station names and 19 line names come from the material; 292 of the material's 292 stations are in the delivery"
+        }
+      },
+      "first_score": {
+        "scenario": "scenario-3",
+        "material_version": "scenario-3@3",
+        "scorer_version": "scorer-3@3",
+        "completion": 0.8571428571428571,
+        "correctness": 0.9583333333333334,
+        "not_done_count": 0,
+        "wrong_count": 1,
+        "not_done": [],
+        "wrong": [
+          "unit_2_5"
+        ],
+        "requirements": {
+          "R1": {
+            "passed": 5,
+            "total": 5,
+            "score": 1.0
+          },
+          "R2": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R3": {
+            "passed": 0,
+            "total": 1,
+            "score": 0.0
+          },
+          "R4": {
+            "passed": 3,
+            "total": 3,
+            "score": 1.0
+          },
+          "R5": {
+            "passed": 1,
+            "total": 1,
+            "score": 1.0
+          },
+          "R6": {
+            "passed": 2,
+            "total": 2,
+            "score": 1.0
+          },
+          "R7": {
+            "passed": 9,
+            "total": 9,
+            "score": 1.0
+          }
+        },
+        "checks": [
+          {
+            "id": "cmd_0_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_1_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_2_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1a",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_3_1b",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_4_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_5_1a",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_7_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "cmd_8_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_1",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "file_11_2",
+            "requirement": "R6",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_1",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_10_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_12_1",
+            "requirement": "R5",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_3",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_4",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_2_5",
+            "requirement": "R3",
+            "status": "wrong",
+            "detail": "Tiananmen East->Zhongguancun preferred ['Line 10']: path does not run on Line 10: ['Line 1', 'Line 1', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4', 'Line 4']"
+          },
+          {
+            "id": "unit_5_2",
+            "requirement": "R2",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_1",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_6_2",
+            "requirement": "R4",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_8_2",
+            "requirement": "R7",
+            "status": "pass",
+            "detail": ""
+          },
+          {
+            "id": "unit_9_1",
+            "requirement": "R1",
+            "status": "pass",
+            "detail": ""
+          }
+        ],
+        "data_fidelity": {
+          "id": "data_1_1",
+          "status": "pass",
+          "detail": "all 292 station names and 19 line names come from the material; 292 of the material's 292 stations are in the delivery"
+        }
+      }
+    }
+  ]
+}

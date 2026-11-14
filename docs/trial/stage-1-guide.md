@@ -1,6 +1,6 @@
 # 「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）
 
-试用版本 0.2.1（标签 `v0.2.1` 指向的 main 发布提交）。试用工单 [#994](https://github.com/bender2333/yudao/issues/994)、[#1706](https://github.com/bender2333/yudao/issues/1706)、[#1717](https://github.com/bender2333/yudao/issues/1717)。这次要你回答的是「职能之间：转实」这个阶段的问题：**一个小的新项目，循环能不能在网页上用真实模型自己把它从意图转到放行，中间的询问、决定请求、打回与返工走得通不通，页面与按位置读出的事实一致不一致。**
+试用版本 0.2.1，main 发布提交 `988be2ad`（标签 `v0.2.1`）。试用工单 [#994](https://github.com/bender2333/yudao/issues/994)、[#1706](https://github.com/bender2333/yudao/issues/1706)、[#1717](https://github.com/bender2333/yudao/issues/1717)。这次要你回答的是「职能之间：转实」这个阶段的问题：**一个小的新项目，循环能不能在网页上用真实模型自己把它从意图转到放行，中间的询问、决定请求、打回与返工走得通不通，页面与按位置读出的事实一致不一致。**
 
 这一步只看你亲手用得怎么样。前序机器试用（[#1153](https://github.com/bender2333/yudao/discussions/1153)、[#1780](https://github.com/bender2333/yudao/discussions/1780)）找出的明确缺陷都已经修完合并进 main；这次不再让你重复跑那些已修的东西。
 
