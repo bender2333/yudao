@@ -48,6 +48,7 @@ ONBOARDING_SOURCE_NAME = "upstream"
 INITIAL_PRD_KIND = "initial_prd"
 CONFIRM_OPTION = "confirm"
 TERMINAL_STATUSES = ("done", "paused", "failed")
+BLOCKING_DECISION_SCOPES = ("run", "work_item")
 # 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目 docs/design/existing-project-onboarding.md「查询的变化」）
 ONBOARDING_RUNNING_STATUSES = ("in_progress", "not_started", "awaiting_initial_prd")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
@@ -275,7 +276,7 @@ class YudaoClient:
     def query(self, name, params=None):
         url = self.base_url + "/api/queries/" + name
         if params:
-            url += "?" + urllib.parse.urlencode(params)
+            url += "?" + urllib.parse.urlencode(params, doseq=True)
         return self._send(urllib.request.Request(url, method="GET"), name)
 
     def _send(self, request, name):
@@ -565,14 +566,34 @@ def work_item_status(client, project_id, work_item_id):
     return cards[0] if cards else None
 
 
+def _has_open_blocking_decision(client, project_id, work_item_id):
+    """查询事项是否存在待回答且阻塞事项推进的决定请求。"""
+    decisions = client.query(
+        "decisions.list",
+        {"project_id": project_id, "work_item_id": work_item_id, "status": ["open"]},
+    )["data"]["decisions"]
+    for item in decisions:
+        if item.get("status") != "open":
+            continue
+        if item.get("work_item_id") not in (None, work_item_id):
+            continue
+        blocks = item.get("blocks") or (item.get("request") or {}).get("blocks")
+        if blocks in BLOCKING_DECISION_SCOPES:
+            return True
+    return False
+
+
 def wait_for_end(client, project_id, work_item_id, limit_seconds):
-    """等待事项结束；到时间上限时经 `work_item.cancel` 结束并标记超时。"""
+    """等待事项结束；出现阻塞事项运行的待回答决定请求时当轮返回；到达时间上限时经 `work_item.cancel` 结束并标记超时。"""
     deadline = time.monotonic() + limit_seconds
     while True:
         card = work_item_status(client, project_id, work_item_id)
         if card is None:
             raise RuntimeError("the work item disappeared from project.overview")
         if card["status"] not in ("in_progress", "not_started", "queued"):
+            return card, False
+        if card["status"] == "in_progress" and _has_open_blocking_decision(
+                client, project_id, work_item_id):
             return card, False
         if time.monotonic() >= deadline:
             _cancel(client, work_item_id)

@@ -18,7 +18,7 @@ import { createDecisionCard, type DecisionCard } from "./card.ts";
 import { ROOM_VISUALS } from "./render-decl.ts";
 import type { DecisionAnswer, DecisionResult } from "./card.ts";
 import type { DecisionFace, FloorModel, SceneLike, TimeText } from "../world/types.ts";
-import type { FactElement, OpenSourceCallback, PixelAction } from "../contract.ts";
+import type { CoverageOverlayData, FactElement, OpenSourceCallback, PixelAction } from "../contract.ts";
 
 /** 概览页与测试共用的时间写法（原型 Y13.time）。 */
 export const FLOOR_TIME: TimeText = {
@@ -112,6 +112,8 @@ export interface FloorChannels {
   waiting: { department: string; text: string }[];
   /** 部门 → 角色与角色的状态。 */
   roles: Record<string, { id: string; kind: string; status: string | null }[]>;
+  /** 覆盖层「检验」的状态（未开启或无数据时为空；工单 #1420）。 */
+  coverage: CoverageOverlayData | null;
 }
 
 /** 读一份状态承载事实的视觉通道：与渲染层取同一份状态数据（渲染层在动作期间另加的临时效果不算）。 */
@@ -174,6 +176,7 @@ function floorChannels(driver: FloorDriver): FloorChannels {
       text: "等待模型服务" + (w.retry_text ? " · " + w.retry_text : ""),
     })),
     roles,
+    coverage: model.coverage ?? null,
   };
 }
 
@@ -226,7 +229,13 @@ export interface FloorTestHooks {
 /** 建立给端到端测试用的读取入口：读的是画面里世界的当前状态。 */
 export function floorTestHooks(view: FloorView, onResync: () => void): FloorTestHooks {
   return {
-    overlay: () => view.inspect().renderer.overlay,
+    overlay: () => {
+      const { renderer, driver } = view.inspect();
+      if (renderer.overlay.id === "coverage" && renderer.overlay.data === null && driver.model.coverage) {
+        return { id: "coverage", data: driver.model.coverage as unknown as Record<string, unknown> };
+      }
+      return renderer.overlay;
+    },
     overlayLabels: () => view.inspect().renderer.overlayLabels.map((r) => ({ ...r })),
     state: () => {
       const { driver, scene } = view.inspect();
@@ -444,7 +453,10 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       draw();
     },
     setOverlay(id, data) {
-      renderer.overlay = { id: id ?? null, data: (data as Record<string, unknown>) ?? null };
+      const resolved = id === "coverage" && (data === undefined || data === null)
+        ? (driver.model.coverage ?? null)
+        : data;
+      renderer.overlay = { id: id ?? null, data: (resolved as Record<string, unknown>) ?? null };
       draw();
     },
     performance(on) {

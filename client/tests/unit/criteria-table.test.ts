@@ -141,12 +141,18 @@ test("三种结果写成通过、不通过、未核验，未登记的结果不�
   assert.equal(trialCaseResultName("interrupted"), "中断");
   assert.equal(trialCaseResultName("unverified"), "未核验");
   assert.equal(trialCaseResultName("blocked"), "其他结果");
-  // 质检结论的三种词
+  // 核验结论的四种词
   assert.equal(verdictName("release"), "放行");
   assert.equal(verdictName("rework_engineering"), "缺陷记录");
+  assert.equal(verdictName("rework"), "打回");
   assert.equal(verdictName("cannot_verify"), "无法核验");
   assert.equal(verdictName(""), "未写明结论");
   assert.equal(verdictName("other"), "其他结论");
+});
+
+test("直做核验打回结论显示为打回", () => {
+  // 保护 R3（路线图已走到的直做与独立核验）：核验角色提交 rework 时，结论词显示为「打回」
+  assert.equal(verdictName("rework"), "打回");
 });
 
 test("交付与合同的版本状态写中文，不写 active、superseded 这样的代码名", () => {
