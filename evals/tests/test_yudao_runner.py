@@ -2489,3 +2489,217 @@ def test_real_service_saves_current_organization_settings_and_fetches_direct_com
     delivery = yudao_metrics.delivery_metrics(export, _delivery_scores(2), _delivery_scores(2))
     assert delivery["first"]["delivered"] is True
     assert delivery["final"]["delivered"] is True
+
+
+# ---------------------------------------------------------------------------
+# 阻塞事项运行的待回答决定请求（工单 #1760）
+
+
+class _WaitForEndClient:
+    """按轮询顺序返回事项卡片与决定请求列表的脚本客户端，记录全部查询与命令。"""
+
+    def __init__(self, cards, decisions_by_poll):
+        self.cards = [dict(card) for card in cards]
+        self.decisions_by_poll = [[dict(item) for item in batch] for batch in decisions_by_poll]
+        self.card_calls = 0
+        self.decision_calls = 0
+        self.queries = []
+        self.commands = []
+        self.cancelled = False
+
+    def query(self, name, params=None):
+        recorded = dict(params or {})
+        self.queries.append((name, recorded))
+        if name == "project.overview":
+            if self.cancelled:
+                return {"data": {"work_items": [{"work_item_id": recorded["work_item"],
+                                                 "status": "cancelled",
+                                                 "stop_reason": "cancelled"}]}}
+            card = dict(self.cards[min(self.card_calls, len(self.cards) - 1)])
+            self.card_calls += 1
+            return {"data": {"work_items": [card]}}
+        if name == "decisions.list":
+            batch = [dict(item)
+                     for item in self.decisions_by_poll[
+                         min(self.decision_calls, len(self.decisions_by_poll) - 1)]]
+            self.decision_calls += 1
+            return {"data": {"decisions": batch}}
+        raise AssertionError("unexpected query: " + name)
+
+    def command(self, name, body):
+        recorded = dict(body)
+        self.commands.append((name, recorded))
+        if name == "work_item.cancel":
+            self.cancelled = True
+            return {"accepted": True}
+        raise AssertionError("unexpected command: " + name)
+
+
+def test_client_query_encodes_repeated_list_parameters(monkeypatch):
+    """守 R3：`YudaoClient.query` 将列表参数编码为重复同名查询参数，满足 `decisions.list` 状态筛选接口约定。"""
+    captured = {}
+
+    def fake_send(_self, request, name):
+        captured["url"] = request.full_url
+        captured["method"] = request.get_method()
+        captured["name"] = name
+        return {"data": {"decisions": []}}
+
+    monkeypatch.setattr(yudao.YudaoClient, "_send", fake_send)
+    client = yudao.YudaoClient("http://127.0.0.1:8765")
+    client.query("decisions.list",
+                 {"project_id": "project-1", "work_item_id": "item-1",
+                  "status": ["open", "answered"]})
+
+    assert captured["name"] == "decisions.list"
+    assert captured["method"] == "GET"
+    assert captured["url"] == (
+        "http://127.0.0.1:8765/api/queries/decisions.list"
+        "?project_id=project-1&work_item_id=item-1&status=open&status=answered"
+    )
+
+
+def test_wait_for_end_returns_immediately_on_open_blocking_decision(monkeypatch):
+    """守 R3：事项处于进行中且存在待回答的阻塞型决定请求时，`wait_for_end` 当轮返回且不发送取消命令；列表为空或请求范围不阻塞事项运行时继续轮询。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+
+    run_blocking_client = _WaitForEndClient(
+        cards=[{"work_item_id": "item-1", "status": "in_progress"}],
+        decisions_by_poll=[[
+            {"decision_id": "dec-run-1", "project_id": "project-1", "work_item_id": "item-1",
+             "status": "open", "blocks": "run", "kind": "model_unavailable",
+             "request": {"blocks": "run", "kind": "model_unavailable",
+                         "reason": "compaction_failed"}},
+        ]],
+    )
+    card, timed_out = yudao.wait_for_end(run_blocking_client, "project-1", "item-1", 0.05)
+    assert card == {"work_item_id": "item-1", "status": "in_progress"}
+    assert timed_out is False
+    assert run_blocking_client.commands == []
+    assert run_blocking_client.queries == [
+        ("project.overview", {"project_id": "project-1", "work_item": "item-1"}),
+        ("decisions.list", {"project_id": "project-1", "work_item_id": "item-1",
+                            "status": ["open"]}),
+    ]
+
+    item_blocking_client = _WaitForEndClient(
+        cards=[{"work_item_id": "item-1", "status": "in_progress"}],
+        decisions_by_poll=[[
+            {"decision_id": "dec-item-1", "project_id": "project-1", "work_item_id": "item-1",
+             "status": "open", "blocks": "work_item", "kind": "initial_prd",
+             "request": {"blocks": "work_item", "kind": "initial_prd"}},
+        ]],
+    )
+    card_item, timed_out_item = yudao.wait_for_end(item_blocking_client, "project-1", "item-1", 0.05)
+    assert card_item["status"] == "in_progress"
+    assert timed_out_item is False
+    assert item_blocking_client.commands == []
+    assert item_blocking_client.decision_calls == 1
+
+    continue_client = _WaitForEndClient(
+        cards=[
+            {"work_item_id": "item-1", "status": "in_progress"},
+            {"work_item_id": "item-1", "status": "in_progress"},
+            {"work_item_id": "item-1", "status": "done", "stop_reason": "released"},
+        ],
+        decisions_by_poll=[
+            [],
+            [{"decision_id": "dec-instance-1", "project_id": None, "work_item_id": None,
+              "status": "open", "blocks": "instance", "kind": "instance_upgrade",
+              "request": {"blocks": "instance", "kind": "instance_upgrade"}}],
+        ],
+    )
+    done_card, done_timed_out = yudao.wait_for_end(continue_client, "project-1", "item-1", 0.5)
+    assert done_card == {"work_item_id": "item-1", "status": "done", "stop_reason": "released"}
+    assert done_timed_out is False
+    assert continue_client.commands == []
+    assert continue_client.decision_calls == 2
+
+    timeout_client = _WaitForEndClient(
+        cards=[{"work_item_id": "item-1", "status": "in_progress"}],
+        decisions_by_poll=[[]],
+    )
+    settled_card, did_timeout = yudao.wait_for_end(timeout_client, "project-1", "item-1", 0.0)
+    assert did_timeout is True
+    assert settled_card["status"] == "cancelled"
+    assert timeout_client.commands == [("work_item.cancel", {"work_item_id": "item-1"})]
+
+
+def test_metrics_collect_records_open_blocking_decision_reason():
+    """守 R3：运行投影缺少停止原因且事件流包含未回答、未撤销的阻塞型决定请求时，指标收集记录结束状态与决定原因；已回答、已撤销或不阻塞事项运行的决定请求保持原判定。"""
+    outcome = {"timed_out": False, "elapsed_seconds": 960.0, "hidden_failures": []}
+
+    compaction_export = _export(
+        outcome="running",
+        events=[
+            {"event_id": "evt-created", "type": "run_created", "payload": {}},
+            {"event_id": "evt-dec-1", "type": "decision_requested",
+             "payload": {"blocks": "run", "kind": "model_unavailable",
+                         "reason": "compaction_failed"}},
+        ],
+        projection={"status": "running", "stop_reason": None},
+    )
+    collected = yudao_metrics.collect(compaction_export, outcome)
+    assert collected["end_status"] == "ended"
+    assert collected["end_reason"] == "compaction_failed"
+    assert collected["timed_out"] is False
+    assert collected["checkpoints"]["ended_within_limit"]["passed"] is False
+
+    fallback_kind_export = _export(
+        outcome="running",
+        events=[
+            {"event_id": "evt-dec-1", "type": "decision_requested",
+             "payload": {"blocks": "run", "kind": "model_unavailable",
+                         "reason": "provider_unavailable"}},
+            {"event_id": "evt-dec-2", "type": "decision_requested",
+             "payload": {"blocks": "work_item", "kind": "qa_cannot_verify", "reason": ""}},
+        ],
+        projection={"status": "running", "stop_reason": None},
+    )
+    fallback_collected = yudao_metrics.collect(fallback_kind_export, outcome)
+    assert fallback_collected["end_status"] == "ended"
+    assert fallback_collected["end_reason"] == "qa_cannot_verify"
+
+    answered_export = _export(
+        outcome="running",
+        events=[
+            {"event_id": "evt-dec-1", "type": "decision_requested",
+             "payload": {"blocks": "run", "kind": "model_unavailable",
+                         "reason": "compaction_failed"}},
+            {"event_id": "evt-ans-1", "type": "decision_answered",
+             "payload": {"decision_id": "evt-dec-1", "option": "continue"}},
+        ],
+        projection={"status": "running", "stop_reason": None},
+    )
+    answered_collected = yudao_metrics.collect(answered_export, outcome)
+    assert answered_collected["end_status"] == "ended"
+    assert answered_collected["end_reason"] == "running"
+
+    withdrawn_export = _export(
+        outcome="running",
+        events=[
+            {"event_id": "evt-dec-1", "type": "decision_requested",
+             "payload": {"blocks": "run", "kind": "model_unavailable",
+                         "reason": "compaction_failed"}},
+            {"event_id": "evt-wd-1", "type": "decision_withdrawn",
+             "payload": {"decision_id": "evt-dec-1", "reason": "cancelled"}},
+        ],
+        projection={"status": "running", "stop_reason": None},
+    )
+    withdrawn_collected = yudao_metrics.collect(withdrawn_export, outcome)
+    assert withdrawn_collected["end_status"] == "ended"
+    assert withdrawn_collected["end_reason"] == "running"
+
+    non_blocking_export = _export(
+        outcome="running",
+        events=[
+            {"event_id": "evt-dec-1", "type": "decision_requested",
+             "payload": {"blocks": "instance", "kind": "instance_upgrade",
+                         "reason": "pending_upgrade"}},
+        ],
+        projection={"status": "running", "stop_reason": None},
+    )
+    non_blocking_collected = yudao_metrics.collect(non_blocking_export, outcome)
+    assert non_blocking_collected["end_status"] == "ended"
+    assert non_blocking_collected["end_reason"] == "running"
+

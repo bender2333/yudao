@@ -19,6 +19,7 @@ TIME_LIMIT = "time_limit"
 # 都不能通过「放行」这一项；放行等于 `status == "done"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
 RELEASE_STATUSES = frozenset({"done"})
+BLOCKING_DECISION_SCOPES = frozenset({"run", "work_item"})
 # 没有核验角色的形态以开环完成结束（harness/models.py 的 OPEN_LOOP_STOP_REASON）：这五项检查点对它不适用
 OPEN_LOOP_STOP_REASON = "open_loop"
 OPEN_LOOP_NOT_APPLICABLE = "不适用：这份形态没有核验角色"
@@ -37,7 +38,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
     projection = export["projection"]
     events = export["events"]
     model_service_failure = _is_model_service_failure(events)
-    status, reason = _end_state(projection, outcome, model_service_failure)
+    status, reason = _end_state(projection, outcome, model_service_failure, events)
     checkpoints = checkpoints_of(events, status, replay, outcome, parameters_version,
                                  model_service_failure)
     open_loop = recorded_open_loop(events)
@@ -107,13 +108,43 @@ def _event_span_seconds(export):
     return round((max(stamps) - min(stamps)).total_seconds(), 1)
 
 
-def _end_state(projection, outcome, model_service_failure):
-    """结束状态与原因：
-    - 放行等于 `status == "done"` 且 `stop_reason == "released"`；
-    - 其余 `status == "done"` 但 stop_reason 不是 released 的（不会发生，留作防御）按 ended 计；
-    - 超时记 `time_limit`；
-    - 模型服务故障记 `model_service_failure`；
-    - `no_tool_call` / `cancelled` / 进程退出都按 ended + 原始 stop_reason。
+def _open_blocking_decision_reason(events):
+    """从事件流读取最后一条未回答、未撤销且阻塞事项运行的决定请求原因。"""
+    open_requests = {}
+    for index, event in enumerate(events):
+        event_type = event.get("type")
+        payload = event.get("payload") or {}
+        if event_type == "decision_requested":
+            decision_id = (event.get("event_id")
+                           or event.get("decision_id")
+                           or payload.get("decision_id"))
+            key = decision_id if isinstance(decision_id, str) and decision_id else index
+            open_requests[key] = payload
+        elif event_type in ("decision_answered", "decision_withdrawn"):
+            decision_id = (payload.get("decision_id")
+                           or event.get("decision_id")
+                           or event.get("parent_event_id"))
+            if isinstance(decision_id, str) and decision_id:
+                open_requests.pop(decision_id, None)
+    reason = None
+    for payload in open_requests.values():
+        if payload.get("blocks") not in BLOCKING_DECISION_SCOPES:
+            continue
+        candidate = payload.get("reason")
+        if not isinstance(candidate, str) or not candidate.strip():
+            candidate = payload.get("kind")
+        if isinstance(candidate, str) and candidate.strip():
+            reason = candidate
+    return reason
+
+
+def _end_state(projection, outcome, model_service_failure, events=()):
+    """计算结束状态与结束原因：
+    - 超时记录 `time_limit`；
+    - 模型服务故障记录 `model_service_failure`；
+    - `status == "done"` 且 `stop_reason == "released"` 记录放行；
+    - 投影缺少 `stop_reason` 且事件流包含未回答、未撤销的阻塞型决定请求时，记录 `ended` 与最后一条该类请求的原因；
+    - 其余情况记录 `ended` 与投影中的停止原因或状态。
     """
     status = projection.get("status")
     stop_reason = projection.get("stop_reason")
@@ -123,6 +154,10 @@ def _end_state(projection, outcome, model_service_failure):
         return "ended", MODEL_SERVICE_FAILURE
     if status in RELEASE_STATUSES and stop_reason in RELEASE_STOP_REASONS:
         return "released", stop_reason
+    if not stop_reason:
+        blocking_reason = _open_blocking_decision_reason(events)
+        if blocking_reason is not None:
+            return "ended", blocking_reason
     return "ended", stop_reason or status or "unknown"
 
 
