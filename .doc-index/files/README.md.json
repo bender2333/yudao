@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"README.md",
-"hash":"bd54ab321c08e7c4",
+"hash":"d66f17067bcff879",
 "nodes":[
-{"hash":"bd54ab321c08e7c4","id":"README.md","kind":"file","title":"README.md"},
+{"hash":"d66f17067bcff879","id":"README.md","kind":"file","title":"README.md"},
 {"hash":"66611e43282bb188","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
 {"hash":"f7744adb2cf357e2","id":"README.md#Yudao Loop System > 当前状态","kind":"section","parent":"README.md#Yudao Loop System","title":"当前状态"},
 {"hash":"e15a4c464ae802ff","id":"README.md#Yudao Loop System > 当前状态 > 现在能试什么","kind":"section","parent":"README.md#Yudao Loop System > 当前状态","title":"现在能试什么"},
@@ -29,6 +29,7 @@
 {"hash":"d545e1bc52c3f227","id":"README.md#Yudao Loop System > 如何使用 > 5. 取消任务","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"5. 取消任务"},
 {"hash":"d39fd7c925f37e90","id":"README.md#Yudao Loop System > 如何使用 > 6. 下载交付物","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"6. 下载交付物"},
 {"hash":"4cebd33474580c50","id":"README.md#Yudao Loop System > 如何使用 > 7. 编辑职能 Prompt","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"7. 编辑职能 Prompt"},
+{"hash":"6100e332db761a8e","id":"README.md#Yudao Loop System > 如何使用 > 8. 通用命令行与随包运维技能","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"8. 通用命令行与随包运维技能"},
 {"hash":"41f4c6160a570f84","id":"README.md#Yudao Loop System > HTTP 接口","kind":"section","parent":"README.md#Yudao Loop System","title":"HTTP 接口"},
 {"hash":"3de67f201a72f3fa","id":"README.md#Yudao Loop System > 任务内 Git 版本","kind":"section","parent":"README.md#Yudao Loop System","title":"任务内 Git 版本"},
 {"hash":"67a6e3df6d1b3c0e","id":"README.md#Yudao Loop System > 模型配置","kind":"section","parent":"README.md#Yudao Loop System","title":"模型配置"},
@@ -42,6 +43,7 @@
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["docs/agents/workflow.md"],"seen":"2c01765171109f63","src":"README.md#Yudao Loop System > 参与开发"},
+{"dst":"docs/design/external-ops-agent.md","kind":"link","raws":["docs/design/external-ops-agent.md"],"seen":"df7f9dd4be99e54a","src":"README.md#Yudao Loop System > 如何使用 > 8. 通用命令行与随包运维技能"},
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["docs/adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"README.md#Yudao Loop System > 安装与启动 > 升级"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"de70a53b154f077f","src":"README.md#Yudao Loop System > 当前状态"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"18f01ebed8e76a55","src":"README.md#Yudao Loop System > 当前状态 > 现在能试什么"},
