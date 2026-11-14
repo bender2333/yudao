@@ -89,8 +89,6 @@ class ProjectEventType:
     PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
     # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
-    # 项目设置里的 MCP 服务器（工单 #236）
-    MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
     # 项目的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：项目现在用发布带的哪一份，
     # 带原值、新值与理由；工单 #1516 只增本项目的改动（changes）与合成结果的组织版本（version），
     # 旧事件没有这两项时按空改动、没有版本读。工单 #1517 起，新建事项的事件（work_item_created 与 run_created）
