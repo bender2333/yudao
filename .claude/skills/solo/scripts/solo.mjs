@@ -486,11 +486,11 @@ function nextTaskId(tasks) {
   return max + 1;
 }
 
-/** 新工单插到「互斥」或「并行」那一节的末尾；没有这两节就追加到文件末尾。 */
-function insertTaskLine(loop, id, issue, exclusive, force) {
+/** 新工单插到「并行」那一节的末尾；没有这一节就追加到文件末尾。互斥只由台账里手写的 @exclusive 决定。 */
+function insertTaskLine(loop, id, issue, touchesCore, force) {
   return withTasksFile(loop, (text) => {
     const lines = text.split(/\r?\n/);
-    const want = exclusive ? /互斥/ : /并行/;
+    const want = /并行/;
     let start = -1;
     let end = lines.length;
     for (let i = 0; i < lines.length; i += 1) {
@@ -502,7 +502,7 @@ function insertTaskLine(loop, id, issue, exclusive, force) {
       end = i;
       break;
     }
-    const line = '- [ ] ' + id + ' #' + issue.number + ' ' + issue.title + (exclusive ? '（touches-core）' : '');
+    const line = '- [ ] ' + id + ' #' + issue.number + ' ' + issue.title + (touchesCore ? '（touches-core）' : '');
     if (start === -1) {
       while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
       lines.push('', line);
@@ -532,9 +532,9 @@ function reconcile(loop, scope, issues, args) {
     if (byIssue.has(issue.number)) continue;
     const id = 'T-' + String(seq).padStart(3, '0');
     seq += 1;
-    const exclusive = issue.labels.includes('touches-core');
-    insertTaskLine(loop, id, issue, exclusive, args.force);
-    added.push({ id, issue: issue.number, title: issue.title, exclusive });
+    const touchesCore = issue.labels.includes('touches-core');
+    insertTaskLine(loop, id, issue, touchesCore, args.force);
+    added.push({ id, issue: issue.number, title: issue.title, touchesCore });
     byIssue.set(issue.number, { id, status: 'pending', text: '' });
   }
 
@@ -560,7 +560,7 @@ function reconcile(loop, scope, issues, args) {
     recount(loop);
     saveLedger(loop);
     const lines = ['## 范围重算（编排者）', ''];
-    for (const a of added) lines.push('- 收进台账 ' + a.id + '（#' + a.issue + '）' + (a.exclusive ? ' [touches-core]' : '') + '：' + a.title);
+    for (const a of added) lines.push('- 收进台账 ' + a.id + '（#' + a.issue + '）' + (a.touchesCore ? ' [touches-core]' : '') + '：' + a.title);
     for (const l of left) lines.push('- 离开范围 ' + l.task + '（#' + l.issue + '）：不再派，台账保留');
     for (const b of back) lines.push('- 回到范围 ' + b.task + '（#' + b.issue + '）：重新可以派');
     appendText(loop, lines.join('\n'));
