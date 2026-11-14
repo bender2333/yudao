@@ -14,6 +14,8 @@ import { createServer, type ViteDevServer } from "vite";
 import { chromium, type Browser } from "@playwright/test";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { SCENES, type Scene } from "../../src/translate/coverage.ts";
+import { VISUAL_CHANNELS, verifyMapping, visualChannelsOf } from "../../src/translate/mapping.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const viewRoot = resolve(here, "..", "..");
@@ -308,6 +310,39 @@ const BUILDING_EVENTS = [
   { type: "qa_submitted", position: 53, project_id: "p1", department: "quality", payload: { verdict: "release" } },
 ];
 
+/** 按翻译层导出的视觉通道清单逐项核对承载事实的通道：清单里每个通道都能从场景的 channels() 读出且前后取值一致。 */
+function assertFactChannelsUnchanged(
+  scene: Scene,
+  firstRead: Record<string, unknown>,
+  secondRead: Record<string, unknown>,
+  stage: string,
+): void {
+  const declared = visualChannelsOf(scene, VISUAL_CHANNELS);
+  assert.ok(declared.length > 0, `${scene} 场景在视觉通道清单里缺少登记`);
+  for (const channel of declared) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(firstRead, channel.key),
+      `${stage}：${scene} 的 channels() 缺少视觉通道 ${channel.id} 对应的字段 ${channel.key}`,
+    );
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(secondRead, channel.key),
+      `${stage}：${scene} 的 channels() 缺少视觉通道 ${channel.id} 对应的字段 ${channel.key}`,
+    );
+    const beforeValue = channel.read(firstRead);
+    const afterValue = channel.read(secondRead);
+    assert.notEqual(beforeValue, undefined, `${stage}：视觉通道 ${channel.id}（${channel.label}）读数为 undefined`);
+    assert.deepEqual(afterValue, beforeValue, `${stage}：视觉通道 ${channel.id}（${channel.label}）前后不一致`);
+  }
+  assert.deepEqual(secondRead, firstRead, `${stage}：${scene} 的承载事实通道整体不一致`);
+}
+
+test("H2 视觉通道清单：三个场景承载事实的通道均在翻译层导出并在对照表里有对应行", () => {
+  verifyMapping();
+  for (const scene of SCENES) {
+    assert.ok(visualChannelsOf(scene, VISUAL_CHANNELS).length > 0, `${scene} 场景没有登记承载事实的视觉通道`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // 楼层
 
@@ -316,8 +351,13 @@ test("H1/H2 楼层：同一份查询结果两次翻译相同、同一份状态�
   // H1：翻译是查询结果的函数
   assert.equal(report.stable, true, "同一份查询结果两次翻译得到的状态不同");
   assert.equal(report.translatedPosition, FLOOR_QUERY.position);
-  // H1：同一份状态两次上画面，承载事实的通道相同
-  assert.deepEqual(report.twice[1], report.twice[0]);
+  // H1：同一份状态两次上画面，按导出的视觉通道清单逐项核对一致
+  assertFactChannelsUnchanged(
+    "floor",
+    report.twice[0] as Record<string, unknown>,
+    report.twice[1] as Record<string, unknown>,
+    "H1 楼层",
+  );
   // 通道不是空的：事项、房间的亮灯与角色都读到了
   const channels = report.twice[0] as {
     items: unknown[]; rooms: Record<string, { lit: boolean; flags: unknown[] }>; roles: Record<string, unknown[]>;
@@ -326,15 +366,20 @@ test("H1/H2 楼层：同一份查询结果两次翻译相同、同一份状态�
   assert.equal(channels.items.length, 4);
   assert.equal(channels.rooms.engineering.flags.length, 1, "工程门口有一面小旗（进行中的 w1）");
   assert.equal(channels.rooms.product.flags.length, 1, "产品门口有一面小旗（中断的 w4）");
-  assert.equal(channels.rooms.quality.flags.length, 0, "已采纳的 w3 不再待在房间里");
+  assert.equal(channels.rooms.quality.flags.length, 0, "已采纳的 w3 不停在房间里");
   assert.ok(channels.rooms.engineering.lit, "工程有进行中的事项，房间亮灯");
   assert.equal(channels.tubes.find((t) => t.department === "product")?.count, 1, "产品管口有一封没回答的询问");
   assert.deepEqual(channels.shelf.adopted, ["w1"], "采纳记录在成果库里按事项列出");
   assert.ok(Object.keys(channels.roles).length > 0);
-  // H2：动作在演的时候关掉表演层，承载事实的通道不变
+  // H2：动作在演的时候关掉表演层，按导出的视觉通道清单逐项核对不变
   assert.ok(report.actions > 0, "样例事件没有翻出动作");
   assert.ok(report.playing.length > 0, `关掉表演层之前应有动作在演：${report.playing.join(",")}`);
-  assert.deepEqual(report.performance[1], report.performance[0]);
+  assertFactChannelsUnchanged(
+    "floor",
+    report.performance[0] as Record<string, unknown>,
+    report.performance[1] as Record<string, unknown>,
+    "H2 楼层",
+  );
   assert.deepEqual((report.performance[0] as { position: number }).position, FLOOR_QUERY.position);
 });
 
@@ -345,7 +390,12 @@ test("H1/H2 房间：同一份查询结果两次翻译相同、同一份状态�
   const report = await run(roomHonesty as never, { query: ROOM_QUERY, events: ROOM_EVENTS, department: "engineering" });
   assert.equal(report.stable, true, "同一份查询结果两次翻译得到的状态不同");
   assert.equal(report.translatedPosition, ROOM_QUERY.position);
-  assert.deepEqual(report.twice[1], report.twice[0]);
+  assertFactChannelsUnchanged(
+    "room",
+    report.twice[0] as Record<string, unknown>,
+    report.twice[1] as Record<string, unknown>,
+    "H1 房间",
+  );
   const channels = report.twice[0] as {
     status: { value: string; text: string };
     pose: { role_id: string; anim: string } | null;
@@ -359,7 +409,12 @@ test("H1/H2 房间：同一份查询结果两次翻译相同、同一份状态�
   assert.equal(channels.objects.letters_waiting, 1);
   assert.ok(report.actions > 0, "样例事件没有翻出动作");
   assert.ok(report.playing.length > 0, `关掉表演层之前应有动作在演：${report.playing.join(",")}`);
-  assert.deepEqual(report.performance[1], report.performance[0]);
+  assertFactChannelsUnchanged(
+    "room",
+    report.performance[0] as Record<string, unknown>,
+    report.performance[1] as Record<string, unknown>,
+    "H2 房间",
+  );
   assert.deepEqual((report.performance[0] as { position: number }).position, ROOM_QUERY.position);
 });
 
@@ -370,7 +425,12 @@ test("H1/H2 楼：同一份查询结果两次翻译相同、同一份状态两�
   const report = await run(buildingHonesty as never, { query: BUILDING_QUERY, events: BUILDING_EVENTS });
   assert.equal(report.stable, true, "同一份查询结果两次翻译得到的状态不同");
   assert.equal(report.translatedPosition, BUILDING_QUERY.position);
-  assert.deepEqual(report.twice[1], report.twice[0]);
+  assertFactChannelsUnchanged(
+    "building",
+    report.twice[0] as Record<string, unknown>,
+    report.twice[1] as Record<string, unknown>,
+    "H1 楼",
+  );
   const channels = report.twice[0] as {
     floors: { project_id: string; status: string; lit: Record<string, boolean>; decisions: number; flags: { work_item_id: string }[] }[];
   };
@@ -381,6 +441,11 @@ test("H1/H2 楼：同一份查询结果两次翻译相同、同一份状态两�
   assert.equal(channels.floors[0].decisions, 2);
   assert.deepEqual(channels.floors[0].flags.map((f) => f.work_item_id), ["w1"]);
   assert.ok(report.actions > 0, "样例事件没有翻出动作");
-  assert.deepEqual(report.performance[1], report.performance[0]);
+  assertFactChannelsUnchanged(
+    "building",
+    report.performance[0] as Record<string, unknown>,
+    report.performance[1] as Record<string, unknown>,
+    "H2 楼",
+  );
   assert.deepEqual((report.performance[0] as { position: number }).position, BUILDING_QUERY.position);
 });
