@@ -5,7 +5,7 @@ import json
 import sys
 import signal
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, get_args
@@ -18,6 +18,7 @@ from .app.access_tokens import AccessTokenStore, TokenNameTaken, UnknownToken
 from .app.application import Application
 from .app.contracts import AccessMode
 from .app.project_queries import NotFound, ProjectOverview, ProjectsList, ReplayCheck
+from .cli_client import NETWORK_SUBCOMMANDS, execute_network_command, register_network_subcommands
 from .data_directory import DISTRIBUTION, configure_logging, default_data_dir
 from .data_directory import default_dotenv as default_dotenv_path
 from .data_directory import default_provider_config as default_provider_config_path
@@ -101,6 +102,8 @@ def build_parser() -> argparse.ArgumentParser:
     release_check = sub.add_parser("release-check", help="check a pending release commit and request the upgrade")
     release_check.add_argument("repository", help="the repository holding the pending release commit")
     release_check.add_argument("--data-dir", default=argparse.SUPPRESS)
+    # 通用命令行网络子命令（工单 #1750，docs/design/external-ops-agent.md「接口」）：经网络访问运行中的服务，不接触数据目录
+    register_network_subcommands(parser, sub)
     return parser
 
 def _stop_on_ctrl_c() -> None:
@@ -122,11 +125,28 @@ def _data_dir(args: argparse.Namespace, command: str) -> str:
     given = getattr(args, "data_dir", None)
     return given if given is not None else str(SMOKE_DIR if command == "smoke" else default_data_dir())
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    stdin: Any = None,
+    stdout: Any = None,
+    stderr: Any = None,
+    environ: Mapping[str, str] | None = None,
+    transport: Any = None,
+) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     # 不写子命令时启动新接口（应用层与接口层 docs/design/app-and-interface.md「命令行」）
     command = args.command or "api"
+    if command in NETWORK_SUBCOMMANDS:
+        return execute_network_command(
+            args,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            environ=environ,
+            transport=transport,
+        )
     args.data_dir = _data_dir(args, command)
     # 关闭取回的启动参数在装配之前交给定义（工单 #1172）：此后这个进程的部门都没有取回工具
     configure_fetch_tools(not args.no_fetch)

@@ -20,6 +20,8 @@ CONTRACT_NAMES = (
     "应用不导入薄驱动的内部",
     # 工单 #69：MCP 客户端模块不导入 Yudao 的其他模块（网络与 MCP docs/design/network-and-mcp.md「客户端模块」）
     "MCP 客户端模块不导入 Yudao 的其他模块",
+    # 工单 #1750：命令行客户端模块位于接口缝外侧，不导入 Yudao 的其他模块（docs/design/external-ops-agent.md「接口」）
+    "命令行客户端模块不导入 Yudao 的其他模块",
 )
 
 

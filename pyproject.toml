@@ -64,6 +64,13 @@ type = "forbidden"
 source_modules = ["harness.mcp_client"]
 forbidden_modules = ["harness.*"]
 
+# 工单 #1750：命令行客户端模块位于接口缝外侧，不导入 Yudao 的其他模块（docs/design/external-ops-agent.md「接口」）
+[[tool.importlinter.contracts]]
+name = "命令行客户端模块不导入 Yudao 的其他模块"
+type = "forbidden"
+source_modules = ["harness.cli_client"]
+forbidden_modules = ["harness.*"]
+
 [[tool.importlinter.contracts]]
 name = "接口层只导入应用层"
 type = "forbidden"
