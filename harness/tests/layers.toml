@@ -15,6 +15,7 @@
 "kernel/test_event_store_empty_positions.py" = "module"
 "kernel/test_every_stop_has_reason.py" = "module"
 "kernel/test_judge_before_explanation.py" = "module"
+"kernel/test_kernel_events_fields.py" = "unit"
 "kernel/test_limits_survive_restart.py" = "integration"
 "kernel/test_manifest.py" = "unit"
 "kernel/test_minimal_projection.py" = "module"

@@ -138,5 +138,86 @@
   "reason": "会话清单只由事项创建事件的载荷带来；别的事件没有 sessions 字段，删掉类型判断以后它们同样折不出会话，结果相同。",
   "registered_by": "solo-deepseek-v4.1-flash",
   "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "_json_default",
+  "before": "if is_dataclass(value) and not isinstance(value, type):\n        return asdict(value)",
+  "after": "if is_dataclass(value) or not isinstance(value, type):\n        return asdict(value)",
+  "reason": "数据类实例使两侧条件同时为真并返回字段字典；数据类类型满足左侧条件进入标准库 asdict 后立即抛出 TypeError，普通对象实例满足右侧条件进入 asdict 后同样抛出 TypeError，普通类型两侧为假在下一行抛出 TypeError，异常消息文字仅面向人类阅读，四种输入的行为保持一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "_json_default",
+  "before": "if is_dataclass(value) and not isinstance(value, type):\n        return asdict(value)",
+  "after": "if is_dataclass(value) and not None:\n        return asdict(value)",
+  "reason": "改动仅在输入为数据类类型时改变分支走向：原代码跳过分支后在下一行抛出 TypeError，改动后进入标准库 asdict，asdict 校验实例类型失败后同样抛出 TypeError，异常消息文字仅面向人类阅读，可观测行为一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "_json_default",
+  "before": "raise TypeError(f\"not json serializable: {type(value)!r}\")",
+  "after": "raise None",
+  "reason": "Python 执行 raise None 时由运行时直接抛出 TypeError，与原语句抛出的异常类型完全一致；异常消息文字属于面向人类阅读的说明文字，不构成契约行为差异。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "apply_decision_event",
+  "before": "return None",
+  "after": "",
+  "reason": "该语句位于函数末尾，前面各事件分支命中后均已提前返回；未命中任何决定事件时执行完函数体自然返回 None，删除末尾显式返回语句后的返回值与状态完全一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "accepted",
+  "before": "number, key = getattr(event, \"dispatch_number\", None), (getattr(event, \"stream\", None), getattr(event, \"session_id\", None))",
+  "after": "number, key = getattr(event, \"dispatch_number\", None), (getattr(event, \"stream\", ' '), getattr(event, \"session_id\", None))",
+  "reason": "系统全部三种事件信封 Event、ProjectEvent 与 CatalogEvent 均将 stream 声明为必填字段，getattr 始终读取实例自身的 stream 属性，默认值参数从未被取用，改成空格字符串不改变结果。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "accepted",
+  "before": "number, key = getattr(event, \"dispatch_number\", None), (getattr(event, \"stream\", None), getattr(event, \"session_id\", None))",
+  "after": "number, key = getattr(event, \"dispatch_number\", None), (getattr(event, \"stream\", None), getattr(event, \"session_id\", ' '))",
+  "reason": "事项流信封 Event 声明了 session_id 字段，getattr 始终读取属性本身；项目流 ProjectEvent 与目录流 CatalogEvent 不含 session_id 且同时不含 dispatch_number，number 恒为 None，在条件首支即直接保留，水位键与事项流按流名天然隔离，默认值改动不改变输出列表。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "accepted",
+  "before": "if number is None or number >= highest.get(key, 0):\n            kept.append(event)\n            highest[key] = max(highest.get(key, 0), number or 0)",
+  "after": "if number is None or number >= highest.get(key, -1):\n            kept.append(event)\n            highest[key] = max(highest.get(key, 0), number or 0)",
+  "reason": "事实中的派发编号由写入口从 1 开始递增分配，恒为非负整数；当该流与会话尚未记录水位时，任意非负编号对默认下限 0 与 -1 的比较结果同为真，记录水位后字典已有对应键值不再读取默认值，过滤结果一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "accepted",
+  "before": "highest[key] = max(highest.get(key, 0), number or 0)",
+  "after": "highest[key] = max(highest.get(key, -1), number or 0)",
+  "reason": "右侧参数 number or 0 在无编号或非负派发编号下恒不小于 0；首次写入水位时 max(0, y) 与 max(-1, y) 对任意非负值 y 均等于 y，后续更新时字典已存有非负水位不再使用 get 的默认值，记录的水位一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/kernel_events.py",
+  "function": "accepted",
+  "before": "highest[key] = max(highest.get(key, 0), number or 0)",
+  "after": "highest[key] = max(highest.get(key, 0), number or -1)",
+  "reason": "左侧参数 highest.get(key, 0) 初值为 0 且只经 max 更新，恒不小于 0；当 number 为空或 0 时右侧取 0 或 -1 在 max 下均返回左侧非负水位，当 number 为正整数时右侧均取 number 本身，计算出的水位一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T17:48:00+08:00"
  }
 ]
