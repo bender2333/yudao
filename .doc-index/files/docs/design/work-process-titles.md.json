@@ -26,7 +26,7 @@
 {"dst":"docs/architecture.html#s4 > 执行","kind":"map-position","raws":["「执行」"],"seen":"65b681c4c2656256","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/architecture.html#s4 > 投影","kind":"map-position","raws":["「投影」"],"seen":"19cd03cec629ecf4","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/architecture.html#s4 > 接口","kind":"map-position","raws":["「接口」"],"seen":"e63f6205412e3598","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
-{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询","kind":"link","raws":["app-and-interface.md"],"seen":"a3ee61ea84082ec2","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询","kind":"link","raws":["app-and-interface.md"],"seen":"58122c68e1292ae2","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 8. 工程的计划","kind":"link","raws":["department-loop.md"],"seen":"cc6a014cf17be212","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"fb91d0dffb8b7ad7","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 2. 共享的与隔开的","kind":"link","raws":["independent-verification.md"],"seen":"392718659b386b6f","src":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明"},

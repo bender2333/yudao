@@ -38,7 +38,7 @@
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"fb91d0dffb8b7ad7","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 1. 依据与范围"},
 {"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"97f55a9ecc8b0990","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 1. 依据与范围"},
 {"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 2. 工作区","kind":"link","raws":["local-tools.md"],"seen":"8fd38c31310978cd","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行 > 3.1 各职能在什么时候工作"},
-{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"97b93618619c8d9b","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行 > 3.2 同时运行的条件"},
+{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"5f846e4e9b633577","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 3. 三个职能同时运行 > 3.2 同时运行的条件"},
 {"dst":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 4. 子循环","kind":"link","raws":["loops-and-convergence.md"],"seen":"ed6b43fcfde993f8","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.5 用量与失败"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","kind":"link","raws":["independent-verification.md"],"seen":"5cfba2bfd2f70c7c","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.6 工程与质检之间的问答：事实与解释"},
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"219992a5c05a5106","src":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 4. 询问与回答 > 4.6 工程与质检之间的问答：事实与解释"},

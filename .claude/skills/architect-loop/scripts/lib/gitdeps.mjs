@@ -10,7 +10,7 @@ export function makeDeps(cwd) {
       return r.status === 0 ? r.stdout : null;
     },
     ciRun: (id) => {
-      const r = gh(['run', 'view', String(id), '--json', 'conclusion,headSha']);
+      const r = gh(['run', 'view', String(id), '--json', 'conclusion,headSha,jobs']);
       if (r.status !== 0) return null;
       try { return JSON.parse(r.stdout); } catch { return null; }
     },

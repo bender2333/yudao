@@ -22,6 +22,7 @@ test-results/
 
 # --- tooling / scratch ---
 .tmp/
+.claude/settings.local.json
 # 变异检查工具 poodle 的临时工作目录（tools/kernel_checks）
 .poodle-temp/
 evals/scenarios/scenario-3/checks/_work/

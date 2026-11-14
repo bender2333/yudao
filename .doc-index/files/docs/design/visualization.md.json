@@ -65,7 +65,7 @@
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","kind":"link","raws":["app-and-interface.md"],"seen":"c64461e11d4738bb","src":"docs/design/visualization.md#画面与播放设计说明 > 5. 画面层 > 5.1 声明表"},
 {"dst":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"link","raws":["../adr/0021-client-pixel-view-follows-v9-structure.md"],"seen":"15afdd9d5eee1b57","src":"docs/design/visualization.md#画面与播放设计说明 > 5. 画面层 > 5.3 渲染"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["app-and-interface.md"],"seen":"1e73a165bc6cbd7b","src":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式"},
-{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"97b93618619c8d9b","src":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式"},
+{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"5f846e4e9b633577","src":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","kind":"link","raws":["test-pyramid.md"],"seen":"ad49142d91f90cad","src":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式"},
 {"dst":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"link","raws":["../adr/0021-client-pixel-view-follows-v9-structure.md"],"seen":"15afdd9d5eee1b57","src":"docs/design/visualization.md#画面与播放设计说明 > 9. 与其他文档的关系"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流 > 5.7 页面的同步规则","kind":"link","raws":["app-and-interface.md"],"seen":"72974f63b7511d31","src":"docs/design/visualization.md#画面与播放设计说明 > 9. 与其他文档的关系"},

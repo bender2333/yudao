@@ -1,7 +1,7 @@
 /**
  * 证据包：解析与核对。纯函数，git 与 gh 通过 deps 注入。
  * deps: { isAncestor(a,b), commitExists(sha), fileAt(sha,path)->string|null,
- *         ciRun(id)->{conclusion,headSha}|null, mainCommitBefore(iso)->sha|'' }
+ *         ciRun(id)->{conclusion,headSha,jobs?}|null, mainCommitBefore(iso)->sha|'' }
  */
 import { startsWithPrefix } from './classify.mjs';
 
@@ -61,8 +61,13 @@ export function checkLine(line, head, deps) {
   return bare && new RegExp(`(?<!\\w)${esc}(?!\\w)`).test(text) ? { status: 'ok' } : { status: '对不上', note: `${ref.file} 里没有 ${bare}` };
 }
 
+function hasIntegrationTest(parsed) {
+  return parsed.entries.some((e) =>
+    e.lines.some((l) => l.type === 'test' && /[（(]\s*集成(?:层)?\s*[）)]\s*$/.test(l.value)));
+}
+
 /** 对解析结果逐行核对；problems 是整包的硬伤（头部提交、CI、空包）。 */
-export function checkParsed(parsed, deps) {
+export function checkParsed(parsed, deps, opts = {}) {
   const problems = [];
   if (!deps.isAncestor(parsed.head, 'origin/main')) problems.push(`头部提交 ${parsed.head} 不是 origin/main 的祖先`);
   if (!parsed.entries.length) problems.push('没有任何条目');
@@ -72,8 +77,19 @@ export function checkParsed(parsed, deps) {
     else {
       const run = deps.ciRun(parsed.ci);
       if (!run) problems.push(`CI 运行 ${parsed.ci} 读不到`);
-      else if (run.conclusion !== 'success') problems.push(`CI 运行 ${parsed.ci} 结论是 ${run.conclusion || '未结束'}`);
-      else if (!deps.isAncestor(run.headSha, parsed.head)) problems.push(`CI 运行 ${parsed.ci} 的提交不是头部提交或其祖先`);
+      else {
+        if (run.conclusion !== 'success') problems.push(`CI 运行 ${parsed.ci} 结论是 ${run.conclusion || '未结束'}`);
+        if (!deps.isAncestor(run.headSha, parsed.head)) problems.push(`CI 运行 ${parsed.ci} 的提交不是头部提交或其祖先`);
+        if (opts.minCiCommit && !deps.isAncestor(opts.minCiCommit, run.headSha)) {
+          problems.push(`CI 运行 ${parsed.ci} 的提交早于最近关闭子工单时的 main 提交 ${opts.minCiCommit.slice(0, 8)}`);
+        }
+        if (hasIntegrationTest(parsed) && Array.isArray(run.jobs)) {
+          const intJob = run.jobs.find((j) => typeof j?.name === 'string' && j.name.includes('集成层'));
+          if (!intJob || intJob.conclusion !== 'success') {
+            problems.push(`CI 运行 ${parsed.ci} 的「③ 集成层」结论是 ${intJob ? (intJob.conclusion || '未结束') : '未运行'}（证据包含集成层用例）`);
+          }
+        }
+      }
       ciItem.status = problems.some((p) => p.startsWith('CI')) ? '对不上' : 'ok';
     }
   }
@@ -105,7 +121,8 @@ export function checkComments(comments, ctx, deps) {
   if (!parsed) return { ...out, problems: ['EVIDENCE: 第一行格式不对'] };
   Object.assign(out, { kind: parsed.kind, head: parsed.head, redo: parsed.redo, createdAt: ev.createdAt });
 
-  const { problems, items } = checkParsed(parsed, deps);
+  const minMain = (parsed.kind === '验收' && ctx.lastChildClosedAt) ? (deps.mainCommitBefore(ctx.lastChildClosedAt) || '') : '';
+  const { problems, items } = checkParsed(parsed, deps, { minCiCommit: minMain });
   out.problems = problems;
   out.items = items;
   out.mismatches = items.filter((i) => i.status === '对不上').length;
@@ -115,10 +132,7 @@ export function checkComments(comments, ctx, deps) {
     out.judged = true;
     out.problems.push('证据包之后已经有 VERDICT:/TRIAGE:');
   }
-  if (parsed.kind === '验收' && ctx.lastChildClosedAt) {
-    const x = deps.mainCommitBefore(ctx.lastChildClosedAt);
-    if (x && !deps.isAncestor(x, parsed.head)) out.stale = true;
-  }
+  if (minMain && !deps.isAncestor(minMain, parsed.head)) out.stale = true;
   if (parsed.kind === '分诊') {
     const newest = comments.filter((c) => RETURN_PREFIXES.some((p) => startsWithPrefix(c, p))).at(-1);
     if (newest && T(newest.createdAt) > T(ev.createdAt)) out.stale = true;
