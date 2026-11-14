@@ -1,11 +1,12 @@
-# 通用命令行客户端的模块层测试（docs/design/external-ops-agent.md「连接、认证与请求头规则」「零维护的单项合同自省」「查询读取与幂等命令提交」「验收」）。
-# 使用 httpx.ASGITransport 对接真实 FastAPI 与 Application 实例，网络异常使用自定义 httpx.BaseTransport 触发。
+# 通用命令行客户端的模块层测试（docs/design/external-ops-agent.md「连接、认证与请求头规则」「零维护的单项合同自省」「查询读取与幂等命令提交」「有界事件流订阅」「验收」）。
+# 使用 httpx.ASGITransport 与流式 ASGI 传输器对接真实 FastAPI 与 Application 实例，网络异常使用自定义 httpx.BaseTransport 触发。
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -588,3 +589,487 @@ def test_credential_secret_via_stdin_never_leaks_to_output_or_event_log(tmp_path
         assert code_bad == 2
         assert secret_value not in out_bad
         assert secret_value not in err_bad
+
+
+class _LiveASGIByteStream(httpx.AsyncByteStream):
+    def __init__(
+        self,
+        body_queue: asyncio.Queue[bytes | None],
+        disconnected: asyncio.Event,
+        app_task: asyncio.Task[None],
+    ) -> None:
+        self._body_queue = body_queue
+        self._disconnected = disconnected
+        self._app_task = app_task
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        while True:
+            chunk = await self._body_queue.get()
+            if chunk is None:
+                break
+            if chunk:
+                yield chunk
+
+    async def aclose(self) -> None:
+        self._disconnected.set()
+        if not self._app_task.done():
+            self._app_task.cancel()
+            try:
+                await self._app_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+
+
+class _StreamingASGITransport(httpx.AsyncBaseTransport):
+    # 在内存内以真实流式 ASGI 消息驱动 FastAPI SSE 端点，使客户端满足停止条件或到达超时后可立即断开连接
+    def __init__(self, app: Any, *, client: tuple[str, int] = ("127.0.0.1", 123)) -> None:
+        self._app = app
+        self._client = client
+        self.seen_requests: list[httpx.Request] = []
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        self.seen_requests.append(request)
+        request_body = await request.aread()
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": request.method,
+            "headers": [(k.lower(), v) for k, v in request.headers.raw],
+            "scheme": request.url.scheme,
+            "path": request.url.path,
+            "raw_path": request.url.raw_path.split(b"?")[0],
+            "query_string": request.url.query,
+            "server": (request.url.host, request.url.port),
+            "client": self._client,
+            "root_path": "",
+        }
+
+        request_sent = False
+        disconnected = asyncio.Event()
+        started = asyncio.Event()
+        body_queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+        status_code = 500
+        response_headers: list[tuple[bytes, bytes]] = []
+        app_error: BaseException | None = None
+
+        async def receive() -> dict[str, Any]:
+            nonlocal request_sent
+            if not request_sent:
+                request_sent = True
+                return {"type": "http.request", "body": request_body, "more_body": False}
+            await disconnected.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message: dict[str, Any]) -> None:
+            nonlocal status_code, response_headers
+            msg_type = message["type"]
+            if msg_type == "http.response.start":
+                status_code = int(message["status"])
+                response_headers = list(message.get("headers", []))
+                started.set()
+            elif msg_type == "http.response.body":
+                chunk = message.get("body", b"")
+                if chunk:
+                    await body_queue.put(bytes(chunk))
+                if not message.get("more_body", False):
+                    await body_queue.put(None)
+                    disconnected.set()
+
+        async def run_app() -> None:
+            nonlocal app_error
+            try:
+                await self._app(scope, receive, send)
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:  # noqa: BLE001
+                app_error = exc
+            finally:
+                started.set()
+                await body_queue.put(None)
+
+        app_task = asyncio.create_task(run_app())
+        await started.wait()
+        if app_error is not None and not response_headers:
+            raise app_error
+        return httpx.Response(
+            status_code=status_code,
+            headers=response_headers,
+            stream=_LiveASGIByteStream(body_queue, disconnected, app_task),
+        )
+
+
+@contextmanager
+def _open_streaming_asgi_service(
+    tmp_path: Path,
+    *,
+    access: AccessMode = "local",
+    tokens: AccessTokenStore | None = None,
+) -> Iterator[tuple[Application, _StreamingASGITransport]]:
+    data_dir = tmp_path / f"stream-data-{access}"
+    system = LoopSystem.for_testing(data_dir, None, resume_on_startup=False)
+    application = Application(system)
+    api = create_app(
+        lambda: application,
+        access=access,
+        pages=tmp_path / "no-pages",
+        tokens=tokens,
+    )
+    api.state.application = application
+    api.state.contract_digest = contract_digest(api)
+    try:
+        yield application, _StreamingASGITransport(api)
+    finally:
+        application.close()
+
+
+class _ScriptedSSEStream(httpx.AsyncByteStream):
+    def __init__(self, steps: Sequence[bytes | float | None]) -> None:
+        self._steps = list(steps)
+        self.closed = False
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for step in self._steps:
+            if step is None:
+                return
+            if isinstance(step, (int, float)):
+                await asyncio.sleep(float(step))
+            else:
+                yield step
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+class _ScriptedSSETransport(httpx.AsyncBaseTransport):
+    # 用于构造精确的检查点推进、超时等待与队列溢出重新同步帧序列
+    def __init__(self, factory: Callable[[httpx.Request], _ScriptedSSEStream]) -> None:
+        self._factory = factory
+        self.last_stream: _ScriptedSSEStream | None = None
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        stream = self._factory(request)
+        self.last_stream = stream
+        return httpx.Response(
+            status_code=200,
+            headers=[("content-type", "text/event-stream; charset=utf-8")],
+            stream=stream,
+        )
+
+
+class _FlushingBuffer(io.StringIO):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flush_snapshots: list[str] = []
+
+    def flush(self) -> None:
+        super().flush()
+        self.flush_snapshots.append(self.getvalue())
+
+
+def test_events_stops_on_limit_until_position_and_until_type_with_scope_filters(tmp_path: Path) -> None:
+    # 守 R1/R2：有界事件流在达到 --limit、到达 --until-position、命中 --until-type 时逐行实时刷新输出独立 JSON 并以退出码 0 立即结束
+    with _open_streaming_asgi_service(tmp_path) as (_app, transport):
+        code_p1, out_p1, err_p1 = _invoke(
+            ["command", "project.create", "--string-param", "name=项目甲", "--string-param", "goal=目标甲"],
+            transport=transport,
+        )
+        assert code_p1 == 0, err_p1
+        p1_resp = json.loads(out_p1)
+        p1_id = p1_resp["refs"]["project_id"]
+        pos_p1 = p1_resp["position"]
+
+        code_p2, out_p2, err_p2 = _invoke(
+            ["command", "project.create", "--string-param", "name=项目乙", "--string-param", "goal=目标乙"],
+            transport=transport,
+        )
+        assert code_p2 == 0, err_p2
+        p2_resp = json.loads(out_p2)
+        p2_id = p2_resp["refs"]["project_id"]
+
+        code_m1, out_m1, err_m1 = _invoke(
+            ["command", "material.record", "--string-param", f"project_id={p1_id}", "--string-param", "text=补充材料一"],
+            transport=transport,
+        )
+        assert code_m1 == 0, err_m1
+        pos_m1 = json.loads(out_m1)["position"]
+
+        code_ov, out_ov, err_ov = _invoke(
+            ["query", "project.overview", "--param", f"project_id={p1_id}"],
+            transport=transport,
+        )
+        assert code_ov == 0, err_ov
+        p1_version = json.loads(out_ov)["data"]["version"]
+
+        code_ren, out_ren, err_ren = _invoke(
+            [
+                "command",
+                "project.rename",
+                "--string-param",
+                f"project_id={p1_id}",
+                "--param",
+                f"base_version={p1_version}",
+                "--string-param",
+                "name=项目甲改名",
+            ],
+            transport=transport,
+        )
+        assert code_ren == 0, err_ren
+        pos_ren = json.loads(out_ren)["position"]
+
+        code_m2, _out_m2, err_m2 = _invoke(
+            ["command", "material.record", "--string-param", f"project_id={p1_id}", "--string-param", "text=改名之后的材料"],
+            transport=transport,
+        )
+        assert code_m2 == 0, err_m2
+
+        # 1. --limit 停止条件与逐条立即 flush
+        flush_buf = _FlushingBuffer()
+        err_buf = io.StringIO()
+        code_lim = cli_main(
+            ["events", "--after", "0", "--limit", "2", "--timeout", "10"],
+            stdin=io.StringIO(""),
+            stdout=flush_buf,
+            stderr=err_buf,
+            environ={},
+            transport=transport,
+        )
+        assert code_lim == 0, err_buf.getvalue()
+        assert err_buf.getvalue() == ""
+        lim_lines = [json.loads(line) for line in flush_buf.getvalue().splitlines() if line.strip()]
+        assert len(lim_lines) == 2
+        assert lim_lines[0]["position"] < lim_lines[1]["position"]
+        assert len(flush_buf.flush_snapshots) >= 2
+        assert len(flush_buf.flush_snapshots[0].splitlines()) == 1
+
+        # 2. --until-position 停止条件与多项目筛选
+        code_upos, out_upos, err_upos = _invoke(
+            [
+                "events",
+                "--after",
+                str(pos_p1 - 1),
+                "--project",
+                p1_id,
+                "--project",
+                p2_id,
+                "--until-position",
+                str(pos_m1),
+                "--timeout",
+                "10",
+            ],
+            transport=transport,
+        )
+        assert code_upos == 0, err_upos
+        upos_events = [json.loads(line) for line in out_upos.splitlines() if line.strip()]
+        assert [ev["project_id"] for ev in upos_events] == [p1_id, p2_id, p1_id]
+        assert upos_events[-1]["position"] == pos_m1
+
+        # 3. --until-type（可重复）在输出命中的事件后立即退出，不继续输出后续事件
+        code_utype, out_utype, err_utype = _invoke(
+            [
+                "events",
+                "--after",
+                "0",
+                "--project",
+                p1_id,
+                "--until-type",
+                "project_archived",
+                "--until-type",
+                "project_renamed",
+                "--timeout",
+                "10",
+            ],
+            transport=transport,
+        )
+        assert code_utype == 0, err_utype
+        utype_events = [json.loads(line) for line in out_utype.splitlines() if line.strip()]
+        assert utype_events[-1]["type"] == "project_renamed"
+        assert utype_events[-1]["position"] == pos_ren
+        assert all(ev["position"] <= pos_ren for ev in utype_events)
+
+        # 4. 全部范围筛选参数正确编码到 GET /api/events 查询串中
+        code_scope, out_scope, err_scope = _invoke(
+            [
+                "events",
+                "--after",
+                "0",
+                "--project",
+                p1_id,
+                "--work-item",
+                "wi-check",
+                "--run",
+                "run-check",
+                "--department",
+                "engineering",
+                "--role",
+                "engineering",
+                "--type",
+                "run_done",
+                "--type",
+                "decision_requested",
+                "--timeout",
+                "1",
+            ],
+            transport=transport,
+        )
+        assert code_scope == 4
+        assert "position=" in err_scope
+        assert out_scope == ""
+        req_params = transport.seen_requests[-1].url.params
+        assert req_params.get_list("project") == [p1_id]
+        assert req_params.get_list("work_item") == ["wi-check"]
+        assert req_params.get_list("run") == ["run-check"]
+        assert req_params.get_list("department") == ["engineering"]
+        assert req_params.get_list("role") == ["engineering"]
+        assert req_params.get_list("type") == ["run_done", "decision_requested"]
+
+
+def test_events_checkpoint_reaches_until_position_and_timeout_outputs_latest_scanned_position() -> None:
+    # 守 R1/R2：经 checkpoint 推进位置达到 --until-position 时以退出码 0 结束；到达 --timeout 未命中条件时输出最新扫描位置（含检查点位置）并以退出码 4 结束，进程不阻塞
+    checkpoint_transport = _ScriptedSSETransport(
+        lambda _req: _ScriptedSSEStream(
+            [
+                b": keep-alive\n\n",
+                b'event: checkpoint\nid: 12\ndata: {"position": 12, "previous": 4}\n\n',
+                b'event: checkpoint\nid: 25\ndata: {"position": 25, "previous": 12}\n\n',
+                10.0,
+            ]
+        )
+    )
+    code_cp, out_cp, err_cp = _invoke(
+        ["events", "--after", "4", "--until-position", "20", "--timeout", "5"],
+        transport=checkpoint_transport,
+    )
+    assert code_cp == 0, err_cp
+    assert out_cp == ""
+    assert err_cp == ""
+    assert checkpoint_transport.last_stream is not None
+    assert checkpoint_transport.last_stream.closed is True
+
+    # 等待期间持续收到保活注释与检查点，总等待到达 --timeout（1 秒）时必须准时断开并返回退出码 4 与检查点推进的最新位置
+    timeout_transport = _ScriptedSSETransport(
+        lambda _req: _ScriptedSSEStream(
+            [
+                b'event: event\nid: 6\ndata: {"position": 6, "type": "work_item_created", "project_id": "p1"}\n\n',
+                b": keep-alive\n\n",
+                b'event: checkpoint\nid: 19\ndata: {"position": 19, "previous": 6}\n\n',
+                0.3,
+                b": keep-alive\n\n",
+                0.3,
+                b": keep-alive\n\n",
+                5.0,
+            ]
+        )
+    )
+    code_to, out_to, err_to = _invoke(
+        ["events", "--after", "5", "--until-type", "run_done", "--timeout", "1"],
+        transport=timeout_transport,
+    )
+    assert code_to == 4
+    emitted = [json.loads(line) for line in out_to.splitlines() if line.strip()]
+    assert len(emitted) == 1
+    assert emitted[0]["position"] == 6
+    assert "19" in err_to
+    assert timeout_transport.last_stream is not None
+    assert timeout_transport.last_stream.closed is True
+
+
+def test_events_resync_exit_code_parameter_bounds_and_auth_connection_errors(tmp_path: Path) -> None:
+    # 守 R1/R2：收到 resync 帧输出原因与末尾位置并返回退出码 5；--limit 或 --timeout 超界返回退出码 2；连接或认证失败返回退出码 3
+    token_store = AccessTokenStore(tmp_path / "lan-tokens")
+    _entry, valid_token = token_store.create("ops-watcher", now=utc_now())
+
+    with _open_streaming_asgi_service(tmp_path, access="lan", tokens=token_store) as (_app, transport):
+        code_create, out_create, err_create = _invoke(
+            [
+                "--url",
+                "http://192.168.10.8:8765",
+                "--token",
+                valid_token,
+                "command",
+                "project.create",
+                "--string-param",
+                "name=重同步核对项目",
+                "--string-param",
+                "goal=验证位置未知重同步",
+            ],
+            transport=transport,
+        )
+        assert code_create == 0, err_create
+        end_pos = json.loads(out_create)["position"]
+
+        # 1. 真实服务端因 --after 超出当前日志末尾发出 resync(position_unknown)
+        code_resync, out_resync, err_resync = _invoke(
+            [
+                "events",
+                "--url",
+                "http://192.168.10.8:8765",
+                "--token",
+                valid_token,
+                "--after",
+                str(end_pos + 50),
+            ],
+            transport=transport,
+        )
+        assert code_resync == 5
+        assert out_resync == ""
+        assert "position_unknown" in err_resync
+        assert str(end_pos) in err_resync
+
+        # 2. 局域网缺少有效令牌访问 events 返回退出码 3
+        code_unauth, _out_unauth, err_unauth = _invoke(
+            ["events", "--url", "http://192.168.10.8:8765", "--token", "bad-token"],
+            transport=transport,
+        )
+        assert code_unauth == 3
+        assert "401" in err_unauth
+
+    # 3. 服务端因队列溢出发送 resync(queue_overflow) 返回退出码 5
+    overflow_transport = _ScriptedSSETransport(
+        lambda _req: _ScriptedSSEStream(
+            [b'event: resync\ndata: {"reason": "queue_overflow", "end_position": 340}\n\n']
+        )
+    )
+    code_ovf, out_ovf, err_ovf = _invoke(["events", "--after", "0"], transport=overflow_transport)
+    assert code_ovf == 5
+    assert out_ovf == ""
+    assert "queue_overflow" in err_ovf
+    assert "340" in err_ovf
+
+    # 4. --limit 超出 1–1000、--timeout 超出 1–3600、非法 --after 与 --until-position 均返回退出码 2
+    for bad_argv in (
+        ["events", "--limit", "0"],
+        ["events", "--limit", "1001"],
+        ["events", "--limit", "-3"],
+        ["events", "--limit", "abc"],
+        ["events", "--timeout", "0"],
+        ["events", "--timeout", "0.5"],
+        ["events", "--timeout", "3601"],
+        ["--timeout", "3601", "events"],
+        ["--timeout", "-1", "events"],
+        ["events", "--timeout", "not-num"],
+        ["events", "--after", "-1"],
+        ["events", "--after", "bad"],
+        ["events", "--until-position", "-2"],
+        ["events", "--until-position", "bad"],
+    ):
+        code_bad, _out_bad, err_bad = _invoke(bad_argv, transport=overflow_transport)
+        assert code_bad == 2, bad_argv
+        assert err_bad.strip()
+
+    # 5. 连接阶段失败、连接超时与流中途异常断开均返回退出码 3
+    for fail_kind in ("connect", "timeout"):
+        code_net, _out_net, err_net = _invoke(
+            ["events", "--timeout", "2"],
+            transport=_FailingSyncTransport(fail_kind),
+        )
+        assert code_net == 3
+        assert err_net.strip()
+
+    eof_transport = _ScriptedSSETransport(lambda _req: _ScriptedSSEStream([None]))
+    code_eof, _out_eof, err_eof = _invoke(
+        ["events", "--until-type", "run_done", "--timeout", "5"],
+        transport=eof_transport,
+    )
+    assert code_eof == 3
+    assert err_eof.strip()
