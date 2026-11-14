@@ -180,3 +180,34 @@ test("职能详情的地址往返：路径上写职能名，事项范围写在 ?
   assert.equal(paths.conversation("demo", { workItem: "w1" }), "#/p/demo/conversation?w=w1");
   assert.equal(withScope(route, "w2"), "#/p/demo/dept-detail/engineering?w=w2");
 });
+
+// 工单 #1745（保护 R2）：对话页路径支持可选的回放位置参数 at，未传入或非法值时省略；
+// 对话页地址与画面的概览回链地址均解析到对话页，同时保留事项标识与事件位置。
+test("对话页路径支持可选位置参数，概览与对话回链均解析到对话页并保留事项与位置", () => {
+  assert.equal(paths.conversation("demo"), "#/p/demo/conversation");
+  assert.equal(paths.conversation("demo", { workItem: "w1", at: null }), "#/p/demo/conversation?w=w1");
+  assert.equal(paths.conversation("demo", { workItem: "w1", at: undefined }), "#/p/demo/conversation?w=w1");
+  assert.equal(paths.conversation("demo", { workItem: "w1", at: -1 }), "#/p/demo/conversation?w=w1");
+  assert.equal(paths.conversation("demo", { workItem: "w1", at: 1.5 }), "#/p/demo/conversation?w=w1");
+  assert.equal(paths.conversation("demo", { at: 0 }), "#/p/demo/conversation?at=0");
+  assert.equal(paths.conversation("demo", { workItem: "w1", at: 2 }), "#/p/demo/conversation?w=w1&at=2");
+
+  const fromConversation = parseRoute("#/p/demo/conversation?at=2&w=w1");
+  assert.equal(fromConversation.name, "conversation");
+  assert.equal(fromConversation.projectId, "demo");
+  assert.equal(fromConversation.workItemId, "w1");
+  assert.equal(fromConversation.at, 2);
+
+  const fromOverview = parseRoute("#/p/demo/overview?at=2&w=w1");
+  assert.equal(fromOverview.name, "conversation");
+  assert.equal(fromOverview.projectId, "demo");
+  assert.equal(fromOverview.workItemId, "w1");
+  assert.equal(fromOverview.at, 2);
+
+  const projectOnly = parseRoute("#/p/demo/overview?at=2");
+  assert.equal(projectOnly.name, "conversation");
+  assert.equal(projectOnly.projectId, "demo");
+  assert.equal(projectOnly.workItemId, null);
+  assert.equal(projectOnly.at, 2);
+});
+

@@ -23,6 +23,7 @@ import { type CancelRequest, cancelItemLabel } from "./cancel-text.ts";
 import {
   amountText,
   FACT_ELEMENT_LABELS,
+  FACT_ELEMENT_ORDER,
   loopRuleText,
   loopRows,
   projectSlotText,
@@ -260,6 +261,46 @@ function sourceOf(item: WorkItemLoop, element: string): FactSourceView | null {
     sourceLabel: SOURCE_KIND_LABELS[ref.source] ?? ref.source,
     position: ref.position,
   };
+}
+
+/**
+ * 按全局事件位置查找事项事实来源（工单 #1745）：命中事项的事实引用时返回对应的中文元素名与来源种类名，
+ * 未命中或事项为空时返回同一位置的读取目标，元素名与来源种类名为空字符串。
+ */
+export function sourceAtPosition(item: WorkItemLoop | null, position: number): FactSourceView {
+  const refs = item?.refs ?? {};
+  const keys = Object.keys(refs);
+  const ordered = [
+    ...FACT_ELEMENT_ORDER.filter((element) => keys.includes(element)),
+    ...keys.filter((element) => !FACT_ELEMENT_ORDER.includes(element)).sort(),
+  ];
+  for (const element of ordered) {
+    const ref = refs[element];
+    if (ref !== undefined && ref.position === position) {
+      return {
+        element,
+        elementLabel: FACT_ELEMENT_LABELS[element] ?? element,
+        source: ref.source,
+        sourceLabel: SOURCE_KIND_LABELS[ref.source] ?? ref.source,
+        position: ref.position,
+      };
+    }
+  }
+  return {
+    element: "",
+    elementLabel: "",
+    source: "",
+    sourceLabel: "",
+    position,
+  };
+}
+
+/** 来源详情区块的标题：包含元素名与来源种类名时一并显示，为空时显示事件位置。 */
+export function sourceHeadingText(fact: FactSourceView): string {
+  if (fact.elementLabel !== "" && fact.sourceLabel !== "") {
+    return `位置 ${fact.position} 上的原始事件（${fact.elementLabel} · 来源：${fact.sourceLabel}）`;
+  }
+  return `位置 ${fact.position} 上的原始事件`;
 }
 
 function stopBlock(item: WorkItemLoop, card: WorkItemCard | null, openLoop: boolean): StopBlock | null {
