@@ -1,10 +1,13 @@
 {
 "schema":1,
 "path":"docs/prototypes/CHANGELOG.md",
-"hash":"da96aa1a92d4a15d",
+"hash":"f059102b4a2fac2a",
 "nodes":[
-{"hash":"da96aa1a92d4a15d","id":"docs/prototypes/CHANGELOG.md","kind":"file","title":"docs/prototypes/CHANGELOG.md"},
-{"hash":"27d8a16f6db917dc","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)","kind":"section","parent":"docs/prototypes/CHANGELOG.md","title":"原型设计变更记录 (Prototype Changelog)"},
+{"hash":"f059102b4a2fac2a","id":"docs/prototypes/CHANGELOG.md","kind":"file","title":"docs/prototypes/CHANGELOG.md"},
+{"hash":"83872159b94a122e","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)","kind":"section","parent":"docs/prototypes/CHANGELOG.md","title":"原型设计变更记录 (Prototype Changelog)"},
+{"hash":"5cffa5c20949161d","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)","title":"[画面步 1 单页草图] - 2026-11-14"},
+{"hash":"7004ffda92d63fed","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14 > 原型交付","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14","title":"原型交付"},
+{"hash":"d84b48fa3022a262","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14 > 回答的设计问题与写回设计说明的结论","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14","title":"回答的设计问题与写回设计说明的结论"},
 {"hash":"76650e93a6e82d99","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)","title":"[v20] - 2026-11-08"},
 {"hash":"99f92102e4c209c6","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 原型交付","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"原型交付"},
 {"hash":"6e5d382d7704a37c","id":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08 > 这一版新增","kind":"section","parent":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v20] - 2026-11-08","title":"这一版新增"},
@@ -90,10 +93,10 @@
 ],
 "edges":[
 {"dst":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"link","raws":["../adr/0021-client-pixel-view-follows-v9-structure.md"],"seen":"15afdd9d5eee1b57","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
-{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"e6d03e9a6b54ae1f","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"fe7802e2dc37a3ee","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
 {"dst":"docs/prototypes/v20/index.html","kind":"link","raws":["v20/index.html"],"seen":"1348c382d2c1e551","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
 {"dst":"docs/prototypes/v20/walkthrough.md","kind":"link","raws":["v20/walkthrough.md"],"seen":"c338ffbf289dc27d","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
-{"dst":"docs/requirements/game-world-three-spaces.md","kind":"link","raws":["../requirements/game-world-three-spaces.md"],"seen":"e0f65f58920a2d31","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
+{"dst":"docs/requirements/game-world-three-spaces.md","kind":"link","raws":["../requirements/game-world-three-spaces.md"],"seen":"154856d1c40d7390","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog)"},
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"14d726dbf2dad669","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v10] - 2026-10-07 > 2026-10-22 的更新（工单 #658）"},
 {"dst":"docs/archive/prototypes/v10/BUILD.md","kind":"link","raws":["../archive/prototypes/v10/BUILD.md"],"seen":"9024d5e96af6c80a","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v10] - 2026-10-07 > 原型交付"},
 {"dst":"docs/archive/prototypes/v10/design.md","kind":"link","raws":["../archive/prototypes/v10/design.md"],"seen":"18124dce854db7f0","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v10] - 2026-10-07 > 原型交付"},
@@ -149,6 +152,9 @@
 {"dst":"docs/archive/prototypes/v8/index.html","kind":"link","raws":["../archive/prototypes/v8/index.html"],"seen":"1b840d9ce2f2184e","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v8] - 2026-09-29 > 原型交付"},
 {"dst":"docs/archive/prototypes/v9/BUILD.md","kind":"link","raws":["../archive/prototypes/v9/BUILD.md"],"seen":"7bdc55fde4607033","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v9] - 2026-09-30 > 原型交付"},
 {"dst":"docs/archive/prototypes/v9/design.md","kind":"link","raws":["../archive/prototypes/v9/design.md"],"seen":"d3d9fd01e59362eb","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v9] - 2026-09-30 > 原型交付"},
-{"dst":"docs/archive/prototypes/v9/index.html","kind":"link","raws":["../archive/prototypes/v9/index.html"],"seen":"b64e3c54c9f82d2f","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v9] - 2026-09-30 > 原型交付"}
+{"dst":"docs/archive/prototypes/v9/index.html","kind":"link","raws":["../archive/prototypes/v9/index.html"],"seen":"b64e3c54c9f82d2f","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [v9] - 2026-09-30 > 原型交付"},
+{"dst":"docs/architecture-view.html","kind":"link","raws":["../architecture-view.html"],"seen":"5aef2176a5e9304b","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14 > 原型交付"},
+{"dst":"docs/design/visualization.md#画面与播放设计说明 > 11. 画面跟着定义伸缩","kind":"link","raws":["../design/visualization.md"],"seen":"c812f7f4160cf1bc","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14 > 原型交付"},
+{"dst":"docs/design/visualization.md#画面与播放设计说明 > 11. 画面跟着定义伸缩","kind":"link","raws":["../design/visualization.md"],"seen":"c812f7f4160cf1bc","src":"docs/prototypes/CHANGELOG.md#原型设计变更记录 (Prototype Changelog) > [画面步 1 单页草图] - 2026-11-14 > 回答的设计问题与写回设计说明的结论"}
 ]
 }

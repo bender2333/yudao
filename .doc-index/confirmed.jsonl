@@ -540,3 +540,4 @@
 {"down":"779a7225cea8da30","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 2. 分层与模块 > 2.4 依赖规则","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 2. 概念与分层 > 2.2 分层与职责","up":"53aa36bdfc58be09"}
 {"down":"3b206c00b5259b05","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关","up":"71aed60a85d42773"}
 {"down":"c1ecd2196cf6354a","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.4A 包图","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 3. 接口","up":"ab09615ca132fd6b"}
+{"down":"5f846e4e9b633577","dst":"docs/design/visualization.md#画面与播放设计说明 > 12. 开环完成与放行","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","up":"3eeafc8b60c508ff"}

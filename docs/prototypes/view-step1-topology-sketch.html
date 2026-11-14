@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>画面步 1 单页草图：跟着定义伸缩、通用外观与开环完成章</title>
+<style>
+  :root {
+    --bg: #14171f;
+    --panel: #1d2230;
+    --panel-border: #31394f;
+    --ink: #e8ecf4;
+    --muted: #9aa5bd;
+    --accent: #5cb8ff;
+    --solid-green: #1f7a4c;
+    --solid-green-hi: #34b371;
+    --open-amber: #d49b38;
+    --open-amber-bg: rgba(212, 155, 56, 0.12);
+    --rework-red: #c94a4a;
+    --ask-blue: #4a90d9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 28px 48px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    max-width: 1180px;
+    margin: 0 auto 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  h1 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .meta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .tabs {
+    max-width: 1180px;
+    margin: 0 auto 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tab-btn {
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab-btn[aria-selected="true"] {
+    background: #28334a;
+    border-color: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
+  }
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .scene-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+  }
+  .shell-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #121620;
+    border: 1px solid #2a3145;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+  .gap-pill {
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: #2b2418;
+    border: 1px solid #7a5c22;
+    color: #f0c36d;
+  }
+  .gap-ok {
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: #182921;
+    border: 1px solid #2b6346;
+    color: #7cd4a3;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    max-width: 1120px;
+    height: auto;
+    background: #0f1219;
+    border: 1px solid #2a3145;
+    border-radius: 4px;
+    image-rendering: pixelated;
+  }
+  .rules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .rule-box {
+    background: #151924;
+    border: 1px solid #283044;
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .rule-box h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: #cfe2ff;
+  }
+  .rule-box ul {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--muted);
+  }
+  .stamp-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    margin-top: 12px;
+  }
+  .stamp-demo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #121620;
+    border: 1px solid #283044;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  .badge-solid {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--solid-green);
+    border: 2px solid var(--solid-green-hi);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .badge-open {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--open-amber-bg);
+    border: 2px dashed var(--open-amber);
+    color: #f4cb78;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>画面步 1 单页草图：跟着定义伸缩、通用外观与开环完成章</h1>
+  <div class="meta">
+    依据：docs/design/visualization.md「画面跟着定义伸缩」「开环完成与放行」；docs/architecture-view.html 第五节；工单 #1379、#1385。假数据单页草图，只回答视觉摆法问题，不带翻译层与播放时间线，不当逐像素标准。
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="草图场景切换">
+  <button class="tab-btn" role="tab" aria-selected="true" data-scene="single">1. 「工程」一间屋（出口托盘与虚线章）</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-scene="two-open">2. 「产品 · 工程」无核验（传信管与出口托盘）</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-scene="two-verified">3. 「工程 · 质检」直做加核验（盖章台与回流管）</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-scene="generic">4. 通用外观（未声明角色标识进缺口清单）</button>
+  <button class="tab-btn" role="tab" aria-selected="false" data-scene="union">5. 同层两份定义并集（各自走冻结定义的屋）</button>
+</nav>
+
+<main>
+  <section class="scene-card">
+    <div class="shell-bar">
+      <span id="scene-title">场景 1：「工程」单职能直做 —— 大厅 + 工程屋（含出口托盘，无盖章台）+ 成果库</span>
+      <span id="shell-gap" class="gap-ok">缺口清单（0）</span>
+    </div>
+    <canvas id="sketch" width="1120" height="430"></canvas>
+
+    <div class="stamp-row">
+      <div class="stamp-demo">
+        <span class="badge-solid">放行</span>
+        <span>核验角色在自己屋里的盖章台上盖实心绿底章；成果库箱子贴实心绿章。</span>
+      </div>
+      <div class="stamp-demo">
+        <span class="badge-open">开环完成</span>
+        <span>交完成的角色在自己屋里的出口托盘上盖虚线镂空章；成果库箱子贴虚线章常驻。</span>
+      </div>
+      <div class="stamp-demo">
+        <span class="badge-open">开环完成 · 外包</span>
+        <span>外包角色交回开环完成时，虚线章加注「外包」字样。</span>
+      </div>
+    </div>
+
+    <div class="rules-grid" id="scene-notes"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  const canvas = document.getElementById("sketch");
+  const ctx = canvas.getContext("2d");
+  const titleEl = document.getElementById("scene-title");
+  const gapEl = document.getElementById("shell-gap");
+  const notesEl = document.getElementById("scene-notes");
+
+  const PALETTE = {
+    lobby: { wall: "#252b3b", floor: "#1c212e", trim: "#526080", label: "大厅（输入与决定）" },
+    archive: { wall: "#232c2b", floor: "#192120", trim: "#4b7568", label: "成果库（已采纳）" },
+    product: { wall: "#332920", floor: "#261f18", trim: "#b88746", rug: "#593e25" },
+    engineering: { wall: "#202b38", floor: "#18212b", trim: "#4f8bc9", rug: "#243b54" },
+    quality: { wall: "#22332b", floor: "#192620", trim: "#49a06f", rug: "#234734" },
+    generic: { wall: "#2d2f36", floor: "#23252b", trim: "#8c93a4", rug: "#383c46" }
+  };
+
+  const SCENES = {
+    "single": {
+      title: "场景 1：「工程」单职能直做 —— 大厅 + 工程屋（含出口托盘，无盖章台）+ 成果库",
+      gapOk: true,
+      gapText: "缺口清单（0）",
+      infoChip: "轮次 1/5 · 已用 02:14 · 所在职能：工程 · 开环完成",
+      rooms: [
+        { id: "engineering", name: "工程", style: "engineering", verifier: false, exitTray: true, active: true, flag: { color: "#4cc9f0", text: "清理脚本" }, outsourcedNote: true }
+      ],
+      pipes: [
+        { from: "lobby", to: "engineering", kind: "handoff", label: "用户输入包裹" },
+        { from: "engineering", to: "archive", kind: "handoff", label: "交完成直接入库" }
+      ],
+      archiveBoxes: [
+        { title: "日志清理脚本 v1", openLoop: true, outsourced: false },
+        { title: "构建配置整理 v1", openLoop: true, outsourced: true }
+      ],
+      notes: [
+        { head: "房间与管道", items: ["定义只有 engineering 一个角色，楼层只画一间「工程」屋，不留产品与质检空屋。", "大厅管道按组织里的入口角色直接连向「工程」屋，交完成后从「工程」送入成果库。"] },
+        { head: "出口托盘与虚线章", items: ["交完成的角色屋右侧设出口托盘（木框加虚线印垫），整层没有盖章台。", "结束时小人在出口托盘盖虚线描边的「开环完成」章；外包角色交回时印文写「开环完成 · 外包」。"] },
+        { head: "成果库箱子与房间内部", items: ["成果库箱子正面贴虚线镂空章并一直保留，与实心绿底「放行」章在形状与填充上直接分开。", "推近进「工程」房间时，工作台右侧同样摆出口托盘，不摆检验台。"] }
+      ]
+    },
+    "two-open": {
+      title: "场景 2：「产品 · 工程」两个职能直做（无核验角色）—— 传信管往来 + 工程出口托盘",
+      gapOk: true,
+      gapText: "缺口清单（0）",
+      infoChip: "轮次 1/5 · 已用 04:08 · 所在职能：工程 · 询问往来中",
+      rooms: [
+        { id: "product", name: "产品", style: "product", verifier: false, exitTray: false, active: true, flag: null },
+        { id: "engineering", name: "工程", style: "engineering", verifier: false, exitTray: true, active: true, flag: { color: "#f59e0b", text: "报名小程序" } }
+      ],
+      pipes: [
+        { from: "lobby", to: "engineering", kind: "handoff", label: "输入直达工程" },
+        { from: "engineering", to: "product", kind: "ask", label: "蓝色传信管（询问与回答）" },
+        { from: "engineering", to: "archive", kind: "handoff", label: "开环完成入库" }
+      ],
+      archiveBoxes: [
+        { title: "活动报名小程序 v1", openLoop: true, outsourced: false }
+      ],
+      notes: [
+        { head: "入口与主线", items: ["冻结定义里 sources.user_input 指向 engineering，大厅交接管道越过产品屋直接连进「工程」屋。", "没有核验角色，两间屋都不设盖章台；交完成的「工程」屋设出口托盘。"] },
+        { head: "传信管", items: ["定义里 asks 包含工程与产品的双向询问关系，上方架设蓝色传信管传递信封。", "产品屋在有询问回答时亮灯，空闲时保留房间但灯熄灭。"] }
+      ]
+    },
+    "two-verified": {
+      title: "场景 3：「工程 · 质检」直做加独立核验 —— 交完成送核验、盖章台实心章与红色回流管",
+      gapOk: true,
+      gapText: "缺口清单（0）",
+      infoChip: "轮次 2/5 · 已用 06:35 · 所在职能：质检 · 独立核验放行",
+      rooms: [
+        { id: "engineering", name: "工程", style: "engineering", verifier: false, exitTray: false, active: false, flag: null },
+        { id: "quality", name: "质检", style: "quality", verifier: true, exitTray: false, active: true, flag: { color: "#34d399", text: "个人博客" } }
+      ],
+      pipes: [
+        { from: "lobby", to: "engineering", kind: "handoff", label: "用户输入" },
+        { from: "engineering", to: "quality", kind: "handoff", label: "交完成送核验" },
+        { from: "quality", to: "engineering", kind: "rework", label: "打回走红色回流管" },
+        { from: "quality", to: "archive", kind: "handoff", label: "放行入库" }
+      ],
+      archiveBoxes: [
+        { title: "个人博客 v2", openLoop: false, outsourced: false }
+      ],
+      notes: [
+        { head: "盖章台跟着核验角色", items: ["定义里 verifiers 含 quality，因此「质检」屋设盖章台（检验台），「工程」屋不设出口托盘。", "即使把 quality 改名为 audit（「审计」），只要仍是核验角色，盖章台照样落在那间屋。"] },
+        { head: "实心章与回流管", items: ["核验通过盖实心绿底「放行」章，成果库箱子贴实心绿章，全过程不出现虚线章。", "核验打回时包裹走下方红色回流管退回「工程」屋返工。"] }
+      ]
+    },
+    "generic": {
+      title: "场景 4：通用外观 —— 声明里没有对应外观的角色标识（security「安全审校」）",
+      gapOk: false,
+      gapText: "缺口清单（1）：未声明外观的角色标识 security",
+      infoChip: "轮次 1/5 · 已用 03:50 · 所在职能：安全审校 · 核验中",
+      rooms: [
+        { id: "engineering", name: "工程", style: "engineering", verifier: false, exitTray: false, active: false, flag: null },
+        { id: "security", name: "安全审校", style: "generic", verifier: true, exitTray: false, active: true, flag: { color: "#a78bfa", text: "鉴权模块" }, genericTag: true }
+      ],
+      pipes: [
+        { from: "lobby", to: "engineering", kind: "handoff", label: "用户输入" },
+        { from: "engineering", to: "security", kind: "handoff", label: "交付送审校" },
+        { from: "security", to: "engineering", kind: "rework", label: "打回回流管" },
+        { from: "security", to: "archive", kind: "handoff", label: "放行入库" }
+      ],
+      archiveBoxes: [
+        { title: "鉴权模块 v1", openLoop: false, outsourced: false }
+      ],
+      notes: [
+        { head: "通用外观（声明中的兜底项）", items: ["角色标识 security 在场景声明中没有专属配色与装饰时，取声明里的通用外观：中性米灰墙地、一张标准工位、通用小人配色。", "门牌照写定义给出的显示名「安全审校」；它是核验角色时照样摆盖章台，是交完成角色时照样摆出口托盘。"] },
+        { head: "缺口清单", items: ["壳顶部的缺口清单新增一行写明未声明外观的角色标识（security），单元测试与画面运行照常通过，不崩溃。"] }
+      ]
+    },
+    "union": {
+      title: "场景 5：一层楼同时跑两份不同定义 —— 房间与管道取并集，事项各走冻结定义的屋",
+      gapOk: true,
+      gapText: "缺口清单（0）",
+      infoChip: "同层并集：事项 A「订单重构」（产品 · 工程 · 质检）+ 事项 B「构建脚本」（工程）",
+      rooms: [
+        { id: "product", name: "产品", style: "product", verifier: false, exitTray: false, active: false, flag: null },
+        { id: "engineering", name: "工程", style: "engineering", verifier: false, exitTray: true, active: true, flag: { color: "#4cc9f0", text: "构建脚本(直做)" } },
+        { id: "quality", name: "质检", style: "quality", verifier: true, exitTray: false, active: true, flag: { color: "#f97316", text: "订单重构(三职能)" } }
+      ],
+      pipes: [
+        { from: "lobby", to: "product", kind: "handoff", label: "事项 A 输入" },
+        { from: "lobby", to: "engineering", kind: "handoff", label: "事项 B 直达工程" },
+        { from: "product", to: "engineering", kind: "handoff", label: "PRD 交接" },
+        { from: "engineering", to: "quality", kind: "handoff", label: "事项 A 送检" },
+        { from: "quality", to: "engineering", kind: "rework", label: "事项 A 回流管" },
+        { from: "engineering", to: "archive", kind: "handoff", label: "事项 B 开环入库" },
+        { from: "quality", to: "archive", kind: "handoff", label: "事项 A 放行入库" }
+      ],
+      archiveBoxes: [
+        { title: "订单重构 v1", openLoop: false, outsourced: false },
+        { title: "构建脚本 v1", openLoop: true, outsourced: false }
+      ],
+      notes: [
+        { head: "房间按角色标识取并集", items: ["事项 A 冻结「产品 · 工程 · 质检」，事项 B 冻结「工程」；楼层房间集合取并集（产品、工程、质检三间屋，按首次出现顺序排列）。", "「工程」屋因为事项 B 以它为交完成角色而摆出出口托盘；「质检」屋因为事项 A 以它为核验角色而摆出盖章台。"] },
+        { head: "各走各的屋", items: ["橙色事项 A 走 大厅 → 产品 → 工程 → 质检（盖实心放行章）→ 成果库。", "青色事项 B 从大厅直接进「工程」屋，在出口托盘盖虚线「开环完成」章后送入成果库，全程不进产品与质检屋。"] }
+      ]
+    }
+  };
+
+  function drawDashedRect(x, y, w, h, color, fill) {
+    if (fill) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+  }
+
+  function drawSolidStamp(x, y, text) {
+    ctx.font = "bold 11px 'Microsoft YaHei UI', sans-serif";
+    const tw = ctx.measureText(text).width;
+    const w = Math.max(44, tw + 14);
+    const h = 20;
+    ctx.fillStyle = "#1f7a4c";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#3ad486";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, x + (w - tw) / 2, y + 14);
+    return w;
+  }
+
+  function drawOpenLoopStamp(x, y, text) {
+    ctx.font = "bold 11px 'Microsoft YaHei UI', sans-serif";
+    const tw = ctx.measureText(text).width;
+    const w = Math.max(64, tw + 14);
+    const h = 20;
+    drawDashedRect(x, y, w, h, "#e0a63b", "rgba(224, 166, 59, 0.12)");
+    ctx.fillStyle = "#f7cf7c";
+    ctx.fillText(text, x + (w - tw) / 2, y + 14);
+    return w;
+  }
+
+  function drawDeskAndWorker(x, y, active, isGeneric) {
+    ctx.fillStyle = isGeneric ? "#5c6270" : "#6e5036";
+    ctx.fillRect(x, y + 22, 54, 16);
+    ctx.fillStyle = "#222834";
+    ctx.fillRect(x + 16, y + 8, 22, 14);
+    ctx.fillStyle = active ? "#6ee7b7" : "#3a4252";
+    ctx.fillRect(x + 18, y + 10, 18, 10);
+    // 像素小人头与肩
+    ctx.fillStyle = "#f1c27d";
+    ctx.fillRect(x + 22, y - 8, 10, 10);
+    ctx.fillStyle = isGeneric ? "#7d8597" : "#4a7cc7";
+    ctx.fillRect(x + 19, y + 2, 16, 10);
+  }
+
+  function drawStampBench(x, y) {
+    // 核验角色的盖章台（检验台）
+    ctx.fillStyle = "#d9e2ec";
+    ctx.fillRect(x, y + 18, 66, 20);
+    ctx.strokeStyle = "#49a06f";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y + 18, 66, 20);
+    ctx.fillStyle = "#192620";
+    ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+    ctx.fillText("盖章台", x + 16, y + 32);
+    drawSolidStamp(x + 10, y - 6, "放行");
+  }
+
+  function drawExitTray(x, y, showOutsourcedSample) {
+    // 交完成角色的出口托盘
+    ctx.fillStyle = "#3a3022";
+    ctx.fillRect(x, y + 18, 78, 20);
+    drawDashedRect(x, y + 18, 78, 20, "#d49b38", null);
+    ctx.fillStyle = "#f0c879";
+    ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+    ctx.fillText("出口托盘", x + 16, y + 32);
+    drawOpenLoopStamp(x + 4, y - 6, "开环完成");
+    if (showOutsourcedSample) {
+      drawOpenLoopStamp(x - 16, y - 30, "开环完成 · 外包");
+    }
+  }
+
+  function render(sceneKey) {
+    const sc = SCENES[sceneKey];
+    titleEl.textContent = sc.title;
+    gapEl.textContent = sc.gapText;
+    gapEl.className = sc.gapOk ? "gap-ok" : "gap-pill";
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 顶部楼层信息条
+    ctx.fillStyle = "#181e2c";
+    ctx.fillRect(16, 14, 1088, 32);
+    ctx.strokeStyle = "#2e3852";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(16, 14, 1088, 32);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "12px 'Microsoft YaHei UI', sans-serif";
+    ctx.fillText("楼层状态条  |  " + sc.infoChip, 28, 34);
+
+    // 计算布局：左大厅 + 中间 N 间职能屋 + 右成果库
+    const lobbyBox = { id: "lobby", x: 24, y: 96, w: 148, h: 240 };
+    const archiveBox = { id: "archive", x: 924, y: 96, w: 172, h: 240 };
+    const midStart = 204;
+    const midEnd = 892;
+    const count = sc.rooms.length;
+    const gap = 26;
+    const roomW = Math.min(260, Math.floor((midEnd - midStart - gap * (count - 1)) / count));
+    const totalRoomsW = roomW * count + gap * (count - 1);
+    const offsetX = midStart + Math.floor((midEnd - midStart - totalRoomsW) / 2);
+
+    const centers = {};
+
+    // 画大厅
+    ctx.fillStyle = PALETTE.lobby.wall;
+    ctx.fillRect(lobbyBox.x, lobbyBox.y, lobbyBox.w, lobbyBox.h);
+    ctx.fillStyle = PALETTE.lobby.floor;
+    ctx.fillRect(lobbyBox.x + 6, lobbyBox.y + 42, lobbyBox.w - 12, lobbyBox.h - 48);
+    ctx.strokeStyle = PALETTE.lobby.trim;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(lobbyBox.x, lobbyBox.y, lobbyBox.w, lobbyBox.h);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "bold 13px 'Microsoft YaHei UI', sans-serif";
+    ctx.fillText("大厅", lobbyBox.x + 14, lobbyBox.y + 24);
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+    ctx.fillText("收件台 · 决定板", lobbyBox.x + 14, lobbyBox.y + 64);
+    // 收件包裹示意
+    ctx.fillStyle = "#d97706";
+    ctx.fillRect(lobbyBox.x + 22, lobbyBox.y + 92, 34, 24);
+    ctx.strokeStyle = "#fbbf24";
+    ctx.strokeRect(lobbyBox.x + 22, lobbyBox.y + 92, 34, 24);
+    ctx.fillStyle = "#fffbeb";
+    ctx.fillText("输入", lobbyBox.x + 28, lobbyBox.y + 108);
+    centers["lobby"] = { x: lobbyBox.x + lobbyBox.w / 2, y: lobbyBox.y + lobbyBox.h / 2, right: lobbyBox.x + lobbyBox.w, left: lobbyBox.x };
+
+    // 画中间各职能屋
+    sc.rooms.forEach((rm, idx) => {
+      const rx = offsetX + idx * (roomW + gap);
+      const ry = 96;
+      const rh = 240;
+      const pal = PALETTE[rm.style] || PALETTE.generic;
+
+      ctx.fillStyle = pal.wall;
+      ctx.fillRect(rx, ry, roomW, rh);
+      ctx.fillStyle = pal.floor;
+      ctx.fillRect(rx + 6, ry + 42, roomW - 12, rh - 48);
+      ctx.fillStyle = pal.rug;
+      ctx.fillRect(rx + 16, ry + 168, roomW - 32, 48);
+
+      ctx.strokeStyle = rm.active ? pal.trim : "#3b4254";
+      ctx.lineWidth = rm.active ? 3 : 2;
+      ctx.strokeRect(rx, ry, roomW, rh);
+
+      // 门牌与状态灯
+      ctx.fillStyle = rm.active ? "#4ade80" : "#64748b";
+      ctx.fillRect(rx + 12, ry + 13, 10, 10);
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "bold 14px 'Microsoft YaHei UI', sans-serif";
+      ctx.fillText(rm.name, rx + 28, ry + 23);
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+      ctx.fillText("id: " + rm.id, rx + 28, ry + 38);
+
+      if (rm.genericTag) {
+        drawDashedRect(rx + roomW - 78, ry + 10, 68, 20, "#94a3b8", "rgba(148,163,184,0.14)");
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+        ctx.fillText("通用外观", rx + roomW - 66, ry + 24);
+      }
+
+      // 门口事项小旗
+      if (rm.flag) {
+        ctx.fillStyle = rm.flag.color;
+        ctx.fillRect(rx + 14, ry + 52, 8, 22);
+        ctx.fillRect(rx + 22, ry + 52, 92, 16);
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "bold 11px 'Microsoft YaHei UI', sans-serif";
+        ctx.fillText(rm.flag.text, rx + 26, ry + 64);
+      }
+
+      // 标准工位与小人
+      drawDeskAndWorker(rx + 22, ry + 126, rm.active, rm.style === "generic");
+
+      // 核验角色的盖章台 / 交完成角色的出口托盘
+      if (rm.verifier) {
+        drawStampBench(rx + roomW - 86, ry + 130);
+      }
+      if (rm.exitTray) {
+        drawExitTray(rx + roomW - 96, ry + 130, Boolean(rm.outsourcedNote));
+      }
+
+      centers[rm.id] = { x: rx + roomW / 2, y: ry + rh / 2, left: rx, right: rx + roomW, top: ry, bottom: ry + rh };
+    });
+
+    // 画成果库
+    ctx.fillStyle = PALETTE.archive.wall;
+    ctx.fillRect(archiveBox.x, archiveBox.y, archiveBox.w, archiveBox.h);
+    ctx.fillStyle = PALETTE.archive.floor;
+    ctx.fillRect(archiveBox.x + 6, archiveBox.y + 42, archiveBox.w - 12, archiveBox.h - 48);
+    ctx.strokeStyle = PALETTE.archive.trim;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(archiveBox.x, archiveBox.y, archiveBox.w, archiveBox.h);
+    ctx.fillStyle = "#e2e8f0";
+    ctx.font = "bold 13px 'Microsoft YaHei UI', sans-serif";
+    ctx.fillText("成果库", archiveBox.x + 14, archiveBox.y + 24);
+
+    sc.archiveBoxes.forEach((box, i) => {
+      const bx = archiveBox.x + 14;
+      const by = archiveBox.y + 58 + i * 82;
+      ctx.fillStyle = "#3b2f20";
+      ctx.fillRect(bx, by, archiveBox.w - 28, 66);
+      ctx.strokeStyle = "#8a6d46";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx, by, archiveBox.w - 28, 66);
+      ctx.fillStyle = "#f1f5f9";
+      ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+      ctx.fillText(box.title, bx + 8, by + 18);
+      if (box.openLoop) {
+        drawOpenLoopStamp(bx + 8, by + 32, box.outsourced ? "开环完成 · 外包" : "开环完成");
+      } else {
+        drawSolidStamp(bx + 8, by + 32, "放行");
+      }
+    });
+    centers["archive"] = { x: archiveBox.x + archiveBox.w / 2, y: archiveBox.y + archiveBox.h / 2, left: archiveBox.x, right: archiveBox.x + archiveBox.w };
+
+    // 画顶部传信管、交接管道与底部回流管
+    let topLane = 0;
+    let bottomLane = 0;
+    sc.pipes.forEach((p) => {
+      const a = centers[p.from];
+      const b = centers[p.to];
+      if (!a || !b) return;
+
+      ctx.save();
+      if (p.kind === "ask") {
+        const y = 66;
+        ctx.strokeStyle = "#4a90d9";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(a.x, 96);
+        ctx.lineTo(a.x, y);
+        ctx.lineTo(b.x, y);
+        ctx.lineTo(b.x, 96);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#93c5fd";
+        ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+        ctx.fillText(p.label, Math.min(a.x, b.x) + 14, y - 5);
+      } else if (p.kind === "rework") {
+        const y = 368 + bottomLane * 22;
+        bottomLane += 1;
+        ctx.strokeStyle = "#d9534f";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(a.x, 336);
+        ctx.lineTo(a.x, y);
+        ctx.lineTo(b.x, y);
+        ctx.lineTo(b.x, 336);
+        ctx.stroke();
+        // 箭头指向被打回方
+        ctx.fillStyle = "#d9534f";
+        ctx.beginPath();
+        ctx.moveTo(b.x, 338);
+        ctx.lineTo(b.x - 5, 347);
+        ctx.lineTo(b.x + 5, 347);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#fca5a5";
+        ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+        ctx.fillText(p.label, Math.min(a.x, b.x) + 14, y + 14);
+      } else {
+        // 交接管道：相邻屋走屋间短管，跨屋走上方或下方走廊管线
+        const adjacent = Math.abs(b.left - a.right) < 42;
+        if (adjacent) {
+          const y = 212;
+          ctx.strokeStyle = "#8fa3bf";
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(a.right, y);
+          ctx.lineTo(b.left, y);
+          ctx.stroke();
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "10px 'Microsoft YaHei UI', sans-serif";
+          ctx.fillText(p.label, a.right + 2, y - 8);
+        } else {
+          const y = 356 + topLane * 20;
+          topLane += 1;
+          ctx.strokeStyle = "#64748b";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(a.x + 18, 336);
+          ctx.lineTo(a.x + 18, y);
+          ctx.lineTo(b.x - 18, y);
+          ctx.lineTo(b.x - 18, 336);
+          ctx.stroke();
+          ctx.fillStyle = "#cbd5e1";
+          ctx.font = "11px 'Microsoft YaHei UI', sans-serif";
+          ctx.fillText(p.label, Math.min(a.x, b.x) + 26, y - 4);
+        }
+      }
+      ctx.restore();
+    });
+
+    // 底部规则说明卡片
+    notesEl.innerHTML = sc.notes.map((n) => (
+      '<div class="rule-box"><h3>' + n.head + '</h3><ul>' +
+      n.items.map((it) => '<li>' + it + '</li>').join("") +
+      '</ul></div>'
+    )).join("");
+  }
+
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.setAttribute("aria-selected", "false"));
+      btn.setAttribute("aria-selected", "true");
+      render(btn.dataset.scene);
+    });
+  });
+
+  render("single");
+})();
+</script>
+</body>
+</html>
