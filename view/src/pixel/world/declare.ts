@@ -108,7 +108,12 @@ function endpoint(world: World, id: string): Endpoint | null {
 function routeLink(world: World, d: LinkDef, a: Endpoint, b: Endpoint): [number, number][] {
   const isMachine = d.to === "machine_room";
   if (d.kind === "handoff" && !isMachine) {
-    return [[a.pipeOut, GEO.PIPE_Y], [b.inPort, GEO.PIPE_Y]];
+    if (adjacent(world, d.from, d.to)) {
+      return [[a.pipeOut, GEO.PIPE_Y], [b.inPort, GEO.PIPE_Y]];
+    }
+    // 跨过中间房间的关注交接管道走走廊地板下管沟，避免横穿中间房间的室内区域
+    const trenchY = GEO.UNDER_Y - 6;
+    return [[a.outPort, GEO.ROOM_B + 4], [a.outPort, trenchY], [b.inPort, trenchY], [b.inPort, GEO.ROOM_B + 4]];
   }
   if (d.kind === "handoff" && isMachine) {
     return [[a.outPort, GEO.PIPE_Y], [a.outPort, GEO.ROOM_B + 10], [b.x + 14, GEO.ROOM_B + 10], [b.x + 14, b.y + 12]];
@@ -134,7 +139,8 @@ export function declareLinks(world: World, defs: LinkDef[]): World {
   world.links = {};
   for (const d of defs) {
     const isTube = d.kind === "tube";
-    const key = d.from + (isTube ? "~" : ">") + d.to;
+    const sep = isTube ? "~" : (d.kind === "return" && world.links[`${d.from}>${d.to}`] ? "<" : ">");
+    const key = d.from + sep + d.to;
     let pts = d.pts;
     if (!pts) {
       const a = endpoint(world, d.from);
@@ -161,8 +167,13 @@ export function roomOf(world: World, id: string): Room | null {
 
 /** 两个房间之间已声明的管道（反向也可以，返回 reversed 标记）。 */
 export function linkBetween(world: World, from: string, to: string, kind?: string): LinkHop | null {
+  if (kind === "return") {
+    const ret = world.links[`${from}<${to}`] ?? world.links[`${from}>${to}`];
+    if (ret && ret.linkKind === "return") return { pts: ret.pts, key: ret.id, reversed: false, link: ret };
+    return null;
+  }
   const sep = kind === "tube" ? "~" : ">";
-  const direct = world.links[from + sep + to];
+  const direct = world.links[from + sep + to] ?? (kind !== "tube" ? world.links[`${from}<${to}`] : undefined);
   if (direct) return { pts: direct.pts, key: direct.id, reversed: false, link: direct };
   const back = world.links[to + sep + from];
   if (back) return { pts: back.pts.slice().reverse(), key: back.id, reversed: true, link: back };

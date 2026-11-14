@@ -11,17 +11,25 @@
 
 import type { Clock } from "../clock.ts";
 import { createPixelSurface } from "../surface.ts";
-import { buildCatalog } from "./../world/floor-decl.ts";
+import { buildCatalog, defaultBuildingRooms } from "./../world/floor-decl.ts";
 import { createScene } from "../world/scene.ts";
 import {
   BUILDING_GEO, buildingWalkerState, createBuildingDriver, emptyBuildingModel,
   type BuildingDriver, type BuildingModel,
 } from "../world/building.ts";
 import { BuildingRenderer } from "./render.ts";
-import type { PixelAction } from "../contract.ts";
+import type { BuildingRoomLight, PixelAction } from "../contract.ts";
 import type { SceneLike } from "../world/types.ts";
 
 export type { BuildingFloor, BuildingModel } from "../world/building.ts";
+
+function normalizeLit(lit: Readonly<Record<string, boolean | undefined>>): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(lit)) {
+    if (v !== undefined) out[k] = Boolean(v);
+  }
+  return out;
+}
 
 /**
  * 楼承载事实的视觉通道（画面与播放 docs/design/visualization.md「视觉通道表」的楼那一行）：每层的状态灯、亮灯的房间、小旗，
@@ -34,6 +42,7 @@ export interface BuildingChannels {
     project_id: string;
     name: string;
     status: string;
+    rooms: BuildingRoomLight[];
     lit: Record<string, boolean>;
     valve_closed: boolean;
     decisions: number;
@@ -50,7 +59,8 @@ function buildingChannels(driver: BuildingDriver): BuildingChannels {
       project_id: f.project_id,
       name: f.name,
       status: f.status,
-      lit: { ...f.lit },
+      rooms: (f.rooms ?? defaultBuildingRooms(f.lit, f.has_ops)).map((r) => ({ id: r.id, label: r.label, lit: r.lit })),
+      lit: normalizeLit(f.lit),
       valve_closed: f.valve_closed,
       decisions: f.decisions,
       flags: f.flags.map((fl) => ({ work_item_id: fl.work_item_id, department: fl.department, color_index: fl.color_index })),
@@ -204,7 +214,7 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
 
 /** 端到端测试的入口：按需要给出每层、每层小人与播放时间线的当前状态（含类型，测试不猜形状）。 */
 export interface BuildingTestHooks {
-  floors: () => { project_id: string; name: string; status: string; lit: Record<string, boolean>; valve_closed: boolean; decisions: number; flags: { work_item_id: string; department: string; color_index: number }[] }[];
+  floors: () => { project_id: string; name: string; status: string; rooms: BuildingRoomLight[]; lit: Record<string, boolean>; valve_closed: boolean; decisions: number; flags: { work_item_id: string; department: string; color_index: number }[] }[];
   walkers: () => { id: string; x: number; y: number; anim: string }[];
   /** 时间线此刻的读数：画面上状态的位置、还排着几份状态、在演的动作（「直接显示最新状态」的核对）。 */
   timeline: () => { shown: number | null; pending: number; lag: number; queued: number; playing: string[] };
@@ -214,8 +224,14 @@ export interface BuildingTestHooks {
 export function buildingTestHooks(view: BuildingView): BuildingTestHooks {
   return {
     floors: () => view.inspect().driver.model.floors.map((f) => ({
-      project_id: f.project_id, name: f.name, status: f.status, lit: { ...f.lit },
-      valve_closed: f.valve_closed, decisions: f.decisions, flags: f.flags.map((fl) => ({ ...fl })),
+      project_id: f.project_id,
+      name: f.name,
+      status: f.status,
+      rooms: (f.rooms ?? defaultBuildingRooms(f.lit, f.has_ops)).map((r) => ({ id: r.id, label: r.label, lit: r.lit })),
+      lit: normalizeLit(f.lit),
+      valve_closed: f.valve_closed,
+      decisions: f.decisions,
+      flags: f.flags.map((fl) => ({ ...fl })),
     })),
     walkers: () => {
       const { driver, scene } = view.inspect();

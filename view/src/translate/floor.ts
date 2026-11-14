@@ -14,11 +14,12 @@
 
 import type {
   AcceptanceCoverageResult, AskView, DecisionView, EventObject, LoopActivation, LoopLayer, ProjectLoopResult,
-  RunLoopsResult, WorkItemLoop,
+  RunLoopsResult, WorkItemLoop, WorkItemOrganization,
 } from "../api/generated/types.gen.ts";
 import type {
   Artifact, BusyState, CoverageLegendRow, CoverageOverlayCriterion, CoverageOverlayData, CoverageResult,
-  DecisionFace, FactElement, FloorModel, ItemState, LoopItem, LoopsOverlayData, MachineView,
+  DecisionFace, FactElement, FloorModel, FloorTopology, FloorTopologyAsk, FloorTopologyHandoff,
+  FloorTopologyRejection, FloorTopologyRoom, ItemState, LoopItem, LoopsOverlayData, MachineView,
   OpenRequest, OpsView, PixelAction, RoleInfo, Source, SourceOverlayData, SourceRef, WaitingProvider,
 } from "../pixel/contract.ts";
 import { COVERAGE_RESULTS, floorState as checkFloorState, SOURCES } from "../pixel/contract.ts";
@@ -213,15 +214,156 @@ function rolesOf(input: FloorStateInput): Record<string, RoleInfo[]> | null {
   return Object.keys(out).length ? out : null;
 }
 
+const FALLBACK_REF = { position: 0, source: "rule" as const };
+
+/**
+ * 旧夹具或单元测试手工行未带 organization 时的集中兜底默认组织（工单 #1383）：
+ * 仅在翻译层这一处保留默认三职能关系，画面层代码零出现职能名。
+ */
+export const DEFAULT_ORGANIZATION: WorkItemOrganization = {
+  form: "three_departments",
+  routing: "watched_outputs",
+  roles: [
+    { id: "product", label: "产品", ref: FALLBACK_REF },
+    { id: "engineering", label: "工程", ref: FALLBACK_REF },
+    { id: "quality", label: "质检", ref: FALLBACK_REF },
+  ],
+  entry: { id: "product", label: "产品", ref: FALLBACK_REF },
+  verifiers: [{ role: "quality", verifies: [{ role: "engineering", outcomes: ["delivery_spec"] }], ref: FALLBACK_REF }],
+  completing: null,
+  watched: [
+    { source: "product", recipient: "engineering", outcome: "product_spec", ref: FALLBACK_REF },
+    { source: "product", recipient: "quality", outcome: "product_spec", ref: FALLBACK_REF },
+    { source: "engineering", recipient: "quality", outcome: "delivery_spec", ref: FALLBACK_REF },
+  ],
+  asks: [
+    { requester: "product", recipient: "engineering", ref: FALLBACK_REF },
+    { requester: "product", recipient: "quality", ref: FALLBACK_REF },
+    { requester: "engineering", recipient: "quality", ref: FALLBACK_REF },
+    { requester: "engineering", recipient: "product", ref: FALLBACK_REF },
+    { requester: "quality", recipient: "product", ref: FALLBACK_REF },
+    { requester: "quality", recipient: "engineering", ref: FALLBACK_REF },
+  ],
+  rejections: [{ verifier: "quality", role: "engineering", outcome: "delivery_spec", ref: FALLBACK_REF }],
+};
+
+/** 推出一个组织的入口角色标识：有 entry 字段时直接取，早期录制快照无 entry 时取未作为关注接收方的首个角色。 */
+function inferEntryIds(org: WorkItemOrganization): string[] {
+  if (org.entry?.id) return [org.entry.id];
+  if (org.roles.length === 0) return [];
+  const recipients = new Set(org.watched.map((w) => w.recipient));
+  const roots = org.roles.filter((r) => !recipients.has(r.id)).map((r) => r.id);
+  return [roots[0] ?? org.roles[0].id];
+}
+
+/**
+ * 从楼层事项冻结定义的组织推出这一层的拓扑（工单 #1383，docs/design/visualization.md「画面跟着定义伸缩」）：
+ * 房间是各事项定义里角色的并集；任一定义里是核验角色的带盖章台，任一定义里是交完成角色的带出口托盘；
+ * 交接管道、传信管与回流管是各定义里对应关系的并集；运维屋只在定义包含运维或传入 ops 状态时出现。
+ */
+export function deriveFloorTopology(
+  workItems: readonly WorkItemLoop[],
+  ops: OpsView | null | undefined = null,
+): FloorTopology {
+  const orgs = workItems.map((row) => row.organization ?? DEFAULT_ORGANIZATION);
+  const roomsMap = new Map<string, FloorTopologyRoom>();
+  for (const org of orgs) {
+    const verifiers = new Set(org.verifiers.map((v) => v.role));
+    const completingId = org.completing?.id ?? null;
+    for (const role of org.roles) {
+      const existing = roomsMap.get(role.id);
+      if (existing) {
+        existing.verifier = existing.verifier || verifiers.has(role.id);
+        existing.exit_tray = existing.exit_tray || completingId === role.id;
+      } else {
+        roomsMap.set(role.id, {
+          id: role.id,
+          label: role.label,
+          verifier: verifiers.has(role.id),
+          exit_tray: completingId === role.id,
+        });
+      }
+    }
+  }
+  if (ops && !roomsMap.has("operations")) {
+    roomsMap.set("operations", { id: "operations", label: "运维", verifier: false, exit_tray: false });
+  }
+
+  const handoffMap = new Map<string, FloorTopologyHandoff>();
+  const addHandoff = (from: string, to: string, extra: Omit<FloorTopologyHandoff, "from" | "to"> = {}): void => {
+    const key = `${from}>${to}`;
+    if (!handoffMap.has(key)) handoffMap.set(key, { from, to, ...extra });
+  };
+
+  for (const org of orgs) {
+    for (const entryId of inferEntryIds(org)) {
+      addHandoff("hall", entryId);
+    }
+    for (const w of org.watched) {
+      if (w.source && w.recipient && w.source !== w.recipient) {
+        addHandoff(w.source, w.recipient, { valve: true });
+      }
+    }
+    for (const v of org.verifiers) {
+      if (v.role) addHandoff(v.role, "library", { valve: true });
+    }
+    if (org.completing?.id) {
+      addHandoff(org.completing.id, "library", { valve: true });
+    }
+  }
+  if (roomsMap.has("operations")) {
+    addHandoff("library", "operations", { optional: true });
+    addHandoff("operations", "machine_room", { optional: true });
+  }
+
+  const roomOrder = Array.from(roomsMap.keys());
+  const orderOf = (id: string): number => {
+    const idx = roomOrder.indexOf(id);
+    return idx >= 0 ? idx : Number.MAX_SAFE_INTEGER;
+  };
+
+  const askMap = new Map<string, FloorTopologyAsk>();
+  for (const org of orgs) {
+    for (const ask of org.asks) {
+      if (!ask.requester || !ask.recipient || ask.requester === ask.recipient) continue;
+      const [from, to] = orderOf(ask.requester) <= orderOf(ask.recipient)
+        ? [ask.requester, ask.recipient]
+        : [ask.recipient, ask.requester];
+      const key = `${from}~${to}`;
+      if (!askMap.has(key)) askMap.set(key, { from, to });
+    }
+  }
+
+  const rejectionMap = new Map<string, FloorTopologyRejection>();
+  for (const org of orgs) {
+    for (const rej of org.rejections) {
+      if (!rej.verifier || !rej.role || rej.verifier === rej.role) continue;
+      const key = `${rej.verifier}>${rej.role}`;
+      if (!rejectionMap.has(key)) rejectionMap.set(key, { from: rej.verifier, to: rej.role });
+    }
+  }
+  if (roomsMap.has("operations")) {
+    rejectionMap.set("operations>hall", { from: "operations", to: "hall", via: "under", optional: true });
+  }
+
+  return {
+    rooms: Array.from(roomsMap.values()),
+    handoffs: Array.from(handoffMap.values()),
+    asks: Array.from(askMap.values()),
+    rejections: Array.from(rejectionMap.values()),
+  };
+}
+
 /**
  * 查询结果 → 画面合同的楼层状态。服务端的说法只在这里换成画面的说法（状态经 tables.ts 的对应表）。
  * 翻完按画面合同校验：取值不在合同里时抛错，错误写明是哪一项。
  */
 export function floorState(input: FloorStateInput): FloorModel {
   const loop = input.loop;
+  const workItems = loop?.work_items ?? [];
   const model: FloorModel = {
     position: input.position,
-    items: (loop?.work_items ?? []).map(itemOf),
+    items: workItems.map(itemOf),
     open_requests: openRequestsOf(loop, input.asks),
     shelves: { adopted: (loop?.adoptions ?? []).map((a) => a.work_item_id) },
     slots: input.slots ?? null,
@@ -231,6 +373,7 @@ export function floorState(input: FloorStateInput): FloorModel {
     interrupted: Boolean(input.interrupted),
     roles: rolesOf(input),
     decisions: [],
+    topology: deriveFloorTopology(workItems, input.ops),
     ...(input.focus ? { focus_id: input.focus } : {}),
     ...(input.coverage !== undefined ? { coverage: coverageOverlay(input.coverage) } : {}),
   };
@@ -295,9 +438,10 @@ export interface FloorEvent {
   payload?: Record<string, unknown> | null;
 }
 
-/** 翻动作时的上下文：角色名称（「把任务交给主程」这类话要用）。 */
+/** 翻动作时的上下文：角色名称与当前事项冻结定义的组织（工单 #1383）。 */
 export interface ActionContext {
   roleName?: (role: string | null) => string | null;
+  organization?: WorkItemOrganization | null;
 }
 
 type Payload = Record<string, unknown>;
@@ -306,28 +450,74 @@ const pl = (ev: FloorEvent): Payload => ev.payload ?? {};
 const text = (value: unknown): string => (value === undefined || value === null ? "" : String(value));
 const num = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null);
 
+function orgOf(ctx?: ActionContext): WorkItemOrganization {
+  return ctx?.organization ?? DEFAULT_ORGANIZATION;
+}
+
+function deptLabelOf(org: WorkItemOrganization): (department: string) => string | null {
+  return (department: string): string | null => org.roles.find((r) => r.id === department)?.label ?? null;
+}
+
+function isVerifierInOrg(org: WorkItemOrganization, department: string | null | undefined): boolean {
+  return Boolean(department && org.verifiers.some((v) => v.role === department));
+}
+
+function specTargetPair(ev: FloorEvent, org: WorkItemOrganization): { from: string; to: string } {
+  const from = ev.department || inferEntryIds(org)[0] || "product";
+  const to = org.watched.find((w) => w.source === from && w.outcome === "product_spec")?.recipient
+    ?? org.watched.find((w) => w.source === from)?.recipient
+    ?? org.roles[1]?.id
+    ?? "engineering";
+  return { from, to };
+}
+
+function deliveryTargetPair(ev: FloorEvent, org: WorkItemOrganization): { from: string; to: string } {
+  const from = ev.department
+    || org.watched.find((w) => w.outcome === "delivery_spec")?.source
+    || org.roles[1]?.id
+    || "engineering";
+  const to = org.watched.find((w) => w.source === from && w.outcome === "delivery_spec")?.recipient
+    ?? org.verifiers[0]?.role
+    ?? (org.completing?.id === from ? "library" : "quality");
+  return { from, to };
+}
+
+function qaReworkPair(ev: FloorEvent, org: WorkItemOrganization): { from: string; to: string } {
+  const from = ev.department || org.verifiers[0]?.role || "quality";
+  const to = text(pl(ev).target_department || pl(ev).to)
+    || org.rejections.find((r) => r.verifier === from)?.role
+    || org.rejections[0]?.role
+    || "engineering";
+  return { from, to };
+}
+
 /** 一条事件在画面上的位置（动作的回链）；事件没有位置时抛错，不猜一个。 */
 function posOf(ev: FloorEvent): number {
   if (!Number.isFinite(ev.position)) throw new Error("翻译层收到的" + ev.type + "事件没有位置");
   return ev.position;
 }
 
-/** 一个部门里的一个角色做的事。 */
+/** 一个职能屋里的一个角色做的事。 */
 function one(kind: string, ev: FloorEvent, ctx: ActionContext, extra?: Record<string, unknown> | null): PixelAction {
+  const org = orgOf(ctx);
   return {
     kind,
     position: posOf(ev),
     item: ev.work_item_id ?? null,
     room: ev.department ?? null,
     role: ev.role ?? null,
-    say: say(ev, { roleName: ctx.roleName }),
+    say: say(ev, {
+      roleName: ctx.roleName,
+      deptLabel: deptLabelOf(org),
+      isVerifier: (dept) => isVerifierInOrg(org, dept),
+    }),
     ...(extra ?? {}),
   };
 }
 
-/** 一份成果从一个部门送到另一个部门：包裹沿管道走，两端的经理各说一句话。 */
-function handoff(ev: FloorEvent, from: string, to: string, artifact: Artifact): PixelAction {
-  const spoken = sayHandoff(artifact, from, to);
+/** 一份成果从一个职能送到另一个职能：包裹沿管道走，两端各说一句话。 */
+function handoff(ev: FloorEvent, from: string, to: string, artifact: Artifact, ctx?: ActionContext): PixelAction {
+  const spoken = sayHandoff(artifact, from, to, deptLabelOf(orgOf(ctx)));
   return {
     kind: "handoff",
     position: posOf(ev),
@@ -346,7 +536,7 @@ function at(kind: string, ev: FloorEvent, extra?: Record<string, unknown> | null
 }
 
 /** 楼层上按工具名称落在哪件事上（原型 v13 translate.js 的 floorTool）。 */
-export function floorTool(ev: FloorEvent): string {
+export function floorTool(ev: FloorEvent, ctx?: ActionContext): string {
   const tool = text(ev.tool ?? pl(ev).tool);
   if (tool === "search") return "search";
   if (tool === "run_command" || tool === "bash") return "command";
@@ -354,7 +544,7 @@ export function floorTool(ev: FloorEvent): string {
   if (/write|edit/.test(tool)) return "write";
   if (/fetch|http|net|url/.test(tool)) return "fetch";
   if (/mcp/.test(tool)) return "tool";
-  if (/browser|computer/.test(tool)) return ev.department === "quality" ? "browse" : "self_test";
+  if (/browser|computer/.test(tool)) return isVerifierInOrg(orgOf(ctx), ev.department) ? "browse" : "self_test";
   if (/scan|legacy|repo/.test(tool)) return "scan";
   return "read";
 }
@@ -386,31 +576,52 @@ const FLOOR: Readonly<Record<string, Rule>> = {
   model_attempt_finished: (ev, ctx) => [one("idea", ev, ctx)],
   model_attempt_failed: (ev, ctx) => [one("request_failed", ev, ctx)],
   model_retry_scheduled: (ev, ctx) => [one("retry", ev, ctx, { count: countOf(ev) })],
-  tool_started: (ev, ctx) => [one(floorTool(ev), ev, ctx)],
+  tool_started: (ev, ctx) => [one(floorTool(ev, ctx), ev, ctx)],
   tool_skipped: (ev, ctx) => [one("tool_denied", ev, ctx)],
   proposal_submitted: (ev, ctx) => [one("submit", ev, ctx)],
   proposal_rejected: (ev, ctx) => [one("rejected", ev, ctx)],
-  // PRD 被接纳：产品盖上有效章，包裹从产品送往工程（一条事件翻出两个动作）
-  spec_accepted: (ev, ctx) => [one("stamp_valid", ev, ctx), handoff(ev, "product", "engineering", "prd")],
-  contract_accepted: (ev, ctx) => [one("stamp_valid", ev, ctx), handoff(ev, "product", "engineering", "prd")],
-  product_decision_accepted: (ev, ctx) => [one("stamp_valid", ev, ctx), handoff(ev, "product", "engineering", "prd")],
-  delivery_accepted: (ev, ctx) => [one("seal", ev, ctx), handoff(ev, "engineering", "quality", "box")],
-  structure_accepted: (ev) => [handoff(ev, "engineering", "quality", "box")],
-  // 放行：放行单送往成果库，载荷写明 release_to 时送往那个部门；缺陷记录经回流管道送回工程
-  qa_submitted: (ev, ctx) => (pl(ev).verdict === "release"
-    ? [one("stamp_release", ev, ctx), handoff(ev, "quality", text(pl(ev).release_to) || "library", "release")]
-    : [one("stamp_defect", ev, ctx), handoff(ev, "quality", "engineering", "defect")]),
+  // 规格或决定被接纳：所在职能盖上有效章，包裹送往关注该成果的下游职能
+  spec_accepted: (ev, ctx) => {
+    const pair = specTargetPair(ev, orgOf(ctx));
+    return [one("stamp_valid", ev, ctx), handoff(ev, pair.from, pair.to, "prd", ctx)];
+  },
+  contract_accepted: (ev, ctx) => {
+    const pair = specTargetPair(ev, orgOf(ctx));
+    return [one("stamp_valid", ev, ctx), handoff(ev, pair.from, pair.to, "prd", ctx)];
+  },
+  product_decision_accepted: (ev, ctx) => {
+    const pair = specTargetPair(ev, orgOf(ctx));
+    return [one("stamp_valid", ev, ctx), handoff(ev, pair.from, pair.to, "prd", ctx)];
+  },
+  delivery_accepted: (ev, ctx) => {
+    const pair = deliveryTargetPair(ev, orgOf(ctx));
+    return [one("seal", ev, ctx), handoff(ev, pair.from, pair.to, "box", ctx)];
+  },
+  structure_accepted: (ev, ctx) => {
+    const pair = deliveryTargetPair(ev, orgOf(ctx));
+    return [handoff(ev, pair.from, pair.to, "box", ctx)];
+  },
+  // 放行：放行单送往成果库，载荷写明 release_to 时送往那个职能；缺陷记录经回流管道送回打回目标职能
+  qa_submitted: (ev, ctx) => {
+    const org = orgOf(ctx);
+    if (pl(ev).verdict === "release") {
+      const from = ev.department || org.verifiers[0]?.role || "quality";
+      return [one("stamp_release", ev, ctx), handoff(ev, from, text(pl(ev).release_to) || "library", "release", ctx)];
+    }
+    const pair = qaReworkPair(ev, org);
+    return [one("stamp_defect", ev, ctx), handoff(ev, pair.from, pair.to, "defect", ctx)];
+  },
   // 独立判断：核验角色交上自己的判断（先判断后看解释，工单 #358）
   independent_judgement_committed: (ev, ctx) => [one("submit", ev, ctx)],
-  ask_started: (ev) => {
-    const spoken = sayAsk(ev);
+  ask_started: (ev, ctx) => {
+    const spoken = sayAsk(ev, deptLabelOf(orgOf(ctx)));
     return [{
       kind: "letter", position: posOf(ev), item: ev.work_item_id ?? null,
       from: pl(ev).requester ?? null, to: pl(ev).recipient ?? null, answer: false, ...spoken,
     }];
   },
-  ask_answered: (ev) => {
-    const spoken = sayAnswer(ev);
+  ask_answered: (ev, ctx) => {
+    const spoken = sayAnswer(ev, deptLabelOf(orgOf(ctx)));
     return [{
       kind: "letter", position: posOf(ev), item: ev.work_item_id ?? null,
       from: pl(ev).recipient ?? null, to: pl(ev).requester ?? null, answer: true, ...spoken,

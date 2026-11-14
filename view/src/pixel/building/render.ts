@@ -7,14 +7,15 @@
 // 画法复用已有的画布原语（grid、char 与 registry），与原型逐行对应。
 
 import { mix, rgba } from "../grid.ts";
-import { DEPTS, ITEM_COLORS, ITEM_SHADES, PAL } from "../registry.ts";
+import { roomShellOf } from "../floor/render-decl.ts";
+import { ITEM_COLORS, ITEM_SHADES, PAL } from "../registry.ts";
 import { drawActor, drawBitmap, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
 import { BUILDING_STATUS } from "./status-text.ts";
+import { buildingRoomSlot, buildingShaftStartX, defaultBuildingRooms } from "../world/floor-decl.ts";
 import type { SceneLike } from "../world/types.ts";
 import { BUILDING_GEO, type BuildingDriver, type BuildingFloor, type FlashColor } from "../world/building.ts";
 
 const { W, ROOF, FH, BASE } = BUILDING_GEO;
-const ROOMS = ["product", "engineering", "quality", "operations"] as const;
 
 /** 状态灯与状态文字的配色：单独成模块，单元测试才能直接核对这几句话。 */
 export { BUILDING_STATUS } from "./status-text.ts";
@@ -112,34 +113,42 @@ export class BuildingRenderer {
     if (f.valve_closed) {
       drawSign(c, 70, y + 50, "等待执行槽位", { size: 5.5, bg: PAL.yellow1, stripe: PAL.orange2, maxW: 100 });
     }
-    // 部门房间的灯
-    ROOMS.forEach((d, k) => {
-      if (d === "operations" && !f.has_ops) return;
-      const x = 150 + k * 96;
-      const D = DEPTS[d];
-      const lit = f.lit[d];
-      fillPixelOutlined(c, x, y + 8, 80, 36, lit ? D.wall : mix(D.wall, PAL.ink, 0.45));
-      fillPixel(c, x + 2, y + 10, 76, 3, D.main);
+    // 这一层的屋子亮灯与门口小旗（屋列表来自楼层定义角色的并集）
+    const rooms = f.rooms ?? defaultBuildingRooms(f.lit, f.has_ops);
+    rooms.forEach((room, k) => {
+      const slot = buildingRoomSlot(rooms.length, k);
+      const x = slot.x;
+      const w = slot.w;
+      const D = roomShellOf(room.id);
+      const lit = room.lit;
+      fillPixelOutlined(c, x, y + 8, w, 36, lit ? D.wall : mix(D.wall, PAL.ink, 0.45));
+      fillPixel(c, x + 2, y + 10, w - 4, 3, D.main);
       if (lit) {
         c.fillStyle = rgba(PAL.yellow1, this.scene.reduced ? 0.45 : 0.35 + 0.1 * Math.sin(t / 400 + k));
-        c.fillRect(x + 2, y + 13, 76, 29);
+        c.fillRect(x + 2, y + 13, w - 4, 29);
       }
-      drawText(c, D.name, x + 40, y + 20, { size: 6, weight: 700, align: "center", color: lit ? PAL.ink : PAL.grey1 });
-      // 房门口的事项小旗：按部门挂，颜色取事项的颜色序号
-      const flags = f.flags.filter((fl) => fl.department === d);
+      drawText(c, room.label || D.name, x + Math.round(w / 2), y + 20, {
+        size: 6,
+        weight: 700,
+        align: "center",
+        color: lit ? PAL.ink : PAL.grey1,
+        max: w - 6,
+      });
+      // 房门口的事项小旗：按角色屋挂，颜色取事项的颜色序号
+      const flags = f.flags.filter((fl) => fl.department === room.id);
       flags.forEach((fl, j) => {
         const name = (Math.floor(t / 320) + j) % 2 && !this.scene.reduced ? "flag2" : "flag";
         drawBitmap(c, name, x + 6 + j * 9, y + 28, {
           recolor: { X: ITEM_COLORS[fl.color_index % 6], x: ITEM_SHADES[fl.color_index % 6] },
         });
       });
-      if (k < 3 && (!f.has_ops ? k < 2 : true)) fillPixel(c, x + 80, y + 26, 16, 3, PAL.glass2);
+      if (k + 1 < rooms.length) fillPixel(c, x + w, y + 26, slot.gap, 3, PAL.glass2);
     });
     // 管线出口：通往机房的管线沿右侧竖井下到地下室，管线里有光点在流动
     const pipe = this.driver.world.links[`floor:${f.project_id}>basement`]
       ?? Object.values(this.driver.world.links).find((p) => p.from === `floor:${f.project_id}`);
     if (pipe) {
-      const x0 = 150 + 3 * 96 + (f.has_ops ? 82 : 0);
+      const x0 = buildingShaftStartX(rooms.length, f.has_ops);
       const sx = W - 22 - (i % 6) * 3;
       const drop = (this.driver.model.floors.length - i) * FH - 30;
       const col = LINK_COLORS[i % LINK_COLORS.length];

@@ -23,6 +23,7 @@ import { create as createTimeline, type Timeline, type TimelineEntry, type Timel
 import { BUILDING_KINDS } from "../building/building-decl.ts";
 import { stepCharacters, stepPipes } from "./characters.ts";
 import { createWorld, declareLinks } from "./declare.ts";
+import { WALKER_SPRITES, buildingRoomSlot, buildingShaftStartX, defaultBuildingRooms } from "./floor-decl.ts";
 import type { Catalog, Character, Pipe, SceneLike, World } from "./types.ts";
 
 // 楼的一层（BuildingFloor）与楼的状态（BuildingModel）的形状在画面合同里（pixel/contract.ts）：
@@ -100,7 +101,7 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
   const flashes: Record<string, FloorFlash> = {};
 
   const floorY = (i: number): number => BUILDING_GEO.ROOF + i * BUILDING_GEO.FH;
-  const roomX = (k: number): number => 150 + k * 96;
+  const floorRooms = (f: BuildingFloor) => f.rooms ?? defaultBuildingRooms(f.lit, f.has_ops);
   const walkerActor = (pid: string): NonNullable<SceneLike["actors"][number]> | null =>
     opts.scene.actors.find((x) => x.id === WALKER_ACTOR_PREFIX + pid) ?? null;
 
@@ -126,7 +127,7 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
       idleAt: null,
     };
     world.characters[f.project_id] = ch;
-    const sprite = `${["product", "engineering", "quality"][i % 3]}.agent`;
+    const sprite = WALKER_SPRITES[i % WALKER_SPRITES.length];
     opts.scene.addActor({
       id: WALKER_ACTOR_PREFIX + f.project_id,
       sprite,
@@ -166,7 +167,8 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
   /** 通往机房的竖井管道：从这一层的出口横着走到右侧竖井，再沿竖井下到地下室的位置。 */
   function shaftPts(f: BuildingFloor, i: number): [number, number][] {
     const y = floorY(i);
-    const x0 = roomX(3) + (f.has_ops ? 82 : 0);
+    const rooms = floorRooms(f);
+    const x0 = buildingShaftStartX(rooms.length, f.has_ops);
     const sx = BUILDING_GEO.W - 22 - (i % 6) * 3;
     const drop = (modelRef.model.floors.length - i) * BUILDING_GEO.FH - 30;
     return [[x0, y + 31], [sx + 1, y + 31], [sx + 1, y + 30 + drop + BUILDING_GEO.BASE]];
@@ -184,16 +186,17 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
       })));
   }
 
-  // 每层的走位（原型 building.js 的 update）：有部门工作时站到那个部门门口，空闲时随机走动
+  // 每层的走位（原型 building.js 的 update）：有房间亮灯时站到那间屋门口，空闲时随机走动
   function updateWalkers(): void {
     modelRef.model.floors.forEach((f) => {
       const ch = world.characters[f.project_id];
       if (!ch) return;
       const actor = walkerActor(f.project_id);
       if (!actor || actor.script) return;
-      const working = (["product", "engineering", "quality", "operations"] as const).findIndex((d) => f.lit[d]);
+      const rooms = floorRooms(f);
+      const working = rooms.findIndex((r) => r.lit);
       if (working >= 0) {
-        const tx = roomX(working) + 40;
+        const tx = buildingRoomSlot(rooms.length, working).doorX;
         actor.speed = SPEED_WORK;
         ch.spot.y = actor.y;
         if (Math.abs(actor.x - tx) > 2) ch.spot.x = tx;
