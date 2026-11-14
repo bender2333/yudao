@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"544f9fc69bb7a091",
+"hash":"86e6e47666a17977",
 "nodes":[
-{"hash":"544f9fc69bb7a091","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"86e6e47666a17977","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"e807088650cfb35e","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"c7f5ba61e70ee42e","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -72,11 +72,11 @@
 {"dst":"docs/decision.md#决策记录 > 2026-11-04 - 事项冻结的形态不在发布里：事项停在原处，不回退默认形态；#1182 的分层问题另开单挪进 U","kind":"section-ref","raws":["decision.md"],"seen":"cb1bed045223785f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-07 - 组织设定：项目页是循环图加对话，形态按部门列，外包是部门里的选项","kind":"section-ref","raws":["decision.md"],"seen":"b7c05cd1012c414c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/README.md","kind":"code-path","raws":["design/README.md","docs/design/README.md"],"seen":"c19c1711c0a6d497","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"d22af4ab7e05f4ca","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["design/app-and-interface.md"],"seen":"d22af4ab7e05f4ca","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"1f56412394c8caa4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["design/app-and-interface.md"],"seen":"1f56412394c8caa4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","kind":"section-ref","raws":["docs/design/app-and-interface.md"],"seen":"76e2b152bf5a7095","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"dd1e7af944272650","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/architecture/name-map.md","kind":"section-ref","raws":["docs/design/architecture/name-map.md"],"seen":"dd1e7af944272650","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"33014931bffd7e0f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/architecture/name-map.md","kind":"section-ref","raws":["docs/design/architecture/name-map.md"],"seen":"33014931bffd7e0f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"code-path","raws":["design/architecture/overall-architecture.md","docs/design/architecture/overall-architecture.md"],"seen":"3e4e4b64d57f7563","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"section-ref","raws":["docs/design/architecture/overall-architecture.md"],"seen":"3e4e4b64d57f7563","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"code-path","raws":["design/browser-and-computer-use.md","docs/design/browser-and-computer-use.md"],"seen":"4f2f768d3257e006","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -102,9 +102,9 @@
 {"dst":"docs/design/model-management.md","kind":"code-path","raws":["design/model-management.md","docs/design/model-management.md"],"seen":"6277c47f32b3e3d7","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/network-and-mcp.md","kind":"code-path","raws":["docs/design/network-and-mcp.md"],"seen":"8a516a8ff9de12c8","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/outsourced-roles.md","kind":"code-path","raws":["docs/design/outsourced-roles.md"],"seen":"7a33fa7648418400","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/project-organization.md","kind":"code-path","raws":["design/project-organization.md","docs/design/project-organization.md"],"seen":"28e55440fa3bb002","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/project-organization.md","kind":"link","raws":["design/project-organization.md"],"seen":"28e55440fa3bb002","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话 > 项目页上的内容在哪里看","kind":"section-ref","raws":["docs/design/project-organization.md"],"seen":"25ca4c2a86227247","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/project-organization.md","kind":"code-path","raws":["design/project-organization.md","docs/design/project-organization.md"],"seen":"fbbf58b3b731d4cb","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["design/project-organization.md"],"seen":"fbbf58b3b731d4cb","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话 > 项目页上的内容在哪里看","kind":"section-ref","raws":["docs/design/project-organization.md"],"seen":"a3cdffd160f48f79","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.7 冻结与升级","kind":"section-ref","raws":["docs/design/project-organization.md"],"seen":"6536a67991a4045b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"code-path","raws":["docs/design/recovery-contract-and-fault-matrix.md"],"seen":"cc9397dfaf732c1e","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/rules-and-parameters.md","kind":"code-path","raws":["design/rules-and-parameters.md","docs/design/rules-and-parameters.md"],"seen":"d4442d7c71888e2a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},

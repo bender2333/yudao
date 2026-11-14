@@ -14,7 +14,7 @@
 
 内环六步各对应一道缝，不另列行：1 路由与边界 → 路由、写入口内侧（边界）；2 装配 → 装配；3 模型 / 外包 → 模型、执行（外包角色）；4 工具与环境 → 动作；5 裁决与写入口 → 写入口；6 投影 → 投影。
 
-路径省略的前缀：Python 在 `harness/` 下，TypeScript 在 `client/src/renderer/src/` 下。
+路径省略的前缀：Python 在 `harness/` 下，页面的 TypeScript 在 `client/src/renderer/src/` 下，画面的 TypeScript 在 `view/src/` 下。
 
 ## 1. 系统里的九道缝
 
@@ -128,17 +128,17 @@
 | --- | --- | --- | --- | --- |
 | 定义、加载与校验 | 第二节「定义」；第四节定义 | `definitions/__init__.py` 的 `Definitions`、`load_definitions`、`DefinitionError`；文件 `organization.json`、`roles.json`、`tools.json`、`proposal_contracts.json`、`rules.json`、`stop_reasons.json`、`work_items.json`、`service_presets.json`、`model_capabilities.json`、`routings.json` | 定义；道 10 | 一致 |
 | 版本 | 第 1.3 节定义「交换」 | `Definitions` 的版本取全部文件的内容摘要 | 定义 | 一致 |
-| 职能与角色 | 第一节「下一个职能」；第 1.3 节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality`；对外合同里职能是字符串（`app/payloads.py` 的 `Department = str`），命令收到定义里没有的职能时拒绝并写明可用的 | 定义；道 01、02 | 不一致：代码里职能叫 department（部门），见下一行；`models.py` 的 `DEPARTMENTS` 与 `providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 都取自模块加载时的默认定义（`DEFINITIONS.departments`），应用层按它列职能的地方还有：新建事项前的模型就绪（`app/project_and_work_item_commands.py`、`providers/facade.py`）、项目的职能设置（`app/project_queries.py`、`projects.py`）、事项的职能状态与「你的输入」送给谁（`app/project_queries.py`、`app/read_models.py`）；`department_prompts.py` 已经按传入的定义取。总图要的是随事项冻结的定义给出 |
+| 职能与角色 | 第一节「下一个职能」；第 1.3 节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality`；对外合同里职能是字符串（`app/payloads.py` 的 `Department = str`），命令收到定义里没有的职能时拒绝并写明可用的；事项一级的读取与核对使用事项冻结的定义，项目一级的读取与核对（新建事项前的模型就绪、项目的职能设置、指导与记录）使用项目当前的组织（`projects.py` 的 `project_definitions`），进程加载的默认定义只用于没有项目与事项的系统页模型管理 | 定义；道 01、02 | 不一致：代码里职能叫 department（部门），见下一行 |
 | 上限 | 第 1.3 节定义「交换」 | `rules.json` 与 `Rule`；`parameters.py`（`check_bounds`、`ParameterChange`、`fold_parameters`）；命令 `parameter.set`、事件 `parameter_set`、`project_parameter_set` | 定义 | 一致（方框的技术名词是上限与规则、参数） |
 | 停止原因清单 | 第三节外环「停止」；第 1.3 节定义「交换」 | `stop_reasons.json`、`StopReason`、`UnknownStopReason`、`models.stop_reason_name`、`Event.stop_reason` | 定义 | 一致 |
-| 职能 | 第一节「下一个职能」；术语表「职能」 | 叫 department：`Department`、`Event.department`、`app/payloads.py` 的 `Department = str`、`DepartmentSession`、`DEPARTMENTS`、`DEPARTMENT_STATES`，事件与命令名里的 `department_*`（`department_activated`、`department_guidance_*`），查询名 `department.workspace` 等，界面里的 `DepartmentPage`、`DepartmentView` | 定义、执行、接口；道 01 | 不一致：代码与接口叫 department（部门），立缝时随各道缝改名，旧名留别名一版 |
+| 职能 | 第一节「下一个职能」；术语表「职能」 | 叫 department：`Department`、`Event.department`、`app/payloads.py` 的 `Department = str`、`DepartmentSession`、`DEPARTMENTS`、`DEPARTMENT_STATES`，事件与命令名里的 `department_*`（`department_activated`、`department_guidance_*`），查询名 `department.workspace` 等，界面里的 `DepartmentDetailPage` | 定义、执行、接口；道 01 | 不一致：代码与接口叫 department（部门），立缝时随各道缝改名，旧名留别名一版 |
 | 形态「产品 · 工程 · 质检」（默认） | 术语表「形态」 | `definitions/__init__.py` 的 `DEFAULT_FORM = "three_departments"`，定义在 `harness/definitions/` 根下 | 定义；道 01 | 不一致：标识按部门数起名 |
 | 形态「工程」 | 术语表「形态」 | `single_role_direct`（`runtime.py` 的 `SINGLE_ROLE_DIRECT`，定义 `definitions/forms/single_role_direct/`） | 定义；道 01、03 | 不一致：标识按角色数与轮转起名 |
 | 形态「产品 · 工程」 | 术语表「形态」 | `several_roles_direct`（`runtime.py` 的 `SEVERAL_ROLES_DIRECT`，定义 `definitions/forms/several_roles_direct/`） | 定义；道 01、03 | 不一致：标识按角色数与轮转起名 |
 | 形态「产品 · 工程 · 质检 · 运维」 | 术语表「形态」 | 无 | 定义；道 08 | 代码里还没有 |
 | 加独立核验、去掉独立核验 | 术语表「核验角色」「形态」 | 查询 `project.organization` 给出的改动 `add_verifier`、`remove_verifier`；采用命令的方式 `mode: "verifier"`（`app/form_commands.py` 的 `AdoptionMode`，另两种是 `template`、`advanced`）；合成 `organization_compose.py` 的 `verifier_changes` | 定义、接口 | 一致（核验角色的直译）；采用方式里的 `template` 指换形态，术语表把「模板」列为避免的说法 |
 | 谁能拒绝谁 | 第 1.3 节定义「交换」 | 由核验声明推出，不另写一份：`definitions/__init__.py` 的 `Definitions.rejection_edges`；加载时 `verification_issues`、`_rejection_cycles` 核对无环；各职能能提交什么另写在 `proposal_contracts.json` | 定义 | 一致 |
-| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第 1.3 节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方都读声明，不再写死职能名；`path_rules.py` 的 `QA_TESTS_DIR` 只剩旧名的别名。应用层的读取（`app/project_queries.py`、`app/read_models.py`、`app/trial_queries.py`）读的是进程加载的那份定义的声明，不是事项冻结的那一份 | 定义、路由；道 01 | 不一致：使用方读声明，但应用层读的不是事项冻结的那一份；直做加核验时成果种类仍按交付取 |
+| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第 1.3 节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方（含应用层 `app/project_queries.py`、`app/read_models.py` 与结算 `projects.py`）都读取事项冻结的那份定义的声明，直做交完成加核验角色时按声明核验 `completion` 并结算采纳；`path_rules.py` 的 `QA_TESTS_DIR` 只剩旧名的别名 | 定义、路由；道 01 | 一致 |
 | 写入范围 | 第 1.3 节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 的写路径检查读 `Definitions.write_scope(职能)`，范围是检查材料时把写入限在声明的目录下，不按职能名 | 定义、写入口 | 一致 |
 | 成果种类与提案合同 | 第 1.3 节定义「交换」 | `outcome_kinds.json`（`OutcomeKinds`：成果种类与分组，单独的一项），路由按组名引用（`routings.json` 的 `outcomes`）；`proposal_contracts.json` | 定义；道 03 | 一致 |
 | 路由实现与它的定义、工作单元的大小 | 第 1.3 节定义「交换」 | 路由实现与它的定义：组织定义的 `routing`、`routings.json`（每种路由一条）、`Definitions.routing_definition`；工作单元的大小：无 | 定义、路由；道 03 | 一致（路由实现与它的定义）；代码里还没有（工作单元的大小） |
@@ -160,19 +160,19 @@
 
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
-| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | 还在 `client/src/renderer/src/` 里，与页面同一个目录、同一份依赖与构建：`pixel/`、`translate/`，挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx`，图鉴 `views/pixel/gallery.tsx`，开发挂载 `pixel/floor/dev-mount`（`main.tsx` 引入） | 画面；画面的阶段步 0 | 不一致：没有单独的目录、依赖与构建；页面取画面的文字与颜色（`views/project/labels.ts`、`materials.tsx`），翻译层反过来取页面的职能名与卡片文字（`translate/floor.ts`） |
-| 壳 | 画面总图第一节「壳」、第四节「回调」 | 没有单独的壳：三个挂载兼做连接，回调直接调页面的函数 | 画面 | 不一致：回调不经命令发现，点开回链在画布上画卡片 |
-| 画面的同步层 | 画面总图第四节「读事实」 | 与页面共用 `contract/view-sync.ts` | 画面 | 不一致：画面没有自己的一份 |
-| 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类取自客户端夹具 `client/tests/fixtures/event-types.json`，由服务端的 `harness/tests/test_event_type_fixture.py` 与 `EVENT_TYPES` 核对；`translate/coverage.ts` 缺一种事件就测试失败；缺口清单：无 | 画面 | 不一致：服务端为画面维护夹具；不认识的事件让测试失败，不进缺口清单 |
-| 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属） | 画面 | 一致 |
-| 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`）；页面里的挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx` | 画面；道 09 | 不一致：叫 pixel，不叫画面层；输入类型带 Pixel 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
+| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | `view/`：单独的依赖（`view/package.json`）、构建（`view/vite.config.ts`）、生成的接口类型（`api/generated/`、`api/interface-version.ts` 的 `VIEW_API_VERSION`）、场景挂载（`scenes/building.tsx`、`scenes/floor.tsx`、`scenes/room.tsx`）、入口（`main.tsx`）、图鉴（`gallery.tsx`）与测试（`view/tests/`）；发布脚本 `scripts/release.py` 构建画面放进 `harness/release_assets/view/`，地址 `/view/` | 画面；画面的阶段步 0 | 一致 |
+| 壳 | 画面总图第一节「壳」、第四节「回调」 | `shell.ts`（`createShell`、`ShellState`、`SceneSurface`）：从能力清单发现命令并带命令身份发出，把点开回链变成 Yudao 页面带位置的路径在新标签页打开，场景切换在壳内完成，提示接口版本与连接状态 | 画面 | 一致 |
+| 画面的同步层 | 画面总图第四节「读事实」 | `sync/sync.ts` 的 `SyncEngine`、`ViewSync`，`sync/connection.ts`，`sync/stream.ts` 的 `EventStream`（画面独立的一份，不导入 `client/`） | 画面 | 一致 |
+| 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类在运行时取自能力清单 `/api/capabilities` 的 `event_types`，测试里取自接口描述 `harness/tests/openapi/openapi.json`；`translate/coverage.ts` 的 `COVERAGE`、`eventGaps`、`gapLines`、`overlayProblems`，未归类的事件进缺口清单并在 `ShellState.eventGaps` 与 `ShellState.gap` 显示，新增事件不让测试失败 | 画面 | 一致 |
+| 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`face.ts`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属与缺口清单） | 画面 | 一致 |
+| 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`、`timeline.ts`），场景挂载在 `scenes/` | 画面；道 09 | 不一致：目录叫 `pixel`，输入类型带 `Pixel` 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
 | 元件断言、回链 | 第四节画面的规矩（回链）；画面总图第四节「映射」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
 | 播放参数 | 画面总图第二节「调节参数」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
 | 七种元件的对照表 | 画面总图第四节「映射」 | `translate/coverage.ts`：事件在三个场景的归属 `COVERAGE`、覆盖层的中文名 `OVERLAY_LABELS`；概念到元件的行：无 | 画面；道 09 | 不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对 |
 | 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个职能字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按职能名分支 |
 | 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按职能 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按职能名取，不按核验角色 |
 | 章（放行、开环完成） | 画面总图第五节 | 合同 `pixel/contract.ts` 的 `Stamp`（楼层状态的 `stamp`）；动作 `stamp_release`、`stamp_defect`、`stamp_valid`（`translate/floor.ts`）；开环完成章：无 | 画面 | 不一致：开环完成章代码里还没有 |
-| 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布上的来源卡片 `pixel/floor/card.ts` 的 `createSourceCard`，卡片内容 `SourceCardFace`（`pixel/contract.ts`）画原始事件与差异 | 画面（页面一侧） | 不一致：细内容画在画布上，没有交给页面 |
+| 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布点击事实元件交出回调 `onOpenSource`（`pixel/floor/view.ts`），壳 `shell.ts` 生成带项目、事项与位置的页面路径在新标签页打开；页面 `views/project/conversation.tsx` 与 `views/project/item-panel.tsx`（`item-panel-model.ts` 的 `sourceAtPosition`）读取 `route.at` 自动展开事项面板并调用 `event.positions` 显示原始事件 | 画面（页面一侧） | 一致 |
 
 ## 3. 外环的九个状态
 
@@ -184,7 +184,7 @@
 | 一轮工作中 | 第三节外环 | `watched_outputs.is_working`；职能状态 `working`；run 状态 `running` | 路由、执行 | 一致 |
 | 询问中 | 第三节外环 | `watched_outputs.pending_ask_department`；职能状态 `asking`；事件 `ask_started` | 路由、执行 | 一致 |
 | 等用户 | 第三节外环 | `decisions.blocks_run`、`DecisionRequest`（见接口一节）；职能状态 `waiting_user` | 接口 | 一致 |
-| 核验中 | 第三节外环 | 职能状态 `verifying`（`app/project_queries.py` 的 `DepartmentState`；`_awaiting_verification`：最新的交付还没有质检的缺陷记录或放行）；检查工作区 `environment.inspection_root` | 路由、动作 | 不一致：`_awaiting_verification` 按质检与交付写死，不按核验角色 |
+| 核验中 | 第三节外环 | 职能状态 `verifying`（`app/project_queries.py` 的 `DepartmentState`；`_awaiting_verification` 按事项冻结定义的核验声明判断被核验职能交出的最新成果或完成版本是否仍在等待核验结论）；检查工作区 `environment.inspection_root` | 路由、动作 | 一致 |
 | 接纳 | 第三节外环 | 通用接纳事件 `artifact_accepted`（`kernel_events.py`）；成果驱动的老事件 `spec_accepted`、`contract_accepted`、`delivery_accepted`、`structure_accepted`、`baseline_review_accepted`、`product_decision_accepted` | 写入口、路由 | 一致 |
 | 返工 | 第三节外环 | 质检结论的取值 `rework_engineering`（`kernel_events.py` 的 `QA_VERDICTS`）；取值 `rework`（`views/timeline/logic.ts`）；缺陷在 `QAReview.defects`，页面显示「缺陷记录」 | 路由 | 一致 |
 | 排空中 | 第三节外环 | `streams.py` 的 `DrainState`（见看门狗一行） | 看门狗 | 一致 |
@@ -204,7 +204,7 @@
 | 动作 | 工具 `tools.py`、`engine.py` ↔ `environment.py`、`actions.py`、`workspace.py`、`snapshot.py` | `test_action_contract.py`（模块）、`test_tool_contracts.py`（单元）、`kernel/test_only_grows.py`（单元）、`test_workspace_boundary.py`（单元） | 两种环境（本机与测试里的第二种）接受同一份动作合同、给出同样的回执；回执带前后公开树摘要与终点快照的引用，旧回执照常读；动作类别与回执字段只增；控制核心不直接读写工作区 |
 | 投影 | `event_store.py` → `projection.py`、`project_projection.py`、`app/read_models.py`；内核的 `minimal_projection.py` | `test_replay.py`（模块）、`test_saved_projections.py`（集成）、`kernel/test_minimal_projection.py`（模块）、`kernel/test_minimal_projection_baselines.py`（集成）、`kernel/test_skeleton_events.py`（单元）、`test_event_classification.py`（单元） | 从头重算得到同一状态；最小投影与应用投影逐项一致；骨架事件有登记表；每种事件声明所属的流 |
 | 接口 | 页面 `client/`、命令行、`evals/`、画面 ↔ 应用层 `app/`，经接口层 `api/` | `test_layers.py`（单元，导入方向合同，定义在 `pyproject.toml` 的 `[tool.importlinter]`）、`test_openapi_snapshot.py`（模块）、`test_event_stream.py`（模块）、`test_capabilities.py`（模块）、`test_department_names.py`（模块） | 接口层只导入应用层、应用层只导入控制核心的公开接口；合同快照不偷偷改；事件流按位置续；能力清单列出改变每条查询的事件；对外合同里的职能是字符串、取值由定义给出，换一份改了名的定义载荷照样通过，定义里没有的职能命令拒绝 |
-| 画面 | 接口 `harness/api/` ↔ 画面（现在还在 `client/src/renderer/src/` 的 `translate/`、`pixel/` 与三个挂载里）；里面一道是翻译层 ↔ 画面层，合同 `pixel/contract.ts` | 客户端 `client/tests/unit/pixel-imports.test.ts`、`pixel-contract.test.ts`、`translate-coverage.test.ts`（都在合并门里）；逐场景回放 `pixel-floor-replay.test.ts`、`pixel-room-replay.test.ts`、`pixel-building-replay.test.ts`（不在 CI 里，手动跑） | 画面层只导入画面合同与自己的声明表；合同取值逐项校验；每种事件在三个场景里都有归属（缺一种就失败）；回放的每个检查点与原型逐像素相同。画面与基础部分互不导入、画面的测试不进合并门、认不出的事件进缺口清单：没有守卫 |
+| 画面 | 接口 `harness/api/` ↔ 画面 `view/`（壳 `shell.ts`、同步层 `sync/`、翻译层 `translate/`、生成的接口类型 `api/`）；里面一道是翻译层 `translate/` ↔ 画面层 `pixel/`，合同 `pixel/contract.ts` | 页面 `client/tests/unit/page-imports.test.ts`（合并门客户端作业）；发布脚本 `test_release_script.py`（模块）；画面（CI「画面」作业，不进合并门）`view/tests/unit/view-imports.test.ts`、`pixel-imports.test.ts`、`pixel-contract.test.ts`、`pixel-honesty.test.ts`、`translate-coverage.test.ts`、`sync-layer.test.ts`、`shell.test.ts`，端到端 `view/tests/e2e/`（录制的接口响应），以及生成接口类型与快照一致核对 | 基础部分与画面互不导入；画面层只导入画面合同与自己的声明表；合同取值逐项校验；事实层与视觉通道诚实性（H1 至 H4、H6 至 H9）；事件种类从接口读取，未归类的事件进缺口清单且测试照常通过；生成的接口类型与接口快照一致；画面的测试单独一个 CI 作业，不进合并门；画面构建失败不阻断发布，`/view/` 返回「这一版没有画面」 |
 | 定义 | 文件 `harness/definitions/*.json` ↔ `definitions/__init__.py` | `test_definitions.py`（集成）、`test_definition_rules.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_definitions_decide.py`（单元）、`test_frozen_parameters.py`（集成） | 加载与校验；版本是内容摘要；裁决读事项所用的那份定义；参数建 run 时冻结；核验声明的校验（核验角色与被核验角色在定义里、成果种类有定义、谁能拒绝谁无环、写入范围的角色在定义里）与开环的判断；没有声明的旧定义读成「产品 · 工程 · 质检」 |
 | 评价 | `evals/`、`release_check.py` → 系统（经接口） | `evals/tests/test_no_harness_import.py`、`evals/tests/test_no_harness_paths.py`；内核清单的 `material` 条目由 `path_guard.py` 在采纳前比较（`test_projects.py` 的内核守卫用例，集成）；`test_release_check.py`（模块） | 评测工具不导入 `harness`、不引用它的内部路径；改动评价材料的交付不自动采纳；发布检查的清单与检查取自运行中的实例，改待发布提交里的清单与检查不改变结果 |
 | 观察者 | 无 | 无 | 无 |

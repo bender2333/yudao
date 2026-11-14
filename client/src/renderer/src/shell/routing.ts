@@ -210,9 +210,18 @@ function scopeQuery(workItem: string | null | undefined): string {
 // 构造函数随旧页面一起删掉（工单 #1716）：它们的地址由 parseRoute 落到对话。
 export const paths = {
   home: () => "#/home",
-  // 对话页（工单 #1638）：项目页先是对话，循环图在它上面；事项范围写在 ?w= 里
-  conversation: (projectId: string, options: { workItem?: string | null } = {}) =>
-    `#/p/${projectId}/conversation${scopeQuery(options.workItem)}`,
+  // 对话页（工单 #1638、#1745）：项目页先是对话，循环图在它上面；事项范围写入 ?w=，回放位置写入 ?at=
+  conversation: (projectId: string, options: { workItem?: string | null; at?: number | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.workItem) {
+      query.set("w", options.workItem);
+    }
+    if (options.at !== undefined && options.at !== null && Number.isInteger(options.at) && options.at >= 0) {
+      query.set("at", String(options.at));
+    }
+    const suffix = query.toString();
+    return `#/p/${projectId}/conversation${suffix ? `?${suffix}` : ""}`;
+  },
   // 首页的回放位置写在 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   homeAt: (at: number | null) => (at === null ? "#/home" : `#/home?at=${at}`),
   // 职能详情（工单 #1713）：从节点面板的「职能详情」进来，关闭时按 ?w= 回到原来的事项

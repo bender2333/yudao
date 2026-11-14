@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/agents/issue-tracker.md",
-"hash":"2f585d2ce9fa7f84",
+"hash":"13e2c1162be1b4f0",
 "nodes":[
-{"hash":"2f585d2ce9fa7f84","id":"docs/agents/issue-tracker.md","kind":"file","title":"docs/agents/issue-tracker.md"},
+{"hash":"13e2c1162be1b4f0","id":"docs/agents/issue-tracker.md","kind":"file","title":"docs/agents/issue-tracker.md"},
 {"hash":"567b7e921dfc4e62","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","kind":"section","parent":"docs/agents/issue-tracker.md","title":"工单系统：GitHub Issues"},
-{"hash":"c14c29e3bf1b2db8","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 常用写法","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"常用写法"},
+{"hash":"975ddea6843ae31d","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 常用写法","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"常用写法"},
 {"hash":"1b772b7de702e985","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 执行者常用","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"执行者常用"},
 {"hash":"e9e89897ec490673","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 工单与 docs/ 的分工","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"工单与 docs/ 的分工"},
 {"hash":"4e8ec48e1421f5fe","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > PR 是否作为分诊入口","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"PR 是否作为分诊入口"},

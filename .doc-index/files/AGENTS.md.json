@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"AGENTS.md",
-"hash":"5f7d027a73bc7026",
+"hash":"553d8bfa97603bab",
 "nodes":[
-{"hash":"5f7d027a73bc7026","id":"AGENTS.md","kind":"file","title":"AGENTS.md"},
+{"hash":"553d8bfa97603bab","id":"AGENTS.md","kind":"file","title":"AGENTS.md"},
 {"hash":"39426a4e8bdd8d8b","id":"AGENTS.md#适用范围","kind":"section","parent":"AGENTS.md","title":"适用范围"},
 {"hash":"ee964457e55f2702","id":"AGENTS.md#共同要求","kind":"section","parent":"AGENTS.md","title":"共同要求"},
 {"hash":"486e6d698c696200","id":"AGENTS.md#项目","kind":"section","parent":"AGENTS.md","title":"项目"},
-{"hash":"2b7907415eabe6e8","id":"AGENTS.md#项目 > 常用命令","kind":"section","parent":"AGENTS.md#项目","title":"常用命令"},
+{"hash":"38a71ac9e43c2650","id":"AGENTS.md#项目 > 常用命令","kind":"section","parent":"AGENTS.md#项目","title":"常用命令"},
 {"hash":"f87cc87154c8f599","id":"AGENTS.md#项目 > GitHub Issues","kind":"section","parent":"AGENTS.md#项目","title":"GitHub Issues"},
 {"hash":"9a3c81a370c8f620","id":"AGENTS.md#项目 > 架构问题","kind":"section","parent":"AGENTS.md#项目","title":"架构问题"}
 ],
@@ -24,13 +24,14 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"e72ef441034a7ae4","src":"AGENTS.md#项目"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"f82ec69fc4f0a370","src":"AGENTS.md#项目"},
 {"dst":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 执行者常用","kind":"link","raws":["docs/agents/issue-tracker.md"],"seen":"1b772b7de702e985","src":"AGENTS.md#项目 > GitHub Issues"},
-{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"161a9dee4a1af22e","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"bafadb9df23df544","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"fa1e1ab66f669cbb","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"6cd634905d5ab090","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"2ee559bd28b06619","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"491485060a686211","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","kind":"section-ref","raws":["docs/design/visualization.md"],"seen":"b5c07471d328449c","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"harness/proposals.py","kind":"code-path","raws":["harness/proposals.py"],"seen":"e22f894ac7e1b3fa","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"8fe9e97075209a6d","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"a25064a63ace15cb","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","kind":"link","raws":["docs/agents/workflow.md"],"seen":"42c164166ea88d67","src":"AGENTS.md#项目 > 架构问题"}
 ]
 }

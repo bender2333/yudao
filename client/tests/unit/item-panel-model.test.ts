@@ -23,6 +23,8 @@ import type {
 import {
   itemPanel,
   pickStatusText,
+  sourceAtPosition,
+  sourceHeadingText,
   stopReasonText,
   type ItemPanelFacts,
 } from "../../src/renderer/src/views/project/item-panel-model.ts";
@@ -414,3 +416,83 @@ test("选事项一行对停止的事项写一句停止原因，开环完成写�
 test("事项不在查询结果里时没有面板", () => {
   assert.equal(itemPanel(facts({ loop: loopOf(), overview: overviewOf() })), null);
 });
+
+// ---- 按事件位置查找来源与标题文案（工单 #1745，保护 R3）
+
+test("按事件位置命中事项事实引用时返回中文元素名与来源种类名，标题包含元素与来源", () => {
+  const entry = item({
+    refs: {
+      sign: { position: 2, source: "user" },
+      parcel: { position: 7, source: "role_statement" },
+      stamp: { position: 9, source: "decision_model" },
+      box: { position: 11, source: "rule" },
+      round: { position: 12, source: "host_measurement" },
+      elapsed: { position: 20, source: "host_measurement" },
+    },
+  });
+  const signFact = sourceAtPosition(entry, 2);
+  assert.deepEqual(signFact, {
+    element: "sign",
+    elementLabel: "门牌",
+    source: "user",
+    sourceLabel: "用户",
+    position: 2,
+  });
+  assert.equal(sourceHeadingText(signFact), "位置 2 上的原始事件（门牌 · 来源：用户）");
+
+  const parcelFact = sourceAtPosition(entry, 7);
+  assert.deepEqual(parcelFact, {
+    element: "parcel",
+    elementLabel: "包裹",
+    source: "role_statement",
+    sourceLabel: "角色陈述",
+    position: 7,
+  });
+  assert.equal(sourceHeadingText(parcelFact), "位置 7 上的原始事件（包裹 · 来源：角色陈述）");
+
+  const stampFact = sourceAtPosition(entry, 9);
+  assert.equal(stampFact.elementLabel, "盖章");
+  assert.equal(stampFact.sourceLabel, "模型判断");
+
+  const boxFact = sourceAtPosition(entry, 11);
+  assert.equal(boxFact.elementLabel, "成果库的箱子");
+  assert.equal(boxFact.sourceLabel, "规则");
+
+  const roundFact = sourceAtPosition(entry, 12);
+  assert.equal(roundFact.elementLabel, "轮次");
+  assert.equal(roundFact.sourceLabel, "主机测量");
+
+  const elapsedFact = sourceAtPosition(entry, 20);
+  assert.equal(elapsedFact.elementLabel, "已用时间");
+  assert.equal(elapsedFact.sourceLabel, "主机测量");
+});
+
+test("事件位置未命中具体事实元素或事项为空时仍返回读取目标，标题不包含空括号", () => {
+  const entry = item({
+    refs: {
+      sign: { position: 2, source: "user" },
+    },
+  });
+  const unmatched = sourceAtPosition(entry, 34);
+  assert.deepEqual(unmatched, {
+    element: "",
+    elementLabel: "",
+    source: "",
+    sourceLabel: "",
+    position: 34,
+  });
+  assert.equal(sourceHeadingText(unmatched), "位置 34 上的原始事件");
+  assert.ok(!sourceHeadingText(unmatched).includes("（"));
+  assert.ok(!sourceHeadingText(unmatched).includes("）"));
+
+  const withoutItem = sourceAtPosition(null, 1);
+  assert.deepEqual(withoutItem, {
+    element: "",
+    elementLabel: "",
+    source: "",
+    sourceLabel: "",
+    position: 1,
+  });
+  assert.equal(sourceHeadingText(withoutItem), "位置 1 上的原始事件");
+});
+

@@ -12,7 +12,7 @@
  * 页面不自己判、不另存一份事实：读的是本页已有的 project.loop、project.overview，再加上 run.loops 与 run.recovery。
  */
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   EventAtPosition,
@@ -36,7 +36,7 @@ import {
   type CancelRequest,
 } from "./cancel-text";
 import { downloadRunExport, type RunExportOutcome } from "./run-export";
-import { itemPanel, type FactSourceView } from "./item-panel-model";
+import { itemPanel, sourceAtPosition, sourceHeadingText, type FactSourceView } from "./item-panel-model";
 import { type SnapshotState, useCommand, useSnapshot } from "./use-snapshot";
 
 /** 面板打开的是事项本身：与节点、箭头、时序行一起放在同一个开关里，一次只开一个。 */
@@ -69,6 +69,10 @@ export function ItemPanel(props: {
   loop: SnapshotState<ProjectLoopResult>;
   /** project.overview：停止说明、上游失败、已收下的交付、标题 */
   overview: SnapshotState<ProjectOverviewResult>;
+  /** 地址参数 ?at= 指定的初始事件位置（工单 #1745） */
+  initialPosition?: number | null;
+  /** 收起来源详情时通知外层清理地址参数 ?at= */
+  onClearPosition?: () => void;
   onClose: () => void;
   onNavigate: (hash: string) => void;
 }) {
@@ -107,6 +111,9 @@ export function ItemPanel(props: {
   const [exporting, setExporting] = useState(false);
   const [source, setSource] = useState<SourceRead | null>(null);
   const [eventId, setEventId] = useState<string | null>(null);
+  const itemRef = useRef(item);
+  itemRef.current = item;
+  const sourceRequestRef = useRef(0);
   const detail = useSnapshot<EventDetailResult>(
     props.app,
     `page.conversation.item.event.${eventId ?? ""}`,
@@ -116,6 +123,7 @@ export function ItemPanel(props: {
   );
 
   const readSource = (fact: FactSourceView): void => {
+    const requestId = ++sourceRequestRef.current;
     setSource({ fact, loading: true, failure: null, event: null });
     const params: Record<string, unknown> = { project_id: props.projectId, positions: [fact.position] };
     if (runId !== "") {
@@ -125,16 +133,33 @@ export function ItemPanel(props: {
       .queryOne<EventPositionsResult>("event.positions", params)
       .then((result) => {
         const event = (result.data.events ?? []).find((row) => row.position === fact.position) ?? null;
-        setSource((current) => (current === null || current.fact.position !== fact.position
+        setSource((current) => (current === null || sourceRequestRef.current !== requestId
           ? current
           : { ...current, event, loading: false }));
       })
       .catch((reason: unknown) => {
         const failure = reason instanceof Error ? reason.message : String(reason);
-        setSource((current) => (current === null || current.fact.position !== fact.position
+        setSource((current) => (current === null || sourceRequestRef.current !== requestId
           ? current
           : { ...current, failure, loading: false }));
       });
+  };
+
+  const initialPosition = props.initialPosition ?? null;
+  useEffect(() => {
+    if (initialPosition === null) {
+      return;
+    }
+    readSource(sourceAtPosition(itemRef.current, initialPosition));
+  }, [initialPosition, props.projectId, props.workItemId, runId]);
+
+  const collapseSource = (): void => {
+    setSource(null);
+    if (panel === null) {
+      props.onClose();
+      return;
+    }
+    props.onClearPosition?.();
   };
 
   const exportRun = (): void => {
@@ -147,8 +172,62 @@ export function ItemPanel(props: {
       .finally(() => setExporting(false));
   };
 
+  const sourceDetail = source === null ? null : (
+    <div className="y10-source-detail v20-item-source-detail" data-testid="item-source-detail">
+      <h4 className="y10-h3 sub">{sourceHeadingText(source.fact)}</h4>
+      {source.loading ? <p className="y10-note note">正在按位置读取</p> : null}
+      {source.failure === null ? null : (
+        <p className="y10-note note" role="status">读不出来：{source.failure}</p>
+      )}
+      {source.event === null ? null : source.event.status !== "available" ? (
+        <p className="y10-note note" role="status">
+          {EVENT_POSITION_REASONS[source.event.reason ?? ""] ?? "这个位置上没有事件"}
+        </p>
+      ) : (
+        <KeyValue
+          items={[
+            ["说明", source.event.label ?? "未上报"],
+            ["种类", eventKindLabel(source.event.type)],
+            ["提出者", source.event.actor_label ?? source.event.department_label ?? "未上报"],
+            ["时间", formatTime(source.event.at)],
+          ]}
+        />
+      )}
+      {source.event?.event_id === undefined || source.event?.event_id === null ? null : (
+        <button
+          type="button"
+          className="y10-link link"
+          data-testid="item-source-full"
+          onClick={() => setEventId(source.event?.event_id ?? null)}
+        >
+          展开全文
+        </button>
+      )}
+      <button type="button" className="y10-link link" onClick={collapseSource}>收起</button>
+    </div>
+  );
+
+  const eventModal = eventId === null ? null : detail.error !== null ? (
+    <Modal title={`事件 ${eventId}`} onClose={() => setEventId(null)}>
+      <p className="y10-note note" role="status">读不出来：{detail.error}</p>
+    </Modal>
+  ) : (
+    <EventDetail eventId={eventId} onClose={() => setEventId(null)} snapshot={detail} />
+  );
+
   if (panel === null) {
-    return null;
+    if (sourceDetail === null) {
+      return null;
+    }
+    return (
+      <section className="y10-cv-panel v20-item-panel" aria-label="事项面板" data-testid="item-panel">
+        <button type="button" className="y10-icon-btn y10-cv-close" aria-label="收起" onClick={props.onClose}>
+          ×
+        </button>
+        {sourceDetail}
+        {eventModal}
+      </section>
+    );
   }
   const confirm = pending === null ? null : {
     title: cancelConfirmTitle(pending.status),
@@ -182,42 +261,7 @@ export function ItemPanel(props: {
           </span>,
         ])}
       />
-      {source === null ? null : (
-        <div className="y10-source-detail v20-item-source-detail" data-testid="item-source-detail">
-          <h4 className="y10-h3 sub">
-            位置 {source.fact.position} 上的原始事件（{source.fact.elementLabel} · 来源：{source.fact.sourceLabel}）
-          </h4>
-          {source.loading ? <p className="y10-note note">正在按位置读取</p> : null}
-          {source.failure === null ? null : (
-            <p className="y10-note note" role="status">读不出来：{source.failure}</p>
-          )}
-          {source.event === null ? null : source.event.status !== "available" ? (
-            <p className="y10-note note" role="status">
-              {EVENT_POSITION_REASONS[source.event.reason ?? ""] ?? "这个位置上没有事件"}
-            </p>
-          ) : (
-            <KeyValue
-              items={[
-                ["说明", source.event.label ?? "未上报"],
-                ["种类", eventKindLabel(source.event.type)],
-                ["提出者", source.event.actor_label ?? source.event.department_label ?? "未上报"],
-                ["时间", formatTime(source.event.at)],
-              ]}
-            />
-          )}
-          {source.event?.event_id === undefined ? null : (
-            <button
-              type="button"
-              className="y10-link link"
-              data-testid="item-source-full"
-              onClick={() => setEventId(source.event?.event_id ?? null)}
-            >
-              展开全文
-            </button>
-          )}
-          <button type="button" className="y10-link link" onClick={() => setSource(null)}>收起</button>
-        </div>
-      )}
+      {sourceDetail}
       {panel.stop === null ? null : (
         <div className="y10-cv-block v20-item-stop" data-testid="item-stop">
           <KeyValue
@@ -336,13 +380,7 @@ export function ItemPanel(props: {
           </p>
         </Modal>
       )}
-      {eventId === null ? null : detail.error !== null ? (
-        <Modal title={`事件 ${eventId}`} onClose={() => setEventId(null)}>
-          <p className="y10-note note" role="status">读不出来：{detail.error}</p>
-        </Modal>
-      ) : (
-        <EventDetail eventId={eventId} onClose={() => setEventId(null)} snapshot={detail} />
-      )}
+      {eventModal}
     </section>
   );
 }
