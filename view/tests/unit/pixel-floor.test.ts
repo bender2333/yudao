@@ -861,43 +861,49 @@ test("点画布上的事实元件就能点开回链：没有打开覆盖层也�
     appType: "spa",
   });
   await server.listen();
-  const address = server.resolvedUrls?.local[0];
-  if (!address) throw new Error("画面的模块服务器没有给出地址");
-  const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
-  const page = await browser.newPage();
   try {
-    const pageErrors: string[] = [];
-    page.on("pageerror", (error) => pageErrors.push(error.message));
-    await page.route(address + "facts.html", (route) => route.fulfill({
-      contentType: "text/html",
-      body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>",
-    }));
-    await page.goto(address + "facts.html");
-    const result = await page.evaluate(async (payload: { fnSource: string; model: unknown }) => {
+    const address = server.resolvedUrls?.local[0];
+    if (!address) throw new Error("画面的模块服务器没有给出地址");
+    const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+    try {
+      const page = await browser.newPage();
       try {
-        const fn = (0, eval)(`(${payload.fnSource})`) as (i: { model: unknown }) => Promise<FactClickReport>;
-        return { ok: await fn({ model: payload.model }) };
-      } catch (e) {
-        return { failed: String((e as Error)?.stack ?? e) };
+        const pageErrors: string[] = [];
+        page.on("pageerror", (error) => pageErrors.push(error.message));
+        await page.route(address + "facts.html", (route) => route.fulfill({
+          contentType: "text/html",
+          body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>",
+        }));
+        await page.goto(address + "facts.html");
+        const result = await page.evaluate(async (payload: { fnSource: string; model: unknown }) => {
+          try {
+            const fn = (0, eval)(`(${payload.fnSource})`) as (i: { model: unknown }) => Promise<FactClickReport>;
+            return { ok: await fn({ model: payload.model }) };
+          } catch (e) {
+            return { failed: String((e as Error)?.stack ?? e) };
+          }
+        }, { fnSource: factClick.toString(), model: factClickModel });
+        if ("failed" in result) throw new Error(`驱动失败：${String(result.failed)}`);
+        assert.deepEqual(pageErrors, [], `页面不应报错：${pageErrors.join("\n")}`);
+        const report = result.ok as FactClickReport;
+        // 画面上没有打开任何覆盖层，事实元件照样画出来了的一部分、缺来源的那一个没画
+        assert.equal(report.overlay, null, "这一条用例说的是没有打开覆盖层的情形");
+        assert.ok(report.facts.some((fact) => fact.drawn), `样例状态没有画出事实元素：${JSON.stringify(report.facts)}`);
+        assert.ok(report.facts.some((fact) => !fact.drawn), `样例状态没有缺来源的元件：${JSON.stringify(report.facts)}`);
+        // 点画出来的事实元件：画面交出「点开回链」，带事项与元件
+        assert.deepEqual(report.drawn, [{ work_item_id: "w1", element: "sign" }], "点画出来的门牌应交出它的事项与元件");
+        // 点没有画出来的那一个（缺来源）：不交出
+        assert.deepEqual(report.missing, report.drawn, "缺来源的元件画面上没有它，不应交出回链");
+        // 鼠标移上去照旧显示可点；缺来源的那一个不显示
+        assert.equal(report.cursor.drawn, "pointer", "画出来的事实元件移上去应显示可点");
+        assert.equal(report.cursor.missing, "default", "缺来源的元件上没有可点的东西");
+      } finally {
+        await page.close();
       }
-    }, { fnSource: factClick.toString(), model: factClickModel });
-    if ("failed" in result) throw new Error(`驱动失败：${String(result.failed)}`);
-    assert.deepEqual(pageErrors, [], `页面不应报错：${pageErrors.join("\n")}`);
-    const report = result.ok as FactClickReport;
-    // 画面上没有打开任何覆盖层，事实元件照样画出来了的一部分、缺来源的那一个没画
-    assert.equal(report.overlay, null, "这一条用例说的是没有打开覆盖层的情形");
-    assert.ok(report.facts.some((fact) => fact.drawn), `样例状态没有画出事实元素：${JSON.stringify(report.facts)}`);
-    assert.ok(report.facts.some((fact) => !fact.drawn), `样例状态没有缺来源的元件：${JSON.stringify(report.facts)}`);
-    // 点画出来的事实元件：画面交出「点开回链」，带事项与元件
-    assert.deepEqual(report.drawn, [{ work_item_id: "w1", element: "sign" }], "点画出来的门牌应交出它的事项与元件");
-    // 点没有画出来的那一个（缺来源）：不交出
-    assert.deepEqual(report.missing, report.drawn, "缺来源的元件画面上没有它，不应交出回链");
-    // 鼠标移上去照旧显示可点；缺来源的那一个不显示
-    assert.equal(report.cursor.drawn, "pointer", "画出来的事实元件移上去应显示可点");
-    assert.equal(report.cursor.missing, "default", "缺来源的元件上没有可点的东西");
+    } finally {
+      await browser.close();
+    }
   } finally {
-    await page.close();
-    await browser.close();
     await server.close();
   }
 });
