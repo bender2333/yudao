@@ -8201,6 +8201,7 @@ export type WorkItemOrganization = {
      * Same As Project
      */
     same_as_project?: boolean | null;
+    entry?: OrganizationRole | null;
 };
 
 /**

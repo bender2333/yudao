@@ -15,20 +15,26 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
+import uuid
 from pathlib import Path
 from typing import Any
 
+from harness import direct
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app import project_queries
 from harness.app.application import Application
+from harness.app.contracts import Accepted
+from harness.app.form_commands import OrganizationAdopt
+from harness.app.form_queries import ProjectOrganization
 from harness.app.project_queries import ProjectFlow, ProjectLoop, WorkItemOrganization
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.event_store import project_stream, run_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import completion_turn
-from harness.runtime import SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, LoopSystem
+from harness.runtime import FORM_REGISTRY, SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, LoopSystem
 from harness.tests.helpers import delivery_turn, product_spec, quality_turns
 from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
@@ -156,7 +162,8 @@ def test_the_default_definition_gives_three_roles_the_verifier_and_the_three_rel
     # 质检是核验角色，它核验工程的交付
     assert [(verifier.role, [(verified.role, verified.outcomes) for verified in verifier.verifies])
             for verifier in organization.verifiers] == [("quality", [("engineering", ["delivery_spec"])])]
-    # 成果驱动以核验角色的放行结束，没有交完成的角色
+    # 成果驱动有核验角色核验最终成果，入口角色为产品，交完成角色为空值
+    assert organization.entry is not None and (organization.entry.id, organization.entry.label) == ("product", "产品")
     assert organization.completing is None
     # 三条关注关系：产品交的 PRD 送到工程与质检，工程交的交付送到质检（推出规则表）
     assert _pairs(organization.watched, "source", "recipient", "outcome") == [
@@ -176,6 +183,7 @@ def test_the_default_definition_gives_three_roles_the_verifier_and_the_three_rel
     # 每项事实带给出它的事件位置与来源种类：给出它们的是把这份定义冻结进事项的那条事件（run_created）
     position = _run_created_position(system, run_id)
     refs = [role.ref for role in organization.roles]
+    refs += [organization.entry.ref]
     refs += [verifier.ref for verifier in organization.verifiers]
     refs += [relation.ref for relation in organization.watched]
     refs += [relation.ref for relation in organization.asks]
@@ -193,13 +201,19 @@ def test_a_single_renamed_role_gives_its_own_role_and_hands_in_completion(tmp_pa
     system = _system(data_dir, forms)
     project_id = system.projects.register("一个角色", GOAL)
     _set_form(system, project_id, DEFAULT_FORM, "single")
-    work_item_id, _run_id = system.projects.start_work_item(project_id, "做一件事")
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
     organization = _organization(_application(system), project_id, work_item_id)
 
     assert organization.form == "single"
     assert [(role.id, role.label) for role in organization.roles] == [(RENAMED, RENAMED_LABEL)]
-    # 直做（一个角色的组织）由它自己交完成
-    assert organization.completing is not None and organization.completing.id == RENAMED
+    # 改名单角色无核验定义：接收来源与提交最终成果的角色均为该改名角色，来源引用指向冻结定义事件
+    position = _run_created_position(system, run_id)
+    assert organization.entry is not None and (organization.entry.id, organization.entry.label) == (
+        RENAMED, RENAMED_LABEL)
+    assert organization.completing is not None and (organization.completing.id, organization.completing.label) == (
+        RENAMED, RENAMED_LABEL)
+    assert {(organization.entry.ref.position, organization.entry.ref.source),
+            (organization.completing.ref.position, organization.completing.ref.source)} == {(position, "user")}
     # 没有核验角色：没有核验、没有打回；只有它一个角色，没有可问的对象
     assert organization.verifiers == [] and organization.rejections == [] and organization.asks == []
     # 关注的成果里没有别的角色交得出的（它只交交付），所以没有关注关系
@@ -365,3 +379,134 @@ def test_the_input_of_a_default_item_goes_to_the_product_role(tmp_path):
     work_item_id, _run_id = system.projects.start_work_item(project_id, "做一件事")
     first = _first_record(_application(system), project_id, work_item_id)
     assert (first.kind, first.direction_to) == ("你的输入", PRODUCT)
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1753：多职能开环的交完成角色与接收来源的入口角色（保护 R2、R3）
+
+RENAMED_PLANNER = "planner"
+RENAMED_PLANNER_LABEL = "规划"
+RENAMED_BUILDER = "builder"
+RENAMED_BUILDER_LABEL = "建造"
+
+
+def _renamed_several_roles_direct(directory: Path) -> Any:
+    """将两职能无核验直做形态的两个角色全部改名，验证入口角色与交完成角色均由定义推导得出。"""
+    shutil.copytree(DEFINITIONS_DIR / "forms" / SEVERAL_ROLES_DIRECT, directory)
+    mapping = {PRODUCT: RENAMED_PLANNER, ENGINEERING: RENAMED_BUILDER}
+    labels = {RENAMED_PLANNER: RENAMED_PLANNER_LABEL, RENAMED_BUILDER: RENAMED_BUILDER_LABEL}
+
+    def replace_names(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {replace_names(key): replace_names(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [replace_names(item) for item in value]
+        if isinstance(value, str) and value in mapping:
+            return mapping[value]
+        return value
+
+    for name in ("organization.json", "proposal_contracts.json", "roles.json",
+                 "routings.json", "tools.json", "work_items.json"):
+        path = directory / name
+        document = replace_names(json.loads(path.read_text(encoding="utf-8")))
+        if name == "organization.json":
+            for department in document["departments"]:
+                department["label"] = labels[department["id"]]
+        path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    return load_definitions(directory)
+
+
+def test_open_loop_forms_expose_entry_and_completing_roles(tmp_path, data_dir):
+    # 保护 R2（对外查询合同字段仅做新增）与 R3（开环完成与形态随事项冻结）：
+    # 单职能直做、两职能无核验直做、改名两职能直做以及去掉核验角色的成果驱动定义均给出入口角色与交完成角色
+    renamed_several = _renamed_several_roles_direct(tmp_path / "renamed_several")
+    forms = {**FORM_REGISTRY, "renamed_several": (renamed_several, direct.DIRECT_TIGHTENING)}
+    system = _system(data_dir, forms)
+    application = _application(system)
+
+    # 1. 单职能无核验直做（「工程」）
+    single_project, single_item, single_run = _started(system, "单职能直做", SINGLE_ROLE_DIRECT)
+    single_org = _organization(application, single_project, single_item)
+    single_pos = _run_created_position(system, single_run)
+    assert single_org is not None
+    assert [role.id for role in single_org.roles] == [ENGINEERING]
+    assert single_org.entry is not None and (single_org.entry.id, single_org.entry.label) == (ENGINEERING, "工程")
+    assert single_org.completing is not None and (single_org.completing.id, single_org.completing.label) == (
+        ENGINEERING, "工程")
+    assert {(single_org.entry.ref.position, single_org.entry.ref.source),
+            (single_org.completing.ref.position, single_org.completing.ref.source)} == {(single_pos, "user")}
+
+    # 2. 两职能无核验直做（「产品 · 工程」）
+    several_project, several_item, several_run = _started(system, "两职能直做", SEVERAL_ROLES_DIRECT)
+    several_org = _organization(application, several_project, several_item)
+    several_pos = _run_created_position(system, several_run)
+    assert several_org is not None
+    assert [role.id for role in several_org.roles] == [PRODUCT, ENGINEERING]
+    assert several_org.verifiers == []
+    assert several_org.entry is not None and (several_org.entry.id, several_org.entry.label) == (ENGINEERING, "工程")
+    assert several_org.completing is not None and (several_org.completing.id, several_org.completing.label) == (
+        ENGINEERING, "工程")
+    assert {(several_org.entry.ref.position, several_org.entry.ref.source),
+            (several_org.completing.ref.position, several_org.completing.ref.source)} == {(several_pos, "user")}
+
+    # 3. 改名两职能无核验直做：无须依赖固定角色标识
+    renamed_project, renamed_item, renamed_run = _started(system, "改名两职能直做", "renamed_several")
+    renamed_org = _organization(application, renamed_project, renamed_item)
+    renamed_pos = _run_created_position(system, renamed_run)
+    assert renamed_org is not None
+    assert [(role.id, role.label) for role in renamed_org.roles] == [
+        (RENAMED_PLANNER, RENAMED_PLANNER_LABEL), (RENAMED_BUILDER, RENAMED_BUILDER_LABEL)]
+    assert renamed_org.entry is not None and (renamed_org.entry.id, renamed_org.entry.label) == (
+        RENAMED_BUILDER, RENAMED_BUILDER_LABEL)
+    assert renamed_org.completing is not None and (renamed_org.completing.id, renamed_org.completing.label) == (
+        RENAMED_BUILDER, RENAMED_BUILDER_LABEL)
+    assert {(renamed_org.entry.ref.position, renamed_org.entry.ref.source),
+            (renamed_org.completing.ref.position, renamed_org.completing.ref.source)} == {(renamed_pos, "user")}
+
+    # 4. 去掉核验角色的成果驱动多职能定义：入口角色为产品，提交最终成果的角色为工程
+    open_watched_project = system.projects.register("成果驱动无核验", GOAL)
+    current = application.query("project.organization", ProjectOrganization(project_id=open_watched_project)).data
+    remove_quality = {
+        "remove_departments": ["quality"],
+        "departments": {
+            "product": {"watched": {"remove": ["baseline_review"]}},
+            "engineering": {"watched": {"remove": ["defect_record"]}},
+        },
+    }
+    adopted = asyncio.run(application.command("organization.adopt", OrganizationAdopt(
+        command_id=str(uuid.uuid4()), project_id=open_watched_project, form=DEFAULT_FORM,
+        changes=remove_quality, reason="去掉核验角色", base_version=current.version, mode="advanced"),
+        actor="user:local"))
+    assert isinstance(adopted, Accepted), adopted
+    watched_item, watched_run = system.projects.start_work_item(open_watched_project, "做一件事")
+    watched_org = _organization(application, open_watched_project, watched_item)
+    watched_pos = _run_created_position(system, watched_run)
+    assert watched_org is not None
+    assert [role.id for role in watched_org.roles] == [PRODUCT, ENGINEERING]
+    assert watched_org.verifiers == []
+    assert watched_org.entry is not None and (watched_org.entry.id, watched_org.entry.label) == (PRODUCT, "产品")
+    assert watched_org.completing is not None and (watched_org.completing.id, watched_org.completing.label) == (
+        ENGINEERING, "工程")
+    assert {(watched_org.entry.ref.position, watched_org.entry.ref.source),
+            (watched_org.completing.ref.position, watched_org.completing.ref.source)} == {(watched_pos, "user")}
+
+
+def test_direct_form_with_independent_verifier_exposes_entry_and_omits_completing(data_dir):
+    # 保护 R2（对外查询合同字段仅做新增）与 R3（有核验角色核验最终成果时以放行结束，交完成角色为空值）：
+    # 直做加独立核验角色的定义下，入口角色为接收来源的角色，交完成角色为空值
+    with_verifier = load_definitions(Path(__file__).parent / "direct_with_verifier_definitions")
+    forms = {**FORM_REGISTRY, "direct_with_verifier": (with_verifier, direct.DIRECT_TIGHTENING)}
+    system = _system(data_dir, forms)
+    application = _application(system)
+
+    project_id, work_item_id, run_id = _started(system, "直做加核验", "direct_with_verifier")
+    organization = _organization(application, project_id, work_item_id)
+    position = _run_created_position(system, run_id)
+
+    assert organization is not None
+    assert [role.id for role in organization.roles] == [ENGINEERING, QUALITY]
+    assert [verifier.role for verifier in organization.verifiers] == [QUALITY]
+    assert organization.entry is not None and (organization.entry.id, organization.entry.label) == (ENGINEERING, "工程")
+    assert (organization.entry.ref.position, organization.entry.ref.source) == (position, "user")
+    assert organization.completing is None
+
