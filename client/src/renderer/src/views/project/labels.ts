@@ -830,10 +830,11 @@ export function launchSystemName(value: string | null | undefined): string {
   return LAUNCH_SYSTEM_LABELS[system] ?? "其他系统";
 }
 
-// 质检结论（QAReview 的 verdict）：三种词，与逐条结论的三种结果不是同一组
+// 核验结论（QAReview 与直做核验的 verdict）：四种词，与逐条结论的三种结果分开登记
 export const VERDICT_LABELS: Readonly<Record<string, string>> = Object.freeze({
   release: "放行",
   rework_engineering: "缺陷记录",
+  rework: "打回",
   cannot_verify: "无法核验",
 });
 
