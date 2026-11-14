@@ -587,8 +587,8 @@ export type RecipientOption = {
   label: string;
 };
 
-/** 收件人连续发送的两种记忆：选过的指导对象（manual）与输入框里有字时冻住的那一个（hold）。 */
-export type ComposerState = { manual: string | null; hold: string | null };
+/** 收件人状态记忆：显式选择的对象（manual）、选取时是否存在在跑事项（manualActive）、草稿非空时冻住的对象（hold）。 */
+export type ComposerState = { manual: string | null; hold: string | null; manualActive?: boolean };
 
 function composerFacts(input: ComposerInput): { roles: readonly ComposerRole[]; routing: string } {
   return input.frozen === null
@@ -600,6 +600,12 @@ function nameOf(id: string, input: ComposerInput, roles: readonly ComposerRole[]
   return input.labels?.[id] ?? roles.find((role) => role.id === id)?.label ?? id;
 }
 
+function receiverNameOf(input: ComposerInput, roles: readonly ComposerRole[]): string {
+  const ids = roles.map((role) => role.id);
+  const receiver = ids.includes(input.receiver) ? input.receiver : ids[0] ?? "";
+  return receiver === "" ? "" : nameOf(receiver, input, roles).trim();
+}
+
 /**
  * 收件人一行的选项（设计说明 4.14 交互骨架第 2 条）：
  *   直做是「开始一个新事项」「给接输入的职能的指导」，点过别的节点再多出给它的指导一项；
@@ -609,13 +615,14 @@ export function recipientOptions(input: ComposerInput): RecipientOption[] {
   const { roles, routing } = composerFacts(input);
   const ids = roles.map((role) => role.id);
   const receiver = ids.includes(input.receiver) ? input.receiver : ids[0] ?? "";
+  const receiverName = receiverNameOf(input, roles);
   const options: RecipientOption[] = [
     { id: "new", kind: "new", department: null, label: "开始一个新事项" },
   ];
   if (routing !== "direct" && input.active) {
     options.push({
       id: "append", kind: "append", department: null,
-      label: `追加输入（${nameOf(receiver, input, roles)}接，重新验收）`,
+      label: receiverName === "" ? "追加输入（重新验收）" : `追加输入（${receiverName}接，重新验收）`,
     });
   }
   const guides: string[] = [];
@@ -649,17 +656,64 @@ export function defaultRecipient(input: ComposerInput): string {
   return guides.includes(receiver) ? receiver : guides[0] ?? "new";
 }
 
-/** 现在选中的收件人：有字时冻住的那一个先在，其次是选过的指导对象，都没有时按状态选。 */
+/** 现在选中的收件人：草稿非空时冻住的对象优先，其次是当前有效的显式选择，其余情况按状态选择默认。 */
 export function chosenRecipient(input: ComposerInput, state: ComposerState): string {
   const options = recipientOptions(input);
   const valid = (id: string | null): boolean => id !== null && options.some((option) => option.id === id);
   if (valid(state.hold)) {
     return state.hold as string;
   }
-  if (valid(state.manual)) {
+  const manualAllowed = input.active || state.manual === "new" || state.manualActive === false;
+  if (manualAllowed && valid(state.manual)) {
     return state.manual as string;
   }
   return defaultRecipient(input);
+}
+
+/** 显式点击一个收件人药丸：草稿为空时同样记住这次选择，草稿非空时一并冻住。 */
+export function pickRecipient(
+  input: ComposerInput, state: ComposerState, optionId: string, draft: string,
+): ComposerState {
+  if (!recipientOptions(input).some((option) => option.id === optionId)) {
+    return state;
+  }
+  return {
+    manual: optionId,
+    hold: draft.trim() === "" ? null : optionId,
+    manualActive: input.active,
+  };
+}
+
+/** 点击循环图节点：有在跑事项时切换到对应职能的指导；无在跑事项时保持原收件人。 */
+export function focusRecipient(
+  input: ComposerInput, state: ComposerState, focusRole: string | null, draft: string,
+): ComposerState {
+  if (!input.active || focusRole === null) {
+    return state;
+  }
+  const id = `guide:${focusRole}`;
+  if (!recipientOptions({ ...input, focus: focusRole }).some((option) => option.id === id)) {
+    return state;
+  }
+  return {
+    manual: id,
+    hold: draft.trim() === "" ? null : id,
+    manualActive: true,
+  };
+}
+
+/** 在跑事项状态切换：事项结束时清空运行期留下的显式记忆；新事项启动且草稿为空时清空空闲期选择。 */
+export function activeChanged(state: ComposerState, active: boolean): ComposerState {
+  if (!active) {
+    if (state.manual !== null && state.manualActive !== false) {
+      return { manual: null, hold: state.hold };
+    }
+    return state;
+  }
+  if (state.manual !== null && state.manualActive === false && state.hold === null) {
+    return { manual: null, hold: null };
+  }
+  return state;
 }
 
 /**
@@ -667,7 +721,7 @@ export function chosenRecipient(input: ComposerInput, state: ComposerState): str
  * 清空以后恢复按状态选（设计说明 4.14：输入框里有字以后收件人不再随状态变，发送后恢复按状态选）。
  */
 export function draftChanged(state: ComposerState, draft: string, current: string): ComposerState {
-  return { manual: state.manual, hold: draft.trim() === "" ? null : state.hold ?? current };
+  return { ...state, hold: draft.trim() === "" ? null : state.hold ?? current };
 }
 
 /**
@@ -676,24 +730,26 @@ export function draftChanged(state: ComposerState, draft: string, current: strin
  */
 export function afterSend(state: ComposerState, sent: string): ComposerState {
   void state;
-  return sent.startsWith("guide:") ? { manual: sent, hold: null } : { manual: null, hold: null };
+  return sent.startsWith("guide:") ? { manual: sent, hold: null, manualActive: true } : { manual: null, hold: null };
 }
 
 /** 收件人下面那一行说明（设计说明 4.14：新事项排在谁后面、追加输入要重新验收、指导下一轮读到）。 */
 export function recipientHint(input: ComposerInput, recipientId: string, activeTitle: string): string {
   const { roles } = composerFacts(input);
-  const ids = roles.map((role) => role.id);
-  const receiver = ids.includes(input.receiver) ? input.receiver : ids[0] ?? "";
+  const receiverName = receiverNameOf(input, roles);
   const option = recipientOptions(input).find((candidate) => candidate.id === recipientId);
   if (option === undefined) {
     return "";
   }
   const working = input.active && activeTitle !== "";
   if (option.kind === "new") {
-    return working ? `排在「${activeTitle}」后面，它做完才开始` : `${nameOf(receiver, input, roles)}接，马上开始`;
+    if (working) {
+      return `排在「${activeTitle}」后面，它做完才开始`;
+    }
+    return receiverName === "" ? "写下意图，马上开始" : `${receiverName}接，马上开始`;
   }
   if (option.kind === "append") {
-    return `${nameOf(receiver, input, roles)}接，已有的交付要重新验收`;
+    return receiverName === "" ? "已有的交付要重新验收" : `${receiverName}接，已有的交付要重新验收`;
   }
   const who = option.department === null ? "" : nameOf(option.department, input, roles);
   return working ? `发给${who}：用在「${activeTitle}」上，下一轮读到` : `发给${who}`;
