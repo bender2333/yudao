@@ -208,12 +208,15 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         first_event = yudao.first_archived_delivery(export)
         last_event = yudao.last_archived_delivery(export)
         if last_event is not None:
-            delivery_files = yudao.fetch_delivery(client, last_event, delivery_dir)
+            delivery_files = yudao.fetch_delivery(client, last_event, delivery_dir,
+                                                  project_id=project_id, work_item_id=work_item_id)
         else:
             os.makedirs(delivery_dir, exist_ok=True)
         if first_event is not None and first_event is not last_event:
             first_delivery_files = yudao.fetch_delivery(client, first_event,
-                                                        first_delivery_dir)
+                                                        first_delivery_dir,
+                                                        project_id=project_id,
+                                                        work_item_id=work_item_id)
     finally:
         client.stop()
         stdout, stderr = yudao.stop_service(process)
@@ -334,12 +337,16 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
             first_event = yudao.first_archived_delivery(export)
             last_event = yudao.last_archived_delivery(export)
             if last_event is not None:
-                delivery_files = yudao.fetch_delivery(client, last_event, delivery_dir)
+                delivery_files = yudao.fetch_delivery(client, last_event, delivery_dir,
+                                                      project_id=project_id,
+                                                      work_item_id=work_item_id)
             else:
                 os.makedirs(delivery_dir, exist_ok=True)
             if first_event is not None and first_event is not last_event:
                 first_delivery_files = yudao.fetch_delivery(client, first_event,
-                                                            first_delivery_dir)
+                                                            first_delivery_dir,
+                                                            project_id=project_id,
+                                                            work_item_id=work_item_id)
     finally:
         client.stop()
         stdout, stderr = yudao.stop_service(process)

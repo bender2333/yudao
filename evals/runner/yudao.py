@@ -6,7 +6,7 @@
 事件、日志与提交。
 
 一次运行：新建每次运行独立的起点文件夹（只含题目提供的数据文件）、建立项目并把它作为
-起始文件夹交给被测的 Yudao、三个部门的项目部门设置使用被测模型、运行器不登记命令、
+起始文件夹交给被测的 Yudao、项目当前组织的各职能设置使用被测模型、运行器不登记命令、
 以用户原始意图提交需求原文加接口约定、等待结束；到时间上限时经 `work_item.cancel`
 结束并标记超时；运行结束以后经 `run.export` 导出事件日志，取最后一次封存的交付交给
 评分器，并在导出的事件日志中查找材料目录的路径（找到时这次运行作废）。
@@ -457,12 +457,12 @@ def form_refusal(error):
 
 
 def save_department_settings(client, project_id):
-    """三个部门的项目部门设置都使用被测模型（一行）。"""
+    """项目当前组织的全部职能设置都使用被测模型。"""
     settings = client.query("project.settings", {"project_id": project_id})["data"]["departments"]
     reminders = {}
-    for department in ("product", "engineering", "quality"):
+    for department, current in settings.items():
         accepted = client.command("department_settings.save",
-                                  {"base_version": settings[department]["version"],
+                                  {"base_version": current["version"],
                                    "project_id": project_id, "department": department,
                                    "provider_id": PROVIDER_ID, "model_id": MODEL_DEFINITION_ID})
         reminders[department] = list((accepted.get("refs") or {}).get("reminders") or [])
@@ -627,9 +627,25 @@ def export_run(client, run_id):
     return client.query("run.export", {"run_id": run_id})["data"]
 
 
+COMPLETION_ARTIFACT_KIND = "completion"
+
+
+def _is_archived_delivery(event):
+    """识别封存交付事件：成果驱动的 `delivery_accepted` 与直做交完成的 `artifact_accepted`。"""
+    kind = event.get("type")
+    if kind == "delivery_accepted":
+        return True
+    if kind != "artifact_accepted":
+        return False
+    payload = event.get("payload") or {}
+    if payload.get("artifact_kind") != COMPLETION_ARTIFACT_KIND:
+        return False
+    return "artifact_ref" not in payload or isinstance(payload.get("artifact_ref"), dict)
+
+
 def last_archived_delivery(export):
-    """最后一次封存的交付：它的 `delivery_accepted` 事件是封存的交付树。"""
-    deliveries = [event for event in export["events"] if event["type"] == "delivery_accepted"]
+    """最后一次封存的交付：`delivery_accepted` 或直做交完成的 `artifact_accepted`。"""
+    deliveries = [event for event in export["events"] if _is_archived_delivery(event)]
     return deliveries[-1] if deliveries else None
 
 
@@ -637,9 +653,9 @@ def first_archived_delivery(export):
     """第一次封存的交付：与 `last_archived_delivery` 对称。
 
     只有一次交付时两次取到同一个事件，没有交付时都是 None。两份都交给评分器：
-    第一次交付的完成度与质检带来的提高都从它算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）。
+    第一次交付的完成度与质检带来的提高都从它计算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）。
     """
-    deliveries = [event for event in export["events"] if event["type"] == "delivery_accepted"]
+    deliveries = [event for event in export["events"] if _is_archived_delivery(event)]
     return deliveries[0] if deliveries else None
 
 
@@ -649,14 +665,33 @@ def quality_released(export):
     return bool(reviews) and reviews[-1]["payload"].get("verdict") == "release"
 
 
-def fetch_delivery(client, delivery_event, target_dir):
-    """把封存的交付树逐个文件取回到评分目录（`delivery.file` 只读封存内容）。"""
+def _delivery_files(client, delivery_event, *, project_id=None, work_item_id=None):
+    """读取一版封存交付的文件路径清单：载荷自带 `files` 时直接读取，直做交完成时经 `work_item.materials` 按事件编号查询。"""
+    payload = delivery_event.get("payload") or {}
+    if isinstance(payload.get("files"), list):
+        return list(payload["files"])
+    resolved_project = project_id or delivery_event.get("project_id")
+    resolved_item = work_item_id or delivery_event.get("work_item_id")
+    if not resolved_project or not resolved_item:
+        raise ValueError("work_item.materials requires project_id and work_item_id")
+    materials = client.query("work_item.materials",
+                             {"project_id": resolved_project, "work_item": resolved_item})["data"]
+    event_id = delivery_event["event_id"]
+    for entry in materials.get("deliveries") or []:
+        if entry.get("event_id") == event_id:
+            return list(entry.get("files") or [])
+    raise RuntimeError("delivery version not found in work_item.materials: " + str(event_id))
+
+
+def fetch_delivery(client, delivery_event, target_dir, *, project_id=None, work_item_id=None):
+    """把封存的交付树逐个文件取回到评分目录（`delivery.file` 只读取封存内容）。"""
+    files = _delivery_files(client, delivery_event,
+                            project_id=project_id, work_item_id=work_item_id)
     if os.path.exists(target_dir):
         shutil.rmtree(target_dir)
     os.makedirs(target_dir)
-    payload = delivery_event["payload"]
     written = []
-    for path in payload["files"]:
+    for path in files:
         fetched = client.query("delivery.file",
                                {"event_id": delivery_event["event_id"], "path": path})["data"]
         destination = os.path.join(target_dir, *path.split("/"))
