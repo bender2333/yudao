@@ -159,6 +159,10 @@ export type LoopState = (typeof LOOP_STATES)[number];
 export const ARTIFACTS = ["prd", "box", "defect", "release"] as const;
 export type Artifact = (typeof ARTIFACTS)[number];
 
+/** 事项结束章的种类：实心绿底的放行章与虚线镂空底的开环完成章（工单 #1385）。 */
+export const STAMP_KINDS = ["release", "open_loop"] as const;
+export type StampKind = (typeof STAMP_KINDS)[number];
+
 /** 房间里状态的姿势（roomState.pose.anim）。 */
 export const POSES = ["type", "read_sit", "write", "think", "rummage", "sit_wait", "tea", "sit", "inspect"] as const;
 export type Pose = (typeof POSES)[number];
@@ -300,6 +304,14 @@ export interface LoopItem extends FloorItem {
   queue_pos?: number;
   waiting_provider_sec?: number;
   url?: string;
+  /** 事项结束章的种类（核验放行或开环完成；未盖结束章时为 null）。 */
+  stamp_kind?: StampKind | null;
+  /** 外包角色交回完成时为 true，印文带「外包」后缀。 */
+  outsourced?: boolean;
+  /** 该事项盖结束章所在的职能屋标识（同层多定义并集时按事项自身冻结定义定位）。 */
+  stamp_room?: string | null;
+  /** 该事项从大厅进入的第一间职能屋标识（同层多定义并集时按事项自身冻结定义选管道）。 */
+  entry_room?: string | null;
 }
 
 /** 一个部门在等模型服务：管道口挂一块牌子。 */
@@ -355,6 +367,13 @@ export interface OpsView {
   auto_repair_stopped?: boolean;
 }
 
+/** 成果库货架上的一个已采纳事项箱子：正面带结束章印记并一直保留（工单 #1385）。 */
+export interface ShelfBox {
+  work_item_id: string;
+  stamp_kind: StampKind;
+  outsourced?: boolean;
+}
+
 /**
  * 项目楼层的画面状态：楼层的状态加上画面上还要用的几个字段
  * （未回答的询问、成果库、执行槽位、等待模型服务、运维、机器、部门里的角色、决定请求）。
@@ -363,7 +382,7 @@ export interface OpsView {
 export interface FloorModel extends PixelState {
   items: LoopItem[];
   open_requests: OpenRequest[];
-  shelves: { adopted: string[] };
+  shelves: { adopted: string[]; boxes?: ShelfBox[] };
   slots: { total: number; used: number } | null;
   waiting_provider: WaitingProvider[];
   machines: MachineView[] | null;
@@ -390,6 +409,13 @@ export interface BuildingRoomLight {
   lit: boolean;
 }
 
+/** 楼里一层的事项结束章明细（工单 #1385，供诚实性不变式 H5 读取）。 */
+export interface BuildingStamp {
+  work_item_id: string;
+  kind: StampKind;
+  outsourced?: boolean;
+}
+
 /** 楼里一层（楼的状态里的一项）：状态灯、亮灯的房间、小旗与名牌。 */
 export interface BuildingFloor {
   project_id: string;
@@ -399,12 +425,14 @@ export interface BuildingFloor {
   name: string;
   /** 按这一层的屋列表给出的亮灯格子（工单 #1383）。 */
   rooms?: BuildingRoomLight[];
-  /** 兼容别名（旧测试读取，工单 #1385 清理）：房间标识 → 是否亮灯。 */
+  /** 兼容别名（旧测试读取）：房间标识 → 是否亮灯。 */
   lit: Record<string, boolean | undefined>;
   /** 这一层的定义里是否有运维角色。 */
   has_ops: boolean;
   /** 事项的小旗：在本层房间里的事项，按部门挂在房门口。 */
   flags: { work_item_id: string; color_index: number; department: string }[];
+  /** 本层已结束事项的结束章明细（核验放行或开环完成）。 */
+  stamps?: BuildingStamp[];
   /** 入口阀门：等待执行槽位时关闭。 */
   valve_closed: boolean;
   /** 用着机器的设备编号：通往机房的管线按它画。 */
@@ -442,6 +470,10 @@ export interface RoomState extends PixelState {
   verifier?: boolean;
   /** 这间屋的角色是否为开环完成角色（决定有没有出口托盘）。 */
   exit_tray?: boolean;
+  /** 当前聚焦事项在这间屋留下的结束章种类（核验放行在检验台，开环完成在出口托盘）。 */
+  stamp_kind?: StampKind | null;
+  /** 当前聚焦事项是否为外包角色完成。 */
+  outsourced?: boolean;
   status: RoomStatus;
   roles?: RoleEntry[];
   pose?: RoomPose;
@@ -490,6 +522,12 @@ export function floorState(s: unknown): FloorState {
   (state.items as unknown[]).forEach((raw) => {
     const it = raw as Loose;
     oneOf(ITEM_STATES, it.status, "事项 " + String(it.id) + " 的状态");
+    if (it.stamp_kind !== undefined && it.stamp_kind !== null) {
+      oneOf(STAMP_KINDS, it.stamp_kind, "事项 " + String(it.id) + " 的章种类");
+    }
+    if (it.outsourced !== undefined && typeof it.outsourced !== "boolean") {
+      fail("事项 " + String(it.id) + " 的外包标记", it.outsourced);
+    }
     const departments = it.departments;
     if (departments) {
       Object.keys(departments as Loose).forEach((d) =>
@@ -497,6 +535,17 @@ export function floorState(s: unknown): FloorState {
     }
     refs(it.refs, "事项 " + String(it.id));
   });
+  const shelves = state.shelves as Loose | undefined;
+  if (shelves && shelves.boxes !== undefined) {
+    if (!Array.isArray(shelves.boxes)) fail("成果库箱子列表形状无效", shelves.boxes);
+    (shelves.boxes as unknown[]).forEach((boxRaw) => {
+      const box = boxRaw as Loose;
+      if (typeof box.work_item_id !== "string" || box.work_item_id === "") {
+        fail("成果库箱子缺少事项标识", boxRaw);
+      }
+      oneOf(STAMP_KINDS, box.stamp_kind, "成果库箱子 " + String(box.work_item_id) + " 的章种类");
+    });
+  }
   const roles = state.roles;
   if (roles) {
     Object.keys(roles as Loose).forEach((d) => {
@@ -560,11 +609,21 @@ export function buildingState(s: unknown): BuildingState {
         }
       });
     }
+    if (f.stamps !== undefined && f.stamps !== null) {
+      if (!Array.isArray(f.stamps)) fail("楼层 " + String(f.project_id) + " 的 stamps 形状无效", f.stamps);
+      (f.stamps as unknown[]).forEach((stRaw) => {
+        const st = stRaw as Loose;
+        if (typeof st.work_item_id !== "string" || st.work_item_id === "") {
+          fail("楼层 " + String(f.project_id) + " 的章条目缺少事项标识", stRaw);
+        }
+        oneOf(STAMP_KINDS, st.kind, "楼层 " + String(f.project_id) + " 事项 " + String(st.work_item_id) + " 的章种类");
+      });
+    }
   });
   return s as BuildingState;
 }
 
-/** 房间状态的校验（原型 v13 roomState）：角色标识、核验与出口托盘标记、房间状态、角色、姿势。 */
+/** 房间状态的校验（原型 v13 roomState）：角色标识、核验与出口托盘标记、章种类、房间状态、角色、姿势。 */
 export function roomState(s: unknown): RoomState {
   positionOf(s, "房间的状态");
   const state = s as Loose;
@@ -579,6 +638,12 @@ export function roomState(s: unknown): RoomState {
   }
   if (state.exit_tray !== undefined && typeof state.exit_tray !== "boolean") {
     fail("房间的出口托盘标记", state.exit_tray);
+  }
+  if (state.stamp_kind !== undefined && state.stamp_kind !== null) {
+    oneOf(STAMP_KINDS, state.stamp_kind, "房间的章种类");
+  }
+  if (state.outsourced !== undefined && typeof state.outsourced !== "boolean") {
+    fail("房间的外包标记", state.outsourced);
   }
   oneOf(ROOM_STATES, state.status, "房间的状态");
   const roles = state.roles;

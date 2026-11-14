@@ -12,7 +12,7 @@ import { RoomRenderer } from "./render.ts";
 import { roomAppearanceOf } from "./decl.ts";
 import { emptyRoomData } from "./room.ts";
 import { H, W, STATUS_TEXT } from "./layout.ts";
-import type { PixelAction, PixelState } from "../contract.ts";
+import type { PixelAction, PixelState, StampKind } from "../contract.ts";
 import type { SceneLike } from "../world/types.ts";
 
 export type { RoomData } from "./room.ts";
@@ -41,6 +41,8 @@ export interface RoomChannels {
   verifier: boolean;
   /** 房间里有没有出口托盘（开环完成角色）。 */
   exit_tray: boolean;
+  /** 房间里盖章台或出口托盘上的结束章事实（实心放行或虚线开环完成）。 */
+  stamp: { kind: StampKind; outsourced: boolean; text: string } | null;
   /** 房间状态与 CRT 上的状态文字。 */
   status: { value: string; text: string };
   /** 状态给出的姿势（哪个角色摆的、什么姿势）。 */
@@ -66,12 +68,19 @@ function roomChannels(driver: RoomDriver): RoomChannels {
   const status = model.status || "idle";
   const actors = driver.actors();
   const defaultLabel = roomAppearanceOf(model.department).defaultLabel;
+  const outsourced = Boolean(model.outsourced);
+  const stamp = model.stamp_kind === "open_loop"
+    ? { kind: "open_loop" as const, outsourced, text: outsourced ? "开环完成 · 外包" : "开环完成" }
+    : model.stamp_kind === "release"
+      ? { kind: "release" as const, outsourced: false, text: "放行" }
+      : null;
   return {
     position: model.position,
     department: model.department,
     label: model.label || defaultLabel || model.department,
     verifier: Boolean(model.verifier),
     exit_tray: Boolean(model.exit_tray),
+    stamp,
     status: { value: status, text: STATUS_TEXT[status] ?? status },
     pose: model.pose ? { role_id: model.pose.role_id ?? null, anim: model.pose.anim } : null,
     roles: model.roles

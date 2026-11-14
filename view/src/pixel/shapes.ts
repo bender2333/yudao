@@ -394,14 +394,22 @@ export function signStyle(text: string): SignStyle {
   if (/待恢复/.test(s)) return { bg: PAL.yellow2, fg: PAL.ink, stripe: PAL.orange2 };
   if (/暂停/.test(s)) return { bg: PAL.blue1, fg: PAL.ink, stripe: PAL.blue2 };
   if (/失败|不通过/.test(s)) return { bg: PAL.red2, fg: PAL.white, stripe: PAL.red3 };
+  if (/开环/.test(s)) return { bg: PAL.paper, fg: "#7a4e16", stripe: "#8a5a1e" };
   if (/完成|通过|放行/.test(s)) return { bg: PAL.green2, fg: PAL.white, stripe: PAL.green3 };
   if (/取消/.test(s)) return { bg: PAL.grey1, fg: PAL.ink, stripe: PAL.grey3 };
   if (/不确定/.test(s)) return { bg: PAL.yellow1, fg: PAL.ink, stripe: PAL.yellow3 };
   return { bg: PAL.paper, fg: PAL.ink, stripe: PAL.paper3 };
 }
 
-/** 印章印记（原型 stampMark）。 */
-export function drawStampMark(c: CanvasRenderingContext2D, cx: number, cy: number, str: string, color: string, o?: { size?: number; rot?: number; alpha?: number }): void {
+/** 印章印记（原型 stampMark；dashed 为真时绘制虚线边框与镂空浅底）。 */
+export function drawStampMark(
+  c: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  str: string,
+  color: string,
+  o?: { size?: number; rot?: number; alpha?: number; dashed?: boolean },
+): void {
   const opt = o ?? {};
   const size = opt.size || 7;
   c.save();
@@ -411,17 +419,77 @@ export function drawStampMark(c: CanvasRenderingContext2D, cx: number, cy: numbe
   c.font = textFont(size, 800);
   const w = Math.round(c.measureText(str).width + 6);
   const h = size + 5;
-  c.fillStyle = color;
-  c.fillRect(-w / 2, -h / 2, w, 1);
-  c.fillRect(-w / 2, h / 2 - 1, w, 1);
-  c.fillRect(-w / 2, -h / 2, 1, h);
-  c.fillRect(w / 2 - 1, -h / 2, 1, h);
-  c.fillRect(-w / 2 + 2, -h / 2 + 2, w - 4, 1);
-  c.fillRect(-w / 2 + 2, h / 2 - 3, w - 4, 1);
+  const x0 = Math.round(-w / 2);
+  const y0 = Math.round(-h / 2);
+  if (opt.dashed) {
+    c.fillStyle = "rgba(246, 240, 226, 0.76)";
+    c.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+    c.fillStyle = color;
+    for (let dx = 0; dx < w; dx++) {
+      if (dx % 4 < 2 || dx === 0 || dx === w - 1) {
+        c.fillRect(x0 + dx, y0, 1, 1);
+        c.fillRect(x0 + dx, y0 + h - 1, 1, 1);
+      }
+    }
+    for (let dy = 0; dy < h; dy++) {
+      if (dy % 4 < 2 || dy === 0 || dy === h - 1) {
+        c.fillRect(x0, y0 + dy, 1, 1);
+        c.fillRect(x0 + w - 1, y0 + dy, 1, 1);
+      }
+    }
+  } else {
+    c.fillStyle = color;
+    c.fillRect(x0, y0, w, 1);
+    c.fillRect(x0, y0 + h - 1, w, 1);
+    c.fillRect(x0, y0, 1, h);
+    c.fillRect(x0 + w - 1, y0, 1, h);
+    c.fillRect(x0 + 2, y0 + 2, w - 4, 1);
+    c.fillRect(x0 + 2, y0 + h - 3, w - 4, 1);
+  }
   c.textAlign = "center";
   c.textBaseline = "middle";
   c.fillText(str, 0, 0.5);
   c.restore();
+}
+
+/** 虚线边框、镂空浅底的像素印章框（用于出口托盘开环完成章与成果库箱子虚线章）。 */
+export function drawDashedStampBox(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  text?: string,
+  o?: { bg?: string; border?: string; fg?: string; size?: number },
+): void {
+  const rx = Math.round(x);
+  const ry = Math.round(y);
+  const rw = Math.max(4, Math.round(w));
+  const rh = Math.max(4, Math.round(h));
+  c.fillStyle = o?.bg ?? "rgba(246, 240, 226, 0.82)";
+  c.fillRect(rx + 1, ry + 1, rw - 2, rh - 2);
+  c.fillStyle = o?.border ?? "#8a5a1e";
+  for (let dx = 0; dx < rw; dx++) {
+    if (dx % 4 < 2 || dx === 0 || dx === rw - 1) {
+      c.fillRect(rx + dx, ry, 1, 1);
+      c.fillRect(rx + dx, ry + rh - 1, 1, 1);
+    }
+  }
+  for (let dy = 0; dy < rh; dy++) {
+    if (dy % 4 < 2 || dy === 0 || dy === rh - 1) {
+      c.fillRect(rx, ry + dy, 1, 1);
+      c.fillRect(rx + rw - 1, ry + dy, 1, 1);
+    }
+  }
+  if (text) {
+    drawText(c, text, rx + rw / 2, ry + rh / 2 + 0.5, {
+      size: o?.size ?? 5.5,
+      weight: 800,
+      align: "center",
+      color: o?.fg ?? "#6e4412",
+      max: rw - 3,
+    });
+  }
 }
 
 /** 箭头：折线加箭头（原型 arrow），减少动画时用它表示交接。 */

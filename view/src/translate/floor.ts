@@ -20,13 +20,13 @@ import type {
   Artifact, BusyState, CoverageLegendRow, CoverageOverlayCriterion, CoverageOverlayData, CoverageResult,
   DecisionFace, FactElement, FloorModel, FloorTopology, FloorTopologyAsk, FloorTopologyHandoff,
   FloorTopologyRejection, FloorTopologyRoom, ItemState, LoopItem, LoopsOverlayData, MachineView,
-  OpenRequest, OpsView, PixelAction, RoleInfo, Source, SourceOverlayData, SourceRef, WaitingProvider,
+  OpenRequest, OpsView, PixelAction, RoleInfo, ShelfBox, Source, SourceOverlayData, SourceRef, StampKind, WaitingProvider,
 } from "../pixel/contract.ts";
 import { COVERAGE_RESULTS, floorState as checkFloorState, SOURCES } from "../pixel/contract.ts";
 import { CHECK_METHODS } from "./coverage.ts";
 import { face, label, STOP_REASON } from "./face.ts";
 import { cut, say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
-import { itemStateOf, roleStatus } from "./tables.ts";
+import { completingRoleOf, itemStateOf, resolveWorkItemStamp, roleStatus } from "./tables.ts";
 
 // ---------------------------------------------------------------------------
 // 状态
@@ -117,6 +117,8 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
   }
   const status = itemState(row);
   const refs = factRefs(row);
+  const org = row.organization ?? DEFAULT_ORGANIZATION;
+  const stampInfo = resolveWorkItemStamp(row as never, org);
   return {
     id: row.work_item_id,
     work_item_id: row.work_item_id,
@@ -128,6 +130,10 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     // 因升级停止的事项没有当前部门（project.loop 的 department 为空）：门口牌子立在最后工作的那个部门
     // （工单 #1186，docs/design/app-and-interface.md「查询清单」 2026-10-29 补充）
     department: row.department ?? (status === "upgrade_stopped" ? row.last_department : null),
+    ...(stampInfo.entry_room ? { entry_room: stampInfo.entry_room } : {}),
+    ...(stampInfo.stamp_room ? { stamp_room: stampInfo.stamp_room } : {}),
+    ...(stampInfo.stamp_kind ? { stamp_kind: stampInfo.stamp_kind } : {}),
+    ...(stampInfo.outsourced ? { outsourced: true } : {}),
     round: row.round,
     started_at: row.started_at,
     elapsed_sec: row.elapsed_sec,
@@ -269,7 +275,7 @@ export function deriveFloorTopology(
   const roomsMap = new Map<string, FloorTopologyRoom>();
   for (const org of orgs) {
     const verifiers = new Set(org.verifiers.map((v) => v.role));
-    const completingId = org.completing?.id ?? null;
+    const completingId = completingRoleOf(org);
     for (const role of org.roles) {
       const existing = roomsMap.get(role.id);
       if (existing) {
@@ -307,8 +313,9 @@ export function deriveFloorTopology(
     for (const v of org.verifiers) {
       if (v.role) addHandoff(v.role, "library", { valve: true });
     }
-    if (org.completing?.id) {
-      addHandoff(org.completing.id, "library", { valve: true });
+    const completingId = completingRoleOf(org);
+    if (completingId) {
+      addHandoff(completingId, "library", { valve: true });
     }
   }
   if (roomsMap.has("operations")) {
@@ -361,11 +368,30 @@ export function deriveFloorTopology(
 export function floorState(input: FloorStateInput): FloorModel {
   const loop = input.loop;
   const workItems = loop?.work_items ?? [];
+  const items = workItems.map(itemOf);
+  const itemByWorkItemId = new Map(items.map((it) => [it.work_item_id, it]));
+  const adoptions = loop?.adoptions ?? [];
+  const boxes: ShelfBox[] = adoptions.map((a) => {
+    const raw = a as unknown as Record<string, unknown>;
+    const matched = itemByWorkItemId.get(a.work_item_id);
+    const stamp_kind: StampKind = matched?.stamp_kind
+      ?? (raw.stop_reason === "open_loop" ? "open_loop" : "release");
+    const outsourced = Boolean(matched?.outsourced)
+      || raw.outsourced === true
+      || raw.verified_external === true;
+    return {
+      work_item_id: a.work_item_id,
+      stamp_kind,
+      ...(outsourced ? { outsourced: true } : {}),
+    };
+  });
   const model: FloorModel = {
     position: input.position,
-    items: workItems.map(itemOf),
+    items,
     open_requests: openRequestsOf(loop, input.asks),
-    shelves: { adopted: (loop?.adoptions ?? []).map((a) => a.work_item_id) },
+    shelves: boxes.length > 0
+      ? { adopted: adoptions.map((a) => a.work_item_id), boxes }
+      : { adopted: adoptions.map((a) => a.work_item_id) },
     slots: input.slots ?? null,
     waiting_provider: input.waiting_provider ?? [],
     machines: input.machines ?? null,
@@ -510,6 +536,7 @@ function one(kind: string, ev: FloorEvent, ctx: ActionContext, extra?: Record<st
       roleName: ctx.roleName,
       deptLabel: deptLabelOf(org),
       isVerifier: (dept) => isVerifierInOrg(org, dept),
+      hasVerifiers: org.verifiers.length > 0,
     }),
     ...(extra ?? {}),
   };
@@ -600,6 +627,39 @@ const FLOOR: Readonly<Record<string, Rule>> = {
   structure_accepted: (ev, ctx) => {
     const pair = deliveryTargetPair(ev, orgOf(ctx));
     return [handoff(ev, pair.from, pair.to, "box", ctx)];
+  },
+  // 通用成果接纳：无核验角色交完成时在出口托盘盖虚线的开环完成章并送成果库；有核验角色交完成只封存送核验屋；独立核验结论按放行或打回走
+  artifact_accepted: (ev, ctx) => {
+    const org = orgOf(ctx);
+    const p = pl(ev);
+    const kind = text(p.artifact_kind);
+    const issuer = ev.department || text(p.artifact_issuer) || completingRoleOf(org) || inferEntryIds(org)[0] || "engineering";
+    const evWithDept: FloorEvent = { ...ev, department: issuer };
+    if (kind === "completion") {
+      if (org.verifiers.length === 0) {
+        const outsourced = p.outsourced === true || p.verified_external === true;
+        return [
+          one("stamp_open_loop", evWithDept, ctx, outsourced ? { outsourced: true } : null),
+          handoff(evWithDept, issuer, "library", "box", ctx),
+        ];
+      }
+      const target = org.watched.find((w) => w.source === issuer && w.outcome === "completion")?.recipient
+        ?? org.verifiers[0]!.role;
+      return [one("seal", evWithDept, ctx), handoff(evWithDept, issuer, target, "box", ctx)];
+    }
+    if (kind === "completion_review") {
+      if (p.verdict === "release") {
+        return [one("stamp_release", evWithDept, ctx), handoff(evWithDept, issuer, text(p.release_to) || "library", "release", ctx)];
+      }
+      const pair = qaReworkPair(evWithDept, org);
+      return [one("stamp_defect", evWithDept, ctx), handoff(evWithDept, pair.from, pair.to, "defect", ctx)];
+    }
+    const target = org.watched.find((w) => w.source === issuer && w.outcome === kind)?.recipient
+      ?? org.watched.find((w) => w.source === issuer)?.recipient
+      ?? "";
+    return target
+      ? [one("stamp_valid", evWithDept, ctx), handoff(evWithDept, issuer, target, "prd", ctx)]
+      : [one("stamp_valid", evWithDept, ctx)];
   },
   // 放行：放行单送往成果库，载荷写明 release_to 时送往那个职能；缺陷记录经回流管道送回打回目标职能
   qa_submitted: (ev, ctx) => {

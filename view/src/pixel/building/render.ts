@@ -7,9 +7,9 @@
 // 画法复用已有的画布原语（grid、char 与 registry），与原型逐行对应。
 
 import { mix, rgba } from "../grid.ts";
-import { roomShellOf } from "../floor/render-decl.ts";
+import { hasDeclaredRoomVisual, roomShellOf } from "../floor/render-decl.ts";
 import { ITEM_COLORS, ITEM_SHADES, PAL } from "../registry.ts";
-import { drawActor, drawBitmap, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
+import { drawActor, drawBitmap, drawDashedStampBox, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
 import { BUILDING_STATUS } from "./status-text.ts";
 import { buildingRoomSlot, buildingShaftStartX, defaultBuildingRooms } from "../world/floor-decl.ts";
 import type { SceneLike } from "../world/types.ts";
@@ -113,16 +113,30 @@ export class BuildingRenderer {
     if (f.valve_closed) {
       drawSign(c, 70, y + 50, "等待执行槽位", { size: 5.5, bg: PAL.yellow1, stripe: PAL.orange2, maxW: 100 });
     }
-    // 这一层的屋子亮灯与门口小旗（屋列表来自楼层定义角色的并集）
+    // 本层已结束事项的章印记：核验放行画实心绿章，开环完成画虚线镂空章
+    (f.stamps ?? []).slice(-2).forEach((st, idx) => {
+      const sy = y + 8 + idx * 8;
+      if (st.kind === "open_loop") {
+        drawDashedStampBox(c, 126, sy, 18, 7, "开环", { size: 4.2 });
+      } else {
+        fillPixelOutlined(c, 127, sy, 16, 6, PAL.green2);
+        drawText(c, "放行", 135, sy + 3.4, { size: 4.2, weight: 800, align: "center", color: PAL.white, max: 14 });
+      }
+    });
+    // 这一层的屋子亮灯与门口小旗（屋列表来自楼层定义角色的并集，未声明专属外观的角色使用中性灰米通用外观）
     const rooms = f.rooms ?? defaultBuildingRooms(f.lit, f.has_ops);
     rooms.forEach((room, k) => {
       const slot = buildingRoomSlot(rooms.length, k);
       const x = slot.x;
       const w = slot.w;
       const D = roomShellOf(room.id);
+      const isGeneric = !hasDeclaredRoomVisual(room.id);
       const lit = room.lit;
       fillPixelOutlined(c, x, y + 8, w, 36, lit ? D.wall : mix(D.wall, PAL.ink, 0.45));
       fillPixel(c, x + 2, y + 10, w - 4, 3, D.main);
+      if (isGeneric) {
+        fillPixel(c, x + 2, y + 40, w - 4, 2, D.trim);
+      }
       if (lit) {
         c.fillStyle = rgba(PAL.yellow1, this.scene.reduced ? 0.45 : 0.35 + 0.1 * Math.sin(t / 400 + k));
         c.fillRect(x + 2, y + 13, w - 4, 29);

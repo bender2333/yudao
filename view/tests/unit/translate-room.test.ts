@@ -132,6 +132,7 @@ const SAMPLES: [string, RoomEvent, string][] = [
   ["run_resumed", { type: "run_resumed", position: 30, department: "engineering", label: "中断的运行自动继续" }, "engineering"],
   ["run_continued", { type: "run_continued", position: 31, department: "engineering", label: "运行从暂停位置继续" }, "engineering"],
   ["decision_requested", { type: "decision_requested", position: 32, department: "engineering", label: "提出等待回答的决定（model_unavailable）", payload: { kind: "model_unavailable", description: "模型引用用不了" } }, "engineering"],
+  ["artifact_accepted", { type: "artifact_accepted", position: 33, department: "engineering", label: "完成成果被接纳", payload: { artifact_kind: "completion", artifact_issuer: "engineering" } }, "engineering"],
 ];
 
 test("翻译：覆盖核对里房间翻成动作的每种事件都翻出至少一个动作，kind 在房间声明表里", () => {
@@ -267,4 +268,67 @@ test("翻译：模型输出片段作为流式文字交给画面，不进时间�
     who: { room: "engineering", role: null }, text: "正在整理验收条件",
   });
   assert.equal(streamOfEvent({ type: "tool_started", position: 51, department: "engineering" }), null);
+});
+
+// ---------------------------------------------------------------------------
+// 开环完成与直做加核验房间翻译（工单 #1385，守 R2 房间合同与 R3 开环完成与放行区分）
+
+test("开环完成与直做加核验：房间翻译区分出口托盘虚线章与送核验屋封存", () => {
+  const ref = { position: 1, source: "rule" as const };
+  const openOrg = {
+    form: "solo_engineering",
+    routing: "watched_outputs" as const,
+    entry: { id: "engineering", label: "工程", ref },
+    roles: [{ id: "engineering", label: "工程", ref }],
+    verifiers: [],
+    completing: { id: "engineering", label: "工程", ref },
+    watched: [],
+    asks: [],
+    rejections: [],
+  };
+  const openEv: RoomEvent = {
+    type: "artifact_accepted",
+    position: 61,
+    department: "engineering",
+    payload: { artifact_kind: "completion", artifact_issuer: "engineering", outsourced: true },
+  };
+  const openActs = actions(openEv, "engineering", { organization: openOrg });
+  assert.deepEqual(openActs.map((a) => a.kind), ["stamp_open_loop", "handoff"]);
+  assert.equal(openActs[0].outsourced, true);
+  assert.equal(openActs[0].say, "现在盖开环完成章");
+  assert.equal(openActs[1].to, "library");
+
+  const openRoomState = state({
+    position: 62,
+    workspace: roomSample({ status: "done", outsourced: true }),
+    department: "engineering",
+    organization: openOrg,
+  });
+  assert.equal(openRoomState.verifier, false);
+  assert.equal(openRoomState.exit_tray, true);
+  assert.equal(openRoomState.stamp_kind, "open_loop");
+  assert.equal(openRoomState.outsourced, true);
+
+  const verifiedOrg = {
+    form: "direct_verified",
+    routing: "watched_outputs" as const,
+    entry: { id: "engineering", label: "工程", ref },
+    roles: [
+      { id: "engineering", label: "工程", ref },
+      { id: "quality", label: "质检", ref },
+    ],
+    verifiers: [{ role: "quality", verifies: [{ role: "engineering", outcomes: ["completion"] }], ref }],
+    completing: null,
+    watched: [{ source: "engineering", recipient: "quality", outcome: "completion", ref }],
+    asks: [],
+    rejections: [{ verifier: "quality", role: "engineering", outcome: "completion", ref }],
+  };
+  const verifiedEv: RoomEvent = {
+    type: "artifact_accepted",
+    position: 63,
+    department: "engineering",
+    payload: { artifact_kind: "completion", artifact_issuer: "engineering" },
+  };
+  assert.deepEqual(actions(verifiedEv, "engineering", { organization: verifiedOrg }).map((a) => a.kind), ["seal", "handoff"]);
+  assert.deepEqual(actions(verifiedEv, "quality", { organization: verifiedOrg }).map((a) => a.kind), ["handoff"]);
 });

@@ -14,6 +14,10 @@ import { chromium, type Browser } from "@playwright/test";
 
 import { floorActions, floorState } from "../../src/translate/floor.ts";
 import { buildingActions, buildingState } from "../../src/translate/building.ts";
+import { actions as roomActions, state as translateRoomState } from "../../src/translate/room.ts";
+import { hasDeclaredFloorAppearance } from "../../src/pixel/world/floor-decl.ts";
+import { hasDeclaredRoomVisual } from "../../src/pixel/floor/render-decl.ts";
+import { hasDeclaredRoomAppearance } from "../../src/pixel/room/decl.ts";
 import type { CoverageOverlayData } from "../../src/pixel/contract.ts";
 import {
   FakeServer,
@@ -594,6 +598,826 @@ test("三职能全部改名跑同一段录制：事实通道除门牌与屋名�
     );
   }
   assert.deepEqual(renamedSnap.criterionLabels, defaultSnap.criterionLabels);
+});
+
+// ---------------------------------------------------------------------------
+// 单屋直做、两屋无核验 / 直做加核验、同层多份定义并集与未声明角色通用外观（工单 #1385）
+
+const TOPO_REF = { position: 2, source: "rule" as const };
+
+function makeTopoRow(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    work_item_id: "w_topo",
+    kind: "request",
+    sign: "示例事项",
+    color_index: 1,
+    status: "in_progress",
+    department: "engineering",
+    progress: null,
+    round: 1,
+    started_at: "2026-11-14T09:00:00+08:00",
+    elapsed_sec: 45,
+    time_limit_sec: 3600,
+    pending_question: null,
+    run_id: "r_topo",
+    adoption_id: null,
+    recovery_state: null,
+    version: 1,
+    refs: { sign: TOPO_REF, round: TOPO_REF, elapsed: TOPO_REF },
+    ...over,
+  };
+}
+
+// 守 R2 与 R3：「工程」只有一个职能时，大厅与成果库之间只画一间自适应铺满标准跨度的「工程」屋，设出口托盘，
+// 交完成时演关键动作盖虚线的开环完成章，采纳后出口托盘与成果库箱子均保留虚线章，进入工程房间也画出口托盘与虚线章。
+test("「工程」单职能直做：只画一间工程屋设出口托盘，楼层、房间与成果库箱子均盖虚线的开环完成章", async () => {
+  const soloOrg = {
+    form: "solo_engineering",
+    routing: "watched_outputs",
+    entry: { id: "engineering", label: "工程", ref: TOPO_REF },
+    roles: [{ id: "engineering", label: "工程", ref: TOPO_REF }],
+    verifiers: [],
+    completing: { id: "engineering", label: "工程", ref: TOPO_REF },
+    watched: [],
+    asks: [],
+    rejections: [],
+  };
+
+  const workingModel = floorState({
+    position: 10,
+    loop: {
+      project_id: "p_solo",
+      work_items: [makeTopoRow({ work_item_id: "w_solo", sign: "修一处样式", organization: soloOrg })] as never,
+      adoptions: [],
+    },
+    roles: { engineering: [{ id: "eng-lead", name: "主程", kind: "lead", status: "working" }] },
+  });
+  const adoptedModel = floorState({
+    position: 20,
+    loop: {
+      project_id: "p_solo",
+      work_items: [
+        makeTopoRow({
+          work_item_id: "w_solo",
+          sign: "修一处样式",
+          status: "adopted",
+          stop_reason: "open_loop",
+          department: null,
+          organization: soloOrg,
+          refs: { sign: TOPO_REF, stamp: { position: 19, source: "role_statement" }, box: { position: 20, source: "rule" } },
+        }),
+      ] as never,
+      adoptions: [{ adoption_id: "ad_solo", work_item_id: "w_solo", run_id: "r_topo" } as never],
+    },
+  });
+  const completionActions = floorActions(
+    {
+      type: "artifact_accepted",
+      position: 19,
+      department: "engineering",
+      work_item_id: "w_solo",
+      payload: { artifact_kind: "completion", artifact_issuer: "engineering" },
+    },
+    { organization: soloOrg as never },
+  );
+  const roomCompletionActions = roomActions(
+    {
+      type: "artifact_accepted",
+      position: 19,
+      department: "engineering",
+      work_item_id: "w_solo",
+      payload: { artifact_kind: "completion", artifact_issuer: "engineering" },
+    },
+    "engineering",
+    { organization: soloOrg as never },
+  );
+  const soloWorkingRoomState = translateRoomState({
+    position: 10,
+    workspace: {
+      room: {
+        department: "engineering",
+        level: "S5",
+        status: "working",
+        crt: { target: "修一处样式", model: "m", protocol: "Responses", status: "进行中", cycle: 1 },
+        roles: [{ id: "eng-lead", name: "主程", kind: "lead", status: "working", task: "修一处样式" }],
+        pose: { role_id: "eng-lead", action: "reading" },
+        door: null,
+        hold_card: null,
+        mailbox: 0,
+        summaries: 0,
+        scrolls: 0,
+        pinned_notes: 0,
+        semantic_cards: 0,
+        machine: null,
+        remote_unknown: false,
+        waiting_provider: false,
+        pipes: { out: "idle", letters_waiting: 0 },
+        existing_read: false,
+        trial: null,
+        tool_panel: null,
+        self_test: null,
+      },
+    },
+    department: "engineering",
+    organization: soloOrg as never,
+  });
+  const soloRoomState = translateRoomState({
+    position: 20,
+    workspace: {
+      room: {
+        department: "engineering",
+        level: "S5",
+        status: "done",
+        crt: { target: "修一处样式", model: "m", protocol: "Responses", status: "已完成", cycle: 1 },
+        roles: [{ id: "eng-lead", name: "主程", kind: "lead", status: "idle", task: null }],
+        pose: { role_id: "eng-lead", action: "idle" },
+        door: null,
+        hold_card: null,
+        mailbox: 0,
+        summaries: 0,
+        scrolls: 0,
+        pinned_notes: 0,
+        semantic_cards: 0,
+        machine: null,
+        remote_unknown: false,
+        waiting_provider: false,
+        pipes: { out: "idle", letters_waiting: 0 },
+        existing_read: false,
+        trial: null,
+        tool_panel: null,
+        self_test: null,
+      },
+    },
+    department: "engineering",
+    organization: soloOrg as never,
+  });
+
+  const snap = await runInPage(
+    async (input: {
+      workingModel: Record<string, unknown>;
+      adoptedModel: Record<string, unknown>;
+      completionActions: Record<string, unknown>[];
+      soloWorkingRoomState: Record<string, unknown>;
+      soloRoomState: Record<string, unknown>;
+      roomCompletionActions: Record<string, unknown>[];
+    }) => {
+      const FloorMod = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+      const RoomMod = await import(/* @vite-ignore */ "/src/pixel/room/view.ts" as string) as typeof import("../../src/pixel/room/view.ts");
+      const ClockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+
+      const hostF = document.createElement("div");
+      hostF.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px";
+      document.body.appendChild(hostF);
+      const hostR = document.createElement("div");
+      hostR.style.cssText = "position:fixed;left:0;top:330px;width:640px;height:320px";
+      document.body.appendChild(hostR);
+
+      const clock = ClockMod.createManualClock();
+      const advance = (ms: number): void => {
+        const frames = Math.max(1, Math.round(ms / 50));
+        for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+      };
+
+      const fView = await FloorMod.createFloorView({ host: hostF, clock });
+      const rView = await RoomMod.createRoomView({ host: hostR, clock, department: "engineering" });
+      try {
+        fView.jump(input.workingModel as never);
+        advance(200);
+        for (const act of input.completionActions) fView.play(act as never);
+        advance(200);
+        const playingFloor = fView.inspect().driver.inspectTimeline().playing.map((p) => p.kind);
+
+        fView.jump(input.adoptedModel as never);
+        advance(250);
+        const world = fView.inspect().driver.world;
+        const engRoom = world.rooms.engineering;
+        const fChannels = fView.inspect().channels();
+        const stampRect = fView.factRects().find((r) => r.element === "stamp") ?? null;
+        const boxRect = fView.factRects().find((r) => r.element === "box") ?? null;
+
+        rView.jump(input.soloWorkingRoomState as never);
+        advance(200);
+        for (const act of input.roomCompletionActions) rView.play(act as never);
+        rView.setState(input.soloRoomState as never);
+        advance(800);
+        const playingRoom = rView.inspect().driver.timeline().playing.map((p) => p.kind);
+        let sawBenchMark: { text: string; color: string; dashed?: boolean } | null = null;
+        for (let step = 0; step < 140; step++) {
+          advance(50);
+          const cur = rView.inspect().driver.state.bench.mark;
+          if (cur?.dashed) sawBenchMark = { ...cur };
+        }
+        const rChannels = rView.inspect().channels();
+
+        return {
+          roomOrder: world.roomOrder.slice(),
+          engBounds: engRoom ? { x: engRoom.x, w: engRoom.w, verifier: Boolean(engRoom.def.verifier), exitTray: Boolean(engRoom.def.exitTray) } : null,
+          fChannels,
+          playingFloor,
+          stampRect: stampRect ? { x: stampRect.x, y: stampRect.y, w: stampRect.w, h: stampRect.h, drawn: stampRect.drawn } : null,
+          boxRect: boxRect ? { x: boxRect.x, y: boxRect.y, w: boxRect.w, h: boxRect.h, drawn: boxRect.drawn } : null,
+          playingRoom,
+          rChannels,
+          benchMark: sawBenchMark,
+        };
+      } finally {
+        fView.destroy();
+        rView.destroy();
+        hostF.remove();
+        hostR.remove();
+      }
+    },
+    { workingModel, adoptedModel, completionActions, soloWorkingRoomState, soloRoomState, roomCompletionActions },
+  );
+
+  // 大厅与成果库之间只有一间铺满标准跨度 342 的工程屋，带出口托盘，整层无盖章台
+  assert.deepEqual(snap.roomOrder, ["hall", "engineering", "library"]);
+  assert.ok(snap.engBounds);
+  assert.equal(snap.engBounds.w, 342);
+  assert.equal(snap.engBounds.verifier, false);
+  assert.equal(snap.engBounds.exitTray, true);
+  assert.deepEqual(snap.fChannels.links, {
+    handoffs: ["engineering>library", "hall>engineering"],
+    tubes: [],
+    returns: [],
+  });
+
+  // 交完成时演关键动作 stamp_open_loop；已采纳时出口托盘与成果库箱子均保留虚线章且回链命中框落在对应区域
+  assert.ok(snap.playingFloor.includes("stamp_open_loop"), `楼层未演 stamp_open_loop：${snap.playingFloor.join(",")}`);
+  assert.deepEqual(snap.fChannels.stamps, [
+    { work_item_id: "w_solo", room: "engineering", kind: "open_loop", outsourced: false, text: "开环完成" },
+  ]);
+  assert.deepEqual(snap.fChannels.shelf.boxes, [
+    { work_item_id: "w_solo", stamp_kind: "open_loop", outsourced: false },
+  ]);
+  assert.ok(snap.stampRect && snap.stampRect.drawn, "出口托盘虚线章未登记点击回链命中框");
+  const stampCenterX = snap.stampRect.x + snap.stampRect.w / 2;
+  assert.ok(
+    stampCenterX >= snap.engBounds.x + snap.engBounds.w - 60 && stampCenterX <= snap.engBounds.x + snap.engBounds.w,
+    `虚线章中心 ${stampCenterX} 未落在工程屋右侧出口托盘区域`,
+  );
+  assert.ok(snap.boxRect && snap.boxRect.drawn, "成果库箱子未登记点击回链命中框");
+
+  // 工程房间：具备出口托盘、无检验台，演出 stamp_open_loop 留下虚线印记，事实通道为 open_loop
+  assert.ok(snap.playingRoom.includes("stamp_open_loop"), `房间未演 stamp_open_loop：${snap.playingRoom.join(",")}`);
+  assert.equal(snap.rChannels.verifier, false);
+  assert.equal(snap.rChannels.exit_tray, true);
+  assert.deepEqual(snap.rChannels.stamp, { kind: "open_loop", outsourced: false, text: "开环完成" });
+  assert.equal(snap.benchMark?.text, "开环完成");
+  assert.equal(snap.benchMark?.dashed, true);
+
+  // 外包字样分支：外包标记为真时，楼层出口托盘、成果库箱子与房间印文均为「开环完成 · 外包」
+  const outsourcedFloorModel = floorState({
+    position: 25,
+    loop: {
+      project_id: "p_solo",
+      work_items: [
+        makeTopoRow({
+          work_item_id: "w_solo_ext",
+          sign: "外包直做事项",
+          status: "adopted",
+          stop_reason: "open_loop",
+          outsourced: true,
+          department: null,
+          organization: soloOrg,
+          refs: { sign: TOPO_REF, stamp: { position: 24, source: "role_statement" }, box: { position: 25, source: "rule" } },
+        }),
+      ] as never,
+      adoptions: [{ adoption_id: "ad_solo_ext", work_item_id: "w_solo_ext", run_id: "r_ext" } as never],
+    },
+  });
+  const outsourcedRoomState = translateRoomState({
+    position: 25,
+    workspace: {
+      room: {
+        department: "engineering",
+        level: "S5",
+        status: "done",
+        outsourced: true,
+        crt: { target: "外包直做事项", model: "m", protocol: "Responses", status: "已完成", cycle: 1 },
+        roles: [{ id: "eng-lead", name: "主程", kind: "lead", status: "idle", task: null }],
+        pose: { role_id: "eng-lead", action: "idle" },
+        door: null,
+        hold_card: null,
+        mailbox: 0,
+        summaries: 0,
+        scrolls: 0,
+        pinned_notes: 0,
+        semantic_cards: 0,
+        machine: null,
+        remote_unknown: false,
+        waiting_provider: false,
+        pipes: { out: "idle", letters_waiting: 0 },
+        existing_read: false,
+        trial: null,
+        tool_panel: null,
+        self_test: null,
+      },
+    },
+    department: "engineering",
+    organization: soloOrg as never,
+  });
+  const extSnap = await runInPage(
+    async (input: { f: Record<string, unknown>; r: Record<string, unknown> }) => {
+      const FloorMod = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+      const RoomMod = await import(/* @vite-ignore */ "/src/pixel/room/view.ts" as string) as typeof import("../../src/pixel/room/view.ts");
+      const ClockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+      const hF = document.createElement("div");
+      hF.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px";
+      document.body.appendChild(hF);
+      const hR = document.createElement("div");
+      hR.style.cssText = "position:fixed;left:0;top:330px;width:640px;height:320px";
+      document.body.appendChild(hR);
+      const clock = ClockMod.createManualClock();
+      const fv = await FloorMod.createFloorView({ host: hF, clock });
+      const rv = await RoomMod.createRoomView({ host: hR, clock, department: "engineering" });
+      try {
+        fv.jump(input.f as never);
+        rv.jump(input.r as never);
+        clock.advance(200);
+        return { fc: fv.inspect().channels(), rc: rv.inspect().channels() };
+      } finally {
+        fv.destroy();
+        rv.destroy();
+        hF.remove();
+        hR.remove();
+      }
+    },
+    { f: outsourcedFloorModel, r: outsourcedRoomState },
+  );
+  assert.deepEqual(extSnap.fc.stamps, [
+    { work_item_id: "w_solo_ext", room: "engineering", kind: "open_loop", outsourced: true, text: "开环完成 · 外包" },
+  ]);
+  assert.deepEqual(extSnap.fc.shelf.boxes, [
+    { work_item_id: "w_solo_ext", stamp_kind: "open_loop", outsourced: true },
+  ]);
+  assert.deepEqual(extSnap.rc.stamp, { kind: "open_loop", outsourced: true, text: "开环完成 · 外包" });
+});
+
+// 守 R2 与 R3：「产品 · 工程」无核验角色（两屋 + 传信管 + 出口托盘虚线章）与「工程 · 质检」直做加核验（两屋 + 盖章台实心章 + 回流管）。
+test("两屋拓扑：「产品 · 工程」无核验设传信管与出口托盘，「工程 · 质检」直做加核验设盖章台与回流管", async () => {
+  const prodEngOrg = {
+    form: "product_engineering_open",
+    routing: "watched_outputs",
+    entry: { id: "product", label: "产品", ref: TOPO_REF },
+    roles: [
+      { id: "product", label: "产品", ref: TOPO_REF },
+      { id: "engineering", label: "工程", ref: TOPO_REF },
+    ],
+    verifiers: [],
+    completing: { id: "engineering", label: "工程", ref: TOPO_REF },
+    watched: [{ source: "product", recipient: "engineering", outcome: "product_spec", ref: TOPO_REF }],
+    asks: [
+      { requester: "engineering", recipient: "product", ref: TOPO_REF },
+      { requester: "product", recipient: "engineering", ref: TOPO_REF },
+    ],
+    rejections: [],
+  };
+  const engQaOrg = {
+    form: "engineering_quality_verified",
+    routing: "watched_outputs",
+    entry: { id: "engineering", label: "工程", ref: TOPO_REF },
+    roles: [
+      { id: "engineering", label: "工程", ref: TOPO_REF },
+      { id: "quality", label: "质检", ref: TOPO_REF },
+    ],
+    verifiers: [{ role: "quality", verifies: [{ role: "engineering", outcomes: ["completion"] }], ref: TOPO_REF }],
+    completing: null,
+    watched: [{ source: "engineering", recipient: "quality", outcome: "completion", ref: TOPO_REF }],
+    asks: [],
+    rejections: [{ verifier: "quality", role: "engineering", outcome: "completion", ref: TOPO_REF }],
+  };
+
+  const prodEngModel = floorState({
+    position: 30,
+    loop: {
+      project_id: "p_pe",
+      work_items: [
+        makeTopoRow({
+          work_item_id: "w_pe",
+          status: "adopted",
+          stop_reason: "open_loop",
+          department: null,
+          organization: prodEngOrg,
+          refs: { sign: TOPO_REF, stamp: TOPO_REF, box: TOPO_REF },
+        }),
+      ] as never,
+      adoptions: [{ adoption_id: "ad_pe", work_item_id: "w_pe", run_id: "r_pe" } as never],
+    },
+  });
+  const engQaModel = floorState({
+    position: 40,
+    loop: {
+      project_id: "p_eq",
+      work_items: [
+        makeTopoRow({
+          work_item_id: "w_eq",
+          status: "adopted",
+          stop_reason: null,
+          department: null,
+          organization: engQaOrg,
+          refs: { sign: TOPO_REF, stamp: TOPO_REF, box: TOPO_REF },
+        }),
+      ] as never,
+      adoptions: [{ adoption_id: "ad_eq", work_item_id: "w_eq", run_id: "r_eq" } as never],
+    },
+  });
+
+  const readTwo = await runInPage(
+    async (input: { prodEngModel: Record<string, unknown>; engQaModel: Record<string, unknown> }) => {
+      const FloorMod = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+      const ClockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+      const host = document.createElement("div");
+      host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px";
+      document.body.appendChild(host);
+      const clock = ClockMod.createManualClock();
+      const advance = (ms: number): void => {
+        const frames = Math.max(1, Math.round(ms / 50));
+        for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+      };
+      const view = await FloorMod.createFloorView({ host, clock });
+      try {
+        view.jump(input.prodEngModel as never);
+        advance(200);
+        const peWorld = view.inspect().driver.world;
+        const peWidths = ["product", "engineering"].map((id) => peWorld.rooms[id]?.w ?? 0);
+        const peChannels = view.inspect().channels();
+
+        view.jump(input.engQaModel as never);
+        advance(200);
+        const eqWorld = view.inspect().driver.world;
+        const eqWidths = ["engineering", "quality"].map((id) => eqWorld.rooms[id]?.w ?? 0);
+        const eqChannels = view.inspect().channels();
+
+        return { peWidths, peChannels, eqWidths, eqChannels };
+      } finally {
+        view.destroy();
+        host.remove();
+      }
+    },
+    { prodEngModel, engQaModel },
+  );
+
+  // 「产品 · 工程」无核验：两屋各宽 168，有传信管，工程设出口托盘盖虚线章，无盖章台与回流管
+  assert.deepEqual(readTwo.peWidths, [168, 168]);
+  assert.deepEqual(Object.keys(readTwo.peChannels.rooms), ["product", "engineering"]);
+  assert.equal(readTwo.peChannels.rooms.product.verifier, false);
+  assert.equal(readTwo.peChannels.rooms.engineering.verifier, false);
+  assert.equal(readTwo.peChannels.rooms.engineering.exit_tray, true);
+  assert.deepEqual(readTwo.peChannels.links, {
+    handoffs: ["engineering>library", "hall>product", "product>engineering"],
+    tubes: ["product~engineering"],
+    returns: [],
+  });
+  assert.deepEqual(readTwo.peChannels.stamps, [
+    { work_item_id: "w_pe", room: "engineering", kind: "open_loop", outsourced: false, text: "开环完成" },
+  ]);
+
+  // 「工程 · 质检」直做加核验：两屋各宽 168，质检设盖章台盖实心放行章，带红色回流管，两屋均无出口托盘与虚线章
+  assert.deepEqual(readTwo.eqWidths, [168, 168]);
+  assert.deepEqual(Object.keys(readTwo.eqChannels.rooms), ["engineering", "quality"]);
+  assert.equal(readTwo.eqChannels.rooms.engineering.exit_tray, false);
+  assert.equal(readTwo.eqChannels.rooms.quality.exit_tray, false);
+  assert.equal(readTwo.eqChannels.rooms.quality.verifier, true);
+  assert.deepEqual(readTwo.eqChannels.links, {
+    handoffs: ["engineering>quality", "hall>engineering", "quality>library"],
+    tubes: [],
+    returns: ["quality>engineering"],
+  });
+  assert.deepEqual(readTwo.eqChannels.stamps, [
+    { work_item_id: "w_eq", room: "quality", kind: "release", outsourced: false, text: "放行" },
+  ]);
+});
+
+// 守 R2 与 R3：同一楼层同时有一个「产品 · 工程 · 质检」事项与一个「工程」事项时，房间与管道取并集，
+// 每件事项的入口包裹、小旗、门牌与结束章位置各自严格按自身冻结定义流转，直做事项不进产品与质检屋。
+test("同层并存「产品 · 工程 · 质检」与「工程」两份定义：房间取并集，每件事项只按自身冻结定义走", async () => {
+  const triOrg = {
+    form: "three_departments",
+    routing: "watched_outputs",
+    entry: { id: "product", label: "产品", ref: TOPO_REF },
+    roles: [
+      { id: "product", label: "产品", ref: TOPO_REF },
+      { id: "engineering", label: "工程", ref: TOPO_REF },
+      { id: "quality", label: "质检", ref: TOPO_REF },
+    ],
+    verifiers: [{ role: "quality", verifies: [{ role: "engineering", outcomes: ["delivery_spec"] }], ref: TOPO_REF }],
+    completing: null,
+    watched: [
+      { source: "product", recipient: "engineering", outcome: "product_spec", ref: TOPO_REF },
+      { source: "product", recipient: "quality", outcome: "product_spec", ref: TOPO_REF },
+      { source: "engineering", recipient: "quality", outcome: "delivery_spec", ref: TOPO_REF },
+    ],
+    asks: [
+      { requester: "product", recipient: "engineering", ref: TOPO_REF },
+      { requester: "engineering", recipient: "quality", ref: TOPO_REF },
+    ],
+    rejections: [{ verifier: "quality", role: "engineering", outcome: "delivery_spec", ref: TOPO_REF }],
+  };
+  const soloOrg = {
+    form: "solo_engineering",
+    routing: "watched_outputs",
+    entry: { id: "engineering", label: "工程", ref: TOPO_REF },
+    roles: [{ id: "engineering", label: "工程", ref: TOPO_REF }],
+    verifiers: [],
+    completing: { id: "engineering", label: "工程", ref: TOPO_REF },
+    watched: [],
+    asks: [],
+    rejections: [],
+  };
+
+  // 阶段 1：两件事项同时进行中（w_tri 在质检核验，w_solo 在工程直做）
+  const workingUnion = floorState({
+    position: 50,
+    loop: {
+      project_id: "p_mix",
+      work_items: [
+        makeTopoRow({ work_item_id: "w_tri", sign: "三职能事项", color_index: 1, status: "in_progress", department: "quality", organization: triOrg }),
+        makeTopoRow({ work_item_id: "w_solo", sign: "直做事项", color_index: 2, status: "in_progress", department: "engineering", organization: soloOrg }),
+      ] as never,
+      adoptions: [],
+    },
+  });
+
+  // 阶段 2：两件事项均结束并采纳（w_tri 放行，w_solo 开环完成）
+  const finishedUnion = floorState({
+    position: 60,
+    loop: {
+      project_id: "p_mix",
+      work_items: [
+        makeTopoRow({
+          work_item_id: "w_tri",
+          sign: "三职能事项",
+          color_index: 1,
+          status: "adopted",
+          stop_reason: null,
+          department: null,
+          organization: triOrg,
+          refs: { sign: TOPO_REF, stamp: { position: 58, source: "role_statement" }, box: { position: 59, source: "rule" } },
+        }),
+        makeTopoRow({
+          work_item_id: "w_solo",
+          sign: "直做事项",
+          color_index: 2,
+          status: "adopted",
+          stop_reason: "open_loop",
+          department: null,
+          organization: soloOrg,
+          refs: { sign: TOPO_REF, stamp: { position: 56, source: "role_statement" }, box: { position: 60, source: "rule" } },
+        }),
+      ] as never,
+      adoptions: [
+        { adoption_id: "ad_tri", work_item_id: "w_tri", run_id: "r1" } as never,
+        { adoption_id: "ad_solo", work_item_id: "w_solo", run_id: "r2" } as never,
+      ],
+    },
+  });
+
+  const unionSnap = await runInPage(
+    async (input: { workingUnion: Record<string, unknown>; finishedUnion: Record<string, unknown> }) => {
+      const FloorMod = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+      const ClockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+      const host = document.createElement("div");
+      host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px";
+      document.body.appendChild(host);
+      const clock = ClockMod.createManualClock();
+      const advance = (ms: number): void => {
+        const frames = Math.max(1, Math.round(ms / 50));
+        for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+      };
+      const view = await FloorMod.createFloorView({ host, clock });
+      try {
+        view.jump(input.workingUnion as never);
+        advance(150);
+
+        // 分别触发两件事项的入口包裹动作，观察在途包裹各自走哪条入口管道
+        view.play({ kind: "parcel_enter", position: 51, item: "w_solo" });
+        advance(150);
+        const soloPkgLinks = Object.values(view.inspect().driver.world.packages)
+          .map((p) => p.transit?.linkKey)
+          .filter((k): k is string => Boolean(k));
+
+        view.jump(input.workingUnion as never);
+        advance(100);
+        view.play({ kind: "parcel_enter", position: 52, item: "w_tri" });
+        advance(150);
+        const triPkgLinks = Object.values(view.inspect().driver.world.packages)
+          .map((p) => p.transit?.linkKey)
+          .filter((k): k is string => Boolean(k));
+
+        const workingChannels = view.inspect().channels();
+        const signRects = view.factRects().filter((r) => r.element === "sign");
+        const world = view.inspect().driver.world;
+        const roomBounds = Object.fromEntries(
+          ["product", "engineering", "quality"].map((id) => [id, { x: world.rooms[id]!.x, w: world.rooms[id]!.w }]),
+        );
+
+        view.jump(input.finishedUnion as never);
+        advance(250);
+        const finishedChannels = view.inspect().channels();
+        const stampRects = view.factRects().filter((r) => r.element === "stamp");
+
+        return { soloPkgLinks, triPkgLinks, workingChannels, signRects, roomBounds, finishedChannels, stampRects };
+      } finally {
+        view.destroy();
+        host.remove();
+      }
+    },
+    { workingUnion, finishedUnion },
+  );
+
+  // 房间并集：engineering 带出口托盘，quality 带盖章台；入口管道同时有 hall>product 与 hall>engineering
+  assert.deepEqual(Object.keys(unionSnap.workingChannels.rooms), ["product", "engineering", "quality"]);
+  assert.equal(unionSnap.workingChannels.rooms.product.verifier, false);
+  assert.equal(unionSnap.workingChannels.rooms.engineering.exit_tray, true);
+  assert.equal(unionSnap.workingChannels.rooms.engineering.verifier, false);
+  assert.equal(unionSnap.workingChannels.rooms.quality.verifier, true);
+  assert.equal(unionSnap.workingChannels.rooms.quality.exit_tray, false);
+  assert.ok(unionSnap.workingChannels.links.handoffs.includes("hall>product"));
+  assert.ok(unionSnap.workingChannels.links.handoffs.includes("hall>engineering"));
+  assert.ok(unionSnap.workingChannels.links.handoffs.includes("engineering>library"));
+  assert.ok(unionSnap.workingChannels.links.handoffs.includes("quality>library"));
+
+  // 直做事项入口包裹直奔 hall>engineering，不进 product；三职能事项走 hall>product
+  assert.deepEqual(unionSnap.soloPkgLinks, ["hall>engineering"]);
+  assert.deepEqual(unionSnap.triPkgLinks, ["hall>product"]);
+
+  // 小旗与门牌各自落在自己所在职能屋门口，直做事项不挂在产品或质检屋
+  assert.deepEqual(unionSnap.workingChannels.rooms.product.flags, []);
+  assert.deepEqual(unionSnap.workingChannels.rooms.engineering.flags.map((f) => f.id), ["w_solo"]);
+  assert.deepEqual(unionSnap.workingChannels.rooms.quality.flags.map((f) => f.id), ["w_tri"]);
+  const soloSign = unionSnap.signRects.find((r) => r.work_item_id === "w_solo");
+  assert.ok(soloSign);
+  const soloSignCenter = soloSign.x + soloSign.w / 2;
+  assert.ok(
+    soloSignCenter >= unionSnap.roomBounds.engineering.x
+      && soloSignCenter <= unionSnap.roomBounds.engineering.x + unionSnap.roomBounds.engineering.w,
+  );
+
+  // 结束章与货架箱子：w_tri 在 quality 盖实心放行章，w_solo 在 engineering 出口托盘盖虚线开环完成章
+  assert.deepEqual(unionSnap.finishedChannels.stamps, [
+    { work_item_id: "w_tri", room: "quality", kind: "release", outsourced: false, text: "放行" },
+    { work_item_id: "w_solo", room: "engineering", kind: "open_loop", outsourced: false, text: "开环完成" },
+  ]);
+  assert.deepEqual(unionSnap.finishedChannels.shelf.boxes, [
+    { work_item_id: "w_tri", stamp_kind: "release", outsourced: false },
+    { work_item_id: "w_solo", stamp_kind: "open_loop", outsourced: false },
+  ]);
+  const triStampRect = unionSnap.stampRects.find((r) => r.work_item_id === "w_tri");
+  const soloStampRect = unionSnap.stampRects.find((r) => r.work_item_id === "w_solo");
+  assert.ok(triStampRect && soloStampRect);
+  assert.ok(
+    triStampRect.x + triStampRect.w / 2 >= unionSnap.roomBounds.quality.x
+      && triStampRect.x + triStampRect.w / 2 <= unionSnap.roomBounds.quality.x + unionSnap.roomBounds.quality.w,
+  );
+  assert.ok(
+    soloStampRect.x + soloStampRect.w / 2 >= unionSnap.roomBounds.engineering.x
+      && soloStampRect.x + soloStampRect.w / 2 <= unionSnap.roomBounds.engineering.x + unionSnap.roomBounds.engineering.w,
+  );
+});
+
+// 守 R2 与 R3：场景声明里未登记专属外观的角色（如 security「安全审校」），显式检查函数返回 false，
+// 楼、楼层、房间三个场景均采用中性灰米通用外观、单张标准工位与通用小人精灵正常渲染。
+test("未声明专属外观的角色 security（安全审校）：显式声明函数返回 false，三个场景使用通用外观正常渲染", async () => {
+  assert.equal(hasDeclaredFloorAppearance("product"), true);
+  assert.equal(hasDeclaredRoomVisual("engineering"), true);
+  assert.equal(hasDeclaredRoomAppearance("quality"), true);
+  assert.equal(hasDeclaredFloorAppearance("security"), false);
+  assert.equal(hasDeclaredRoomVisual("security"), false);
+  assert.equal(hasDeclaredRoomAppearance("security"), false);
+
+  const secOrg = {
+    form: "security_audit",
+    routing: "watched_outputs",
+    entry: { id: "engineering", label: "工程", ref: TOPO_REF },
+    roles: [
+      { id: "engineering", label: "工程", ref: TOPO_REF },
+      { id: "security", label: "安全审校", ref: TOPO_REF },
+    ],
+    verifiers: [{ role: "security", verifies: [{ role: "engineering", outcomes: ["completion"] }], ref: TOPO_REF }],
+    completing: null,
+    watched: [{ source: "engineering", recipient: "security", outcome: "completion", ref: TOPO_REF }],
+    asks: [],
+    rejections: [{ verifier: "security", role: "engineering", outcome: "completion", ref: TOPO_REF }],
+  };
+  const secLoop = {
+    project_id: "p_sec",
+    work_items: [makeTopoRow({ work_item_id: "w_sec", sign: "核查令牌权限", department: "security", organization: secOrg })] as never,
+    adoptions: [],
+  };
+  const fModel = floorState({
+    position: 70,
+    loop: secLoop,
+    roles: { security: [{ id: "sec-1", name: "审校员", kind: "agent", status: "working" }] },
+  });
+  const bModel = buildingState({
+    position: 70,
+    projects: [{ project_id: "p_sec", name: "安全项目", goal: "审计", pinned: false, archived: false, last_activity_at: "2026-11-14T10:00:00+08:00", decisions_waiting: 0 }] as never,
+    loops: { p_sec: secLoop },
+  });
+  const rModel = translateRoomState({
+    position: 70,
+    workspace: {
+      room: {
+        department: "security",
+        level: "S5",
+        status: "working",
+        crt: { target: "核查令牌权限", model: "m", protocol: "Responses", status: "进行中", cycle: 1 },
+        roles: [{ id: "sec-1", name: "审校员", kind: "agent", status: "working", task: null }],
+        pose: { role_id: "sec-1", action: "reading" },
+        door: null,
+        hold_card: null,
+        mailbox: 0,
+        summaries: 0,
+        scrolls: 1,
+        pinned_notes: 0,
+        semantic_cards: 0,
+        machine: null,
+        remote_unknown: false,
+        waiting_provider: false,
+        pipes: { out: "idle", letters_waiting: 0 },
+        existing_read: false,
+        trial: null,
+        tool_panel: null,
+        self_test: null,
+      },
+    },
+    department: "security",
+    organization: secOrg as never,
+  });
+
+  const secSnap = await runInPage(
+    async (input: { fModel: Record<string, unknown>; bModel: Record<string, unknown>; rModel: Record<string, unknown> }) => {
+      const BuildingMod = await import(/* @vite-ignore */ "/src/pixel/building/view.ts" as string) as typeof import("../../src/pixel/building/view.ts");
+      const FloorMod = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+      const FloorDeclMod = await import(/* @vite-ignore */ "/src/pixel/world/floor-decl.ts" as string) as typeof import("../../src/pixel/world/floor-decl.ts");
+      const RoomMod = await import(/* @vite-ignore */ "/src/pixel/room/view.ts" as string) as typeof import("../../src/pixel/room/view.ts");
+      const RoomDeclMod = await import(/* @vite-ignore */ "/src/pixel/room/decl.ts" as string) as typeof import("../../src/pixel/room/decl.ts");
+      const ClockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+
+      const makeHost = (top: number): HTMLDivElement => {
+        const el = document.createElement("div");
+        el.style.cssText = `position:fixed;left:0;top:${top}px;width:640px;height:320px`;
+        document.body.appendChild(el);
+        return el;
+      };
+      const hB = makeHost(0);
+      const hF = makeHost(330);
+      const hR = makeHost(660);
+      const clock = ClockMod.createManualClock();
+      const advance = (ms: number): void => {
+        const frames = Math.max(1, Math.round(ms / 50));
+        for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+      };
+
+      const bView = await BuildingMod.createBuildingView({ host: hB, clock });
+      const fView = await FloorMod.createFloorView({ host: hF, clock });
+      const rView = await RoomMod.createRoomView({ host: hR, clock, department: "security" });
+      try {
+        bView.jump(input.bModel as never);
+        fView.jump(input.fModel as never);
+        rView.jump(input.rModel as never);
+        advance(250);
+
+        const world = fView.inspect().driver.world;
+        const secChar = Object.values(world.characters).find((c) => c.department === "security");
+        const rInspected = rView.inspect();
+        const rActor = rInspected.driver.actors()[0];
+        const secApp = RoomDeclMod.roomAppearanceOf("security");
+        return {
+          bRooms: bView.inspect().channels().floors[0]?.rooms,
+          fSecRoom: fView.inspect().channels().rooms.security,
+          fCharSprite: secChar ? FloorDeclMod.characterSprite(secChar.department ?? "", secChar.roleKind) : null,
+          rChannels: rInspected.channels(),
+          rWallPalette: [secApp.shell.wall, secApp.shell.wall2, secApp.shell.wall3],
+          rDesksCount: rInspected.driver.state.desks.length,
+          rCharSprite: rActor ? RoomDeclMod.spriteForRole("security", rActor.role.kind) : null,
+        };
+      } finally {
+        bView.destroy();
+        fView.destroy();
+        rView.destroy();
+        hB.remove();
+        hF.remove();
+        hR.remove();
+      }
+    },
+    { fModel, bModel, rModel },
+  );
+
+  assert.deepEqual(secSnap.bRooms, [
+    { id: "engineering", label: "工程", lit: false },
+    { id: "security", label: "安全审校", lit: true },
+  ]);
+  assert.equal(secSnap.fSecRoom.label, "安全审校");
+  assert.equal(secSnap.fSecRoom.verifier, true);
+  assert.ok(secSnap.fCharSprite?.startsWith("generic."), `未声明角色在楼层未使用通用精灵配色：${String(secSnap.fCharSprite)}`);
+  assert.equal(secSnap.rChannels.department, "security");
+  assert.equal(secSnap.rChannels.label, "安全审校");
+  assert.equal(secSnap.rChannels.verifier, true);
+  assert.deepEqual(secSnap.rWallPalette, ["#e4dfd3", "#d6d0c2", "#c7c0b0"]);
+  assert.equal(secSnap.rDesksCount, 1);
+  assert.ok(secSnap.rCharSprite?.startsWith("generic."), `未声明角色在房间未使用通用精灵配色：${String(secSnap.rCharSprite)}`);
 });
 
 // ---------------------------------------------------------------------------

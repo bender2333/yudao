@@ -18,7 +18,7 @@ import {
   type BuildingDriver, type BuildingModel,
 } from "../world/building.ts";
 import { BuildingRenderer } from "./render.ts";
-import type { BuildingRoomLight, PixelAction } from "../contract.ts";
+import type { BuildingRoomLight, BuildingStamp, PixelAction } from "../contract.ts";
 import type { SceneLike } from "../world/types.ts";
 
 export type { BuildingFloor, BuildingModel } from "../world/building.ts";
@@ -47,6 +47,7 @@ export interface BuildingChannels {
     valve_closed: boolean;
     decisions: number;
     flags: { work_item_id: string; department: string; color_index: number }[];
+    stamps: { work_item_id: string; kind: BuildingStamp["kind"]; outsourced: boolean }[];
   }[];
 }
 
@@ -64,6 +65,11 @@ function buildingChannels(driver: BuildingDriver): BuildingChannels {
       valve_closed: f.valve_closed,
       decisions: f.decisions,
       flags: f.flags.map((fl) => ({ work_item_id: fl.work_item_id, department: fl.department, color_index: fl.color_index })),
+      stamps: (f.stamps ?? []).map((st) => ({
+        work_item_id: st.work_item_id,
+        kind: st.kind,
+        outsourced: Boolean(st.outsourced),
+      })),
     })),
   };
 }
@@ -214,7 +220,17 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
 
 /** 端到端测试的入口：按需要给出每层、每层小人与播放时间线的当前状态（含类型，测试不猜形状）。 */
 export interface BuildingTestHooks {
-  floors: () => { project_id: string; name: string; status: string; rooms: BuildingRoomLight[]; lit: Record<string, boolean>; valve_closed: boolean; decisions: number; flags: { work_item_id: string; department: string; color_index: number }[] }[];
+  floors: () => {
+    project_id: string;
+    name: string;
+    status: string;
+    rooms: BuildingRoomLight[];
+    lit: Record<string, boolean>;
+    valve_closed: boolean;
+    decisions: number;
+    flags: { work_item_id: string; department: string; color_index: number }[];
+    stamps: { work_item_id: string; kind: BuildingStamp["kind"]; outsourced: boolean }[];
+  }[];
   walkers: () => { id: string; x: number; y: number; anim: string }[];
   /** 时间线此刻的读数：画面上状态的位置、还排着几份状态、在演的动作（「直接显示最新状态」的核对）。 */
   timeline: () => { shown: number | null; pending: number; lag: number; queued: number; playing: string[] };
@@ -232,6 +248,11 @@ export function buildingTestHooks(view: BuildingView): BuildingTestHooks {
       valve_closed: f.valve_closed,
       decisions: f.decisions,
       flags: f.flags.map((fl) => ({ ...fl })),
+      stamps: (f.stamps ?? []).map((st) => ({
+        work_item_id: st.work_item_id,
+        kind: st.kind,
+        outsourced: Boolean(st.outsourced),
+      })),
     })),
     walkers: () => {
       const { driver, scene } = view.inspect();

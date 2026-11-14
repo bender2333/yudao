@@ -1,9 +1,11 @@
-// H1、H2 与 H6 的单元测试（画面与播放 docs/design/visualization.md「画面诚实性的不变式」、docs/design/visualization.md「视觉通道表」；工单 #959、#1383）。
-// 守 docs/design/test-pyramid.md「测试按三环留」的 R2（承载事实的视觉通道与楼层拓扑合同）与 R3（画面跟着事项冻结定义伸缩、空事件零轨迹元素）。
+// H1、H2、H5 与 H6 的单元测试（画面与播放 docs/design/visualization.md「画面诚实性的不变式」、docs/design/visualization.md「视觉通道表」；工单 #959、#1383、#1385）。
+// 守 docs/design/test-pyramid.md「测试按三环留」的 R2（承载事实的视觉通道与楼层拓扑合同）与 R3（画面跟着事项冻结定义伸缩、开环完成不画成放行、空事件零轨迹元素）。
 //
 // H1 事实层是事件的函数：同一份查询结果两次翻译得到的状态相同；同一份状态两次上画面，承载事实的通道相同。
 // H2 表演层不占用承载事实的视觉通道：同一份状态上画面以后，开着表演层（待机活动与动作）与关掉它各读一次
 //    承载事实的通道，两次相同。
+// H5 开环完成不画成放行：以开环完成结束的事项，在楼、楼层、房间任何场景的事实通道里都没有实心放行章，
+//    只有虚线的开环完成章；放行结束的事项只有实心放行章，没有虚线章。
 // H6 固定画出的只有边界、裁决点与权威关系：事件为空时轨迹元素的数量为 0；房间的集合等于楼层上事项冻结的定义里
 //    角色的并集，连线的集合等于这些定义中的关注、询问与打回关系，盖章台只出现在核验角色的屋里。
 //
@@ -739,4 +741,261 @@ test("H6 空事件与空楼层：事件为空时轨迹元素数量为 0，无事
   assert.equal(idleRead.channels.board.length, 0);
   assert.equal(idleRead.channels.shelf.adopted.length, 0);
   assert.ok(idleRead.channels.tubes.every((t) => t.count === 0));
+});
+
+// ---------------------------------------------------------------------------
+// H5：开环完成不画成放行（工单 #1385，docs/design/visualization.md「画面诚实性的不变式」 H5）
+
+interface H5StampReadout {
+  buildingStamps: { work_item_id: string; kind: string; outsourced?: boolean }[];
+  floorStamps: { work_item_id: string; room: string; kind: string; outsourced: boolean; text: string }[];
+  shelfBoxes: { work_item_id: string; stamp_kind: string; outsourced?: boolean }[];
+  roomStamp: { kind: string; outsourced: boolean; text: string } | null;
+  floorTexts: string[];
+  roomTexts: string[];
+}
+
+async function h5StampHonestyDriver(input: {
+  buildingQuery: Record<string, unknown>;
+  floorQuery: Record<string, unknown>;
+  roomQuery: Record<string, unknown>;
+  department: string;
+}): Promise<H5StampReadout> {
+  const BuildingMod = await import(/* @vite-ignore */ "/src/pixel/building/view.ts" as string) as typeof import("../../src/pixel/building/view.ts");
+  const FloorMod = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/pixel/floor/view.ts");
+  const RoomMod = await import(/* @vite-ignore */ "/src/pixel/room/view.ts" as string) as typeof import("../../src/pixel/room/view.ts");
+  const ClockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/pixel/clock.ts");
+  const TB = await import(/* @vite-ignore */ "/src/translate/building.ts" as string) as typeof import("../../src/translate/building.ts");
+  const TF = await import(/* @vite-ignore */ "/src/translate/floor.ts" as string) as typeof import("../../src/translate/floor.ts");
+  const TR = await import(/* @vite-ignore */ "/src/translate/room.ts" as string) as typeof import("../../src/translate/room.ts");
+
+  const captured: string[] = [];
+  const origFillText = CanvasRenderingContext2D.prototype.fillText;
+  CanvasRenderingContext2D.prototype.fillText = function (text: string, x: number, y: number, maxWidth?: number): void {
+    captured.push(String(text));
+    if (maxWidth !== undefined) origFillText.call(this, text, x, y, maxWidth);
+    else origFillText.call(this, text, x, y);
+  };
+
+  const makeHost = (top: number): HTMLDivElement => {
+    const el = document.createElement("div");
+    el.style.cssText = `position:fixed;left:0;top:${top}px;width:640px;height:320px`;
+    document.body.appendChild(el);
+    return el;
+  };
+  const hostB = makeHost(0);
+  const hostF = makeHost(330);
+  const hostR = makeHost(660);
+  const clock = ClockMod.createManualClock();
+  const advance = (ms: number): void => {
+    const frames = Math.max(1, Math.round(ms / 50));
+    for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+  };
+
+  let bView: Awaited<ReturnType<typeof BuildingMod.createBuildingView>> | null = null;
+  let fView: Awaited<ReturnType<typeof FloorMod.createFloorView>> | null = null;
+  let rView: Awaited<ReturnType<typeof RoomMod.createRoomView>> | null = null;
+  try {
+    bView = await BuildingMod.createBuildingView({ host: hostB, clock });
+    fView = await FloorMod.createFloorView({ host: hostF, clock });
+    rView = await RoomMod.createRoomView({ host: hostR, clock, department: input.department });
+
+    bView.jump(TB.buildingState(input.buildingQuery as never));
+    advance(150);
+
+    captured.length = 0;
+    fView.jump(TF.floorState(input.floorQuery as never));
+    advance(200);
+    const floorTexts = captured.slice();
+
+    captured.length = 0;
+    rView.jump(TR.state(input.roomQuery as never));
+    advance(200);
+    const roomTexts = captured.slice();
+
+    const bChannels = bView.inspect().channels();
+    const fChannels = fView.inspect().channels();
+    const rChannels = rView.inspect().channels();
+    return {
+      buildingStamps: (bChannels.floors[0]?.stamps ?? []) as H5StampReadout["buildingStamps"],
+      floorStamps: fChannels.stamps as H5StampReadout["floorStamps"],
+      shelfBoxes: (fChannels.shelf.boxes ?? []) as H5StampReadout["shelfBoxes"],
+      roomStamp: rChannels.stamp as H5StampReadout["roomStamp"],
+      floorTexts,
+      roomTexts,
+    };
+  } finally {
+    CanvasRenderingContext2D.prototype.fillText = origFillText;
+    bView?.destroy();
+    fView?.destroy();
+    rView?.destroy();
+    hostB.remove();
+    hostF.remove();
+    hostR.remove();
+  }
+}
+
+// 守 R2 与 R3：以开环完成结束的事项（含外包核验分支），在楼、楼层、房间任何场景的事实通道里都没有实心放行章，只有虚线的开环完成章；放行结束的事项只有实心放行章。
+test("H5 开环完成不画成放行：三个场景的事实通道与成果库箱子严格区分虚线开环完成章与实心放行章", async () => {
+  const soloOrg = {
+    form: "solo_engineering",
+    routing: "watched_outputs",
+    entry: { id: "engineering", label: "工程", ref: REF_POS3 },
+    roles: [{ id: "engineering", label: "工程", ref: REF_POS3 }],
+    verifiers: [],
+    completing: { id: "engineering", label: "工程", ref: REF_POS3 },
+    watched: [],
+    asks: [],
+    rejections: [],
+  };
+  const openLoopData = {
+    project_id: "p_h5_open",
+    work_items: [
+      loopRow({
+        work_item_id: "w_open_plain",
+        sign: "直做事项甲",
+        status: "adopted",
+        stop_reason: "open_loop",
+        department: null,
+        organization: soloOrg,
+        refs: { sign: REF_POS3, stamp: { position: 18, source: "role_statement" }, box: { position: 19, source: "rule" } },
+      }),
+      loopRow({
+        work_item_id: "w_open_ext",
+        sign: "外包事项乙",
+        status: "adopted",
+        stop_reason: "open_loop",
+        outsourced: true,
+        department: null,
+        organization: soloOrg,
+        refs: { sign: REF_POS3, stamp: { position: 28, source: "role_statement" }, box: { position: 29, source: "rule" } },
+      }),
+    ],
+    adoptions: [
+      { adoption_id: "ad_1", work_item_id: "w_open_plain", run_id: "r1" },
+      { adoption_id: "ad_2", work_item_id: "w_open_ext", run_id: "r2" },
+    ],
+  };
+
+  const makeRoomWorkspace = (dept: string) => ({
+    room: {
+      department: dept,
+      level: "S5",
+      status: "done",
+      crt: { target: "完成", model: "m", protocol: "Responses", status: "已完成", cycle: 1 },
+      roles: [{ id: `${dept}-lead`, name: "主责人", kind: "lead", status: "idle", task: null }],
+      pose: { role_id: `${dept}-lead`, action: "idle" },
+      door: null,
+      hold_card: null,
+      mailbox: 0,
+      summaries: 0,
+      scrolls: 0,
+      pinned_notes: 0,
+      semantic_cards: 0,
+      machine: null,
+      remote_unknown: false,
+      waiting_provider: false,
+      pipes: { out: "idle", letters_waiting: 0 },
+      existing_read: false,
+      trial: null,
+      tool_panel: null,
+      self_test: null,
+    },
+  });
+
+  const openReadPlain = await run<H5StampReadout>(h5StampHonestyDriver as never, {
+    buildingQuery: {
+      position: 30,
+      projects: [{ project_id: "p_h5_open", name: "直做项目", goal: "开环", pinned: false, archived: false, last_activity_at: "2026-11-14T10:00:00+08:00", decisions_waiting: 0 }],
+      loops: { p_h5_open: openLoopData },
+    },
+    floorQuery: { position: 30, loop: openLoopData, asks: {}, roles: {} },
+    roomQuery: { position: 30, workspace: makeRoomWorkspace("engineering"), department: "engineering", loop: openLoopData, workItemId: "w_open_plain" },
+    department: "engineering",
+  });
+
+  // 1. 开环完成：楼、楼层、房间与成果库箱子均无任何 release 实心放行章，只有 open_loop 虚线章
+  assert.deepEqual(openReadPlain.buildingStamps, [
+    { work_item_id: "w_open_plain", kind: "open_loop", outsourced: false },
+    { work_item_id: "w_open_ext", kind: "open_loop", outsourced: true },
+  ]);
+  assert.equal(openReadPlain.buildingStamps.some((s) => s.kind === "release"), false);
+  assert.deepEqual(openReadPlain.floorStamps, [
+    { work_item_id: "w_open_plain", room: "engineering", kind: "open_loop", outsourced: false, text: "开环完成" },
+    { work_item_id: "w_open_ext", room: "engineering", kind: "open_loop", outsourced: true, text: "开环完成 · 外包" },
+  ]);
+  assert.equal(openReadPlain.floorStamps.some((s) => s.kind === "release"), false);
+  assert.deepEqual(openReadPlain.shelfBoxes, [
+    { work_item_id: "w_open_plain", stamp_kind: "open_loop", outsourced: false },
+    { work_item_id: "w_open_ext", stamp_kind: "open_loop", outsourced: true },
+  ]);
+  assert.deepEqual(openReadPlain.roomStamp, { kind: "open_loop", outsourced: false, text: "开环完成" });
+  assert.ok(openReadPlain.floorTexts.includes("开环完成"), `楼层未绘制「开环完成」：${openReadPlain.floorTexts.join(" | ")}`);
+  assert.ok(openReadPlain.floorTexts.includes("开环完成 · 外包"), `楼层未绘制「开环完成 · 外包」：${openReadPlain.floorTexts.join(" | ")}`);
+  assert.equal(openReadPlain.floorTexts.includes("放行"), false, "开环完成楼层禁止绘制「放行」");
+  assert.ok(openReadPlain.roomTexts.includes("出口托盘"), `直做房间未绘制「出口托盘」：${openReadPlain.roomTexts.join(" | ")}`);
+  assert.ok(openReadPlain.roomTexts.includes("开环完成"), `直做房间未绘制「开环完成」：${openReadPlain.roomTexts.join(" | ")}`);
+  assert.equal(openReadPlain.roomTexts.includes("放行"), false, "开环完成房间禁止绘制「放行」");
+
+  // 外包事项在房间场景下也给出「开环完成 · 外包」虚线章
+  const openReadExtRoom = await run<H5StampReadout>(h5StampHonestyDriver as never, {
+    buildingQuery: {
+      position: 30,
+      projects: [{ project_id: "p_h5_open", name: "直做项目", goal: "开环", pinned: false, archived: false, last_activity_at: "2026-11-14T10:00:00+08:00", decisions_waiting: 0 }],
+      loops: { p_h5_open: openLoopData },
+    },
+    floorQuery: { position: 30, loop: openLoopData, asks: {}, roles: {} },
+    roomQuery: { position: 30, workspace: makeRoomWorkspace("engineering"), department: "engineering", loop: openLoopData, workItemId: "w_open_ext" },
+    department: "engineering",
+  });
+  assert.deepEqual(openReadExtRoom.roomStamp, { kind: "open_loop", outsourced: true, text: "开环完成 · 外包" });
+  assert.ok(openReadExtRoom.roomTexts.includes("开环完成 · 外包"));
+
+  // 2. 独立核验角色放行结束：三个场景与成果库箱子只有 release 实心放行章，没有 open_loop 虚线章
+  const verifiedOrg = {
+    form: "direct_verified",
+    routing: "watched_outputs",
+    entry: { id: "engineering", label: "工程", ref: REF_POS3 },
+    roles: [
+      { id: "engineering", label: "工程", ref: REF_POS3 },
+      { id: "quality", label: "质检", ref: REF_POS3 },
+    ],
+    verifiers: [{ role: "quality", verifies: [{ role: "engineering", outcomes: ["completion"] }], ref: REF_POS3 }],
+    completing: null,
+    watched: [{ source: "engineering", recipient: "quality", outcome: "completion", ref: REF_POS3 }],
+    asks: [],
+    rejections: [{ verifier: "quality", role: "engineering", outcome: "completion", ref: REF_POS3 }],
+  };
+  const releasedLoopData = {
+    project_id: "p_h5_rel",
+    work_items: [
+      loopRow({
+        work_item_id: "w_rel",
+        sign: "经核验放行事项",
+        status: "adopted",
+        stop_reason: null,
+        department: null,
+        organization: verifiedOrg,
+        refs: { sign: REF_POS3, stamp: { position: 38, source: "role_statement" }, box: { position: 39, source: "rule" } },
+      }),
+    ],
+    adoptions: [{ adoption_id: "ad_rel", work_item_id: "w_rel", run_id: "r_rel" }],
+  };
+  const relRead = await run<H5StampReadout>(h5StampHonestyDriver as never, {
+    buildingQuery: {
+      position: 40,
+      projects: [{ project_id: "p_h5_rel", name: "核验项目", goal: "放行", pinned: false, archived: false, last_activity_at: "2026-11-14T10:05:00+08:00", decisions_waiting: 0 }],
+      loops: { p_h5_rel: releasedLoopData },
+    },
+    floorQuery: { position: 40, loop: releasedLoopData, asks: {}, roles: {} },
+    roomQuery: { position: 40, workspace: makeRoomWorkspace("quality"), department: "quality", loop: releasedLoopData, workItemId: "w_rel" },
+    department: "quality",
+  });
+  assert.deepEqual(relRead.buildingStamps, [{ work_item_id: "w_rel", kind: "release", outsourced: false }]);
+  assert.deepEqual(relRead.floorStamps, [{ work_item_id: "w_rel", room: "quality", kind: "release", outsourced: false, text: "放行" }]);
+  assert.deepEqual(relRead.shelfBoxes, [{ work_item_id: "w_rel", stamp_kind: "release", outsourced: false }]);
+  assert.deepEqual(relRead.roomStamp, { kind: "release", outsourced: false, text: "放行" });
+  assert.equal(relRead.floorTexts.some((t) => t.includes("开环完成")), false, "独立核验放行楼层禁止绘制「开环完成」");
+  assert.ok(relRead.floorTexts.includes("放行"));
+  assert.ok(relRead.roomTexts.includes("放行"));
 });

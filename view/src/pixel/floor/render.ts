@@ -10,10 +10,10 @@ import { paint } from "../paint.ts";
 import { ITEM_COLORS, ITEM_SHADES, PAL, PIXEL_FONT_STACK } from "../registry.ts";
 import { roomShellOf, type ShellPaint } from "./render-decl.ts";
 import {
-  drawActor, drawArrow, drawBitmap, drawBubble, drawIcon, drawPixelText, drawSign, drawText, headTop, measure, signStyle,
+  drawActor, drawArrow, drawBitmap, drawBubble, drawDashedStampBox, drawIcon, drawPixelText, drawSign, drawText, headTop, measure, signStyle,
 } from "../shapes.ts";
 import { polyLength, pointAt, roomOf } from "../world/declare.ts";
-import { ACTIVE, IN_ROOM, busyItems, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
+import { ACTIVE, IN_ROOM, busyItems, resolveFloorStamps, resolveShelfBoxes, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
 import type { CoverageOverlayData, FactElement, LoopsOverlayData, Source, SourceOverlayData } from "../contract.ts";
@@ -477,6 +477,10 @@ export class FloorRenderer {
     const r = this.rooms().lib;
     drawSign(c, r.x + r.w / 2, 68, "成果库", { size: 7, bg: PAL.paper, stripe: PAL.green3 });
     const adopted = this.driver.model.shelves.adopted;
+    const resolvedStamps = resolveFloorStamps(this.driver.model, this.driver.world);
+    const boxMap = new Map(
+      resolveShelfBoxes(this.driver.model, resolvedStamps).map((b) => [b.work_item_id, b]),
+    );
     drawText(c, "已采纳", r.x + 20, 82, { size: 6, weight: 700, color: PAL.green3 });
     paint.shelf(c, r.x + 18, 126, { w: r.w - 24 });
     const per = Math.max(1, Math.floor((r.w - 26) / 18));
@@ -485,14 +489,28 @@ export class FloorRenderer {
       const bx = r.x + 20 + i * 18;
       // 成果库的箱子的位置：覆盖层「来源」按它描边，点它交出回链回调（工单 #398、#1382）
       const item = this.driver.model.items.find((it) => it.work_item_id === v) ?? null;
+      const boxInfo = boxMap.get(v);
+      const isOpenLoop = boxInfo?.stamp_kind === "open_loop";
       const refs = item?.refs as Record<string, unknown> | undefined;
       const missing = Boolean(item) && noSource(refs, "box");
       this.factRects.push({
         work_item_id: v, element: "box", position: factPos(refs, "box"), x: bx - 1, y: 115, w: 15, h: 23, drawn: !missing,
       });
       drawBitmap(c, "box_sealed", bx, 117);
+      if (isOpenLoop) {
+        drawDashedStampBox(c, bx + 1, 119, 13, 8, boxInfo?.outsourced ? "外包" : "开环", { size: 4.5 });
+      } else {
+        RB(c, bx + 2, 120, 11, 6, PAL.green2, PAL.green3);
+        drawText(c, "放行", bx + 7.5, 123.3, { size: 4.2, weight: 800, align: "center", color: PAL.white, max: 10 });
+      }
       RB(c, bx + 1, 130, 13, 7, PAL.white);
-      drawText(c, v, bx + 7.5, 133.8, { size: 6, weight: 800, align: "center", color: PAL.green3, max: 13 });
+      drawText(c, v, bx + 7.5, 133.8, {
+        size: 6,
+        weight: 800,
+        align: "center",
+        color: isOpenLoop ? "#6e4412" : PAL.green3,
+        max: 13,
+      });
       if (i === shown.length - 1 && this.sig("shelf")) paint.blinkFrame(c, bx - 1, 115, { w: 15, h: 23 });
     });
     if (!adopted.length) drawText(c, "尚未采纳", r.x + r.w / 2, 120, { size: 6, align: "center", color: PAL.grey3 });
@@ -656,42 +674,66 @@ export class FloorRenderer {
     this.stamps(c);
   }
 
-  /** 核验角色屋里盖章台旁的实心放行章（工单 #1382、#1383）：随放行到来，登记进事实元件命中矩形。 */
+  /** 核验角色屋盖章台旁的实心放行章与交完成角色屋出口托盘处的虚线开环完成章（工单 #1382、#1383、#1385）。 */
   private stamps(c: CanvasRenderingContext2D): void {
-    const verifierRoom = this.rooms().depts.find((r) => Boolean(r.def.verifier)) ?? null;
-    if (!verifierRoom) return;
-    const stamped = this.driver.model.items.filter(
-      (it) => Boolean(it.refs?.stamp) || it.status === "done" || it.status === "adopted",
-    );
-    stamped.forEach((it, idx) => {
-      const refs = it.refs as Record<string, unknown> | undefined;
+    const resolved = resolveFloorStamps(this.driver.model, this.driver.world);
+    const countByRoom = new Map<string, number>();
+    for (const st of resolved) {
+      const targetRoom = this.driver.world.rooms[st.room];
+      if (!targetRoom || targetRoom.roomKind !== "dept") continue;
+      const item = this.driver.model.items.find((it) => it.work_item_id === st.work_item_id) ?? null;
+      const refs = item?.refs as Record<string, unknown> | undefined;
       const missing = noSource(refs, "stamp");
-      const sw = 22;
-      const sh = 9;
-      const sx = verifierRoom.x + verifierRoom.w - 36;
-      const sy = 190 - idx * 12;
-      this.factRects.push({
-        work_item_id: it.work_item_id,
-        element: "stamp",
-        position: factPos(refs, "stamp"),
-        x: sx - 1,
-        y: sy - 1,
-        w: sw + 2,
-        h: sh + 2,
-        drawn: !missing,
-      });
-      if (missing) return;
-      c.globalAlpha = this.dimFor(it.work_item_id);
-      RB(c, sx, sy, sw, sh, PAL.green2, PAL.green3);
-      drawText(c, "放行", sx + sw / 2, sy + sh / 2 + 0.5, {
-        size: 5.5,
-        weight: 800,
-        align: "center",
-        color: PAL.white,
-        max: sw - 2,
-      });
-      c.globalAlpha = 1;
-    });
+      const idx = countByRoom.get(st.room) ?? 0;
+      countByRoom.set(st.room, idx + 1);
+      if (st.kind === "open_loop") {
+        const sw = st.outsourced ? 52 : 32;
+        const sh = 10;
+        const rightMargin = targetRoom.w <= 120 ? 5 : 14;
+        const sx = Math.max(targetRoom.x + 4, targetRoom.x + targetRoom.w - rightMargin - sw);
+        const sy = 189 - idx * 12;
+        this.factRects.push({
+          work_item_id: st.work_item_id,
+          element: "stamp",
+          position: factPos(refs, "stamp"),
+          x: sx - 1,
+          y: sy - 1,
+          w: sw + 2,
+          h: sh + 2,
+          drawn: !missing,
+        });
+        if (missing) continue;
+        c.globalAlpha = this.dimFor(st.work_item_id);
+        drawDashedStampBox(c, sx, sy, sw, sh, st.text, { size: 5.5 });
+        c.globalAlpha = 1;
+      } else {
+        const sw = 22;
+        const sh = 9;
+        const sx = targetRoom.x + targetRoom.w - 36;
+        const sy = 190 - idx * 12;
+        this.factRects.push({
+          work_item_id: st.work_item_id,
+          element: "stamp",
+          position: factPos(refs, "stamp"),
+          x: sx - 1,
+          y: sy - 1,
+          w: sw + 2,
+          h: sh + 2,
+          drawn: !missing,
+        });
+        if (missing) continue;
+        c.globalAlpha = this.dimFor(st.work_item_id);
+        RB(c, sx, sy, sw, sh, PAL.green2, PAL.green3);
+        drawText(c, st.text, sx + sw / 2, sy + sh / 2 + 0.5, {
+          size: 5.5,
+          weight: 800,
+          align: "center",
+          color: PAL.white,
+          max: sw - 2,
+        });
+        c.globalAlpha = 1;
+      }
+    }
   }
 
   /** 头顶的对话框：说话气泡是正在做的任务，思考气泡是队列里的下一项。 */

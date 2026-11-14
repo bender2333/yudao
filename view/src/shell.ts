@@ -22,6 +22,9 @@ import type {
 } from "./pixel/contract.ts";
 import type { DecisionAnswer, DecisionResult } from "./pixel/floor/card.ts";
 import type { Clock } from "./pixel/clock.ts";
+import { hasDeclaredFloorAppearance } from "./pixel/world/floor-decl.ts";
+import { hasDeclaredRoomVisual } from "./pixel/floor/render-decl.ts";
+import { hasDeclaredRoomAppearance } from "./pixel/room/decl.ts";
 import { buildingActions, buildingState, toBuildingEvent } from "./translate/building.ts";
 import { belongsTo, coverageOverlay, floorActions, floorCards, floorInterrupted, floorState, streamText, toFloorEvent } from "./translate/floor.ts";
 import * as room from "./translate/room.ts";
@@ -359,6 +362,7 @@ export class Shell {
     this.decisions = [];
     this.note = null;
     this.openSceneViews();
+    if (this.capabilities !== null) this.gap = this.gapText(this.capabilities);
     this.notify();
   }
 
@@ -565,7 +569,37 @@ export class Shell {
     }
     lines.push(...overlayProblems((capabilities.overlays ?? []).map((overlay) => overlay.name), OVERLAY_LABELS)
       .map((problem) => `${problem}，这个覆盖层不画`));
+    lines.push(...this.undeclaredAppearanceGapLines());
     return lines;
+  }
+
+  /** 当前可见项目定义里未声明专属外观的角色：使用通用外观，并在缺口清单写明是哪个角色标识（工单 #1385）。 */
+  private undeclaredAppearanceGapLines(): string[] {
+    const activeLoops: ProjectLoopResult[] = [];
+    if (this.loop !== null) activeLoops.push(this.loop);
+    else if (this.lastLoop !== null && this.scene.kind !== "building") activeLoops.push(this.lastLoop);
+    for (const loop of this.loops.values()) activeLoops.push(loop);
+
+    const seen = new Map<string, string>();
+    for (const loop of activeLoops) {
+      for (const row of loop.work_items ?? []) {
+        for (const role of row.organization?.roles ?? []) {
+          if (seen.has(role.id)) continue;
+          const declared = hasDeclaredFloorAppearance(role.id)
+            && hasDeclaredRoomVisual(role.id)
+            && hasDeclaredRoomAppearance(role.id);
+          if (!declared) {
+            seen.set(role.id, role.label || role.id);
+          }
+        }
+      }
+    }
+    const out: string[] = [];
+    for (const [id, label] of seen) {
+      const display = label && label !== id ? `${id}（${label}）` : id;
+      out.push(`场景声明里没有角色 ${display} 的专属外观：使用通用外观`);
+    }
+    return out;
   }
 
   private onEvent(event: EventObject): void {
@@ -940,6 +974,7 @@ export class Shell {
     this.model = model;
     this.decisions = decisions;
     this.note = null;
+    if (this.capabilities !== null) this.gap = this.gapText(this.capabilities);
     const binding = this.bindings.get(sceneKey(this.scene));
     if (binding?.surface) {
       if (model !== null) binding.surface.setState(model);
