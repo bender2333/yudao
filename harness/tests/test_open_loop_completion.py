@@ -19,13 +19,14 @@ from types import SimpleNamespace
 from copy import deepcopy
 from typing import Any
 
-from harness import orchestrator, routing_contract, watched_outputs
+from harness import orchestrator, organization_compose, routing_contract, watched_outputs
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.home import AwayReportRequest
 from harness.app.labels import OPEN_LOOP_LABEL, event_label
 from harness.app.payloads import RunCreatedPayload
-from harness.definitions import DEFAULT_FORM, DEFINITIONS, definitions_from_contents
+from harness.app.project_queries import ProjectOverview
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, definitions_from_contents, parse_organization_changes
 from harness.event_store import project_stream
 from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
@@ -123,8 +124,10 @@ def test_an_item_without_a_verifier_is_created_open_loop_and_ends_open_loop(tmp_
     assert "放行" not in OPEN_LOOP_LABEL
     # 不因为缺少核验发决定请求
     assert _decisions(system, run_id) == []
-    # 采纳照常进行：交付被采纳，项目流上的采纳事件照常写下
-    assert system.projects.settle(run_id).type == ProjectEventType.DELIVERABLE_ADOPTED
+    # 采纳照常进行：交付被采纳，项目流上的采纳事件照常写下，没有放行评审所以 qa_event_id 为空串
+    adopted = system.projects.settle(run_id)
+    assert adopted is not None and adopted.type == ProjectEventType.DELIVERABLE_ADOPTED
+    assert adopted.payload["qa_event_id"] == ""
     system.close()
 
 
@@ -262,3 +265,45 @@ def test_the_second_routing_declares_no_completion_reason():
     # 验收第 4 条：测试里的第二种路由（任务池）不改，它不声明这个方法，事项结束照旧由它自己的一份定义给原因
     assert not hasattr(second_routing.ROUTING, "completion_reason")
     assert not hasattr(second_routing.ROUTING, "recorded_open_loop")
+
+
+def test_a_watched_outputs_form_without_a_verifier_settles_without_any_quality_turns(tmp_path):
+    # 工单 #1742 验收第 3 条（守 R3：没有核验角色的成果驱动开环形态闭环）：
+    # 合成去掉质检部门的成果驱动形态（只留产品与工程），在不提供质检评审回合的条件下，
+    # 产品提交 PRD、工程提交交付后运行直接以 open_loop 结束，经 settle 正常采纳，当前成果可读到这一版
+    changes, issues = parse_organization_changes({
+        "remove_departments": ["quality"],
+        "departments": {
+            "product": {"watched": {"remove": ["baseline_review"]}},
+            "engineering": {"watched": {"remove": ["defect_record"]}},
+        },
+    })
+    assert issues == [] and changes is not None
+    composed = organization_compose.compose(DEFINITIONS, changes)
+    no_verifier_form = "watched_outputs_without_verifier"
+    forms = {**FORMS, no_verifier_form: (composed, WATCHED_OUTPUTS)}
+    script_without_quality = {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(summary="补了用法一节")],
+    }
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter(script_without_quality), forms=forms,
+                                    resume_on_startup=False)
+    application = Application(system)
+    project_id = system.projects.register("无质检成果驱动项目", GOAL, form=no_verifier_form)
+    item_id, run_id = system.projects.start_work_item(project_id, "补一份用法说明")
+
+    ended = system.run_until_stop(run_id)
+    assert (ended.status, ended.stop_reason) == ("done", OPEN_LOOP_STOP_REASON), ended.error
+    assert ended.reviews == []
+
+    settled = system.projects.settle(run_id)
+    assert settled is not None and settled.type == ProjectEventType.DELIVERABLE_ADOPTED
+    assert settled.payload["qa_event_id"] == ""
+    assert settled.payload["summary"] == "补了用法一节"
+
+    overview = application.query("project.overview", ProjectOverview(project_id=project_id)).data
+    [card] = overview.work_items
+    assert (card.work_item_id, card.status, card.stop_reason) == (item_id, "adopted", OPEN_LOOP_STOP_REASON)
+    assert overview.current_adoption is not None
+    assert overview.current_adoption.summary == "补了用法一节"
+    system.close()

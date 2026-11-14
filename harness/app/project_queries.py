@@ -1336,7 +1336,7 @@ def _event_artifacts(application: Application, event: Any) -> dict[str, Any]:
             raise NotFound(str(error)) from error
     elif version is not None:
         raise NotFound("Git 版本未绑定正式事件")
-    if event.type == EventType.DELIVERY_ACCEPTED:
+    if _is_archived_delivery(event):
         tree, archive = _delivery_archive(application, event)
         loaded["tree_archive"] = archive
         loaded["tree_files"] = [{"path": item.path, "size": len(item.data)} for item in tree.files]
@@ -1403,11 +1403,26 @@ def _compaction_sources(application: Application, event: Any) -> list[dict[str, 
     return sources
 
 
+def _is_archived_delivery(event: Any) -> bool:
+    if event.type == EventType.DELIVERY_ACCEPTED:
+        return True
+    payload = event.payload or {}
+    return (event.type == EventType.ARTIFACT_ACCEPTED
+            and payload.get("artifact_kind") == COMPLETION_KIND
+            and isinstance(payload.get("artifact_ref"), dict))
+
+
 def _delivery_archive(application: Application, event: Any) -> tuple[Any, Any]:
-    ref = ArtifactRef(**event.payload["tree_ref"])
+    payload = event.payload or {}
+    if event.type == EventType.DELIVERY_ACCEPTED:
+        ref = ArtifactRef(**payload["tree_ref"])
+        expected_digest = payload["code_tree_digest"]
+    else:
+        ref = ArtifactRef(**payload["artifact_ref"])
+        expected_digest = payload["artifact_tree_digest"]
     artifacts = application.system.artifacts
     tree = load_tree(artifacts, event.run_id, ref)
-    if tree.digest != event.payload["code_tree_digest"]:
+    if tree.digest != expected_digest:
         raise ValueError("archived tree does not match its accepted delivery")
     return tree, json.loads(artifacts.get_for_run(event.run_id, ref))
 
@@ -2900,13 +2915,19 @@ def _completion_version(application: Application, event: Any, stream: Sequence[A
 
 
 def _completion_files(application: Application, event: Any, stream: Sequence[Any]) -> list[str]:
-    # 交完成那一版的文件清单（工单 #1699）：完成事件只带这一版的公开树摘要，不带文件；事件流里每个工作区
-    # 动作记下动作后的公开树快照（工单 #17、#1398），摘要与这一版相同的那一份就是这一版的文件。
-    # 与交付各版本同一个口径（工单 #677）：这一版公开树的全部文件，按路径排序；没有对得上的快照时为空
-    digest = (event.payload or {}).get("artifact_tree_digest")
+    # 交完成那一版的文件清单（工单 #1699、#1742）：带封存树引用时直接从封存树读出公开树文件清单并核对树摘要；
+    # 旧事件没有封存树引用时回退扫描工作区动作后的公开树快照（工单 #17、#1398），与交付各版本同一口径按路径排序
+    payload = event.payload or {}
+    digest = payload.get("artifact_tree_digest")
     if not isinstance(digest, str) or not digest:
         return []
     artifacts = application.system.artifacts
+    archive_ref = payload.get("artifact_ref")
+    if isinstance(archive_ref, dict):
+        tree = load_tree(artifacts, event.run_id, ArtifactRef(**archive_ref))
+        if tree.digest != digest:
+            raise ValueError("archived tree does not match its accepted delivery")
+        return [entry.path for entry in tree.files]
     for earlier in reversed(stream):
         if earlier.position >= event.position or earlier.type != EventType.TOOL_CALLED:
             continue
@@ -3056,7 +3077,7 @@ class DeliveryFileResult(Contract):
 def _delivery_file(application: Application, request: DeliveryFile) -> Snapshot[DeliveryFileResult]:
     store = application.system.store
     event = store.get_event(request.event_id)
-    if event is None or event.type != EventType.DELIVERY_ACCEPTED:
+    if event is None or not _is_archived_delivery(event):
         raise NotFound(f"delivery not found: {request.event_id}")
     tree, _archive = _delivery_archive(application, event)
     item = next((entry for entry in tree.files if entry.path == request.path), None)

@@ -13,24 +13,33 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import uuid
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from harness import direct
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.contracts import Accepted
+from harness.app.decision_commands import DecisionAnswer
+from harness.app.decision_queries import DecisionsList
 from harness.app.project_and_work_item_commands import WorkItemCreate
 from harness.app.project_commands import ProjectCreate
-from harness.app.project_queries import ProjectFlow, ProjectLoop, WorkItemMaterials
+from harness.app.project_queries import (
+    DeliveryFile, NotFound, ProjectFlow, ProjectLoop, ProjectOverview, WorkItemMaterials,
+)
 from harness.definitions import load_definitions
-from harness.models import EventType
+from harness.event_store import run_stream
+from harness.models import ArtifactRef, EventType, ProjectEventType, hash_bytes
 from harness.proposals import completion_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import FORM_REGISTRY, SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, LoopSystem
 from harness.watched_outputs import OPEN_LOOP_STOP_REASON
+from harness.write_path import NewEvent
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 WORK_ITEM = "补一份用法说明"
@@ -54,10 +63,12 @@ def _system(data_dir: Path, script: dict[str, list[Any]], *, forms: dict | None 
                                   resume_on_startup=False)
 
 
-def _created(application: Application, form: str, name: str) -> str:
-    # 页面上新建项目走的就是这条命令：带形态一起定下来
+def _created(application: Application, form: str, name: str, *,
+             initial_directory: str | None = None) -> str:
+    # 页面上新建项目走的就是这条命令：带形态与可选的起始文件夹一起定下来
     created = asyncio.run(application.command("project.create", ProjectCreate(
-        command_id=str(uuid.uuid4()), name=name, goal=GOAL, form=form), actor="user:local"))
+        command_id=str(uuid.uuid4()), name=name, goal=GOAL, form=form,
+        initial_directory=initial_directory), actor="user:local"))
     assert isinstance(created, Accepted), created
     return created.refs.project_id
 
@@ -289,4 +300,251 @@ def test_the_completing_role_waits_in_verification_until_the_reviewer_concludes(
     ended = _loop(application, project_id, work_item_id)
     assert ended.departments is None
     assert ended.progress.conclusion == direct.RELEASE_VERDICT
+    system.close()
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1742：直做交完成封存代码树，接通文件读取与事项采纳结算
+# ---------------------------------------------------------------------------
+
+INITIAL_TEXT = "# 逐行工具\n起始说明\n"
+INITIAL_BYTES = b"\x89PNG\r\n\x1a\n\x00\x01"
+SECOND_WRITTEN = {"docs/guide.md": "补充使用指南\n"}
+
+
+def _seed_initial_directory(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "README.md").write_bytes(INITIAL_TEXT.encode("utf-8"))
+    (root / "assets").mkdir(parents=True, exist_ok=True)
+    (root / "assets" / "icon.bin").write_bytes(INITIAL_BYTES)
+    return root
+
+
+@pytest.mark.parametrize("form", [SINGLE_ROLE_DIRECT, SEVERAL_ROLES_DIRECT])
+def test_direct_forms_with_initial_directory_settle_into_adopted_and_seed_next_item(tmp_path, form):
+    # 守 R3（路线图已走到的直做与开环完成采纳闭环）与 R2（对外查询与事件字段只复用既有统一字段）：
+    # 两份直做形态带起始文件夹新建项目并跑完事项加结算后，事项进入 adopted、stop_reason 保持 open_loop，
+    # 项目流写 deliverable_adopted（qa_event_id 为空串），项目概览可读到当前成果，delivery.file 按交完成事件
+    # 读回起始文件夹带入的文件与本轮新写文件，后续新建事项继承这一版基线代码树
+    initial_dir = _seed_initial_directory(tmp_path / "seed")
+    script = {
+        ENGINEERING: [
+            FakeTurn(writes=WRITTEN, checks={}),
+            completion_turn(SUMMARY, known_risks=["暂未覆盖超大单行输入"]),
+            FakeTurn(writes=SECOND_WRITTEN, checks={}),
+            completion_turn("补充了使用指南"),
+        ],
+    }
+    system = _system(tmp_path / form, script)
+    application = Application(system)
+    project_id = _created(application, form, f"带起始文件夹的{form}", initial_directory=str(initial_dir))
+    work_item_id, run_id = _started(application, project_id)
+    ended = system.run_until_stop(run_id)
+    assert (ended.status, ended.stop_reason) == ("done", OPEN_LOOP_STOP_REASON)
+
+    completion = _completion(system, run_id)
+    assert isinstance(completion.payload.get("artifact_ref"), dict)
+    assert completion.payload["artifact_ref"]["content_hash"] in completion.artifact_hashes
+
+    settled = system.projects.settle(run_id)
+    assert settled is not None and settled.type == ProjectEventType.DELIVERABLE_ADOPTED
+    assert settled.payload["delivery_event_id"] == completion.event_id
+    assert settled.payload["qa_event_id"] == ""
+    expected_files = ["README.md", "assets/icon.bin", "src/echo.py"]
+    assert settled.payload["files"] == expected_files
+    assert settled.payload["known_risks"] == ["暂未覆盖超大单行输入"]
+
+    overview = application.query("project.overview", ProjectOverview(project_id=project_id)).data
+    [card] = overview.work_items
+    assert (card.work_item_id, card.status, card.stop_reason) == (work_item_id, "adopted", OPEN_LOOP_STOP_REASON)
+    assert (overview.stats.adopted, overview.stats.open_loop, overview.stats.released_unsettled) == (1, 0, 0)
+    assert overview.current_adoption is not None
+    assert overview.current_adoption.summary == SUMMARY
+    assert overview.current_adoption.files == expected_files
+    assert overview.current_adoption.code_tree_digest == completion.payload["artifact_tree_digest"]
+
+    # 事项资料与 delivery.file：起始文件（含文本与二进制）与本轮写入文件全部可读回完整内容与摘要
+    [version] = _versions(application, project_id, work_item_id)
+    assert version.files == expected_files
+
+    readme = application.query(
+        "delivery.file", DeliveryFile(event_id=completion.event_id, path="README.md")).data
+    assert readme.content == INITIAL_TEXT and readme.base64 is None
+    assert readme.content_hash == hash_bytes(INITIAL_TEXT.encode("utf-8"))
+
+    icon = application.query(
+        "delivery.file", DeliveryFile(event_id=completion.event_id, path="assets/icon.bin")).data
+    assert icon.content is None and icon.base64 is not None
+    assert base64.b64decode(icon.base64) == INITIAL_BYTES
+    assert icon.content_hash == hash_bytes(INITIAL_BYTES)
+
+    echo = application.query(
+        "delivery.file", DeliveryFile(event_id=completion.event_id, path="src/echo.py")).data
+    assert echo.content == WRITTEN["src/echo.py"] and echo.base64 is None
+    assert echo.content_hash == hash_bytes(WRITTEN["src/echo.py"].encode("utf-8"))
+
+    # 后续新建事项继承这一版基线代码树
+    first_adoption_id = overview.current_adoption.adoption_id
+    second_item_id, second_run_id = _started(application, project_id)
+    second_workspace = system.workspace_root / second_run_id
+    assert (second_workspace / "README.md").read_text(encoding="utf-8") == INITIAL_TEXT
+    assert (second_workspace / "assets" / "icon.bin").read_bytes() == INITIAL_BYTES
+    assert (second_workspace / "src" / "echo.py").read_text(encoding="utf-8") == WRITTEN["src/echo.py"]
+
+    second_ended = system.run_until_stop(second_run_id)
+    assert (second_ended.status, second_ended.stop_reason) == ("done", OPEN_LOOP_STOP_REASON)
+    second_settled = system.projects.settle(second_run_id)
+    assert second_settled is not None and second_settled.type == ProjectEventType.DELIVERABLE_ADOPTED
+    assert second_settled.payload["previous_adoption_id"] == first_adoption_id
+    assert second_settled.payload["files"] == ["README.md", "assets/icon.bin", "docs/guide.md", "src/echo.py"]
+    after_second = application.query("project.overview", ProjectOverview(project_id=project_id)).data
+    assert after_second.current_adoption is not None
+    assert after_second.current_adoption.work_item_id == second_item_id
+    system.close()
+
+
+def test_a_direct_item_with_a_verifier_settles_with_the_release_event_id(tmp_path):
+    # 守 R3（直做加独立核验放行的采纳闭环）与 R1（采纳记录绑定当前这一版的放行结论事件）：
+    # 第一版被打回、第二版经核验角色放行以后，结算写入 deliverable_adopted，qa_event_id 为第二版放行结论事件编号，
+    # 两版交完成各自封存的文件均可经 delivery.file 按各自的 event_id 读回
+    first_code = "import sys\nprint(sys.argv[1])\n"
+    second_code = "import sys\nprint(sys.argv[1] if len(sys.argv) > 1 else '')\n"
+    script = {
+        ENGINEERING: [
+            FakeTurn(writes={"src/echo.py": first_code}, checks={}),
+            completion_turn("第一版完成"),
+            FakeTurn(writes={"src/echo.py": second_code}, checks={}),
+            completion_turn("第二版修复缺参"),
+        ],
+        QUALITY: [
+            review_turn("rework", "缺少无参数保护"),
+            review_turn("release", "无参数与带参数均通过"),
+        ],
+    }
+    system = _system(tmp_path / "loop", script)
+    application = Application(system)
+    project_id = _created(application, FORM, "直做加独立核验采纳")
+    work_item_id, run_id = _started(application, project_id)
+    ended = system.run_until_stop(run_id)
+    assert (ended.status, ended.stop_reason) == ("done", "released")
+
+    completions = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.ARTIFACT_ACCEPTED
+                   and (event.payload or {}).get("artifact_kind") == direct.COMPLETION_KIND]
+    assert len(completions) == 2
+    release_event = next(event for event in reversed(system.store.list_events(run_id))
+                         if event.type == EventType.ARTIFACT_ACCEPTED
+                         and (event.payload or {}).get("artifact_kind") == direct.REVIEW_KIND
+                         and (event.payload or {}).get("verdict") == direct.RELEASE_VERDICT)
+
+    settled = system.projects.settle(run_id)
+    assert settled is not None and settled.type == ProjectEventType.DELIVERABLE_ADOPTED
+    assert settled.payload["delivery_event_id"] == completions[1].event_id
+    assert settled.payload["qa_event_id"] == release_event.event_id
+
+    overview = application.query("project.overview", ProjectOverview(project_id=project_id)).data
+    [card] = overview.work_items
+    assert (card.work_item_id, card.status, card.stop_reason) == (work_item_id, "adopted", "released")
+    assert overview.current_adoption is not None
+    assert overview.current_adoption.summary == "第二版修复缺参"
+
+    first_file = application.query(
+        "delivery.file", DeliveryFile(event_id=completions[0].event_id, path="src/echo.py")).data
+    second_file = application.query(
+        "delivery.file", DeliveryFile(event_id=completions[1].event_id, path="src/echo.py")).data
+    assert first_file.content == first_code
+    assert second_file.content == second_code
+    system.close()
+
+
+def test_a_direct_completion_touching_a_kernel_path_requests_approval_before_adoption(tmp_path):
+    # 守 R1（受控内核路径守卫对任何形态一致生效）：直做交完成改动内核清单路径时，结算发出 kernel_modification
+    # 决定请求且暂不采纳；用户批准以后写入 deliverable_adopted，事项进入 adopted
+    kernel_file = "harness/thin_driver.py"
+    kernel_content = "# 经用户批准的薄驱动改动\n"
+    script = {
+        ENGINEERING: [
+            FakeTurn(writes={kernel_file: kernel_content}, checks={}),
+            completion_turn("更新薄驱动"),
+        ],
+    }
+    system = _system(tmp_path / "loop", script)
+    application = Application(system)
+    project_id = _created(application, SINGLE_ROLE_DIRECT, "直做触及内核路径")
+    work_item_id, run_id = _started(application, project_id)
+    ended = system.run_until_stop(run_id)
+    assert (ended.status, ended.stop_reason) == ("done", OPEN_LOOP_STOP_REASON)
+
+    requested = system.projects.settle(run_id)
+    assert requested is not None and requested.type == ProjectEventType.PROJECT_DECISION_REQUESTED
+    assert requested.payload["kind"] == "kernel_modification"
+    assert requested.payload["kernel_paths"] == [kernel_file]
+    assert requested.payload["department"] == ENGINEERING
+    assert system.projects.projection(project_id).current_adoption is None
+
+    [decision] = application.query(
+        "decisions.list", DecisionsList(project_id=project_id, status=["open"])).data.decisions
+    assert decision.kind == "kernel_modification"
+    answered = asyncio.run(application.command("decision.answer", DecisionAnswer(
+        command_id=str(uuid.uuid4()),
+        base_version=decision.version,
+        decision_id=decision.decision_id,
+        option="approve",
+    ), actor="user:local"))
+    assert isinstance(answered, Accepted), answered
+
+    overview = application.query("project.overview", ProjectOverview(project_id=project_id)).data
+    [card] = overview.work_items
+    assert (card.work_item_id, card.status) == (work_item_id, "adopted")
+    assert overview.current_adoption is not None
+    assert overview.current_adoption.files == [kernel_file]
+    system.close()
+
+
+def test_legacy_completion_without_archive_ref_falls_back_in_materials_and_404s_delivery_file(tmp_path):
+    # 守 R2（旧事件无 artifact_ref 时的向后兼容）：旧事件只带 artifact_tree_digest、不带 artifact_ref 时，
+    # work_item.materials 仍回退扫描工作区动作快照列出文件，delivery.file 对无封存树的事件返回 NotFound
+    system = _system(tmp_path / "loop", {ENGINEERING: [FakeTurn(writes=WRITTEN, checks={})]})
+    application = Application(system)
+    project_id = _created(application, SINGLE_ROLE_DIRECT, "旧格式交完成回退")
+    work_item_id, run_id = _started(application, project_id)
+    # 先跑一轮写入动作留下带 after_snapshot_ref 的 TOOL_CALLED 事件，再追加一条无 artifact_ref 的旧式交完成事件
+    system.run_until_stop(run_id)
+    tool_event = next(event for event in reversed(system.store.list_events(run_id))
+                      if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("after_snapshot_ref"))
+    snapshot = json.loads(system.artifacts.get_for_run(
+        run_id, ArtifactRef(**tool_event.payload["after_snapshot_ref"]),
+    ))
+    legacy = system.writes.append(run_stream(run_id), NewEvent(
+        EventType.ARTIFACT_ACCEPTED,
+        actor=f"department:{ENGINEERING}",
+        department=ENGINEERING,
+        state_before="running",
+        state_after="running",
+        payload={
+            "id": "artifact_legacy",
+            "kind": direct.COMPLETION_KIND,
+            "summary": "旧事件摘要",
+            "uncertain": [],
+            "known_risks": [],
+            "revision": 1,
+            "status": "active",
+            "issuer": ENGINEERING,
+            "parent_hash": None,
+            "content_hash": "0" * 64,
+            "tree_digest": snapshot["digest"],
+            "artifact_kind": direct.COMPLETION_KIND,
+            "artifact_version": 1,
+            "artifact_basis": {},
+            "artifact_issuer": ENGINEERING,
+            "artifact_tree_digest": snapshot["digest"],
+        },
+        artifact_hashes=["0" * 64],
+    ))[0]
+
+    [version] = _versions(application, project_id, work_item_id)
+    assert version.event_id == legacy.event_id
+    assert version.files == ["src/echo.py"]
+    with pytest.raises(NotFound):
+        application.query("delivery.file", DeliveryFile(event_id=legacy.event_id, path="src/echo.py"))
     system.close()
