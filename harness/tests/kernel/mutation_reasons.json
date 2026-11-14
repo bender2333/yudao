@@ -219,5 +219,23 @@
   "reason": "左侧参数 highest.get(key, 0) 初值为 0 且只经 max 更新，恒不小于 0；当 number 为空或 0 时右侧取 0 或 -1 在 max 下均返回左侧非负水位，当 number 为正整数时右侧均取 number 本身，计算出的水位一致。",
   "registered_by": "solo-gemini-3.1-pro",
   "registered_at": "2026-11-14T17:48:00+08:00"
+ },
+ {
+  "file": "harness/contract_versions.py",
+  "function": "require_version",
+  "before": "def require_version(\n    implementation: Any,\n    *,\n    component: str,\n    current: int,\n    previous: int | None = None,\n) -> int:\n    # 薄驱动核对实现声明的契约版本。声明缺失、类型不对或不在接受的版本里都失败，说明里写明\n    # 是哪一样的实现、它声明了哪一版、薄驱动接受哪几版\n    allowed = accepted_versions(current, previous)\n    declared = getattr(implementation, \"CONTRACT_VERSION\", None)\n    if type(declared) is not int or declared not in allowed:\n        raise ContractVersionError(\n            f\"{component} declares contract version {declared!r}; \"\n            f\"the thin driver accepts {list(allowed)} (current {current}, previous {previous})\"\n        )\n    return declared",
+  "after": "def require_version(\n    implementation: Any,\n    *,\n    component: str,\n    current: int,\n    previous: int | None = ' ',\n) -> int:\n    # 薄驱动核对实现声明的契约版本。声明缺失、类型不对或不在接受的版本里都失败，说明里写明\n    # 是哪一样的实现、它声明了哪一版、薄驱动接受哪几版\n    allowed = accepted_versions(current, previous)\n    declared = getattr(implementation, \"CONTRACT_VERSION\", None)\n    if type(declared) is not int or declared not in allowed:\n        raise ContractVersionError(\n            f\"{component} declares contract version {declared!r}; \"\n            f\"the thin driver accepts {list(allowed)} (current {current}, previous {previous})\"\n        )\n    return declared",
+  "reason": "显式传入 previous 时不使用默认值；省略 previous 时 allowed 变为 (current, ' ')，后续判断由 type(declared) is not int 先行拦截全部非整数类型（含字符串 ' '），而任意精确 int 实例与字符串 ' ' 比较恒不相等，成员关系与 (current,) 完全一致，改动仅影响面向人类阅读的异常说明文字，返回值与抛出的 ContractVersionError 保持一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T23:23:00+08:00"
+ },
+ {
+  "file": "harness/contract_versions.py",
+  "function": "require_version",
+  "before": "declared = getattr(implementation, \"CONTRACT_VERSION\", None)",
+  "after": "declared = getattr(implementation, \"CONTRACT_VERSION\", ' ')",
+  "reason": "实现带有 CONTRACT_VERSION 属性时直接读取该属性值，不使用 getattr 的默认参数；缺失该属性时原默认值 None 与变异后的空格字符串均满足 type(declared) is not int，短路右侧成员检查并立即抛出 ContractVersionError，改动仅影响面向人类阅读的异常说明文字，返回值与异常类型保持一致。",
+  "registered_by": "solo-gemini-3.1-pro",
+  "registered_at": "2026-11-14T23:23:00+08:00"
  }
 ]
