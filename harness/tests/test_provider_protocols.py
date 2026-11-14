@@ -82,6 +82,57 @@ def test_chat_wire_format_tool_round_trip_and_identity_headers():
     assert result.usage.output_tokens == 5
 
 
+def test_chat_wire_format_merges_developer_into_single_system_and_preserves_tool_round_trip():
+    # 保护 R3：经真实 HTTP 发送 /chat/completions 请求时，工作请求与整理请求的 developer 消息均合并为开头单条 system 消息
+    server, capture, base = serve(chat_responder)
+    try:
+        facade = facade_with(base + "/v1", protocol="chat_completions")
+        target = bound_target(facade)
+        work_items = [
+            {"role": "developer", "content": "常驻材料"},
+            {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "请写文件"}]},
+            {"type": "function_call", "call_id": "call-1", "name": "write_file",
+             "arguments": '{"path": "a.txt"}'},
+            {"type": "function_call_output", "call_id": "call-1", "output": "已写入"},
+        ]
+        work_call = model_call(
+            work_items,
+            [{"name": "write_file", "description": "写文件",
+              "parameters": {"type": "object", "properties": {}}}],
+            max_output_tokens=1024, session_id="run-1:engineering", attempt_id="a-work",
+        )
+        work_result = invoke(facade, target, work_call)
+
+        compaction_items = [
+            {"role": "developer", "content": "整理规则"},
+            {"role": "developer", "content": "常驻材料"},
+            {"role": "user", "content": "历史切片"},
+        ]
+        compaction_call = model_call(
+            compaction_items, max_output_tokens=1024,
+            session_id="run-1:engineering", attempt_id="a-compact", purpose="compaction",
+        )
+        invoke(facade, target, compaction_call)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert [path.endswith("/chat/completions") for path in capture.paths] == [True, True]
+    work_messages = capture.requests[0]["messages"]
+    assert work_messages[0] == {"role": "system", "content": "常驻材料"}
+    assert [message["role"] for message in work_messages] == ["system", "user", "assistant", "tool"]
+    assert work_messages[1] == {"role": "user", "content": "请写文件"}
+    assert work_messages[2]["tool_calls"][0]["id"] == "call-1"
+    assert work_messages[3] == {"role": "tool", "tool_call_id": "call-1", "content": "已写入"}
+    returned_call = next(item for item in work_result.output if item["type"] == "function_call")
+    assert returned_call["call_id"] == "call-1"
+
+    assert capture.requests[1]["messages"] == [
+        {"role": "system", "content": "整理规则\n常驻材料"},
+        {"role": "user", "content": "历史切片"},
+    ]
+
+
 def test_messages_wire_format_system_split_tool_round_trip_and_usage():
     server, capture, base = serve(messages_responder)
     with preset_base_urls(base + "/v1"):

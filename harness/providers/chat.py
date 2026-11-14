@@ -332,9 +332,10 @@ def _chat_request_params(invocation: _ChatInvocation, target: FrozenTarget) -> d
 
 
 def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
-    # 把已装配的 Responses 形状输入翻译为 Chat 形状，保留顺序与工具配对
+    # 将已装配的 Responses 形状输入翻译为 Chat 形状，system 与 developer 文本按出现顺序合并为开头单条 system 消息
     raw = provider_input.raw_request or {}
     items = raw.get("input") if isinstance(raw, dict) else None
+    system_parts: list[str] = []
     messages: list[dict[str, Any]] = []
     if isinstance(items, list) and items:
         pending_calls: list[dict[str, Any]] = []
@@ -371,18 +372,26 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
                 continue
             if item_type == "message" or item_type is None:
                 role = str(item.get("role") or "user")
-                entry: dict[str, Any] = {"role": role, "content": _message_text(item.get("content"))}
-                # 推理内容挂在它伴随的 assistant 消息上；部门输入与用户消息消耗掉它
+                text = _message_text(item.get("content"))
+                if role in {"system", "developer"}:
+                    pending_reasoning = ""
+                    system_parts.append(text)
+                    continue
+                entry: dict[str, Any] = {"role": role, "content": text}
+                # 推理内容挂在它伴随的 assistant 消息上；系统输入与用户消息消耗掉它
                 if role == "assistant" and pending_reasoning:
                     entry["reasoning_content"] = pending_reasoning
                 pending_reasoning = ""
                 messages.append(entry)
         _flush_tool_calls(messages, pending_calls, pending_reasoning)
         _flush_tool_images(messages, pending_images)
-        return messages
+        return _prepend_system_message(system_parts, messages)
     # 没有装配好的 input 时才由统一消息与工具结果组成请求；input 中的工具结果已按原位置翻译
     images: list[tuple[str, ToolImage]] = []
     for message in provider_input.messages:
+        if message.role in {"system", "developer"}:
+            system_parts.append(message.content)
+            continue
         entry: dict[str, Any] = {"role": message.role, "content": message.content}
         if message.name:
             entry["name"] = message.name
@@ -395,7 +404,14 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
         })
         images.extend((result.call_id, image) for image in result.images)
     _flush_tool_images(messages, images)
-    return messages
+    return _prepend_system_message(system_parts, messages)
+
+
+def _prepend_system_message(system_parts: list[str], messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    system_text = "\n".join(part for part in system_parts if part)
+    if not system_text:
+        return messages
+    return [{"role": "system", "content": system_text}, *messages]
 
 
 def _flush_tool_images(messages: list[dict[str, Any]], pending: list[tuple[str, ToolImage]]) -> None:
