@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/architecture/name-map.md",
-"hash":"02a1c2b2ed20d1cd",
+"hash":"841f09e7262186c3",
 "nodes":[
-{"hash":"02a1c2b2ed20d1cd","id":"docs/design/architecture/name-map.md","kind":"file","title":"docs/design/architecture/name-map.md"},
+{"hash":"841f09e7262186c3","id":"docs/design/architecture/name-map.md","kind":"file","title":"docs/design/architecture/name-map.md"},
 {"hash":"886e48f3c318e081","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照","kind":"section","parent":"docs/design/architecture/name-map.md","title":"总图的词与代码名的对照"},
 {"hash":"e7f1ee76c44db50b","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 用法","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"用法"},
 {"hash":"64923c86a768c556","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 1. 系统里的九道缝","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"1. 系统里的九道缝"},
@@ -19,7 +19,7 @@
 {"hash":"14066f260b734c1e","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"2. 系统之外的四道缝"},
 {"hash":"b0738484b306ddf6","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝 > 画面","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝","title":"画面"},
 {"hash":"d683a77c39f66ee2","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 3. 外环的九个状态","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"3. 外环的九个状态"},
-{"hash":"fc2e7655d778fa89","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"4. 每道缝的守卫"}
+{"hash":"1c57b9c395b7553a","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"4. 每道缝的守卫"}
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["第一节"],"seen":"762ce1eedbb2875f","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
@@ -38,7 +38,8 @@
 {"dst":"client/tests/unit/page-imports.test.ts","kind":"code-path","raws":["client/tests/unit/page-imports.test.ts"],"seen":"5ae152056718c387","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"evals/tests/test_no_harness_import.py","kind":"code-path","raws":["evals/tests/test_no_harness_import.py"],"seen":"cbe2016afca46411","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"evals/tests/test_no_harness_paths.py","kind":"code-path","raws":["evals/tests/test_no_harness_paths.py"],"seen":"7d9820516943ec39","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
-{"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"e40b0abaa479aaee","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
+{"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"ac339641c3cdfeb7","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
+{"dst":"harness/tests/kernel/mutation_reasons.json","kind":"code-path","raws":["harness/tests/kernel/mutation_reasons.json"],"seen":"215b1329f2cbed25","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"e7e8ff5a5b47ad77","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"08a7ce7e61a441b6","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"view/tests/unit/view-imports.test.ts","kind":"code-path","raws":["view/tests/unit/view-imports.test.ts"],"seen":"eb6cc492074b5273","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
