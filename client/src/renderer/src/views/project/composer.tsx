@@ -13,8 +13,8 @@ import type { ClientApp } from "../../contract/client-app";
 import { CommandFeedback, hasCommand } from "./common";
 import { useCommand } from "./use-snapshot";
 import {
-  afterSend, chosenRecipient, draftChanged, recipientHint, recipientOptions,
-  type ComposerInput, type ComposerState, type RecipientOption,
+  activeChanged, afterSend, chosenRecipient, draftChanged, focusRecipient, pickRecipient,
+  recipientHint, recipientOptions, type ComposerInput, type ComposerState, type RecipientOption,
 } from "./thread-model";
 
 export function Composer(props: {
@@ -34,28 +34,32 @@ export function Composer(props: {
   const [draft, setDraft] = useState("");
   const [state, setState] = useState<ComposerState>({ manual: null, hold: null });
   const command = useCommand(props.app, props.dataKey);
-  const options = useMemo(() => recipientOptions(props.input), [props.input]);
-  const chosen = chosenRecipient(props.input, state);
-  // 点循环图的节点：收件人切到给这个职能的指导。这是用户的一次选择，输入框里有字也照切（与原型一致），
-  // 切过去以后重新冻住；点的职能不在这份组织里时不理会。
-  const seenFocus = useRef(props.input.focus);
+  const input = useMemo(
+    () => (props.activeItemId === null && props.input.active ? { ...props.input, active: false } : props.input),
+    [props.activeItemId, props.input],
+  );
+  const options = useMemo(() => recipientOptions(input), [input]);
+  const chosen = chosenRecipient(input, state);
+  const seenActive = useRef(input.active);
   useEffect(() => {
-    const next = props.input.focus;
+    if (input.active === seenActive.current) {
+      return;
+    }
+    seenActive.current = input.active;
+    setState((prev) => activeChanged(prev, input.active));
+  }, [input.active]);
+  // 点击循环图节点：有在跑事项时收件人切换到对应职能的指导；草稿非空时一并冻住；无在跑事项时保持原收件人。
+  const seenFocus = useRef(input.focus);
+  useEffect(() => {
+    const next = input.focus;
     if (next === seenFocus.current) {
       return;
     }
     seenFocus.current = next;
-    if (next === null) {
-      return;
-    }
-    const id = `guide:${next}`;
-    if (!options.some((option) => option.id === id)) {
-      return;
-    }
-    setState({ manual: id, hold: draft.trim() === "" ? null : id });
-  }, [props.input.focus, options, draft]);
+    setState((prev) => focusRecipient(input, prev, next, draft));
+  }, [input, draft]);
   const option: RecipientOption = options.find((candidate) => candidate.id === chosen) ?? options[0];
-  const hint = recipientHint(props.input, option.id, props.activeTitle);
+  const hint = recipientHint(input, option.id, props.activeTitle);
   // 指导与追加输入要发到在跑的那件事项上；没有在跑的事项时这两项发不出去，写明原因
   const targetless = option.kind !== "new" && props.activeItemId === null;
   const commandName = option.kind === "new" ? "work_item.create"
@@ -64,12 +68,11 @@ export function Composer(props: {
   const disabled = draft.trim() === "" || command.busy || targetless || !allowed;
 
   const pick = (next: RecipientOption): void => {
-    // 输入框里有字时点收件人仍然能切：切过去以后就冻住在这个选择上
-    setState({ manual: next.kind === "guide" ? next.id : null, hold: draft.trim() === "" ? null : next.id });
+    setState((prev) => pickRecipient(input, prev, next.id, draft));
   };
 
   const changeDraft = (value: string): void => {
-    setState(draftChanged(state, value, chosenRecipient(props.input, state)));
+    setState((prev) => draftChanged(prev, value, chosenRecipient(input, prev)));
     setDraft(value);
   };
 
@@ -90,7 +93,7 @@ export function Composer(props: {
       if (!ok) {
         return;
       }
-      setState(afterSend(state, option.id));
+      setState((prev) => afterSend(prev, option.id));
       setDraft("");
       props.onSent();
     });
