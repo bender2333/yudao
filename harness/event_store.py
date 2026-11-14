@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import queue
 import sqlite3
+import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -215,6 +216,10 @@ def dump_decision(decision: DecisionRequest) -> SavedDecision:
                          _DECISION_STATE.dump_json(decision).decode("utf-8"))
 
 
+_READ_ONLY_OPEN_TIMEOUT_SEC = 5.0
+_READ_ONLY_OPEN_RETRY_INTERVAL_SEC = 0.1
+
+
 class EventStore:
     def __init__(self, path: str | Path, *, read_only: bool = False) -> None:
         # read_only 用于只读的子命令：不建立目录、不写库结构，连接以只读方式打开； 写入方法在使用时直接拒绝，读取期间不会改动事件日志与保存的投影
@@ -225,10 +230,7 @@ class EventStore:
         self._listeners: list[Callable[[list[Event | ProjectEvent]], None]] = []
         self._closed = False
         if read_only:
-            if not self.path.is_file():
-                raise FileNotFoundError(f"event log does not exist: {self.path}")
-            with self._connection() as connection:
-                self.log_id: str = connection.execute("SELECT log_id FROM log").fetchone()["log_id"]
+            self.log_id: str = self._open_read_only()
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as connection:
@@ -238,6 +240,26 @@ class EventStore:
                 connection.execute("ALTER TABLE events ADD COLUMN dispatch_number INTEGER")  # 旧数据目录：补一列空值
             connection.execute("INSERT OR IGNORE INTO log (singleton, log_id) VALUES (1, ?)", (new_id("log"),))
             self.log_id: str = connection.execute("SELECT log_id FROM log").fetchone()["log_id"]
+
+    def _open_read_only(self) -> str:
+        # 持有事件库的进程刚退出时，Windows 异步释放共享内存映射段期间首次读取可能触发瞬时 OperationalError；
+        # 每次失败先关闭已打开的连接并重置空闲队列，再在 5 秒上限内短暂等待重试
+        if not self.path.is_file():
+            raise FileNotFoundError(f"event log does not exist: {self.path}")
+        deadline = time.monotonic() + _READ_ONLY_OPEN_TIMEOUT_SEC
+        while True:
+            try:
+                with self._connection() as connection:
+                    return str(connection.execute("SELECT log_id FROM log").fetchone()["log_id"])
+            except sqlite3.OperationalError:
+                for opened in self._opened:
+                    opened.close()
+                self._opened.clear()
+                self._idle = queue.SimpleQueue()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                time.sleep(min(_READ_ONLY_OPEN_RETRY_INTERVAL_SEC, remaining))
 
     def commit(self, stream: str, expected_version: int, events: Sequence[Event | ProjectEvent], state: str, *,
                epoch: int | None = None, command: Command | None = None,

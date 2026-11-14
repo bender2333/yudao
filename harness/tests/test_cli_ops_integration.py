@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import psutil
 
 from harness.__main__ import main as cli_main
 from harness.event_store import EventStore
@@ -42,19 +43,43 @@ def _utf8_env(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 
 def _terminate_process_tree(process: subprocess.Popen[Any]) -> None:
-    # 严格按记录的进程号 PID 终止测试启动的子进程树，禁止按进程名终止
-    if process.poll() is not None:
-        return
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-    else:
-        os.killpg(process.pid, signal.SIGKILL)
+    # 严格按记录的进程号 PID 收集并终止测试启动的服务进程及其全部子孙进程，确认整棵进程树完全退出后再返回
+    tracked: list[psutil.Process] = []
+    try:
+        root = psutil.Process(process.pid)
+        tracked = [root, *root.children(recursive=True)]
+    except psutil.Error:
+        pass
+
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    for member in list(tracked):
+        try:
+            for descendant in member.children(recursive=True):
+                if descendant not in tracked:
+                    tracked.append(descendant)
+        except psutil.Error:
+            pass
+        try:
+            member.kill()
+        except psutil.Error:
+            pass
+
     process.wait(timeout=30)
+    _gone, alive = psutil.wait_procs(tracked, timeout=30)
+    assert not alive, f"服务子进程树未在时限内完全退出：{[proc.pid for proc in alive]}"
 
 
 def _read_log_lines(log_path: Path) -> list[str]:
@@ -222,7 +247,7 @@ def _build_provider_responder() -> Any:
 def test_real_service_headless_cli_roundtrip_events_until_run_done_and_secret_isolation(tmp_path: Path) -> None:
     # 守 R1/R3：启动真实 Yudao 服务进程后，仅凭通用命令行走通 capabilities -> describe -> 模型连接与准入 ->
     # project.create -> work_item.create -> events --until-type run_done -> project.overview -> run.export，
-    # 并核验标准输入传入的明文密钥不出现在任何命令行输出、日志文件、事件库与运行导出结果中
+    # 服务关闭后执行离线 replay --project 只读核对，并核验明文密钥不出现在任何命令行输出、日志文件、事件库与导出结果中
     upstream = ScriptedProvider([_build_provider_responder()] * 16)
     data_dir = tmp_path / "service-data"
     cli_outputs: list[str] = []
@@ -420,7 +445,17 @@ def test_real_service_headless_cli_roundtrip_events_until_run_done_and_secret_is
             assert export_doc["data"]["run_id"] == run_id
             assert SECRET_API_KEY not in export_res.stdout
 
-        # 6. 服务关闭后核对全部命令行输出、日志目录与 SQLite 事件库（含原始文件字节）均不含明文密钥
+        # 6. 服务关闭后立即运行离线 replay --project 只读核对，并核对全部命令行输出、日志目录与 SQLite 事件库均不含明文密钥
+        replay_res = _run_cli_subprocess(
+            ["--data-dir", str(data_dir), "replay", "--project", project_id],
+            cwd=tmp_path,
+        )
+        cli_outputs.append(replay_res.stdout)
+        cli_outputs.append(replay_res.stderr)
+        assert replay_res.returncode == 0, replay_res.stderr
+        replay_doc = json.loads(replay_res.stdout)
+        assert replay_doc["data"]["consistent"] is True
+
         for text_chunk in cli_outputs:
             assert SECRET_API_KEY not in text_chunk
 
