@@ -27,6 +27,7 @@ const SAMPLE: Record<string, (base: FloorEvent) => FloorEvent> = {
   tool_started: (base) => ({ ...base, tool: "read_file", payload: { name: "a.py" } }),
   tool_skipped: (base) => ({ ...base, tool: "bash", payload: {} }),
   qa_submitted: (base) => ({ ...base, department: "quality", payload: { verdict: "release" } }),
+  artifact_accepted: (base) => ({ ...base, department: "engineering", payload: { artifact_kind: "completion", artifact_issuer: "engineering" } }),
   department_activated: (base) => ({ ...base, department: "product", payload: {} }),
   decision_requested: (base) => ({ ...base, event_id: "evt_d1", payload: { decision_id: "d1", kind: "model_unavailable" } }),
   decision_answered: (base) => ({ ...base, payload: { decision_id: "d1", option: "continue" } }),
@@ -397,4 +398,135 @@ test("流式文字：输出片段翻成一句话，别的种类没有", () => {
   const stream = streamText({ type: "model_stream_progress", position: 8, department: "engineering", role: "e-arch", payload: { text: "正在写导出逻辑" } });
   assert.deepEqual(stream, { room: "engineering", role: "e-arch", text: "正在写导出逻辑" });
   assert.equal(streamText({ type: "run_done", position: 9, payload: {} }), null);
+});
+
+// ---------------------------------------------------------------------------
+// 开环完成与直做加独立核验（工单 #1385，守 R2 画面合同取值与 R3 开环完成与放行区分）
+
+test("开环完成与直做加核验：无核验交完成盖虚线章入库，有核验交完成只封存送核验屋", () => {
+  const ref = { position: 1, source: "rule" as const };
+  const openOrg = {
+    form: "solo_engineering",
+    routing: "watched_outputs" as const,
+    entry: { id: "engineering", label: "工程", ref },
+    roles: [{ id: "engineering", label: "工程", ref }],
+    verifiers: [],
+    completing: { id: "engineering", label: "工程", ref },
+    watched: [],
+    asks: [],
+    rejections: [],
+  };
+  const openActs = floorActions(
+    {
+      type: "artifact_accepted",
+      position: 21,
+      department: "engineering",
+      work_item_id: "w_open",
+      payload: { artifact_kind: "completion", artifact_issuer: "engineering" },
+    },
+    { organization: openOrg },
+  );
+  assert.deepEqual(openActs.map((a) => a.kind), ["stamp_open_loop", "handoff"]);
+  assert.equal(openActs[0].say, "现在盖开环完成章");
+  assert.equal(openActs[0].outsourced, undefined);
+  assert.equal(openActs[1].from, "engineering");
+  assert.equal(openActs[1].to, "library");
+  assert.equal(openActs[1].artifact, "box");
+
+  const outsourcedActs = floorActions(
+    {
+      type: "artifact_accepted",
+      position: 22,
+      department: "engineering",
+      work_item_id: "w_open",
+      payload: { artifact_kind: "completion", artifact_issuer: "engineering", outsourced: true },
+    },
+    { organization: openOrg },
+  );
+  assert.equal(outsourcedActs[0].kind, "stamp_open_loop");
+  assert.equal(outsourcedActs[0].outsourced, true);
+
+  const openDone = floorActions(
+    { type: "run_done", position: 23, department: "engineering", work_item_id: "w_open", payload: { stop_reason: "open_loop" } },
+    { organization: openOrg },
+  );
+  assert.equal(openDone[0].say, "现在开环完成");
+
+  // 直做加独立核验角色（「工程 · 质检」）：交完成包裹送核验屋，不盖开环完成虚线章
+  const verifiedOrg = {
+    form: "direct_verified",
+    routing: "watched_outputs" as const,
+    entry: { id: "engineering", label: "工程", ref },
+    roles: [
+      { id: "engineering", label: "工程", ref },
+      { id: "quality", label: "质检", ref },
+    ],
+    verifiers: [{ role: "quality", verifies: [{ role: "engineering", outcomes: ["completion"] }], ref }],
+    completing: null,
+    watched: [{ source: "engineering", recipient: "quality", outcome: "completion", ref }],
+    asks: [],
+    rejections: [{ verifier: "quality", role: "engineering", outcome: "completion", ref }],
+  };
+  const verifiedSubmit = floorActions(
+    {
+      type: "artifact_accepted",
+      position: 31,
+      department: "engineering",
+      work_item_id: "w_ver",
+      payload: { artifact_kind: "completion", artifact_issuer: "engineering" },
+    },
+    { organization: verifiedOrg },
+  );
+  assert.deepEqual(verifiedSubmit.map((a) => a.kind), ["seal", "handoff"]);
+  assert.equal(verifiedSubmit[0].say, "现在装箱封存");
+  assert.equal(verifiedSubmit[1].to, "quality");
+
+  const verifiedRelease = floorActions(
+    {
+      type: "artifact_accepted",
+      position: 32,
+      department: "quality",
+      work_item_id: "w_ver",
+      payload: { artifact_kind: "completion_review", verdict: "release" },
+    },
+    { organization: verifiedOrg },
+  );
+  assert.deepEqual(verifiedRelease.map((a) => a.kind), ["stamp_release", "handoff"]);
+  assert.equal(verifiedRelease[1].to, "library");
+
+  const verifiedRework = floorActions(
+    {
+      type: "artifact_accepted",
+      position: 33,
+      department: "quality",
+      work_item_id: "w_ver",
+      payload: { artifact_kind: "completion_review", verdict: "rework" },
+    },
+    { organization: verifiedOrg },
+  );
+  assert.deepEqual(verifiedRework.map((a) => a.kind), ["stamp_defect", "handoff"]);
+  assert.equal(verifiedRework[1].to, "engineering");
+
+  // 楼层状态翻译：开环完成已采纳事项与货架箱子均带 open_loop 章种类
+  const openFloor = floorState({
+    position: 40,
+    loop: {
+      project_id: "p_open",
+      work_items: [
+        loopRow({
+          work_item_id: "w_open",
+          status: "adopted",
+          stop_reason: "open_loop",
+          outsourced: true,
+          department: null,
+          organization: openOrg,
+        }),
+      ] as never,
+      adoptions: [{ adoption_id: "ad_open", work_item_id: "w_open", run_id: "r1" } as never],
+    },
+  });
+  assert.equal(openFloor.items[0].stamp_kind, "open_loop");
+  assert.equal(openFloor.items[0].stamp_room, "engineering");
+  assert.equal(openFloor.items[0].outsourced, true);
+  assert.deepEqual(openFloor.shelves.boxes, [{ work_item_id: "w_open", stamp_kind: "open_loop", outsourced: true }]);
 });

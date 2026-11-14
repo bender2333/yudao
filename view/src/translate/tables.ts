@@ -12,6 +12,7 @@ import {
   type Pose,
   type RoleState,
   type RoomStatus,
+  type StampKind,
 } from "../pixel/contract.ts";
 
 /**
@@ -175,3 +176,60 @@ export const roleStatus = table<RoleState>("角色状态", {
   failed: "failed",
   away: "away",
 });
+
+// ---------------------------------------------------------------------------
+// 事项的入口屋、结束章归属屋与章的种类（docs/design/visualization.md「开环完成与放行」，工单 #1385）
+
+/** 从组织结构推导入口屋与结束章位置所需的字段。 */
+export interface OrganizationStampSpec {
+  readonly entry?: { readonly id: string } | null;
+  readonly roles: readonly { readonly id: string }[];
+  readonly verifiers: readonly { readonly role: string }[];
+  readonly completing?: { readonly id: string } | null;
+  readonly watched: readonly { readonly recipient: string }[];
+}
+
+/** 推出一个组织的交完成角色标识：有 completing 时直接读取，单角色无核验组织回退到唯一角色。 */
+export function completingRoleOf(org: OrganizationStampSpec): string | null {
+  if (org.completing?.id) return org.completing.id;
+  if (org.verifiers.length === 0 && org.roles.length === 1) return org.roles[0]!.id;
+  return null;
+}
+
+/** 检查事项快照行是否带有外包核验标记。 */
+export function isOutsourcedRow(row: Readonly<Record<string, unknown>>): boolean {
+  return row.outsourced === true || row.verified_external === true || row.external === true;
+}
+
+/** 从事项快照行与冻结组织结构推出该事项的入口屋、盖章屋、章种类与外包标记。 */
+export function resolveWorkItemStamp(
+  row: { status: string; stop_reason?: string | null; refs?: Readonly<Record<string, unknown>> | null } & Readonly<Record<string, unknown>>,
+  org: OrganizationStampSpec,
+): {
+  entry_room: string | null;
+  stamp_room: string | null;
+  stamp_kind: StampKind | undefined;
+  outsourced: boolean;
+} {
+  const recipients = new Set(org.watched.map((w) => w.recipient));
+  const entry_room = org.entry?.id
+    ?? (org.roles.length > 0 ? (org.roles.find((r) => !recipients.has(r.id))?.id ?? org.roles[0]!.id) : null);
+  const verifierRole = org.verifiers[0]?.role ?? null;
+  const completingRole = completingRoleOf(org);
+  const stamp_room = verifierRole ?? completingRole;
+  const hasStampRef = Boolean(row.refs && row.refs.stamp);
+  let stamp_kind: StampKind | undefined;
+  if (row.stop_reason === "open_loop") {
+    stamp_kind = "open_loop";
+  } else if (!verifierRole && completingRole && (row.status === "adopted" || hasStampRef)) {
+    stamp_kind = "open_loop";
+  } else if (verifierRole && row.stop_reason !== "open_loop" && (row.status === "adopted" || row.status === "released_unsettled" || hasStampRef)) {
+    stamp_kind = "release";
+  }
+  return {
+    entry_room,
+    stamp_room,
+    stamp_kind,
+    outsourced: isOutsourcedRow(row),
+  };
+}

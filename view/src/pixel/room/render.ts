@@ -9,11 +9,11 @@ import { bitmapDef } from "../char.ts";
 import { mix, rgba } from "../grid.ts";
 import { paint } from "../paint.ts";
 import { PAL } from "../registry.ts";
-import { drawActor, drawBitmap, drawIcon, drawSign, drawStampMark, drawText, headTop, signStyle } from "../shapes.ts";
+import { drawActor, drawBitmap, drawDashedStampBox, drawIcon, drawSign, drawStampMark, drawText, headTop, signStyle } from "../shapes.ts";
 import { drawSpeeches } from "../floor/render.ts";
 import type { Actor, SceneLike } from "../world/types.ts";
 import { BASE, H, L, ROW_A, ROW_B, STATUS_COLOR, STATUS_TEXT, W, levelAtLeast, type RoomSeat } from "./layout.ts";
-import { VERIFIER_BENCH_LABEL, rolesOf, roomAppearanceOf, type RoomAppearance } from "./decl.ts";
+import { EXIT_TRAY_BENCH_LABEL, VERIFIER_BENCH_LABEL, rolesOf, roomAppearanceOf, type RoomAppearance } from "./decl.ts";
 import type { RoomDriver } from "./driver.ts";
 import type { DeskState } from "./room.ts";
 
@@ -417,12 +417,13 @@ export class RoomRenderer {
     const app = this.appearance();
     const D = app.shell;
     const isVerifier = Boolean(this.driver.model.verifier);
+    const isExitTray = !isVerifier && Boolean(this.driver.model.exit_tray);
     const b = L.bench;
     const bs = this.driver.state.bench;
     const benchSpec = app.nonVerifierBench;
-    const top = isVerifier ? PAL.white : benchSpec.top;
-    const face = isVerifier ? D.light : benchSpec.face;
-    const label = isVerifier ? VERIFIER_BENCH_LABEL : benchSpec.label;
+    const top = isVerifier ? PAL.white : isExitTray ? PAL.wood1 : benchSpec.top;
+    const face = isVerifier ? D.light : isExitTray ? PAL.wood2 : benchSpec.face;
+    const label = isVerifier ? VERIFIER_BENCH_LABEL : isExitTray ? EXIT_TRAY_BENCH_LABEL : benchSpec.label;
     paint.table(c, b.x, b.y, b.w, { top, face, edge: mix(face, PAL.ink, 0.3), label });
     const cx = b.x + Math.round(b.w / 2);
     if (isVerifier) {
@@ -432,13 +433,22 @@ export class RoomRenderer {
       if (this.driver.state.darkTarget === 0 || bs.ticks) paint.lightCone(c, b.x + b.w - 22, b.y - 25, 18, 26, "#fff4c4", 0.28);
       RB(c, b.x + 5, b.y - 6, 14, 5, PAL.white);
       for (let i = 0; i < 3; i++) R(c, b.x + 7 + i * 4, b.y - 5, 2, 2, i < bs.ticks ? PAL.green2 : PAL.grey2);
+      if (!bs.slip && this.driver.model.stamp_kind === "release") {
+        drawStampMark(c, cx + 16, b.y - 8, "放行", PAL.green2, { size: 6 });
+      }
+    } else if (isExitTray) {
+      RB(c, b.x + b.w - 28, b.y - 8, 22, 6, PAL.wood3);
+      R(c, b.x + b.w - 26, b.y - 7, 18, 3, PAL.paper2);
+      if (!bs.mark && this.driver.model.stamp_kind === "open_loop") {
+        const outsourced = Boolean(this.driver.model.outsourced);
+        const text = outsourced ? "开环完成 · 外包" : "开环完成";
+        const boxW = outsourced ? 48 : 30;
+        drawDashedStampBox(c, cx - Math.round(boxW / 2), b.y - 16, boxW, 9, text, { size: 5 });
+      }
     } else if (benchSpec.style === "seal_table") {
       RB(c, b.x + b.w - 16, b.y - 9, 12, 5, PAL.red3);
       drawBitmap(c, "tape", b.x + b.w - 13, b.y - 12);
       RB(c, b.x + 5, b.y - 6, 10, 3, PAL.blue3);
-    } else if (this.driver.model.exit_tray && benchSpec.style === "work_table") {
-      RB(c, b.x + 5, b.y - 7, 14, 5, PAL.wood3);
-      R(c, b.x + 7, b.y - 9, 10, 3, PAL.paper);
     }
     if (bs.item === "scroll_open") {
       RB(c, cx - 18, b.y - 6, 36, 5, PAL.paper);
@@ -453,7 +463,16 @@ export class RoomRenderer {
       drawBitmap(c, bs.item, cx - Math.floor(bm.rows[0].length / 2), b.y - 3 - bm.rows.length);
       if (bs.item === "box" && bs.tape > 0 && bs.tape < 1) R(c, cx - 1, b.y - 11, 2, Math.round(8 * bs.tape), "#efe0b8");
     }
-    if (bs.mark) drawStampMark(c, cx + (bs.item === "scroll_open" ? 6 : 0), b.y - (bs.item === "scroll_open" ? 5 : 8), bs.mark.text, bs.mark.color, { size: 6 });
+    if (bs.mark) {
+      drawStampMark(
+        c,
+        cx + (bs.item === "scroll_open" ? 6 : 0),
+        b.y - (bs.item === "scroll_open" ? 5 : 8),
+        bs.mark.text,
+        bs.mark.color,
+        { size: bs.mark.dashed ? 5.5 : 6, dashed: bs.mark.dashed },
+      );
+    }
     if (bs.slip) {
       drawBitmap(c, bs.slip === "release" ? "slip_release" : "slip_defect", cx + 14, b.y - 8);
       if (bs.slipMark) drawStampMark(c, cx + 17, b.y - 8, bs.slipMark.text, bs.slipMark.color, { size: 6, rot: -0.2 });

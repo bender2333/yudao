@@ -299,3 +299,176 @@ test("缺口清单：缺的查询各写一行，壳上写出还没画的事件�
     shell.close();
   }
 });
+
+// 守 R2 与 R3（工单 #1385）：定义里出现场景声明未登记专属外观的角色标识时，壳顶栏缺口清单写明该角色标识与通用外观，画面照常推进。
+test("缺口清单：定义含未声明专属外观的角色 security 时列出该角色标识，切回已声明角色项目后消退", async () => {
+  const base = loadFixtures();
+  const demo = recordingOf(base, "demo");
+  const ref = { position: 5, source: "rule" as const };
+  const securityLoop = {
+    project_id: "proj_sec",
+    work_items: [
+      {
+        work_item_id: "wi_sec",
+        kind: "request",
+        sign: "审查鉴权边界",
+        color_index: 1,
+        status: "in_progress",
+        department: "security",
+        progress: null,
+        round: 1,
+        started_at: "2026-11-14T10:00:00+08:00",
+        elapsed_sec: 30,
+        time_limit_sec: 3600,
+        pending_question: null,
+        run_id: "run_sec",
+        adoption_id: null,
+        recovery_state: null,
+        version: 1,
+        organization: {
+          form: "engineering_security",
+          routing: "watched_outputs",
+          entry: { id: "engineering", label: "工程", ref },
+          roles: [
+            { id: "engineering", label: "工程", ref },
+            { id: "security", label: "安全审校", ref },
+          ],
+          verifiers: [{ role: "security", verifies: [{ role: "engineering", outcomes: ["completion"] }], ref }],
+          completing: null,
+          watched: [{ source: "engineering", recipient: "security", outcome: "completion", ref }],
+          asks: [{ requester: "security", recipient: "engineering", ref }],
+          rejections: [{ verifier: "security", role: "engineering", outcome: "completion", ref }],
+        },
+      },
+    ],
+    adoptions: [],
+  };
+  const customRecording = {
+    name: "sec_recording",
+    ids: { project_id: "proj_sec", work_item_id: "wi_sec", run_id: "run_sec" },
+    queries: [
+      {
+        name: "projects.list",
+        params: {},
+        response: {
+          position: 20,
+          data: {
+            projects: [
+              {
+                project_id: "proj_sec",
+                name: "安全审校示例项目",
+                goal: "验证通用外观",
+                pinned: false,
+                archived: false,
+                last_activity_at: "2026-11-14T10:01:00+08:00",
+                decisions_waiting: 0,
+              },
+              ...(demo.queries.find((q) => q.name === "projects.list")?.response.data as { projects: unknown[] }).projects,
+            ],
+          },
+        },
+      },
+      {
+        name: "project.loop",
+        params: { project_id: "proj_sec" },
+        response: { position: 20, data: securityLoop },
+      },
+      {
+        name: "project.loop",
+        params: { project_id: "proj_sec", work_item: "wi_sec" },
+        response: { position: 20, data: securityLoop },
+      },
+      {
+        name: "decisions.list",
+        params: { project_id: "proj_sec", status: ["open"] },
+        response: { position: 20, data: { decisions: [] } },
+      },
+      {
+        name: "run.asks",
+        params: { run_id: "run_sec" },
+        response: { position: 20, data: { asks: [] } },
+      },
+      {
+        name: "department.workspace",
+        params: { project_id: "proj_sec", department: "security", work_item: "wi_sec" },
+        response: {
+          position: 20,
+          data: {
+            room: {
+              department: "security",
+              level: "S5",
+              status: "working",
+              crt: { target: "审查鉴权边界", model: "test-model", protocol: "Responses", status: "进行中", cycle: 1 },
+              roles: [{ id: "sec-reviewer", name: "安全审校员", kind: "agent", status: "working", task: null }],
+              pose: { role_id: "sec-reviewer", action: "reading" },
+              door: null,
+              hold_card: null,
+              mailbox: 0,
+              summaries: 0,
+              scrolls: 1,
+              pinned_notes: 0,
+              semantic_cards: 0,
+              machine: null,
+              remote_unknown: false,
+              waiting_provider: false,
+              pipes: { out: "idle", letters_waiting: 0 },
+              existing_read: false,
+              trial: null,
+              tool_panel: null,
+              self_test: null,
+            },
+          },
+        },
+      },
+      ...demo.queries.filter((q) => q.name !== "projects.list"),
+    ],
+  };
+  const fixtures = {
+    capabilities: base.capabilities,
+    recordings: [...base.recordings, customRecording],
+  };
+  const server = new FakeServer(fixtures as never, "sec_recording");
+  const shell = shellFor(server);
+  await shell.open("http://view.test", "");
+  try {
+    await until(
+      () => shell.state.gap.some((line) => line.includes("security") && line.includes("通用外观")),
+      "楼场景列出未声明外观角色 security",
+    );
+
+    shell.goFloor("proj_sec", "wi_sec");
+    const floorSurface = fakeSurface();
+    const detachFloor = shell.attachHost(fakeHost, fakeClock, async () => floorSurface);
+    await until(() => floorSurface.jumped.length + floorSurface.states.length > 0, "楼层状态送达");
+    assert.ok(
+      shell.state.gap.some((line) => line.includes("security") && line.includes("安全审校") && line.includes("通用外观")),
+      `楼层缺口清单未列出 security：${shell.state.gap.join("\n")}`,
+    );
+    detachFloor();
+
+    shell.goRoom("security");
+    const roomSurface = fakeSurface();
+    const detachRoom = shell.attachHost(fakeHost, fakeClock, async () => roomSurface);
+    await until(() => roomSurface.jumped.length + roomSurface.states.length > 0, "房间状态送达");
+    assert.ok(
+      shell.state.gap.some((line) => line.includes("security") && line.includes("通用外观")),
+      `房间缺口清单未列出 security：${shell.state.gap.join("\n")}`,
+    );
+    assert.equal(shell.state.crumbs.at(-1)?.label, "安全审校");
+    detachRoom();
+
+    // 切到只有默认已声明角色的项目楼层时，未声明角色外观的缺口行随之消退
+    shell.goFloor(demo.ids.project_id, demo.ids.work_item_id);
+    const demoSurface = fakeSurface();
+    const detachDemo = shell.attachHost(fakeHost, fakeClock, async () => demoSurface);
+    await until(() => demoSurface.jumped.length + demoSurface.states.length > 0, "默认项目楼层状态送达");
+    assert.equal(
+      shell.state.gap.some((line) => line.includes("security")),
+      false,
+      `切回已声明角色项目后仍残留 security 缺口：${shell.state.gap.join("\n")}`,
+    );
+    detachDemo();
+  } finally {
+    shell.close();
+  }
+});

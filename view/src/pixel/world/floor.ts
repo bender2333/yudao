@@ -408,6 +408,10 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
         if (a.room) flash(String(a.room), a.kind === "stamp_release" ? PAL_MAP.green2 : PAL_MAP.red2, 1200);
         task(run);
         return;
+      case "stamp_open_loop":
+        if (a.room) flash(String(a.room), PAL_MAP.yellow2, 1000);
+        task(run);
+        return;
       // 传信：发信的经理走到管口塞进信，信沿传信管走，收信的经理走到信来的那一侧管口取信；回答的信是绿色
       case "letter": {
         const from = asText(a.from) ?? "";
@@ -433,14 +437,17 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
           run.finish();
         }
         return;
-      case "parcel_enter":
+      case "parcel_enter": {
         flash(lay.hall.id, PAL_MAP.green2, 900);
-        if (!lay.out) {
+        const preferredTo = asText(a.to) ?? (it && typeof it.entry_room === "string" ? it.entry_room : null);
+        const outLink = (preferredTo ? world.links[`${lay.hall.id}>${preferredTo}`] : null) ?? lay.out;
+        if (!outLink) {
           run.finish();
           return;
         }
-        send(lay.out.pts, "box", { itemId: asText(a.item), color, linkKey: lay.out.id, run, onDone: () => trip(run, lay.out!.to, "package_handoff_in", run.finish) });
+        send(outLink.pts, "box", { itemId: asText(a.item), color, linkKey: outLink.id, run, onDone: () => trip(run, outLink.to, "package_handoff_in", run.finish) });
         return;
+      }
       case "queue_moved":
         flash(lay.hall.id, PAL_MAP.blue1, 900);
         run.finish();
@@ -590,7 +597,9 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
       case "queue_moved":
         return ["room:" + rooms().hall.id];
       case "parcel_enter": {
-        const out = rooms().out;
+        const enterItem = itemById(asText(a.item));
+        const preferredTo = asText(a.to) ?? (enterItem && typeof enterItem.entry_room === "string" ? enterItem.entry_room : null);
+        const out = (preferredTo ? world.links[`${rooms().hall.id}>${preferredTo}`] : null) ?? rooms().out;
         return ["room:" + rooms().hall.id, out ? laneOf(out.to) : null].filter((x): x is string => typeof x === "string");
       }
       case "resume":
@@ -794,4 +803,106 @@ function tubeFor(world: World, from: string, to: string): [number, number][] | n
 function tubeKeyOf(world: World, from: string, to: string): string | null {
   const link = linkBetween(world, from, to, "tube");
   return link ? link.key : null;
+}
+
+/** 楼层上已结算事项的结束章解析结果（绘制与事实通道共用）。 */
+export interface ResolvedFloorStamp {
+  work_item_id: string;
+  room: string;
+  kind: "release" | "open_loop";
+  outsourced: boolean;
+  text: string;
+}
+
+/** 成果库货架箱子的结束章印记解析结果（绘制与事实通道共用）。 */
+export interface ResolvedShelfBox {
+  work_item_id: string;
+  stamp_kind: "release" | "open_loop";
+  outsourced: boolean;
+}
+
+/** 解析楼层状态里每个已结束事项的章种类、所在房间与印文（支持同层多份定义并集）。 */
+export function resolveFloorStamps(model: FloorModel, world: World): ResolvedFloorStamp[] {
+  const depts = world.roomOrder
+    .map((id) => world.rooms[id])
+    .filter((r): r is NonNullable<typeof r> => Boolean(r && r.roomKind === "dept"));
+  const firstVerifier = depts.find((r) => Boolean(r.def.verifier)) ?? null;
+  const firstExitTray = depts.find((r) => Boolean(r.def.exitTray)) ?? null;
+  const out: ResolvedFloorStamp[] = [];
+
+  for (const it of model.items) {
+    let kind: "release" | "open_loop" | null = null;
+    if (it.stamp_kind === "open_loop" || it.stamp_kind === "release") {
+      kind = it.stamp_kind;
+    } else if (it.stamp_kind === null) {
+      kind = null;
+    } else if (Boolean(it.refs?.stamp) || it.status === "done" || it.status === "adopted") {
+      const explicitRoom = typeof it.stamp_room === "string" ? world.rooms[it.stamp_room] : undefined;
+      if (explicitRoom && explicitRoom.roomKind === "dept") {
+        if (explicitRoom.def.verifier) kind = "release";
+      } else if (!explicitRoom && firstVerifier) {
+        kind = "release";
+      }
+    }
+    if (!kind) continue;
+
+    let roomObj = typeof it.stamp_room === "string" ? world.rooms[it.stamp_room] : undefined;
+    if (!roomObj || roomObj.roomKind !== "dept") {
+      roomObj = (kind === "open_loop" ? firstExitTray : firstVerifier) ?? undefined;
+    }
+    if (!roomObj) continue;
+
+    const outsourced = Boolean(it.outsourced);
+    const text = kind === "open_loop"
+      ? (outsourced ? "开环完成 · 外包" : "开环完成")
+      : "放行";
+    out.push({
+      work_item_id: it.work_item_id,
+      room: roomObj.id,
+      kind,
+      outsourced,
+      text,
+    });
+  }
+  return out;
+}
+
+/** 解析成果库货架上每个已采纳事项箱子的章种类与外包标记。 */
+export function resolveShelfBoxes(model: FloorModel, stamps: readonly ResolvedFloorStamp[]): ResolvedShelfBox[] {
+  const explicit = new Map<string, ResolvedShelfBox>();
+  for (const b of model.shelves.boxes ?? []) {
+    explicit.set(b.work_item_id, {
+      work_item_id: b.work_item_id,
+      stamp_kind: b.stamp_kind,
+      outsourced: Boolean(b.outsourced),
+    });
+  }
+  const byStamp = new Map<string, ResolvedFloorStamp>();
+  for (const st of stamps) byStamp.set(st.work_item_id, st);
+
+  return model.shelves.adopted.map((id) => {
+    const found = explicit.get(id);
+    if (found) return found;
+    const st = byStamp.get(id);
+    if (st) {
+      return {
+        work_item_id: id,
+        stamp_kind: st.kind,
+        outsourced: st.outsourced,
+      };
+    }
+    const item = model.items.find((it) => it.work_item_id === id || it.id === id);
+    if (item && item.stamp_kind === "open_loop") {
+      return {
+        work_item_id: id,
+        stamp_kind: "open_loop",
+        outsourced: Boolean(item.outsourced),
+      };
+    }
+    return {
+      work_item_id: id,
+      stamp_kind: "release",
+      outsourced: false,
+    };
+  });
 }

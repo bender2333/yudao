@@ -19,12 +19,13 @@ export interface SayEvent {
   payload?: Record<string, unknown> | null;
 }
 
-/** 说话时的上下文：side 为 "to" 表示这个小人是收东西的一方，roleName 给出角色名称，deptLabel 与 isVerifier 来自定义组织。 */
+/** 说话时的上下文：side 为 "to" 表示这个小人是收东西的一方，roleName 给出角色名称，deptLabel、isVerifier 与 hasVerifiers 来自定义组织。 */
 export interface SayContext {
   side?: "to" | null;
   roleName?: (role: string | null) => string | null;
   deptLabel?: (department: string) => string | null;
   isVerifier?: (department: string | null | undefined) => boolean;
+  hasVerifiers?: boolean;
 }
 
 /** 事件载荷是按种类不同的字段集合，取值时先收窄。 */
@@ -163,6 +164,7 @@ type SayText = (
   x: Required<Pick<SayContext, "side">> & {
     roleName: (role: string | null) => string | null;
     isVerifier: (department: string | null | undefined) => boolean;
+    hasVerifiers: boolean;
   },
 ) => string | null | undefined;
 
@@ -197,6 +199,12 @@ const TEXT: Readonly<Record<string, SayText>> = {
   product_decision_accepted: () => "现在盖上有效章",
   spec_superseded: () => "现在换用新版本的规格",
   delivery_accepted: () => "现在装箱封存",
+  artifact_accepted: (_ev, pl, x) => {
+    const kind = text(pl.artifact_kind);
+    if (kind === "completion") return x.hasVerifiers ? "现在装箱封存" : "现在盖开环完成章";
+    if (kind === "completion_review") return pl.verdict === "release" ? "现在盖放行章" : "现在盖返工章";
+    return "现在盖上有效章";
+  },
   qa_submitted: (_ev, pl) => (pl.verdict === "release" ? "现在盖放行章" : "现在盖返工章"),
   independent_judgement_committed: () => "现在交上独立判断",
   qa_tests_saved: () => "现在写下测试用例",
@@ -210,7 +218,7 @@ const TEXT: Readonly<Record<string, SayText>> = {
     const reason = text(pl.reason || pl.stopReason);
     return reason === "cancelled" ? "事项取消了，收拾桌面" : "失败了" + (reason ? "：" + cut(reason, 12) : "");
   },
-  run_done: () => "完成了！",
+  run_done: (_ev, pl) => (pl.stop_reason === "open_loop" ? "现在开环完成" : "完成了！"),
   run_resumed: () => "继续工作",
   run_continued: () => "收到你的回答，继续工作",
   decision_requested: (_ev, pl) => (
@@ -234,6 +242,7 @@ export function say(ev: SayEvent, x?: SayContext): string | null {
     roleName: (role: string | null): string | null => (x?.roleName ? x.roleName(role) : null),
     isVerifier: (department: string | null | undefined): boolean =>
       x?.isVerifier ? x.isVerifier(department) : department === "quality",
+    hasVerifiers: x?.hasVerifiers ?? true,
   };
   const f = TEXT[ev.type];
   if (!f) return fromLabel(ev);

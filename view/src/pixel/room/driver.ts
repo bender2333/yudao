@@ -197,7 +197,7 @@ function blocked(blocks: Block[], p0: [number, number], p1: [number, number]): b
 /** 交接的物件到画法位图（原型 room.js 的 ART_BMP）。 */
 const ART_BMP: Record<string, string | false> = { prd: "scroll", box: "box_sealed", defect: "box_rework", release: "box_release" };
 /** 提案有了结果（盖章或退回），托盘清空。 */
-const TRAY_CLEAR = new Set(["stamp_valid", "seal", "stamp_release", "stamp_rework", "returned"]);
+const TRAY_CLEAR = new Set(["stamp_valid", "seal", "stamp_open_loop", "stamp_release", "stamp_rework", "returned"]);
 /** 只改变房间物件、没有小人要走动的动作（演完立刻报告时间线）。 */
 const PROPS_ONLY = new Set(["guidance_in", "semantic", "hold_card"]);
 /** 动作自己让两端的小人各说一句（交接的两端、交回结果的两端）。 */
@@ -406,6 +406,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       label: typeof next.label === "string" ? next.label : "",
       verifier: Boolean(next.verifier),
       exit_tray: Boolean(next.exit_tray),
+      stamp_kind: next.stamp_kind === "release" || next.stamp_kind === "open_loop" ? next.stamp_kind : null,
+      outsourced: Boolean(next.outsourced),
     };
     if (model.level && model.level !== level) {
       levelAtLeast(model.level, "ui");
@@ -846,6 +848,34 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         })), S.anim("side_reach", 900, true));
         p2.back();
         p2.run(() => { const actor = actorOf(pa.id); if (actor) actor.hold = null; });
+      });
+    },
+    stamp_open_loop(act, a) {
+      setPersist(a, null);
+      const stampText = act.outsourced ? "开环完成 · 外包" : "开环完成";
+      const p = plan(a);
+      p.add(S.call(() => { state.bench.item = "box_open"; state.bench.mark = null; state.bench.tape = 0; }));
+      p.stand();
+      p.add(S.hold("docs"));
+      p.spot("bench", "carry");
+      p.add(
+        S.anim("place", 500),
+        S.hold(null),
+        S.call(() => { state.bench.item = "box_sealed"; state.bench.tape = 1; }),
+      );
+      p.add(...stampSteps("stamp_amber", () => {
+        state.bench.mark = { text: stampText, color: "#8a5a1e", dashed: true };
+      }));
+      p.add(S.icon({ kind: "check" }), S.anim("idle_happy", 500), S.icon(null));
+      p.back();
+      p.run(() => {
+        if (state.bench.item === "box" || state.bench.item === "box_open") state.bench.item = "box_sealed";
+        if (state.bench.item === "box_sealed" && !state.bench.mark) {
+          state.bench.mark = { text: stampText, color: "#8a5a1e", dashed: true };
+        }
+        state.bench.tape = 1;
+        const actor = actorOf(a.id);
+        if (actor) actor.hold = null;
       });
     },
     inspect(_act, a) {
