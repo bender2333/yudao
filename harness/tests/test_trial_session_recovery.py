@@ -24,6 +24,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -54,12 +55,39 @@ WAIT_SEC = 60.0
 # 一条真实的进程树：启动命令自己起一个子进程，写下两个进程号以后一直服务到会话结束
 
 
+def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
+    # 先写入同目录临时文件并关闭句柄，再使用 os.replace 原子替换目标路径
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=str(path.parent),
+            prefix=f"{path.name}.", suffix=".tmp", delete=False,
+        ) as fh:
+            tmp_path = Path(fh.name)
+            json.dump(data, fh, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    except BaseException:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def _launch(tree_report: Path, *, ready_timeout_sec: int = 120) -> dict[str, Any]:
     script = (
-        "import http.server, json, os, subprocess, sys\n"
+        "import http.server, json, os, pathlib, subprocess, sys, tempfile\n"
         "child = subprocess.Popen([sys.executable, '-c', 'import time\\nwhile True: time.sleep(0.2)'])\n"
-        f"json.dump({{'pid': os.getpid(), 'child': child.pid}}, "
-        f"open({json.dumps(str(tree_report))}, 'w'))\n"
+        f"target = pathlib.Path({json.dumps(str(tree_report))})\n"
+        "tmp_path = None\n"
+        "try:\n"
+        "    with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=str(target.parent),\n"
+        "                                     prefix=target.name + '.', suffix='.tmp', delete=False) as fh:\n"
+        "        tmp_path = fh.name\n"
+        "        json.dump({'pid': os.getpid(), 'child': child.pid}, fh)\n"
+        "    os.replace(tmp_path, target)\n"
+        "except BaseException:\n"
+        "    if tmp_path is not None and os.path.exists(tmp_path):\n"
+        "        os.unlink(tmp_path)\n"
+        "    raise\n"
         "port = int(os.environ['PORT'])\n"
         "print('trial server listening on', port, flush=True)\n"
         "http.server.HTTPServer(('127.0.0.1', port), http.server.SimpleHTTPRequestHandler).serve_forever()\n"
@@ -112,7 +140,7 @@ def _events(system: LoopSystem, run_id: str, event_type: str) -> list[Any]:
 
 
 def _tree_pids(report: Path) -> tuple[int, int]:
-    data = json.loads(report.read_text(encoding="utf-8"))
+    data = _wait_for_json(report)
     return int(data["pid"]), int(data["child"])
 
 
@@ -130,13 +158,30 @@ def _gone(pid: int, *, timeout: float = 20.0) -> bool:
     return not _alive(pid)
 
 
-def _wait_for_file(path: Path, *, timeout: float = WAIT_SEC) -> None:
+def _wait_for_json(path: Path, *, timeout: float = WAIT_SEC) -> dict[str, Any]:
+    # 在有界截止时间内等待目标存在且解析为合法字典，超时带上最后读取状态抛出 TimeoutError
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if path.exists():
-            return
+    last_detail = "文件尚未创建"
+    while True:
+        text: str | None = None
+        try:
+            text = path.read_text(encoding="utf-8")
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
+            last_detail = f"解析结果不是字典（{type(data).__name__}: {data!r}）"
+        except FileNotFoundError:
+            last_detail = "文件不存在"
+        except OSError as exc:
+            last_detail = f"读取文件失败：{exc}"
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            if text is None:
+                last_detail = f"读取解码失败：{exc}"
+            else:
+                last_detail = f"最后读取内容为 {text!r}（{exc}）"
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"在 {timeout:g} 秒内未能从 {path} 读取合法 JSON 字典；{last_detail}")
         time.sleep(0.05)
-    raise TimeoutError(f"没有等到 {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -280,8 +325,7 @@ def _child_main(data_dir: Path, ready: Path) -> None:
                              source_tree=source, run_root=system.workspace_root / run_id,
                              source="workspace_seal", output_limit=4000, stop=None))
     session = trials.session_of(run_id, "engineering")
-    ready.write_text(json.dumps({"run_id": run_id, "session_id": session.session_id},
-                                ensure_ascii=False), encoding="utf-8")
+    _write_json_atomic(ready, {"run_id": run_id, "session_id": session.session_id})
     while True:
         time.sleep(0.2)
 
@@ -345,11 +389,11 @@ def test_a_restart_marks_the_session_interrupted_and_leaves_no_process(tmp_path)
     log = tmp_path / "yudao.log"
     process = _spawn_child(data_dir, ready, log)
     try:
-        _wait_for_file(ready)
-        _wait_for_file(marker / "tree.json")
+        ready_data = _wait_for_json(ready)
+        launcher, child = _tree_pids(marker / "tree.json")
     finally:
         _kill(process)
-    run_id = json.loads(ready.read_text(encoding="utf-8"))["run_id"]
+    run_id = str(ready_data["run_id"])
 
     # 终止以后：开始记录在，结束记录不在
     observed = _observe(data_dir, run_id)
@@ -357,7 +401,6 @@ def test_a_restart_marks_the_session_interrupted_and_leaves_no_process(tmp_path)
     assert len(started) == 1, "终止以前应当有一条会话开始事件"
     assert [event for event in observed if event.type == EventType.TRIAL_SESSION_ENDED] == [], \
         "终止以前不应当有会话结束的记录"
-    launcher, child = _tree_pids(marker / "tree.json")
     assert _gone(launcher, timeout=30) and _gone(child, timeout=30), "交付软件的进程树没有随 Yudao 进程一起结束"
 
     restarted = _open_after_kill(data_dir)
