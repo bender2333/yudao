@@ -6,10 +6,21 @@
 # 工单 #373 以后 yudao client install 子命令不再提供，界面改为服务提供的网页。
 
 
+from contextlib import contextmanager
 from importlib.metadata import version
+import os
+from pathlib import Path
+import sqlite3
+import threading
+import time
+
+import pytest
 
 from harness.__main__ import _data_dir, build_parser, release_version, _provider_paths
+from harness.app.application import Application, ReadOnlyCore
+from harness.app.project_queries import ProjectsList
 from harness.data_directory import default_dotenv
+from harness.event_store import EventStore
 
 def test_version_option_prints_the_release_version(capsys):
     assert release_version() == version("yudao-harness")
@@ -66,3 +77,123 @@ def test_release_check_takes_the_repository_and_the_data_directory_from_either_p
     after = build_parser().parse_args(["release-check", "some-repo", "--data-dir", str(tmp_path)])
     assert after.command == "release-check" and after.repository == "some-repo"
     assert _data_dir(after, "release-check") == str(tmp_path)
+
+
+@contextmanager
+def _locked_sqlite_data_pages(sqlite_path: Path):
+    # 锁定事件库数据页制造真实的 sqlite3.OperationalError，保留文件头可读使连接先进入已打开列表再在读取 log_id 时失败
+    if os.name == "nt":
+        import msvcrt
+
+        lock_len = max(4096, sqlite_path.stat().st_size - 4096)
+        handle = sqlite_path.open("r+b")
+        handle.seek(4096)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, lock_len)
+        try:
+            yield
+        finally:
+            handle.seek(4096)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, lock_len)
+            handle.close()
+    else:
+        os.chmod(sqlite_path, 0)
+        try:
+            yield
+        finally:
+            os.chmod(sqlite_path, 0o644)
+
+
+@contextmanager
+def _transient_sqlite_read_lock(sqlite_path: Path):
+    # 持有真实文件锁直到观测到首次只读查询建立并关闭共享内存映射文件，随即释放锁供后续重试恢复
+    locked = threading.Event()
+    stop_waiting = threading.Event()
+    released_after_failure = threading.Event()
+    shm_path = sqlite_path.with_name(sqlite_path.name + "-shm")
+
+    def holder() -> None:
+        with _locked_sqlite_data_pages(sqlite_path):
+            locked.set()
+            deadline = time.monotonic() + 10.0
+            if os.name == "nt":
+                first_ctime_ns: int | None = None
+                while not stop_waiting.is_set() and time.monotonic() < deadline:
+                    if first_ctime_ns is None:
+                        if shm_path.exists():
+                            try:
+                                first_ctime_ns = shm_path.stat().st_ctime_ns
+                            except OSError:
+                                released_after_failure.set()
+                                break
+                    else:
+                        try:
+                            if shm_path.stat().st_ctime_ns != first_ctime_ns:
+                                released_after_failure.set()
+                                break
+                        except OSError:
+                            released_after_failure.set()
+                            break
+                    time.sleep(0.005)
+            else:
+                stop_waiting.wait(timeout=0.25)
+                released_after_failure.set()
+
+    worker = threading.Thread(target=holder, daemon=True)
+    worker.start()
+    assert locked.wait(timeout=10.0)
+    try:
+        yield released_after_failure
+    finally:
+        stop_waiting.set()
+        worker.join(timeout=10.0)
+
+
+def test_read_only_event_store_retries_transient_operational_error_and_closes_failed_connection(tmp_path: Path) -> None:
+    # 守 R3（docs/design/test-pyramid.md「测试按三环留」）：只读打开事件库遇到瞬时 OperationalError 时先关闭失败连接并在上限内重试恢复
+    sqlite_path = tmp_path / "data" / "events.sqlite"
+    writable = EventStore(sqlite_path)
+    expected_log_id = writable.log_id
+    writable.close()
+
+    with _transient_sqlite_read_lock(sqlite_path) as released_after_failure:
+        store = EventStore(sqlite_path, read_only=True)
+    assert released_after_failure.is_set()
+    try:
+        assert store.log_id == expected_log_id
+        assert len(store._opened) == 1
+    finally:
+        store.close()
+    sqlite_path.unlink()
+
+
+def test_open_readonly_application_retries_transient_sqlite_operational_error(tmp_path: Path) -> None:
+    # 守 R3（docs/design/app-and-interface.md「命令行」）：命令行离线只读查询经 ReadOnlyCore 打开数据目录时可从瞬时锁错误恢复
+    data_dir = tmp_path / "data"
+    writable = EventStore(data_dir / "events.sqlite")
+    writable.close()
+
+    with _transient_sqlite_read_lock(data_dir / "events.sqlite") as released_after_failure:
+        application = Application.open_readonly(data_dir)
+    assert released_after_failure.is_set()
+    try:
+        snapshot = application.query("projects.list", ProjectsList())
+        assert snapshot.data.projects == []
+    finally:
+        application.close()
+    (data_dir / "events.sqlite").unlink()
+
+
+def test_read_only_open_reraises_operational_error_after_timeout_and_closes_connections(tmp_path: Path) -> None:
+    # 守 R3（docs/design/test-pyramid.md「测试按三环留」）：只读打开持续遭遇 OperationalError 超过 5 秒上限时关闭连接并原样抛出异常
+    data_dir = tmp_path / "data"
+    sqlite_path = data_dir / "events.sqlite"
+    writable = EventStore(sqlite_path)
+    writable.close()
+
+    started = time.monotonic()
+    with _locked_sqlite_data_pages(sqlite_path):
+        with pytest.raises(sqlite3.OperationalError):
+            ReadOnlyCore(data_dir)
+    elapsed = time.monotonic() - started
+    assert 5.0 <= elapsed < 15.0
+    sqlite_path.unlink()
