@@ -182,14 +182,30 @@ IMPROVEMENT_NOT_COUNTED = "not_counted"    # 第一次交付已经全部通过�
 IMPROVEMENT_NO_CONCLUSION = "no_conclusion"  # 导出里没有质检提交，没有结论可观察
 
 
+COMPLETION_ARTIFACT_KIND = "completion"
+
+
+def _is_archived_delivery(event):
+    """识别封存交付事件：成果驱动的 `delivery_accepted` 与直做交完成的 `artifact_accepted`。"""
+    kind = event.get("type")
+    if kind == "delivery_accepted":
+        return True
+    if kind != "artifact_accepted":
+        return False
+    payload = event.get("payload") or {}
+    if payload.get("artifact_kind") != COMPLETION_ARTIFACT_KIND:
+        return False
+    return "artifact_ref" not in payload or isinstance(payload.get("artifact_ref"), dict)
+
+
 def delivery_metrics(export, final_scores, first_scores):
     """第一次交付与最终交付的完成度、通过的检查，以及质检带来的提高。
 
     `final_scores` 与 `first_scores` 是评分器对两份封存交付的结果（没有交付时评分器
-    把每条隐藏检查记成「没有做」，两份评分相同）。每次运行的这两个值由运行器取：
+    把每条隐藏检查记成「没有做」，两份评分相同）。每次运行的这两个值由运行器读取：
     只有一次交付时两份相同，没有交付时都是「没有做」。
     """
-    delivered = any(event.get("type") == "delivery_accepted" for event in export.get("events", []))
+    delivered = any(_is_archived_delivery(event) for event in export.get("events", []))
     concluded = qa_concluded(export)
     first = _delivery_summary(first_scores, delivered)
     final = _delivery_summary(final_scores, delivered)
