@@ -110,7 +110,7 @@ const projectRow = (over: Partial<ProjectRow> = {}): ProjectRow => ({
   created_at: "2026-10-26T09:00:00+08:00", updated_at: "2026-10-26T09:00:00+08:00", version: 1,
   work_item_count: 1, in_progress_count: 1, waiting_count: 0, decisions_waiting: 0,
   last_activity_at: "2026-10-26T09:00:00+08:00", active_work_item_id: null, current_adoption: null,
-  onboarding_status: null, interrupted_count: 0, waiting_resume_count: 0,
+  onboarding_status: null, interrupted_count: 0, waiting_resume_count: 0, department_count: 3,
   ...over,
 });
 

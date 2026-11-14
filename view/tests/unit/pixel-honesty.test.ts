@@ -33,11 +33,17 @@ before(async () => {
     logLevel: "error",
     appType: "spa",
   });
-  await server.listen();
-  const url = server.resolvedUrls?.local[0];
-  if (!url) throw new Error("渲染进程的模块服务器没有给出地址");
-  address = url;
-  browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+  try {
+    await server.listen();
+    const url = server.resolvedUrls?.local[0];
+    if (!url) throw new Error("渲染进程的模块服务器没有给出地址");
+    address = url;
+    browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+  } catch (error) {
+    await browser?.close();
+    await server?.close();
+    throw error;
+  }
 });
 
 after(async () => {

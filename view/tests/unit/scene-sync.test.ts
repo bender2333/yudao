@@ -134,3 +134,28 @@ test("房间：录下的 department.workspace 画出角色与状态，录下的�
     shell.close();
   }
 });
+
+test("楼：projects.list 已返回而 project.loop 尚未返回时，等待首次查询完成后再输出状态", async () => {
+  // 守 R1（状态只来自查询快照，未收到 project.loop 时不把进行中的楼层提前绘制为 idle）与 R2（画面合同的楼层状态灯与查询一致）
+  const fixtures = loadFixtures();
+  const server = new FakeServer(fixtures, "demo");
+  server.deferNext("project.loop");
+  const shell = shellFor(server);
+  const surface = fakeSurface();
+  const detach = shell.attachHost(fakeHost, fakeClock, async () => surface);
+  try {
+    await shell.open("http://view.test", "");
+    await until(() => server.waiting.length === 1, "楼等待项目的首次 project.loop");
+    assert.equal(lastState(surface), null);
+
+    server.release();
+    await until(() => lastState(surface) !== null, "楼收到完整的查询状态");
+    const model = lastState(surface) as BuildingModel;
+    assert.equal(model.floors.length, 1);
+    assert.equal(model.floors[0].status, "working");
+    assert.deepEqual(model.floors[0].lit, { product: false, engineering: true, quality: true, operations: false });
+  } finally {
+    detach();
+    shell.close();
+  }
+});
