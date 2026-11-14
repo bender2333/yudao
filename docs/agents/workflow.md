@@ -167,7 +167,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | `triage` | `needs-triage`、Ideas、外部报告 → `TRIAGE:`；代替 Matt 的 `/triage` | grilling |
 | `milestone-retro` | 证据 → 教训 → 检查或技能改动 | — |
 
-`solo` 是执行者的循环，按范围一轮一轮跑 `solo-worker`；`architect-loop` 是架构师的循环，由定时任务唤醒，一次做一件转换。积木直接调用，不复制进来：grilling、domain-modeling、research、prototype、tdd、diagnosing-bugs、code-review、codebase-design、ticket、trial、seam-diff、doc-scan、discussion-note。
+`solo` 是执行者的循环，按范围一轮一轮跑 `solo-worker`；`architect-loop` 是架构师的循环，由定时任务唤醒，一次做一件转换。积木直接调用，不复制进来：grilling、domain-modeling、research、prototype、tdd、diagnosing-bugs、code-review、codebase-design、ticket、trial、seam-diff、doc-scan、discussion-note。「职能之间：转实」收尾并入本体脚手架（`tools/yudao-ontology/`）后，随之并入的只读本体推理技能将与 `/seam-diff`、`/doc-scan` 配合使用，负责日常概念方向检查与阶段结束核对中的本体检查。
 
 **每个技能用同一副骨架**：
 

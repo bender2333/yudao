@@ -50,7 +50,7 @@
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"14d726dbf2dad669","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"bb852bc64f44ccbd","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/architecture.html#s6","kind":"map-position","raws":["「可以多份」"],"seen":"8c88000a63b7e9a8","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
-{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"4890ea9efb53ab25","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"f18d7b85c325e349","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c967dae939e2fda6","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"4de695e920eac8be","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 3. 执行权与一致边界","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"9ef68c45f56c5af4","src":"docs/design/execution-environment.md#执行环境服务设计说明"},

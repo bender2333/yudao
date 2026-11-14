@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"CONTEXT.md",
-"hash":"3dad447c8949d8f3",
+"hash":"68eda7f05b4fb7ec",
 "nodes":[
-{"hash":"3dad447c8949d8f3","id":"CONTEXT.md","kind":"file","title":"CONTEXT.md"},
+{"hash":"68eda7f05b4fb7ec","id":"CONTEXT.md","kind":"file","title":"CONTEXT.md"},
 {"hash":"0ef72090aa788720","id":"CONTEXT.md#Yudao","kind":"section","parent":"CONTEXT.md","title":"Yudao"},
 {"hash":"0d3895bc0865e9cc","id":"CONTEXT.md#Yudao > Language","kind":"section","parent":"CONTEXT.md#Yudao","title":"Language"},
-{"hash":"ff439aa48fd3d4a6","id":"CONTEXT.md#Yudao > Language > 系统结构","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"系统结构"},
+{"hash":"4439fc68b77a70f8","id":"CONTEXT.md#Yudao > Language > 系统结构","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"系统结构"},
 {"hash":"a6f46893ad7cafb7","id":"CONTEXT.md#Yudao > Language > 规则与参数","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"规则与参数"},
 {"hash":"0bc25b310ff619ae","id":"CONTEXT.md#Yudao > Language > 裁决与验证","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"裁决与验证"},
 {"hash":"b9a718ee64cc5c01","id":"CONTEXT.md#Yudao > Language > 循环","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"循环"},
