@@ -182,6 +182,20 @@ export const VISUAL_CHANNELS: readonly VisualChannel[] = Object.freeze([
     read: (channels) => channels.coverage,
   },
   {
+    id: "room.identity",
+    scene: "room",
+    key: "department",
+    label: "房间的角色标识与门顶显示名",
+    read: (channels) => ({ department: channels.department, label: channels.label }),
+  },
+  {
+    id: "room.stations",
+    scene: "room",
+    key: "verifier",
+    label: "房间有没有检验台与出口托盘",
+    read: (channels) => ({ verifier: Boolean(channels.verifier), exit_tray: Boolean(channels.exit_tray) }),
+  },
+  {
     id: "room.status",
     scene: "room",
     key: "status",
@@ -322,7 +336,7 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     operation: "楼层上点击职能房间推近查看房间场景",
     meter: "房间亮灯、屏幕状态与房间 CRT 状态文字",
     unpainted: "职能 Prompt 全文与完整历史记录留在页面，画布不排长篇文字",
-    visualChannels: ["floor.rooms.topology", "floor.rooms.activity", "room.status", "building.lit"],
+    visualChannels: ["floor.rooms.topology", "floor.rooms.activity", "room.identity", "room.status", "building.lit"],
     eventTypes: ["department_activated", "run_paused", "run_failed", "run_done", "run_resumed", "run_continued"],
   }),
   row({
@@ -544,7 +558,7 @@ export const MAPPING_TABLE: readonly MappingRow[] = Object.freeze([
     operation: "无",
     meter: "无",
     unpainted: "交出检查细则与拒绝理由全文留在页面",
-    visualChannels: ["floor.rooms.stations"],
+    visualChannels: ["floor.rooms.stations", "room.stations"],
     eventTypes: ["proposal_rejected"],
   }),
 

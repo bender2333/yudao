@@ -10,9 +10,11 @@
 // 哪些事件在房间里翻成动作、哪些作为实时内容、哪些不画，写在 translate/coverage.ts；
 // 这个文件只实现其中房间「翻成动作」的那一组与流式文字。
 
-import type { EventObject } from "../api/generated/types.gen.ts";
+import type { EventObject, ProjectLoopResult, WorkItemOrganization } from "../api/generated/types.gen.ts";
 import { roomState as contractRoomState } from "../pixel/contract.ts";
 import type { Artifact, PixelAction, RoomState } from "../pixel/contract.ts";
+import { DEPARTMENT_NAMES } from "./face.ts";
+import { DEFAULT_ORGANIZATION } from "./floor.ts";
 import { roomPose, roomStatus, roleStatus } from "./tables.ts";
 import { say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 
@@ -48,9 +50,20 @@ export interface RoomEvent {
   payload?: Record<string, unknown> | null;
 }
 
-/** 翻译时的上下文：roleName 把角色 id 写成页面上的名称（动作里的话要用）。 */
+/** 翻译时的上下文：roleName 把角色 id 写成页面上的名称，organization 给出事项冻结的角色定义。 */
 export interface RoomContext {
   roleName?: (role: string | null) => string | null;
+  organization?: WorkItemOrganization | null;
+}
+
+/** 房间状态翻译的输入：工作间快照与可选的事项定义或楼层快照。 */
+export interface RoomStateInput {
+  position: number;
+  workspace: { room: unknown };
+  department?: string | null;
+  organization?: WorkItemOrganization | null;
+  loop?: ProjectLoopResult | null;
+  workItemId?: string | null;
 }
 
 /** 流式文字：接在哪个房间的哪个角色头上，与显示的文字。 */
@@ -95,17 +108,49 @@ function roleOf(raw: unknown): { id: string; name: string; kind: string; status:
   };
 }
 
+/** 从事项冻结定义或楼层事项集合推出这间屋的显示名、是否核验角色与是否开环完成角色。 */
+export function deriveRoomRoleSpec(
+  dept: string,
+  input: Pick<RoomStateInput, "organization" | "loop" | "workItemId">,
+): { label: string; verifier: boolean; exit_tray: boolean } {
+  const workItems = input.loop?.work_items ?? [];
+  const orgs: WorkItemOrganization[] = input.organization
+    ? [input.organization]
+    : workItems.length > 0
+      ? workItems.map((item) => item.organization ?? DEFAULT_ORGANIZATION)
+      : [DEFAULT_ORGANIZATION];
+
+  const focusedItem = input.workItemId
+    ? workItems.find((item) => item.work_item_id === input.workItemId)
+    : undefined;
+  const focusedOrg = focusedItem ? (focusedItem.organization ?? DEFAULT_ORGANIZATION) : null;
+  const focusedLabel = focusedOrg?.roles.find((role) => role.id === dept)?.label;
+  const unionLabel = orgs
+    .flatMap((org) => org.roles)
+    .find((role) => role.id === dept)?.label;
+  const label = focusedLabel ?? unionLabel ?? DEPARTMENT_NAMES[dept] ?? dept;
+  const verifier = orgs.some((org) => org.verifiers.some((entry) => entry.role === dept));
+  const exit_tray = orgs.some((org) => org.completing?.id === dept);
+  return { label, verifier, exit_tray };
+}
+
 /**
  * 部门工作间的查询（department.workspace，带位置）→ 房间的状态。
- * 画面合同的状态带位置：位置来自查询快照（translate 只传递它，不解读它）。
+ * 画面合同的状态带位置：位置来自查询快照（translate 只传递它，不解读它）；
+ * 角色显示名、核验角色标记与出口托盘标记从事项冻结定义的 organization 推出。
  */
-export function state(o: { position: number; workspace: { room: unknown } }): RoomState {
+export function state(o: RoomStateInput): RoomState {
   const r = roomOf(o.workspace);
+  const department = str(r.department) || str(o.department);
+  const spec = deriveRoomRoleSpec(department, o);
   const pose = r.pose;
   const pipes = r.pipes;
   const s: Record<string, unknown> = {
     position: o.position,
-    department: str(r.department),
+    department,
+    label: spec.label,
+    verifier: spec.verifier,
+    exit_tray: spec.exit_tray,
     level: str(r.level) || "ui",
     status: roomStatus(str(r.status)),
     crt: rec(r.crt),
@@ -157,18 +202,67 @@ const ROOM_TOOL: Readonly<Record<string, string>> = {
   browser_navigate: "self_test",
 };
 
+function orgOf(ctx?: RoomContext): WorkItemOrganization {
+  return ctx?.organization ?? DEFAULT_ORGANIZATION;
+}
+
+function deptLabelOf(org: WorkItemOrganization): (department: string) => string | null {
+  return (department: string): string | null => org.roles.find((r) => r.id === department)?.label ?? null;
+}
+
+function isVerifierInOrg(org: WorkItemOrganization, department: string | null | undefined): boolean {
+  return Boolean(department && org.verifiers.some((v) => v.role === department));
+}
+
+function specPair(ev: RoomEvent, org: WorkItemOrganization): { from: string; to: string } {
+  const from = ev.department || org.entry?.id || org.roles[0]?.id || "";
+  const to = org.watched.find((w) => w.source === from && w.outcome === "product_spec")?.recipient
+    ?? org.watched.find((w) => w.source === from)?.recipient
+    ?? org.roles[1]?.id
+    ?? "";
+  return { from, to };
+}
+
+function deliveryPair(ev: RoomEvent, org: WorkItemOrganization): { from: string; to: string } {
+  const from = ev.department
+    || org.watched.find((w) => w.outcome === "delivery_spec")?.source
+    || org.roles[1]?.id
+    || org.roles[0]?.id
+    || "";
+  const to = org.watched.find((w) => w.source === from && w.outcome === "delivery_spec")?.recipient
+    ?? org.watched.find((w) => w.source === from)?.recipient
+    ?? org.verifiers[0]?.role
+    ?? (org.completing?.id === from ? "library" : "");
+  return { from, to };
+}
+
+function reworkPair(ev: RoomEvent, org: WorkItemOrganization): { from: string; to: string } {
+  const from = ev.department || org.verifiers[0]?.role || "";
+  const to = str(pl(ev).target_department || pl(ev).to)
+    || org.rejections.find((r) => r.verifier === from)?.role
+    || org.rejections[0]?.role
+    || org.roles[1]?.id
+    || "";
+  return { from, to };
+}
+
 /** 事件与这个房间有关：事件没有部门（整个事项的事），或者就是这个部门的事。 */
 const mine = (ev: RoomEvent, dept: string): boolean => !ev.department || ev.department === dept;
 
 /** 一个部门里的一个角色做的一件事：画面上的一次动作。 */
 function one(kind: string, ev: RoomEvent, ctx: RoomContext, extra?: Record<string, unknown>): PixelAction {
+  const org = orgOf(ctx);
   return {
     kind,
     position: ev.position,
     item: ev.work_item_id ?? null,
     room: ev.department ?? null,
     role: ev.role ?? null,
-    say: say(ev, { roleName: ctx.roleName }),
+    say: say(ev, {
+      roleName: ctx.roleName,
+      deptLabel: deptLabelOf(org),
+      isVerifier: (dept) => isVerifierInOrg(org, dept),
+    }),
     ...(extra ?? {}),
   };
 }
@@ -179,8 +273,8 @@ const own = (kind: string, extra?: (ev: RoomEvent) => Record<string, unknown>) =
     (mine(ev, dept) ? [one(kind, ev, ctx, extra ? extra(ev) : undefined)] : []);
 
 /** 交接的一端：交出的部门是 from 一侧，收到的部门是 to 一侧（说的话按这一侧）。 */
-function handoffIn(ev: RoomEvent, dept: string, from: string, to: string, artifact: string): PixelAction[] {
-  if (dept !== from && dept !== to) return [];
+function handoffIn(ev: RoomEvent, dept: string, from: string, to: string, artifact: string, ctx?: RoomContext): PixelAction[] {
+  if (!from || !to || (dept !== from && dept !== to)) return [];
   return [{
     kind: "handoff",
     position: ev.position,
@@ -189,7 +283,7 @@ function handoffIn(ev: RoomEvent, dept: string, from: string, to: string, artifa
     from,
     to,
     artifact: artifact as Artifact,
-    ...sayHandoff(artifact, from, to),
+    ...sayHandoff(artifact, from, to, deptLabelOf(orgOf(ctx))),
   }];
 }
 
@@ -243,36 +337,55 @@ const ROOM: Readonly<Record<string, (ev: RoomEvent, dept: string, ctx: RoomConte
   tool_skipped: own("toss"),
   proposal_submitted: own("submit"),
   proposal_rejected: own("returned"),
-  // PRD 与产品决定被接纳：产品房间里盖有效章，同时包裹从产品送往工程
-  spec_accepted: (ev, dept, ctx) => stampThenHandoff(ev, dept, ctx, "product", "engineering", "prd"),
-  contract_accepted: (ev, dept, ctx) => stampThenHandoff(ev, dept, ctx, "product", "engineering", "prd"),
-  product_decision_accepted: (ev, dept, ctx) => stampThenHandoff(ev, dept, ctx, "product", "engineering", "prd"),
-  // 交付被接纳：工程房间里封存交付箱，同时交付箱从工程送往质检
-  delivery_accepted: (ev, dept, ctx) => sealThenHandoff(ev, dept, ctx, "engineering", "quality", "box"),
-  structure_accepted: (ev, dept) => handoffIn(ev, dept, "engineering", "quality", "box"),
-  // 质检结论：放行单送回成果库（或载荷指定的部门），缺陷记录经回流管道送回工程
+  // 规格或决定被接纳：发起角色房间里盖有效章，同时包裹送往关注该成果的下游角色
+  spec_accepted: (ev, dept, ctx) => {
+    const pair = specPair(ev, orgOf(ctx));
+    return stampThenHandoff(ev, dept, ctx, pair.from, pair.to, "prd");
+  },
+  contract_accepted: (ev, dept, ctx) => {
+    const pair = specPair(ev, orgOf(ctx));
+    return stampThenHandoff(ev, dept, ctx, pair.from, pair.to, "prd");
+  },
+  product_decision_accepted: (ev, dept, ctx) => {
+    const pair = specPair(ev, orgOf(ctx));
+    return stampThenHandoff(ev, dept, ctx, pair.from, pair.to, "prd");
+  },
+  // 交付被接纳：产出角色房间里封存交付箱，同时交付箱送往下游角色或成果库
+  delivery_accepted: (ev, dept, ctx) => {
+    const pair = deliveryPair(ev, orgOf(ctx));
+    return sealThenHandoff(ev, dept, ctx, pair.from, pair.to, "box");
+  },
+  structure_accepted: (ev, dept, ctx) => {
+    const pair = deliveryPair(ev, orgOf(ctx));
+    return handoffIn(ev, dept, pair.from, pair.to, "box", ctx);
+  },
+  // 核验结论：放行单送回成果库（或载荷指定的角色），缺陷记录经回流管道送回打回目标角色
   qa_submitted: (ev, dept, ctx) => {
+    const org = orgOf(ctx);
     const release = released(ev);
     const stamp = ev.department === dept ? [one(release ? "stamp_release" : "stamp_rework", ev, ctx)] : [];
-    return stamp.concat(release
-      ? handoffIn(ev, dept, "quality", str(pl(ev).release_to) || "library", "release")
-      : handoffIn(ev, dept, "quality", "engineering", "defect"));
+    if (release) {
+      const from = ev.department || org.verifiers[0]?.role || "";
+      return stamp.concat(handoffIn(ev, dept, from, str(pl(ev).release_to) || "library", "release", ctx));
+    }
+    const pair = reworkPair(ev, org);
+    return stamp.concat(handoffIn(ev, dept, pair.from, pair.to, "defect", ctx));
   },
   // 独立判断：核验角色交上自己的判断（先判断后看解释，工单 #358），交出的判断留在房间里
   independent_judgement_committed: own("submit"),
-  // 询问：发问的部门写纸条塞进传信管口；被询问的部门取出来读
-  ask_started: (ev, dept) => {
+  // 询问：发问的角色写纸条塞进传信管口；被询问的角色取出来读
+  ask_started: (ev, dept, ctx) => {
     const p = pl(ev);
-    const s = sayAsk(ev);
+    const s = sayAsk(ev, deptLabelOf(orgOf(ctx)));
     const base = { position: ev.position, item: ev.work_item_id ?? null, room: dept, role: null };
     if (dept === str(p.requester)) return [{ kind: "send_letter", say: s.say, ...base }];
     if (dept === str(p.recipient)) return [{ kind: "answer_letter", reads: true, say: s.sayTo, ...base }];
     return [];
   },
-  // 回答：被询问的部门写回答塞回；发问的部门在管道口接住回答读
-  ask_answered: (ev, dept) => {
+  // 回答：被询问的角色写回答塞回；发问的角色在管道口接住回答读
+  ask_answered: (ev, dept, ctx) => {
     const p = pl(ev);
-    const s = sayAnswer(ev);
+    const s = sayAnswer(ev, deptLabelOf(orgOf(ctx)));
     const base = { position: ev.position, item: ev.work_item_id ?? null, room: dept, role: null };
     if (dept === str(p.recipient)) return [{ kind: "answer_letter", reads: false, say: s.say, ...base }];
     if (dept === str(p.requester)) return [{ kind: "answer_letter", reads: true, say: s.sayTo, ...base }];
@@ -309,8 +422,21 @@ const ROOM: Readonly<Record<string, (ev: RoomEvent, dept: string, ctx: RoomConte
   x_rolled_back: own("rollback"),
   x_fault_recorded: own("fault"),
   x_provider_wait_entered: own("wait_provider"),
-  x_role_task_assigned: (ev, dept, ctx) => (mine(ev, dept) ? [one("assign", ev, ctx, { role: str(pl(ev).to) || ev.role || null, sayTo: say(ev, { side: "to", roleName: ctx.roleName }) })] : []),
-  x_role_result_returned: (ev, dept, ctx) => (mine(ev, dept) ? [one("hand_back", ev, ctx, { sayTo: say(ev, { side: "to", roleName: ctx.roleName }) })] : []),
+  x_role_task_assigned: (ev, dept, ctx) => {
+    if (!mine(ev, dept)) return [];
+    const org = orgOf(ctx);
+    return [one("assign", ev, ctx, {
+      role: str(pl(ev).to) || ev.role || null,
+      sayTo: say(ev, { side: "to", roleName: ctx.roleName, deptLabel: deptLabelOf(org), isVerifier: (d) => isVerifierInOrg(org, d) }),
+    })];
+  },
+  x_role_result_returned: (ev, dept, ctx) => {
+    if (!mine(ev, dept)) return [];
+    const org = orgOf(ctx);
+    return [one("hand_back", ev, ctx, {
+      sayTo: say(ev, { side: "to", roleName: ctx.roleName, deptLabel: deptLabelOf(org), isVerifier: (d) => isVerifierInOrg(org, d) }),
+    })];
+  },
   x_review_recorded: own("review", (ev) => ({ verdict: ["passed", "pass"].includes(str(pl(ev).verdict)) ? "pass" : "return" })),
   x_explorer_fetch: own("explore"),
   x_replanned: own("replan"),
@@ -318,16 +444,16 @@ const ROOM: Readonly<Record<string, (ev: RoomEvent, dept: string, ctx: RoomConte
   decision_requested: decisionAction,
 };
 
-/** 产品房间里盖章，接着把包裹送到下一个部门。 */
+/** 发起角色房间里盖有效章，接着把包裹送往下游角色。 */
 function stampThenHandoff(ev: RoomEvent, dept: string, ctx: RoomContext, from: string, to: string, artifact: string): PixelAction[] {
   const stamp = ev.department === dept ? [one("stamp_valid", ev, ctx)] : [];
-  return stamp.concat(handoffIn(ev, dept, from, to, artifact));
+  return stamp.concat(handoffIn(ev, dept, from, to, artifact, ctx));
 }
 
-/** 工程房间里封存交付箱，接着把交付箱送到质检。 */
+/** 产出角色房间里封存交付箱，接着把交付箱送往下游角色。 */
 function sealThenHandoff(ev: RoomEvent, dept: string, ctx: RoomContext, from: string, to: string, artifact: string): PixelAction[] {
   const seal = ev.department === dept ? [one("seal", ev, ctx)] : [];
-  return seal.concat(handoffIn(ev, dept, from, to, artifact));
+  return seal.concat(handoffIn(ev, dept, from, to, artifact, ctx));
 }
 
 /**

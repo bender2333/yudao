@@ -432,8 +432,16 @@ export interface RoomPose {
   [key: string]: unknown;
 }
 
-/** 房间（角色、姿势、桌面物件、等待原因）的状态。 */
+/** 房间（角色标识、核验角色与出口托盘标记、角色、姿势、桌面物件、等待原因）的状态。 */
 export interface RoomState extends PixelState {
+  /** 这间屋的角色标识（事项冻结定义里的 role id）。 */
+  department?: string;
+  /** 这间屋的角色显示名（门顶名牌与屏幕标题文字）。 */
+  label?: string;
+  /** 这间屋的角色是否为核验角色（决定有没有检验台）。 */
+  verifier?: boolean;
+  /** 这间屋的角色是否为开环完成角色（决定有没有出口托盘）。 */
+  exit_tray?: boolean;
   status: RoomStatus;
   roles?: RoleEntry[];
   pose?: RoomPose;
@@ -556,10 +564,22 @@ export function buildingState(s: unknown): BuildingState {
   return s as BuildingState;
 }
 
-/** 房间状态的校验（原型 v13 roomState）：房间状态、角色、姿势。 */
+/** 房间状态的校验（原型 v13 roomState）：角色标识、核验与出口托盘标记、房间状态、角色、姿势。 */
 export function roomState(s: unknown): RoomState {
   positionOf(s, "房间的状态");
   const state = s as Loose;
+  if (state.department !== undefined && (typeof state.department !== "string" || state.department.length === 0)) {
+    fail("房间的角色标识", state.department);
+  }
+  if (state.label !== undefined && typeof state.label !== "string") {
+    fail("房间的显示名", state.label);
+  }
+  if (state.verifier !== undefined && typeof state.verifier !== "boolean") {
+    fail("房间的核验角色标记", state.verifier);
+  }
+  if (state.exit_tray !== undefined && typeof state.exit_tray !== "boolean") {
+    fail("房间的出口托盘标记", state.exit_tray);
+  }
   oneOf(ROOM_STATES, state.status, "房间的状态");
   const roles = state.roles;
   if (roles) {
