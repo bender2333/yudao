@@ -7,10 +7,11 @@
 
 
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from importlib.metadata import version
-import os
 from pathlib import Path
 import sqlite3
+import sys
 import threading
 import time
 
@@ -79,73 +80,85 @@ def test_release_check_takes_the_repository_and_the_data_directory_from_either_p
     assert _data_dir(after, "release-check") == str(tmp_path)
 
 
-@contextmanager
-def _locked_sqlite_data_pages(sqlite_path: Path):
-    # 锁定事件库数据页制造真实的 sqlite3.OperationalError，保留文件头可读使连接先进入已打开列表再在读取 log_id 时失败
-    if os.name == "nt":
-        import msvcrt
-
-        lock_len = max(4096, sqlite_path.stat().st_size - 4096)
-        handle = sqlite_path.open("r+b")
-        handle.seek(4096)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, lock_len)
-        try:
-            yield
-        finally:
-            handle.seek(4096)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, lock_len)
-            handle.close()
-    else:
-        os.chmod(sqlite_path, 0)
-        try:
-            yield
-        finally:
-            os.chmod(sqlite_path, 0o644)
+@dataclass
+class _SqliteShmDirectoryBlock:
+    target_path: Path
+    shm_path: Path
+    release_on_retry: bool
+    connect_attempts: int = 0
+    closed_before_retry: bool = False
+    released_on_retry: bool = False
+    pending_handle: bool = False
+    connections: list[sqlite3.Connection] = field(default_factory=list)
 
 
-@contextmanager
-def _transient_sqlite_read_lock(sqlite_path: Path):
-    # 持有真实文件锁直到观测到首次只读查询建立并关闭共享内存映射文件，随即释放锁供后续重试恢复
-    locked = threading.Event()
-    stop_waiting = threading.Event()
-    released_after_failure = threading.Event()
-    shm_path = sqlite_path.with_name(sqlite_path.name + "-shm")
+_ACTIVE_SHM_BLOCKS: dict[tuple[int, Path], _SqliteShmDirectoryBlock] = {}
 
-    def holder() -> None:
-        with _locked_sqlite_data_pages(sqlite_path):
-            locked.set()
-            deadline = time.monotonic() + 10.0
-            if os.name == "nt":
-                first_ctime_ns: int | None = None
-                while not stop_waiting.is_set() and time.monotonic() < deadline:
-                    if first_ctime_ns is None:
-                        if shm_path.exists():
-                            try:
-                                first_ctime_ns = shm_path.stat().st_ctime_ns
-                            except OSError:
-                                released_after_failure.set()
-                                break
-                    else:
-                        try:
-                            if shm_path.stat().st_ctime_ns != first_ctime_ns:
-                                released_after_failure.set()
-                                break
-                        except OSError:
-                            released_after_failure.set()
-                            break
-                    time.sleep(0.005)
-            else:
-                stop_waiting.wait(timeout=0.25)
-                released_after_failure.set()
 
-    worker = threading.Thread(target=holder, daemon=True)
-    worker.start()
-    assert locked.wait(timeout=10.0)
+def _is_connection_closed(connection: sqlite3.Connection) -> bool:
     try:
-        yield released_after_failure
+        connection.execute("PRAGMA query_only")
+    except sqlite3.ProgrammingError:
+        return True
+    except sqlite3.OperationalError:
+        return False
+    return False
+
+
+def _sqlite_shm_audit_hook(event: str, args: tuple[object, ...]) -> None:
+    if not _ACTIVE_SHM_BLOCKS:
+        return
+    if event == "sqlite3.connect" and args:
+        try:
+            resolved = Path(str(args[0])).resolve()
+        except OSError:
+            return
+        block = _ACTIVE_SHM_BLOCKS.get((threading.get_ident(), resolved))
+        if block is None:
+            return
+        if block.release_on_retry and block.connect_attempts == 1:
+            block.closed_before_retry = bool(block.connections) and all(
+                _is_connection_closed(conn) for conn in block.connections
+            )
+            if block.shm_path.is_dir():
+                block.shm_path.rmdir()
+                block.released_on_retry = True
+        block.connect_attempts += 1
+        block.pending_handle = True
+    elif event == "sqlite3.connect/handle" and args:
+        tid = threading.get_ident()
+        for (watch_tid, _), block in list(_ACTIVE_SHM_BLOCKS.items()):
+            if watch_tid == tid and block.pending_handle:
+                block.pending_handle = False
+                conn = args[0]
+                if isinstance(conn, sqlite3.Connection):
+                    block.connections.append(conn)
+                break
+
+
+sys.addaudithook(_sqlite_shm_audit_hook)
+
+
+@contextmanager
+def _sqlite_shm_directory_block(sqlite_path: Path, *, release_on_retry: bool):
+    # 在 WAL 共享内存路径建立真实空目录：连接与 query_only 正常完成后，首次读取 log_id 打开共享内存文件失败并抛出 OperationalError；
+    # 审计钩子在第二次 sqlite3.connect 事件到达时核对首次失败连接已关闭并移除目录，实现无轮询与无固定时长等待的确定性恢复
+    resolved = sqlite_path.resolve()
+    shm_path = sqlite_path.with_name(sqlite_path.name + "-shm")
+    shm_path.mkdir()
+    key = (threading.get_ident(), resolved)
+    block = _SqliteShmDirectoryBlock(
+        target_path=resolved,
+        shm_path=shm_path,
+        release_on_retry=release_on_retry,
+    )
+    _ACTIVE_SHM_BLOCKS[key] = block
+    try:
+        yield block
     finally:
-        stop_waiting.set()
-        worker.join(timeout=10.0)
+        _ACTIVE_SHM_BLOCKS.pop(key, None)
+        if shm_path.is_dir():
+            shm_path.rmdir()
 
 
 def test_read_only_event_store_retries_transient_operational_error_and_closes_failed_connection(tmp_path: Path) -> None:
@@ -155,32 +168,39 @@ def test_read_only_event_store_retries_transient_operational_error_and_closes_fa
     expected_log_id = writable.log_id
     writable.close()
 
-    with _transient_sqlite_read_lock(sqlite_path) as released_after_failure:
+    with _sqlite_shm_directory_block(sqlite_path, release_on_retry=True) as block:
         store = EventStore(sqlite_path, read_only=True)
-    assert released_after_failure.is_set()
+    assert block.connect_attempts == 2
+    assert block.released_on_retry
+    assert block.closed_before_retry
     try:
         assert store.log_id == expected_log_id
         assert len(store._opened) == 1
     finally:
         store.close()
+    assert all(_is_connection_closed(conn) for conn in block.connections)
     sqlite_path.unlink()
 
 
 def test_open_readonly_application_retries_transient_sqlite_operational_error(tmp_path: Path) -> None:
     # 守 R3（docs/design/app-and-interface.md「命令行」）：命令行离线只读查询经 ReadOnlyCore 打开数据目录时可从瞬时锁错误恢复
     data_dir = tmp_path / "data"
-    writable = EventStore(data_dir / "events.sqlite")
+    sqlite_path = data_dir / "events.sqlite"
+    writable = EventStore(sqlite_path)
     writable.close()
 
-    with _transient_sqlite_read_lock(data_dir / "events.sqlite") as released_after_failure:
+    with _sqlite_shm_directory_block(sqlite_path, release_on_retry=True) as block:
         application = Application.open_readonly(data_dir)
-    assert released_after_failure.is_set()
+    assert block.connect_attempts == 2
+    assert block.released_on_retry
+    assert block.closed_before_retry
     try:
         snapshot = application.query("projects.list", ProjectsList())
         assert snapshot.data.projects == []
     finally:
         application.close()
-    (data_dir / "events.sqlite").unlink()
+    assert all(_is_connection_closed(conn) for conn in block.connections)
+    sqlite_path.unlink()
 
 
 def test_read_only_open_reraises_operational_error_after_timeout_and_closes_connections(tmp_path: Path) -> None:
@@ -191,9 +211,11 @@ def test_read_only_open_reraises_operational_error_after_timeout_and_closes_conn
     writable.close()
 
     started = time.monotonic()
-    with _locked_sqlite_data_pages(sqlite_path):
+    with _sqlite_shm_directory_block(sqlite_path, release_on_retry=False) as block:
         with pytest.raises(sqlite3.OperationalError):
             ReadOnlyCore(data_dir)
     elapsed = time.monotonic() - started
     assert 5.0 <= elapsed < 15.0
+    assert block.connect_attempts >= 2
+    assert all(_is_connection_closed(conn) for conn in block.connections)
     sqlite_path.unlink()
