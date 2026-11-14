@@ -1,17 +1,17 @@
 {
 "schema":1,
 "path":"docs/trial/stage-1-guide.md",
-"hash":"22e90d61811ac478",
+"hash":"04d6144e01e1ccb5",
 "nodes":[
-{"hash":"22e90d61811ac478","id":"docs/trial/stage-1-guide.md","kind":"file","title":"docs/trial/stage-1-guide.md"},
-{"hash":"c15b5b62c821ddbb","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","kind":"section","parent":"docs/trial/stage-1-guide.md","title":"「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）"},
-{"hash":"3976094aaad0ecf1","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 1. 试用前的准备","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"1. 试用前的准备"},
-{"hash":"e60b6262958ce8ad","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 2. 安装与启动","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"2. 安装与启动"},
-{"hash":"5155546aa8236889","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 3. 配置模型","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"3. 配置模型"},
-{"hash":"5123dbd5be58def8","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 4. 试用要做的六件事","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"4. 试用要做的六件事"},
-{"hash":"4312c2e8edc66628","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 5. 卡住的时候","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"5. 卡住的时候"},
-{"hash":"f97be024d35b150f","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 6. 试完怎么给结论","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"6. 试完怎么给结论"},
-{"hash":"8f98b0a123598e27","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0） > 7. 这次不看的","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）","title":"7. 这次不看的"}
+{"hash":"04d6144e01e1ccb5","id":"docs/trial/stage-1-guide.md","kind":"file","title":"docs/trial/stage-1-guide.md"},
+{"hash":"9cc3d1b0ad157da3","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","kind":"section","parent":"docs/trial/stage-1-guide.md","title":"「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）"},
+{"hash":"3976094aaad0ecf1","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 1. 试用前的准备","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"1. 试用前的准备"},
+{"hash":"dc25158b9c74d58f","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 2. 安装与启动","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"2. 安装与启动"},
+{"hash":"5155546aa8236889","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 3. 配置模型","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"3. 配置模型"},
+{"hash":"9e0b18b6beddb87c","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 4. 试用要做的六件事","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"4. 试用要做的六件事"},
+{"hash":"4312c2e8edc66628","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 5. 卡住的时候","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"5. 卡住的时候"},
+{"hash":"f97be024d35b150f","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 6. 试完怎么给结论","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"6. 试完怎么给结论"},
+{"hash":"8f98b0a123598e27","id":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1） > 7. 这次不看的","kind":"section","parent":"docs/trial/stage-1-guide.md#「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）","title":"7. 这次不看的"}
 ],
 "edges":[
 
