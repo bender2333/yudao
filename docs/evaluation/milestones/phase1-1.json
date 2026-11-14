@@ -1,0 +1,2480 @@
+{
+  "milestone": "1.1 职能之间：转实",
+  "collected_at": "2026-11-14T03:51:00Z",
+  "issues": [
+    {
+      "number": 994,
+      "title": "[1.1 转实 试用 ①] 在页面上配好模型，默认形态自己把一件小的事从意图转到放行",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-25T09:30:37Z",
+      "closed_at": null,
+      "labels": [
+        "waiting",
+        "trial"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/994",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-25T09:30:39Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-29T13:04:50Z",
+          "event": "labeled",
+          "label": "ready-for-human"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-29T13:04:50Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-31T18:10:44Z",
+          "event": "labeled",
+          "label": "trial"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T13:51:48Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T13:51:48Z",
+          "event": "unlabeled",
+          "label": "ready-for-human"
+        }
+      ]
+    },
+    {
+      "number": 1264,
+      "title": "[模型管理] 选用即启用：填写地址与 Key，选择模型即可使用",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-10-29T23:20:53Z",
+      "closed_at": null,
+      "labels": [
+        "enhancement",
+        "waiting",
+        "parent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1264",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-29T23:20:55Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-29T23:20:55Z",
+          "event": "labeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-30T03:11:34Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-30T03:11:34Z",
+          "event": "unlabeled",
+          "label": "needs-triage"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-10-31T18:11:39Z",
+          "event": "labeled",
+          "label": "parent"
+        }
+      ]
+    },
+    {
+      "number": 1451,
+      "title": "[薄驱动] 薄驱动只做连接：不属于连接的部分搬到应用模块，留下的列入内核清单",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-02T23:17:10Z",
+      "closed_at": "2026-11-11T03:48:34Z",
+      "labels": [
+        "waiting",
+        "parent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1451",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-02T23:17:11Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-02T23:17:12Z",
+          "event": "labeled",
+          "label": "parent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:48:34Z",
+          "event": "closed",
+          "label": null
+        }
+      ]
+    },
+    {
+      "number": 1621,
+      "title": "[集成层] test_independent_judgement.py 不稳定",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-08T09:42:10Z",
+      "closed_at": "2026-11-11T05:02:04Z",
+      "labels": [
+        "bug"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1621",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T09:42:11Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T09:42:11Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:59:15Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:59:15Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:01:39Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:01:40Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:02:06Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:02:31Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1647,
+      "title": "[项目的组织 · 接口 5] 形态卡要的内容不带项目也能读；长期目标可选；项目列表带职能数",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-08T16:29:27Z",
+      "closed_at": "2026-11-11T07:42:24Z",
+      "labels": [
+        "enhancement",
+        "touches-core"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1647",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:29Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:29Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:30Z",
+          "event": "labeled",
+          "label": "touches-core"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T00:30:46Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T00:30:46Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T10:03:01Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T10:03:01Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T02:41:19Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T02:41:19Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:08Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:11Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:50:45Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:42:25Z",
+          "event": "closed",
+          "label": null
+        }
+      ]
+    },
+    {
+      "number": 1648,
+      "title": "[项目的组织 · 页面 7] 形态卡与小循环图：新建项目、接入已有项目都选卡",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-08T16:29:30Z",
+      "closed_at": "2026-11-11T08:24:59Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1648",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:32Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:33Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T10:03:09Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T10:03:09Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:43:46Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:43:46Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:44:43Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:44:43Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:15:22Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:15:23Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:25:01Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:25:21Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1649,
+      "title": "[项目的组织 · 页面 8] 设置页的组织一行、「加独立核验」「换形态」",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-08T16:29:33Z",
+      "closed_at": "2026-11-11T09:02:00Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1649",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:35Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-08T16:29:35Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T10:03:15Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-10T10:03:15Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:26:05Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:26:05Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:27:00Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:27:04Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:01:33Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:02:01Z",
+          "event": "closed",
+          "label": null
+        }
+      ]
+    },
+    {
+      "number": 1673,
+      "title": "[集成层] test_department_providers.py 不稳定",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-09T16:50:06Z",
+      "closed_at": "2026-11-11T05:16:28Z",
+      "labels": [
+        "bug"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1673",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-09T16:50:07Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-09T16:50:07Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:59:45Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:59:45Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:06:22Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:06:22Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:16:30Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:16:48Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1698,
+      "title": "[职能与核验] 读取跟着事项冻结的定义：换一份形态，页面上从新建走到结束",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T03:58:26Z",
+      "closed_at": "2026-11-14T02:40:07Z",
+      "labels": [
+        "parent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1698",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:58:27Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:58:28Z",
+          "event": "labeled",
+          "label": "parent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:40:04Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:40:07Z",
+          "event": "closed",
+          "label": null
+        }
+      ]
+    },
+    {
+      "number": 1699,
+      "title": "[职能与核验 · 1] 直做交完成的那一版进流转记录与事项资料：两份形态经页面的路走到开环完成",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T03:58:44Z",
+      "closed_at": "2026-11-11T05:50:50Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1699",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:58:46Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:58:46Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:10Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:12Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:32:54Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:32:58Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:50:51Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:51:20Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1700,
+      "title": "[职能与核验 · 2] 新建事项前的模型就绪只看这份组织里的职能",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T03:58:55Z",
+      "closed_at": "2026-11-11T06:20:50Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1700",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:58:57Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:58:57Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:35:19Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:35:19Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:09:48Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:09:48Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:20:51Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:21:07Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1701,
+      "title": "[职能与核验 · 3] 项目的职能设置按项目现在的组织列；给组织外的职能保存设置或发指导被拒绝",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T03:59:07Z",
+      "closed_at": "2026-11-11T07:04:40Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1701",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:59:09Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T03:59:09Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:37:59Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:37:59Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:55:47Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:55:47Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:04:42Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:04:57Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1703,
+      "title": "[职能与核验 · 4] 事项的职能状态、「你的输入」送给谁、在等谁核验，按事项冻结的定义取",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:00:12Z",
+      "closed_at": "2026-11-11T07:19:18Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1703",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:00:15Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:00:15Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:01:27Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:01:27Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:02:25Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:02:25Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:19:05Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:19:05Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:19:19Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:19:34Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1704,
+      "title": "[页面] 以开环完成结束的事项被采纳以后，循环图的终点仍写开环完成",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:00:27Z",
+      "closed_at": "2026-11-11T04:27:18Z",
+      "labels": [
+        "bug"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1704",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:00:28Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:00:28Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:13Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:13Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:19:15Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:19:15Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:27:19Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:27:45Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1705,
+      "title": "[评价的缝] 场景 3 的运行器能指定形态：两份特例与默认形态用同一份任务跑",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:00:42Z",
+      "closed_at": "2026-11-11T06:56:07Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1705",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:00:44Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:00:45Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:40:37Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:40:38Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:10:49Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:10:49Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:47:10Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:47:10Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:56:09Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:56:27Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1706,
+      "title": "[1.1 转实 试用 ②] 新建项目时选一份形态，「工程」「产品 · 工程」各把一件小的事转到开环完成",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-11-11T04:00:59Z",
+      "closed_at": null,
+      "labels": [
+        "waiting",
+        "trial"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1706",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:01Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:01Z",
+          "event": "labeled",
+          "label": "trial"
+        }
+      ]
+    },
+    {
+      "number": 1707,
+      "title": "[页面] 项目页收成对话与设置两页：事项面板、全部事项、节点与箭头面板、模型请求与用量，收掉旧页签",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:01:19Z",
+      "closed_at": "2026-11-14T02:40:16Z",
+      "labels": [
+        "parent"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1707",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:21Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:21Z",
+          "event": "labeled",
+          "label": "parent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:40:13Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:40:16Z",
+          "event": "closed",
+          "label": null
+        }
+      ]
+    },
+    {
+      "number": 1708,
+      "title": "[页面 · 两页 1] 事项面板：走到哪、停在哪一层、为什么停，来源、导出与取消",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:01:45Z",
+      "closed_at": "2026-11-11T05:23:39Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1708",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:47Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:01:47Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:04:48Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:04:48Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:05:39Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:05:39Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:23:40Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:03Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1709,
+      "title": "[页面 · 两页 2] 全部事项：分组列表，点一件图切过去并打开事项面板",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:01:59Z",
+      "closed_at": "2026-11-11T06:01:35Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1709",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:01Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:02Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:47Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:47Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:26:05Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:26:05Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:52:20Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:52:20Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:01:36Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:01:53Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1710,
+      "title": "[页面 · 两页 3] 设置页「模型请求与用量」：请求记录与用量统计搬进设置页，请求详情回到这一节",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:02:18Z",
+      "closed_at": "2026-11-11T05:21:20Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1710",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:20Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:20Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:27:43Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:27:43Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:10:35Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:10:35Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:21:22Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:21:36Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1711,
+      "title": "[页面 · 两页 4] 箭头面板接住资料页的内容：文件下载、逐条结论与证据、输入进度、建档各轮",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:02:40Z",
+      "closed_at": "2026-11-11T05:08:07Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1711",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:42Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:02:42Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:23:17Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:23:17Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:55:13Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:55:13Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:08:08Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:08:21Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1712,
+      "title": "[页面 · 两页 5] 节点面板接住职能页的内容：实时输出、后台命令、工作间状态，加「职能详情」与「本职能的模型请求」入口",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:02:58Z",
+      "closed_at": "2026-11-11T06:34:36Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1712",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:00Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:00Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:44Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:44Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:57Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:24:57Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:11:22Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:11:22Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:34:38Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:34:56Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1713,
+      "title": "[页面 · 两页 6] 职能详情：职责与写入范围只读，模型与 Prompt 可改；设置页去掉「职能设置」一节",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:03:18Z",
+      "closed_at": "2026-11-11T07:59:42Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1713",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:20Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:20Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:36:20Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:36:20Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:56:08Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T06:56:08Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:45:19Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:45:19Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T07:59:44Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:00:03Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1714,
+      "title": "[页面 · 两页 7] 项目头部的当前成果一行：当前成果、建档基线、现有缺陷、写回状态，重新建档的入口",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:03:32Z",
+      "closed_at": "2026-11-11T05:39:19Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1714",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:34Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:34Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:48:47Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:48:47Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:29:48Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:29:48Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:39:20Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T05:39:30Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1715,
+      "title": "[页面 · 两页 8] 页签收成对话与设置：旧地址落到对话，首页、报告与决定卡片的链接改到对话页上的位置",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:03:52Z",
+      "closed_at": "2026-11-11T09:15:05Z",
+      "labels": [
+        "enhancement"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1715",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:53Z",
+          "event": "labeled",
+          "label": "enhancement"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:03:54Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:00:53Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:00:53Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:13:06Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T08:13:06Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:14:28Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:14:28Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:15:06Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:15:19Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1716,
+      "title": "[页面 · 两页 9] 清理：删掉概览、资料、观测与职能页的代码，以及只为它们存在的模块、样式与用例",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-11T04:04:28Z",
+      "closed_at": "2026-11-11T10:10:31Z",
+      "labels": [
+        "cleanup"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1716",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:04:30Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:04:30Z",
+          "event": "labeled",
+          "label": "cleanup"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:16:15Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:16:15Z",
+          "event": "unlabeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:26:59Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T09:27:02Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T10:09:54Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T10:09:58Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T10:10:33Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T10:10:47Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1717,
+      "title": "[1.1 转实 试用 ③] 项目页只有对话与设置两页，看得见转到哪、为什么停、用了多少",
+      "state": "OPEN",
+      "state_reason": "",
+      "created_at": "2026-11-11T04:04:45Z",
+      "closed_at": null,
+      "labels": [
+        "waiting",
+        "trial"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1717",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:04:47Z",
+          "event": "labeled",
+          "label": "waiting"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-11T04:04:47Z",
+          "event": "labeled",
+          "label": "trial"
+        }
+      ]
+    },
+    {
+      "number": 1742,
+      "title": "[职能与核验] 直做交完成封存代码树，接通文件读取与事项采纳结算",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-14T01:14:07Z",
+      "closed_at": "2026-11-14T02:17:33Z",
+      "labels": [
+        "bug"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1742",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T01:14:08Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T01:14:08Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T01:14:53Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T01:14:53Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:06:48Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:06:49Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:07:48Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:07:48Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:16:24Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:16:25Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:17:34Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:18:20Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    },
+    {
+      "number": 1743,
+      "title": "[评价与验收] 评测运行器按项目当前组织保存职能设置并取回直做交完成文件",
+      "state": "CLOSED",
+      "state_reason": "COMPLETED",
+      "created_at": "2026-11-14T01:15:02Z",
+      "closed_at": "2026-11-14T03:38:57Z",
+      "labels": [
+        "bug"
+      ],
+      "url": "https://github.com/bender2333/yudao/issues/1743",
+      "timeline": [
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T01:15:03Z",
+          "event": "labeled",
+          "label": "bug"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T01:15:04Z",
+          "event": "labeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:19:39Z",
+          "event": "labeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T02:19:39Z",
+          "event": "unlabeled",
+          "label": "ready-for-agent"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T03:33:36Z",
+          "event": "unlabeled",
+          "label": "in-progress"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T03:33:36Z",
+          "event": "labeled",
+          "label": "needs-review"
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T03:38:59Z",
+          "event": "closed",
+          "label": null
+        },
+        {
+          "actor": "bender2333",
+          "created_at": "2026-11-14T03:39:09Z",
+          "event": "unlabeled",
+          "label": "needs-review"
+        }
+      ]
+    }
+  ],
+  "pull_requests": [
+    {
+      "number": 1719,
+      "closes": [
+        1704
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:11:53Z",
+      "merged_at": "2026-11-11T04:27:16Z",
+      "branch": "issue-1704",
+      "files": [
+        "agents_jour/1704.md",
+        "client/src/renderer/src/views/project/loop-graph-model.ts",
+        "client/tests/unit/loop-graph-model.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T04:19:12Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1720,
+      "closes": [
+        1621
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:30:05Z",
+      "merged_at": "2026-11-11T05:02:03Z",
+      "branch": "issue-1621",
+      "files": [
+        "agents_jour/1621.md",
+        "harness/tests/signals.py",
+        "harness/tests/test_concurrent_departments.py",
+        "harness/tests/test_independent_judgement.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:01:36Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1722,
+      "closes": [
+        1673
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:35:41Z",
+      "merged_at": "2026-11-11T05:16:27Z",
+      "branch": "issue-1673",
+      "files": [
+        "agents_jour/1673.md",
+        "harness/tests/test_department_providers.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:06:19Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1723,
+      "closes": [
+        1711
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:45:18Z",
+      "merged_at": "2026-11-11T05:08:05Z",
+      "branch": "issue-1711",
+      "files": [
+        "agents_jour/1711.md",
+        "client/src/renderer/src/styles.css",
+        "client/src/renderer/src/styles/v20-panels.css",
+        "client/src/renderer/src/views/project/arrow-panel-model.ts",
+        "client/src/renderer/src/views/project/arrow-panel.tsx",
+        "client/src/renderer/src/views/project/loop-graph-model.ts",
+        "client/src/renderer/src/views/project/loop-panel.tsx",
+        "client/tests/unit/arrow-panel-model.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T04:54:59Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-11-11T05:08:01Z",
+          "author": "bender2333",
+          "first_line": "合并前同步了 main（#1704 已合）："
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1724,
+      "closes": [
+        1647
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:45:45Z",
+      "merged_at": "2026-11-11T07:42:22Z",
+      "branch": "issue-1647",
+      "files": [
+        "agents_jour/1647.md",
+        "client/src/renderer/src/api/generated/index.ts",
+        "client/src/renderer/src/api/generated/sdk.gen.ts",
+        "client/src/renderer/src/api/generated/types.gen.ts",
+        "client/src/renderer/src/api/interface-version.ts",
+        "client/src/renderer/src/shell/sidebar.tsx",
+        "client/tests/unit/form-section.test.ts",
+        "harness/app/application.py",
+        "harness/app/contracts.py",
+        "harness/app/form_queries.py",
+        "harness/app/project_and_work_item_commands.py",
+        "harness/app/project_commands.py",
+        "harness/app/project_queries.py",
+        "harness/definitions/__init__.py",
+        "harness/definitions/forms/several_roles_direct/organization.json",
+        "harness/definitions/forms/single_role_direct/organization.json",
+        "harness/definitions/organization.json",
+        "harness/projects.py",
+        "harness/tests/layers.toml",
+        "harness/tests/openapi/openapi.json",
+        "harness/tests/test_api.py",
+        "harness/tests/test_form_catalog.py",
+        "harness/tests/test_query_refresh_lists.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:50:21Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-11-11T06:17:59Z",
+          "author": "bender2333",
+          "first_line": "REVIEW: 要求修改"
+        },
+        {
+          "created_at": "2026-11-11T07:06:38Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 2 轮"
+        },
+        {
+          "created_at": "2026-11-11T07:26:18Z",
+          "author": "bender2333",
+          "first_line": "REVIEW: 批准"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1725,
+      "closes": [
+        1708
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:46:50Z",
+      "merged_at": "2026-11-11T05:23:37Z",
+      "branch": "issue-1708",
+      "files": [
+        "agents_jour/1708.md",
+        "client/src/renderer/src/styles.css",
+        "client/src/renderer/src/styles/v20-items.css",
+        "client/src/renderer/src/views/project/conversation.tsx",
+        "client/src/renderer/src/views/project/item-panel-model.ts",
+        "client/src/renderer/src/views/project/item-panel.tsx",
+        "client/src/renderer/src/views/project/item-picker.tsx",
+        "client/tests/unit/item-panel-model.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:05:27Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1726,
+      "closes": [
+        1710
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T04:52:00Z",
+      "merged_at": "2026-11-11T05:21:19Z",
+      "branch": "issue-1710",
+      "files": [
+        "agents_jour/1710.md",
+        "client/src/renderer/src/app.tsx",
+        "client/src/renderer/src/shell/routing.ts",
+        "client/src/renderer/src/styles.css",
+        "client/src/renderer/src/styles/v20-requests.css",
+        "client/src/renderer/src/views/project/attempt-detail.tsx",
+        "client/src/renderer/src/views/project/observe-filter.ts",
+        "client/src/renderer/src/views/project/observe.tsx",
+        "client/src/renderer/src/views/project/requests-section.tsx",
+        "client/src/renderer/src/views/project/settings.tsx",
+        "client/src/renderer/src/views/project/work-process.tsx",
+        "client/tests/unit/requests-filter.test.ts",
+        "client/tests/unit/routing.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:10:20Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1727,
+      "closes": [
+        1714
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T05:02:43Z",
+      "merged_at": "2026-11-11T05:39:17Z",
+      "branch": "issue-1714",
+      "files": [
+        "agents_jour/1714.md",
+        "client/src/renderer/src/app.tsx",
+        "client/src/renderer/src/styles.css",
+        "client/src/renderer/src/styles/v20-head.css",
+        "client/src/renderer/src/views/project/project-head-model.ts",
+        "client/src/renderer/src/views/project/project-head.tsx",
+        "client/tests/unit/project-head-model.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:29:46Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-11-11T05:58:37Z",
+          "author": "bender2333",
+          "first_line": "补充：交付说明发出以后又合并了一次 origin/main（a0e5a785，含 #1708 的 c1e8e6bd 与 #1710 的 435d7ccc；styles.css 的四个 v20 @import 都留），并以日记提交 8b417a61 结束分支。"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1728,
+      "closes": [
+        1699
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T05:11:02Z",
+      "merged_at": "2026-11-11T05:50:48Z",
+      "branch": "issue-1699",
+      "files": [
+        "agents_jour/1699.md",
+        "harness/app/project_queries.py",
+        "harness/app/read_models.py",
+        "harness/tests/layers.toml",
+        "harness/tests/test_direct_page_path.py"
+      ],
+      "comments": [],
+      "reviews": []
+    },
+    {
+      "number": 1729,
+      "closes": [
+        1709
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T05:44:49Z",
+      "merged_at": "2026-11-11T06:01:34Z",
+      "branch": "issue-1709",
+      "files": [
+        "agents_jour/1709.md",
+        "client/src/renderer/src/styles/v20-items.css",
+        "client/src/renderer/src/views/project/all-items.tsx",
+        "client/src/renderer/src/views/project/board.ts",
+        "client/src/renderer/src/views/project/conversation.tsx",
+        "client/src/renderer/src/views/project/item-picker.tsx",
+        "client/tests/unit/board-columns.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T05:52:09Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1730,
+      "closes": [
+        1700
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T06:01:47Z",
+      "merged_at": "2026-11-11T06:20:48Z",
+      "branch": "issue-1700",
+      "files": [
+        "agents_jour/1700.md",
+        "harness/app/project_and_work_item_commands.py",
+        "harness/tests/test_project_and_work_item_commands.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T06:09:36Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1731,
+      "closes": [
+        1712
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T06:04:25Z",
+      "merged_at": "2026-11-11T06:34:35Z",
+      "branch": "issue-1712",
+      "files": [
+        "agents_jour/1712.md",
+        "client/src/renderer/src/styles/v20-panels.css",
+        "client/src/renderer/src/views/project/department-parts.tsx",
+        "client/src/renderer/src/views/project/department.tsx",
+        "client/src/renderer/src/views/project/loop-panel.tsx",
+        "client/src/renderer/src/views/project/node-panel-model.ts",
+        "client/src/renderer/src/views/project/step-timeline.tsx",
+        "client/tests/unit/department-states.test.ts",
+        "client/tests/unit/guidance-status.test.ts",
+        "client/tests/unit/node-panel-model.test.ts",
+        "client/tests/unit/running-background-commands.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T06:10:42Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮## 改动清单十个文件（全部在工单「只改」列里），另有一份执行日记随分支提交。| 文件 | 改了什么 || --- | --- || `client/src/renderer/src/views/project/node-panel-model.ts`（新增） | 面板的模型，纯函数。状态与原因、在等什么；实时输出段的开关；工作间的事实（执行机器、等模型服务、结果未知、未读指导数、角色）；最近一次请求的模型与档位；底部两个入口的地址。 || `client/src/renderer/src/views/project/department-parts.tsx`（新增） | 从 `department.tsx` 原样搬出三个共用部件：`DepartmentsLine`、`RunningBackgroundCommands`、`GuidanceSection`。 || `client/src/renderer/src/views/project/loop-panel.tsx` | 只改 `NodePanel` 一段：按上面的模型从上到下画，实时输出用 `RoomLiveOutput`、后台命令用搬出的 `RunningBackgroundCommands`，读同一条 `department.workspace` 查询；`LoopPanel` 把本来就有的 `projectId`、`workItemId` 透传下去。箭头面板一段未动。 || `client/src/renderer/src/views/project/department.tsx` | 改成从 `department-parts.tsx` 引用那三个部件；文字与结构不变，随搬走失效的导入删掉。 || `client/src/renderer/src/views/project/step-timeline.tsx` | 引入路径改成 `department-parts.tsx`。 || `client/src/renderer/src/styles/v20-panels.css` | 只追加节点面板这五条样式（`.v20-node-panel`、`.v20-node-waiting`、`.v20-node-live`、`.v20-node-facts`、`.v20-node-entries`）；#1711 的箭头规则一条没改，文件头注释补一句本文件也排节点面板。 || `client/tests/unit/node-panel-model.test.ts`（新增） | 9 条用例。 || `client/tests/unit/department-states.test.ts`、`guidance-status.test.ts`、`running-background-commands.test.ts` | 只改 `require` 的路径（`department.tsx` → `department-parts.tsx`），断言一个字没动。 || `agents_jour/1712.md`（新增） | 执行日记。 |不改 `harness/`、不改接口合同、不新增查询。`live-output.tsx` 一行没改（`RoomLiveOutput` 原样复用）。## 测试命令与计数```cd clientnode --test tests/unit/*.test.js tests/unit/*.test.ts   # ℹ tests 595 / pass 595 / fail 0 / cancelled 0 / skipped 0 / todo 0npm run typecheck                                        # 通过（tsc -p tsconfig.json --noEmit，无输出）npm run build:pages                                      # ✓ built in 8.15s（index-*.js 694.67 kB、css 122.29 kB）node --test tests/unit/node-panel-model.test.ts           # ℹ tests 9 / pass 9 / fail 0```动手前客户端单元 586 条全过（在分支基点 `95661113` 的临时 worktree 上量），改完 595 条（+9），只加不删。CI：https://github.com/bender2333/yudao/actions/runs/42969873148（提交 36a4c0af）、https://github.com/bender2333/yudao/actions/runs/42971140373（合并 main 并补日记后的 04291291）、https://github.com/bender2333/yudao/actions/runs/42972303782（再合一次 main 后的 7a5feca2）—— 三次都是九个作业 pass、③ 集成层按仓库的规矩在合并以后运行（这里显示 skipping）。## 逐条验收### 一、单元测试（面板的模型）：等模型服务、结果未知、未读指导各有一句；不在工作的职能没有实时输出段；最近一次请求的模型与档位取自工作间`node --test client/tests/unit/node-panel-model.test.ts` 9 条全过。对应这一条的三组断言：- 「工作间的事实写执行机器、等模型服务、结果未知、未读指导各一句」——`workshopFacts` 给出 `执行机器：build-01`、`等模型服务：正在等待模型服务`／`没有在等待模型服务`、`结果未知：有结果未知的远程动作`／`没有结果未知的远程动作`、`未读指导：3 封未读指导`。- 「不在工作的职能没有实时输出那一段，正在工作的才有」——`liveOutputShown` 对 `working: false` 的节点是 `false`、对 `working: true` 的是 `true`；渲染时这一段只在为真时出现（`data-testid=\"node-live\"`）。- 「最近一次请求的模型与档位取自工作间」——`lastRequestFacts` 对工作间的 `last_call` 给 `最近一次请求：deepseek-v4（请求 deep / 实际发送 flash）`；`last_call` 为 null 时写 `这个职能还没有模型请求`。另附两条：「状态与原因取图上节点的字，没有状态时写一句」（`现在没有状态`）、「在等什么取节点上开着的询问，按行给」（沿用图上已经拼好的 `在等待某某的回答`）。### 二、页面：正在工作的节点看得到实时的模型输出与后台命令；点「本职能的模型请求」到设置页那一节，职能筛选已经生效按 `docs/design/test-pyramid.md`「各角色运行哪一层」，基础页面没有端到端测试，页面验收写成操作步骤 + `data-testid`（与同组 #1711 的做法一致），另在本机用 `renderToStaticMarkup` 渲染真的 `LoopPanel` 量了一遍面板正文：1. 打开项目页，选一件正在进行的事项，点循环图上**正在工作**的节点：面板里出现实时输出段（`data-testid=\"node-live\"`，含 `RoomLiveOutput` 的「实时的模型输出」与 `RunningBackgroundCommands` 的「正在运行的后台命令（N 条）」两处，后者只在有 running 命令时才有正文）。2. 点**不在工作**的节点：这两样都没有（同一位置只接着工作间的事实与往来）。3. 点面板底部的「本职能的模型请求」（`data-testid=\"node-requests-link\"`）：到设置页的「模型请求与用量」一节并展开，职能筛选已生效——地址是 `#/p/{项目}/settings?w={事项}&section=requests&dept={职能}`，`RequestsSection` 以 `settingsSection === \"requests\"` 展开，`RequestsPanel` 用地址里的筛选作初值（#1710 建的能力，本单只写地址）。本机静态渲染的读数：正在工作的节点渲染出 `data-testid=\"node-live\"` 与「实时的模型输出」；空闲节点没有这一段；两个节点都渲染出「职能详情」（`#/p/p1/settings?w=w1&section=departments`）与「本职能的模型请求」（`#/p/p1/settings?w=w1&section=requests&dept=engineering`，空闲节点那一个写 `dept=quality`）。路由回读 `parseRoute` 得到 `settingsSection === \"requests\"`、`requestFilters.department === \"engineering\"`、`workItemId === \"w1\"`——这两条已经写成用例「底部两个入口：职能详情到设置页的职能设置，模型请求带着职能筛选」。### 三、用「工程」的项目，节点面板同样可用；面板里不出现这份组织以外的职能名- 节点面板的每一句都取自图上这个节点（`LoopNode` 的 label 与 state）、工作间的角色与最近一次请求，加两条跳设置页的地址；面板里没有一处写死职能清单。- 用例「面板里不写死职能清单：这份组织以外的职能名一个都不出现」用一份只有「运维」的组织跑 `nodePanelView`，断言正文里 `产品`、`工程`、`质检` 一个都不出现，而 `运维` 出现。- 用例「角色取工作间的角色与它的状态，不写死职能清单」用工作间给的两个角色（含各自的 `task`）断言逐条照抄。### 四、旧职能页的内容与搬之前相同（搬出的部件两处共用）；三个改了引入路径的用例不改断言就通过- 搬动保真：把 `git show HEAD:client/src/renderer/src/views/project/department.tsx` 里那三块切出来与新文件里的同名函数逐行比对——`DepartmentsLine` 28 行、`RunningBackgroundCommands` 20 行、`GuidanceSection` 29 行，**内容逐字相同**。旧职能页只换了引用路径，文字与结构没变。- 两处共用：`RunningBackgroundCommands` 由 step-timeline（旧职能页的工作过程里）与节点面板两处引用；`RoomLiveOutput` 由旧职能页的房间段与节点面板两处引用。- 三个用例 `department-states.test.ts`、`guidance-status.test.ts`、`running-background-commands.test.ts` 只把 `require` 的路径改成 `department-parts.tsx`，断言未动，全过；`page-imports.test.ts` 也过（新文件没有反向导入 `view/`）。### 五、验收层：缝`cd client && npm test && npm run typecheck && npm run build:pages` 三项在本机全过（读数见上）；main 上的检查见上面的 CI 链接。本次只改 `client/`，不涉及内核模块，内核路径覆盖与内核清单 `checks` 两条不适用。## 新增用例守哪一环9 条都守 **R3**：项目页的节点面板接住职能页的内容（设计说明「节点面板与箭头面板接住的内容」写明的行为，路线图 4.15 的阶段行为），并且经过 R2 的查询合同——`department.workspace`、`run.steps`、`attempt.live`、`project.loop`。断言落在写出来的文字与有没有那一段上，不钉实现细节（不比 class、不比 DOM 结构）。## 自定的边界1. **「职能详情」入口先指到设置页的职能设置一节**（`paths.settings(projectId, { workItem, section: \"departments\" })`）。工单正文写明「#1713 合并以前这个入口指到设置页现有的职能设置」，所以这里不新建页面、不占位跳转。2. **两个入口用 `<a href>`，不用按钮改地址**。页面路由就是地址栏（`paths.*` 生成完整 `#/p/...`），与旧职能页「本职能的模型请求」那个链接同一做法；这样中键、复制链接都能用。3. **未读指导只写数量，不搬指导记录列表**。设计说明的节点面板一条写的是「未读指导数」；指导记录那一段（`GuidanceSection`）留在旧职能页，本单只把它搬到 `department-parts.tsx` 供 #1713 的职能详情页用，没有在面板里新开一处。4. **实时输出段与后台命令同一个开关**（`node.working`）。设计说明把这两样写在同一段「下面是实时的模型输出与后台命令」，一个开关避免出现「有后台命令却没有输出段」的半截状态；后台命令本身仍只列 `running` 的（沿用 `RunningBackgroundCommands` 的既有过滤）。5. **状态与原因仍取图上节点的 `state`**（面板原来就如此），不改成 `departmentStatusView` 那份「本部门状态优先」的口径：面板守的是图上这一个节点，与图的读法保持一致。6. **工作间读不到时**（`workspace.error`）在面板里写一句读失败的原因，事实段照常画（只是没有工作间那几行）；`projectId` 为空时不发这条查询。7. **`node-panel-model.ts` 的引用写成带 `.ts` 的名字**：单元测试用 `node --test` 直接跑 TypeScript，不带扩展名找不到模块（与 `arrow-panel-model.ts`、`loop-graph-model.ts` 同一约定）。8. **`department.workspace` 的 `viewId` 用 `page.cv.node.workspace.${node.id}`**：同一个面板里两个节点各读各的，切节点时不会拿上一个节点的缓存。## 删掉的用例无。用例数 586 → 595（只加 9 条，没有删改任何既有断言）。— solo-deepseek-v4.1-flash"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1732,
+      "closes": [
+        1705
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T06:28:03Z",
+      "merged_at": "2026-11-11T06:56:06Z",
+      "branch": "issue-1705",
+      "files": [
+        "agents_jour/1705.md",
+        "evals/README.md",
+        "evals/runner/run_yudao_eval.py",
+        "evals/runner/yudao.py",
+        "evals/runner/yudao_compare.py",
+        "evals/runner/yudao_metrics.py",
+        "evals/runner/yudao_report.py",
+        "evals/tests/test_yudao_runner.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T06:47:07Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1733,
+      "closes": [
+        1701
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T06:29:55Z",
+      "merged_at": "2026-11-11T07:04:39Z",
+      "branch": "issue-1701",
+      "files": [
+        "agents_jour/1701.md",
+        "harness/app/project_and_work_item_commands.py",
+        "harness/app/project_queries.py",
+        "harness/project_projection.py",
+        "harness/projects.py",
+        "harness/tests/test_query_refresh_lists.py",
+        "harness/tests/test_routing_per_form.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T06:55:44Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-11-11T07:04:30Z",
+          "author": "bender2333",
+          "first_line": "合并 main（fe0d6a06 之后的分支 head 是 `63513dc7`）以后重新跑检查：运行 https://github.com/bender2333/yudao/actions/runs/42975908363 全过（① 单元层 55s、② 模块层 6m32s、内核检查 2m58s、客户端 56s、工作台脚本 48s、用例变化 1m17s、评测工具 1m35s、范围 6s、`check` 8s），`③ 集成层` 在 PR 上仍是 skipping。合并前的最后一次 head 是 `63513dc7`。"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1734,
+      "closes": [
+        1703
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T06:47:49Z",
+      "merged_at": "2026-11-11T07:19:16Z",
+      "branch": "issue-1703",
+      "files": [
+        "agents_jour/1703.md",
+        "harness/app/project_queries.py",
+        "harness/app/read_models.py",
+        "harness/tests/test_direct_page_path.py",
+        "harness/tests/test_project_loop_organization.py",
+        "harness/tests/test_watched_outputs_renamed.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T07:19:03Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1735,
+      "closes": [
+        1713
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T07:37:45Z",
+      "merged_at": "2026-11-11T07:59:40Z",
+      "branch": "issue-1713",
+      "files": [
+        "agents_jour/1713.md",
+        "client/src/renderer/src/app.tsx",
+        "client/src/renderer/src/shell/routing.ts",
+        "client/src/renderer/src/styles/v20-panels.css",
+        "client/src/renderer/src/views/decisions/card-logic.ts",
+        "client/src/renderer/src/views/project/department-detail-model.ts",
+        "client/src/renderer/src/views/project/department-detail.tsx",
+        "client/src/renderer/src/views/project/node-panel-model.ts",
+        "client/src/renderer/src/views/project/settings.tsx",
+        "client/tests/unit/card-logic.test.js",
+        "client/tests/unit/department-detail-model.test.ts",
+        "client/tests/unit/node-panel-model.test.ts",
+        "client/tests/unit/routing.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T07:45:11Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1736,
+      "closes": [
+        1648
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T08:08:30Z",
+      "merged_at": "2026-11-11T08:24:58Z",
+      "branch": "issue-1648",
+      "files": [
+        "agents_jour/1648.md",
+        "client/src/renderer/src/shell/new-project-text.ts",
+        "client/src/renderer/src/shell/sidebar.tsx",
+        "client/src/renderer/src/styles/v10-project.css",
+        "client/src/renderer/src/views/project/form-cards-model.ts",
+        "client/src/renderer/src/views/project/form-cards.tsx",
+        "client/tests/unit/form-cards-model.test.ts",
+        "client/tests/unit/new-project-text.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T08:15:19Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1737,
+      "closes": [
+        1649
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T08:42:06Z",
+      "merged_at": "2026-11-11T09:01:58Z",
+      "branch": "issue-1649",
+      "files": [
+        "agents_jour/1649.md",
+        "client/src/renderer/src/styles/v10-project.css",
+        "client/src/renderer/src/views/project/conversation.tsx",
+        "client/src/renderer/src/views/project/form-section-logic.ts",
+        "client/src/renderer/src/views/project/form-section.tsx",
+        "client/src/renderer/src/views/project/settings.tsx",
+        "client/src/renderer/src/views/project/thread-model.ts",
+        "client/src/renderer/src/views/project/thread.tsx",
+        "client/tests/unit/form-section.test.ts",
+        "client/tests/unit/thread-model.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T09:01:26Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1738,
+      "closes": [
+        1715
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T08:55:27Z",
+      "merged_at": "2026-11-11T09:15:03Z",
+      "branch": "issue-1715",
+      "files": [
+        "agents_jour/1715.md",
+        "client/src/renderer/src/app.tsx",
+        "client/src/renderer/src/shell/routing.ts",
+        "client/src/renderer/src/views/decisions/card-logic.ts",
+        "client/src/renderer/src/views/home/away-report.tsx",
+        "client/src/renderer/src/views/home/building-section.tsx",
+        "client/src/renderer/src/views/project/loop-panel.tsx",
+        "client/src/renderer/src/views/project/node-panel-model.ts",
+        "client/src/renderer/src/views/project/organization.ts",
+        "client/src/renderer/src/views/project/project-head-model.ts",
+        "client/src/renderer/src/views/project/project-head.tsx",
+        "client/tests/unit/away-report-coverage.test.ts",
+        "client/tests/unit/card-logic.test.js",
+        "client/tests/unit/node-panel-model.test.ts",
+        "client/tests/unit/organization.test.ts",
+        "client/tests/unit/project-head-model.test.ts",
+        "client/tests/unit/routing.test.ts"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T09:14:25Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1739,
+      "closes": [
+        1716
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-11T10:02:57Z",
+      "merged_at": "2026-11-11T10:10:30Z",
+      "branch": "issue-1716",
+      "files": [
+        "agents_jour/1716.md",
+        "client/src/renderer/src/app.tsx",
+        "client/src/renderer/src/shell/routing.ts",
+        "client/src/renderer/src/styles/v10-department.css",
+        "client/src/renderer/src/styles/v10-project.css",
+        "client/src/renderer/src/styles/v20-panels.css",
+        "client/src/renderer/src/views/project/arrow-panel-model.ts",
+        "client/src/renderer/src/views/project/arrow-panel.tsx",
+        "client/src/renderer/src/views/project/asks-text.ts",
+        "client/src/renderer/src/views/project/attempts-summary.ts",
+        "client/src/renderer/src/views/project/department.tsx",
+        "client/src/renderer/src/views/project/floor-screen.tsx",
+        "client/src/renderer/src/views/project/floor-text.ts",
+        "client/src/renderer/src/views/project/flow-segments.ts",
+        "client/src/renderer/src/views/project/labels.ts",
+        "client/src/renderer/src/views/project/loops-block.tsx",
+        "client/src/renderer/src/views/project/materials-read.ts",
+        "client/src/renderer/src/views/project/materials.tsx",
+        "client/src/renderer/src/views/project/observe.tsx",
+        "client/src/renderer/src/views/project/overview.tsx",
+        "client/src/renderer/src/views/project/read-existing.tsx",
+        "client/src/renderer/src/views/project/requests-section.tsx",
+        "client/src/renderer/src/views/project/use-snapshot.ts",
+        "client/tests/unit/asks-text.test.ts",
+        "client/tests/unit/attempts-summary.test.ts",
+        "client/tests/unit/page-read-failure.test.ts",
+        "client/tests/unit/project-list.test.ts",
+        "harness/tests/test_design_section_refs.py",
+        "scripts/convert_design_section_refs.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-11T10:09:51Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1746,
+      "closes": [
+        1742
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-14T01:59:13Z",
+      "merged_at": "2026-11-14T02:17:32Z",
+      "branch": "issue-1742",
+      "files": [
+        "agents_jour/1742.md",
+        "harness/app/project_queries.py",
+        "harness/projects.py",
+        "harness/submissions.py",
+        "harness/tests/test_direct_page_path.py",
+        "harness/tests/test_open_loop_completion.py",
+        "harness/tightening.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-14T02:06:45Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        },
+        {
+          "created_at": "2026-11-14T02:16:21Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 2 轮"
+        }
+      ],
+      "reviews": []
+    },
+    {
+      "number": 1748,
+      "closes": [
+        1743
+      ],
+      "state": "MERGED",
+      "created_at": "2026-11-14T03:21:31Z",
+      "merged_at": "2026-11-14T03:38:56Z",
+      "branch": "issue-1743",
+      "files": [
+        "agents_jour/1743.md",
+        "evals/runner/run_yudao_eval.py",
+        "evals/runner/yudao.py",
+        "evals/runner/yudao_metrics.py",
+        "evals/tests/test_yudao_runner.py"
+      ],
+      "comments": [
+        {
+          "created_at": "2026-11-14T03:33:30Z",
+          "author": "bender2333",
+          "first_line": "DELIVERY: 第 1 轮"
+        }
+      ],
+      "reviews": []
+    }
+  ]
+}
