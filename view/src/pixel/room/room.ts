@@ -4,7 +4,7 @@
 // 动作过程中的临时状态（灯、抽屉、工作台上的物件、白板……）只属于表演层，动作演完就回到
 // 只由状态决定的样子。这里不依赖渲染与场景，可以直接在 node --test 下驱动。
 
-import type { PixelState, RoomStatus } from "../contract.ts";
+import type { PixelState, RoomStatus, StampKind } from "../contract.ts";
 import type { RoomRole, RoomSeat } from "./layout.ts";
 
 /** 房间里的一个角色（状态已由翻译层翻成画面的词）。 */
@@ -24,6 +24,8 @@ export interface RoomData extends PixelState {
   label: string;
   verifier: boolean;
   exit_tray: boolean;
+  stamp_kind: StampKind | null;
+  outsourced: boolean;
   level: string;
   status: RoomStatus;
   crt: { target?: string; model?: string; protocol?: string; status?: string; cycle?: number | null };
@@ -51,7 +53,8 @@ export interface RoomData extends PixelState {
 /** 一份空房间：画面建立时用，状态到达之前的样子（默认单角色由 rolesOf 补上）。 */
 export function emptyRoomData(department: string): RoomData {
   return {
-    position: 0, department, label: "", verifier: false, exit_tray: false, level: "ui", status: "idle",
+    position: 0, department, label: "", verifier: false, exit_tray: false,
+    stamp_kind: null, outsourced: false, level: "ui", status: "idle",
     crt: {}, roles: [], pose: null, door: null,
     hold_card: null, mailbox: 0, summaries: 0, scrolls: 0, pinned_notes: 0, semantic_cards: 0,
     machine: null, remote_unknown: false, waiting_provider: false, pipes: null, existing_read: false,
@@ -61,7 +64,7 @@ export function emptyRoomData(department: string): RoomData {
 
 export interface BenchState {
   item: string | null;
-  mark: { text: string; color: string } | null;
+  mark: { text: string; color: string; dashed?: boolean } | null;
   slip: string | null;
   slipMark: { text: string; color: string } | null;
   ticks: number;

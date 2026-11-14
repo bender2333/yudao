@@ -58,6 +58,9 @@ export interface RoomAppearance {
 /** 核验角色房间里的检验台名称。 */
 export const VERIFIER_BENCH_LABEL = "检验台";
 
+/** 开环完成角色房间里的出口托盘名称。 */
+export const EXIT_TRAY_BENCH_LABEL = "出口托盘";
+
 /** 核验角色未单独登记中心工种时的中心角色种类。 */
 export const VERIFIER_CENTER_KIND = "tester";
 
@@ -82,7 +85,7 @@ export const GENERIC_ROOM_SHELL: RoomShellPaint = {
 export const GENERIC_ROOM_APPEARANCE: RoomAppearance = {
   defaultLabel: "",
   shell: GENERIC_ROOM_SHELL,
-  spriteDept: "engineering",
+  spriteDept: "generic",
   defaultSingleKind: "agent",
   centerKind: "architect",
   machineRoomStyle: false,
@@ -199,9 +202,14 @@ export const ROOM_APPEARANCES: Readonly<Record<string, RoomAppearance>> = {
   },
 };
 
+/** 判断角色标识在房间声明中是否登记了专属外观。 */
+export function hasDeclaredRoomAppearance(roleId: string): boolean {
+  return Object.prototype.hasOwnProperty.call(ROOM_APPEARANCES, roleId);
+}
+
 /** 按角色标识查房间外观声明，未登记角色返回通用外观。 */
 export function roomAppearanceOf(roleId: string): RoomAppearance {
-  return Object.prototype.hasOwnProperty.call(ROOM_APPEARANCES, roleId)
+  return hasDeclaredRoomAppearance(roleId)
     ? ROOM_APPEARANCES[roleId]
     : GENERIC_ROOM_APPEARANCE;
 }

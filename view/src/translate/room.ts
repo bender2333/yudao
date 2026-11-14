@@ -12,10 +12,10 @@
 
 import type { EventObject, ProjectLoopResult, WorkItemOrganization } from "../api/generated/types.gen.ts";
 import { roomState as contractRoomState } from "../pixel/contract.ts";
-import type { Artifact, PixelAction, RoomState } from "../pixel/contract.ts";
+import type { Artifact, PixelAction, RoomState, StampKind } from "../pixel/contract.ts";
 import { DEPARTMENT_NAMES } from "./face.ts";
 import { DEFAULT_ORGANIZATION } from "./floor.ts";
-import { roomPose, roomStatus, roleStatus } from "./tables.ts";
+import { completingRoleOf, resolveWorkItemStamp, roomPose, roomStatus, roleStatus } from "./tables.ts";
 import { say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 
 /**
@@ -108,11 +108,12 @@ function roleOf(raw: unknown): { id: string; name: string; kind: string; status:
   };
 }
 
-/** 从事项冻结定义或楼层事项集合推出这间屋的显示名、是否核验角色与是否开环完成角色。 */
+/** 从事项冻结定义或楼层事项集合推出这间屋的显示名、是否核验角色、是否设出口托盘与常态印章种类。 */
 export function deriveRoomRoleSpec(
   dept: string,
   input: Pick<RoomStateInput, "organization" | "loop" | "workItemId">,
-): { label: string; verifier: boolean; exit_tray: boolean } {
+  rawRoom?: Payload,
+): { label: string; verifier: boolean; exit_tray: boolean; stamp_kind?: StampKind; outsourced?: boolean } {
   const workItems = input.loop?.work_items ?? [];
   const orgs: WorkItemOrganization[] = input.organization
     ? [input.organization]
@@ -130,8 +131,36 @@ export function deriveRoomRoleSpec(
     .find((role) => role.id === dept)?.label;
   const label = focusedLabel ?? unionLabel ?? DEPARTMENT_NAMES[dept] ?? dept;
   const verifier = orgs.some((org) => org.verifiers.some((entry) => entry.role === dept));
-  const exit_tray = orgs.some((org) => org.completing?.id === dept);
-  return { label, verifier, exit_tray };
+  const exit_tray = orgs.some((org) => completingRoleOf(org) === dept);
+
+  const stampTarget = focusedItem
+    ?? workItems.find((item) => {
+      const info = resolveWorkItemStamp(item as never, item.organization ?? DEFAULT_ORGANIZATION);
+      return info.stamp_room === dept && info.stamp_kind !== undefined;
+    });
+  let stamp_kind: StampKind | undefined;
+  let outsourced = false;
+  if (stampTarget) {
+    const info = resolveWorkItemStamp(stampTarget as never, stampTarget.organization ?? DEFAULT_ORGANIZATION);
+    if (info.stamp_room === dept && info.stamp_kind !== undefined) {
+      stamp_kind = info.stamp_kind;
+      outsourced = info.outsourced;
+    }
+  } else if (input.organization && rawRoom && str(rawRoom.status) === "done") {
+    if (input.organization.verifiers.some((entry) => entry.role === dept) && str(rawRoom.stop_reason) !== "open_loop") {
+      stamp_kind = "release";
+    } else if (input.organization.verifiers.length === 0 && completingRoleOf(input.organization) === dept) {
+      stamp_kind = "open_loop";
+      outsourced = flag(rawRoom.outsourced) || flag(rawRoom.verified_external);
+    }
+  }
+  return {
+    label,
+    verifier,
+    exit_tray,
+    ...(stamp_kind ? { stamp_kind } : {}),
+    ...(outsourced ? { outsourced: true } : {}),
+  };
 }
 
 /**
@@ -142,7 +171,7 @@ export function deriveRoomRoleSpec(
 export function state(o: RoomStateInput): RoomState {
   const r = roomOf(o.workspace);
   const department = str(r.department) || str(o.department);
-  const spec = deriveRoomRoleSpec(department, o);
+  const spec = deriveRoomRoleSpec(department, o, r);
   const pose = r.pose;
   const pipes = r.pipes;
   const s: Record<string, unknown> = {
@@ -151,6 +180,8 @@ export function state(o: RoomStateInput): RoomState {
     label: spec.label,
     verifier: spec.verifier,
     exit_tray: spec.exit_tray,
+    ...(spec.stamp_kind ? { stamp_kind: spec.stamp_kind } : {}),
+    ...(spec.outsourced ? { outsourced: true } : {}),
     level: str(r.level) || "ui",
     status: roomStatus(str(r.status)),
     crt: rec(r.crt),
@@ -262,6 +293,7 @@ function one(kind: string, ev: RoomEvent, ctx: RoomContext, extra?: Record<strin
       roleName: ctx.roleName,
       deptLabel: deptLabelOf(org),
       isVerifier: (dept) => isVerifierInOrg(org, dept),
+      hasVerifiers: org.verifiers.length > 0,
     }),
     ...(extra ?? {}),
   };
@@ -358,6 +390,41 @@ const ROOM: Readonly<Record<string, (ev: RoomEvent, dept: string, ctx: RoomConte
   structure_accepted: (ev, dept, ctx) => {
     const pair = deliveryPair(ev, orgOf(ctx));
     return handoffIn(ev, dept, pair.from, pair.to, "box", ctx);
+  },
+  // 通用成果接纳：无核验角色交完成时在出口托盘盖虚线的开环完成章并送成果库；有核验角色交完成只封存送核验屋；独立核验结论按放行或打回走
+  artifact_accepted: (ev, dept, ctx) => {
+    const org = orgOf(ctx);
+    const p = pl(ev);
+    const kind = str(p.artifact_kind);
+    const issuer = ev.department || str(p.artifact_issuer) || completingRoleOf(org) || org.entry?.id || org.roles[0]?.id || "engineering";
+    const evWithDept: RoomEvent = { ...ev, department: issuer };
+    if (kind === "completion") {
+      if (org.verifiers.length === 0) {
+        if (dept !== issuer) return [];
+        const outsourced = flag(p.outsourced) || flag(p.verified_external);
+        return [
+          one("stamp_open_loop", evWithDept, ctx, outsourced ? { outsourced: true } : undefined),
+          ...handoffIn(evWithDept, dept, issuer, "library", "box", ctx),
+        ];
+      }
+      const target = org.watched.find((w) => w.source === issuer && w.outcome === "completion")?.recipient
+        ?? org.verifiers[0]!.role;
+      return sealThenHandoff(evWithDept, dept, ctx, issuer, target, "box");
+    }
+    if (kind === "completion_review") {
+      const release = p.verdict === "release";
+      const stamp = dept === issuer ? [one(release ? "stamp_release" : "stamp_rework", evWithDept, ctx)] : [];
+      if (release) {
+        return stamp.concat(handoffIn(evWithDept, dept, issuer, str(p.release_to) || "library", "release", ctx));
+      }
+      const pair = reworkPair(evWithDept, org);
+      return stamp.concat(handoffIn(evWithDept, dept, pair.from, pair.to, "defect", ctx));
+    }
+    const target = org.watched.find((w) => w.source === issuer && w.outcome === kind)?.recipient
+      ?? org.watched.find((w) => w.source === issuer)?.recipient
+      ?? "";
+    if (!target) return dept === issuer ? [one("stamp_valid", evWithDept, ctx)] : [];
+    return stampThenHandoff(evWithDept, dept, ctx, issuer, target, "prd");
   },
   // 核验结论：放行单送回成果库（或载荷指定的角色），缺陷记录经回流管道送回打回目标角色
   qa_submitted: (ev, dept, ctx) => {

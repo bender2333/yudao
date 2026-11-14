@@ -11,7 +11,10 @@
 import type { Clock } from "../clock.ts";
 import { createPixelSurface } from "../surface.ts";
 import { buildCatalog } from "./../world/floor-decl.ts";
-import { ACTIVE, IN_ROOM, busyItems, createFloorDriver, createFloorState, itemColor, type FloorDriver, type FloorState } from "./../world/floor.ts";
+import {
+  ACTIVE, IN_ROOM, busyItems, createFloorDriver, createFloorState, itemColor,
+  resolveFloorStamps, resolveShelfBoxes, type FloorDriver, type FloorState,
+} from "./../world/floor.ts";
 import { createScene } from "./../world/scene.ts";
 import { FloorRenderer, H, W, type FactRect } from "./render.ts";
 import { createDecisionCard, type DecisionCard } from "./card.ts";
@@ -112,8 +115,20 @@ export interface FloorChannels {
   };
   /** 大厅板上的决定单。 */
   board: { id: string; kind: string; title: string; color: string | null }[];
-  /** 成果库里的成果：已采纳的全部与货架上摆得下的那几个。 */
-  shelf: { adopted: string[]; shown: string[] };
+  /** 成果库里的成果：已采纳的全部、货架上摆得下的那几个，以及每个箱子正面的章印记种类。 */
+  shelf: {
+    adopted: string[];
+    shown: string[];
+    boxes: { work_item_id: string; stamp_kind: "release" | "open_loop"; outsourced: boolean }[];
+  };
+  /** 楼层上已结束事项盖下的章：实心放行章或虚线开环完成章。 */
+  stamps: {
+    work_item_id: string;
+    room: string;
+    kind: "release" | "open_loop";
+    outsourced: boolean;
+    text: string;
+  }[];
   /** 传信管里等待回答的询问数（接收的部门、封数）。 */
   tubes: { department: string; count: number }[];
   /** 等待模型服务的文字（部门与牌子上的字）。 */
@@ -160,6 +175,8 @@ function floorChannels(driver: FloorDriver): FloorChannels {
   };
   const adopted = model.shelves.adopted.slice();
   const per = shelfRoom ? Math.max(1, Math.floor((shelfRoom.w - 26) / 18)) : adopted.length;
+  const stamps = resolveFloorStamps(model, world);
+  const shelfBoxes = resolveShelfBoxes(model, stamps);
   const itemById = (id: string | null): (typeof model.items)[number] | null =>
     (id ? model.items.find((it) => it.id === id || it.work_item_id === id) ?? null : null);
   const roles: FloorChannels["roles"] = {};
@@ -185,7 +202,8 @@ function floorChannels(driver: FloorDriver): FloorChannels {
       const item = itemById(d.work_item_id ?? null);
       return { id: d.id, kind: d.kind, title: d.title, color: item ? itemColor(item) : null };
     }),
-    shelf: { adopted, shown: adopted.slice(-per) },
+    shelf: { adopted, shown: adopted.slice(-per), boxes: shelfBoxes },
+    stamps,
     tubes: world.roomOrder.filter((id) => world.rooms[id].roomKind === "dept")
       .map((id) => ({ department: id, count: model.open_requests.filter((q) => q.to === id).length })),
     waiting: model.waiting_provider.map((w) => ({
@@ -241,6 +259,8 @@ export interface FloorTestHooks {
   facts: () => FactRect[];
   /** 当前点选并画出了外围高亮框的事实元件（工单 #1382 的端到端核对）。 */
   selectedFact: () => { work_item_id: string; element: FactElement } | null;
+  /** 楼层承载事实的视觉通道读数（供端到端测试读取房间拓扑、章种类与货架箱子）。 */
+  channels: () => FloorChannels;
 }
 
 /** 建立给端到端测试用的读取入口：读的是画面里世界的当前状态。 */
@@ -304,6 +324,7 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
     resync: () => onResync(),
     facts: () => view.factRects(),
     selectedFact: () => view.selectedFact(),
+    channels: () => view.inspect().channels(),
   };
 }
 

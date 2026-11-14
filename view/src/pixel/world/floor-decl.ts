@@ -11,8 +11,21 @@ import decl from "../generated/floor-decl.json" with { type: "json" };
 import type { BuildingRoomLight, FloorTopology } from "../contract.ts";
 import type { Catalog, DeclContext, IdleDef, LinkDef, RestFn, RestState, RoleRestFn, RoomDef, RoomVisual, TaskDef } from "./types.ts";
 
-/** 任务目录（数据来自原型 v13 floor-decl.js 的 TASKS）。 */
-export const TASKS = decl.tasks as unknown as Record<string, TaskDef>;
+const OPEN_LOOP_TASK: TaskDef = {
+  tier: "key",
+  label: "开环完成",
+  spot: "terminal",
+  pose: "stamp_once",
+  bubble: "say",
+  ms: 1100,
+  icon: "check",
+};
+
+/** 任务目录（数据来自原型 v13 floor-decl.js 的 TASKS，补充开环完成盖虚线章关键动作）。 */
+export const TASKS: Record<string, TaskDef> = {
+  ...(decl.tasks as unknown as Record<string, TaskDef>),
+  stamp_open_loop: OPEN_LOOP_TASK,
+};
 
 /** 待机活动（数据来自原型 v13 floor-decl.js 的 IDLE）。 */
 export const IDLE = decl.idle as unknown as IdleDef[];
@@ -20,8 +33,11 @@ export const IDLE = decl.idle as unknown as IdleDef[];
 /** 不是角色一件事的动作（交接、传信、决定单、闪光……）的级别与时长（原型 v13 floor-decl.js 的 EFFECTS）。 */
 export const EFFECTS = decl.effects as unknown as Record<string, { tier: "key" | "normal" | "progress"; ms: number }>;
 
-/** 画面上认的动作种类：级别与声明时长（原型 v13 floor-decl.js 的 KINDS）。 */
-export const KINDS = decl.kinds as unknown as Record<string, { tier: "key" | "normal" | "progress"; ms: number }>;
+/** 画面上认的动作种类：级别与声明时长（原型 v13 floor-decl.js 的 KINDS，补充开环完成盖虚线章动作）。 */
+export const KINDS: Record<string, { tier: "key" | "normal" | "progress"; ms: number }> = {
+  ...(decl.kinds as unknown as Record<string, { tier: "key" | "normal" | "progress"; ms: number }>),
+  stamp_open_loop: { tier: "key", ms: 1100 },
+};
 
 export const DEPT_PORTS = ["in", "out", "tubeIn", "tubeOut"];
 
@@ -151,12 +167,17 @@ export function buildCatalog(
 const DECLARED_SPRITE_DEPTS = new Set(["product", "engineering", "quality", "operations"]);
 const DECLARED_ROLE_KINDS = new Set(["agent", "ops", "manager", "architect", "tester", "explorer", "reviewer", "lead"]);
 
+/** 判断角色标识在楼层与楼场景声明中是否具有专属外观（未登记的角色使用中性灰米通用外观并计入缺口清单）。 */
+export function hasDeclaredFloorAppearance(roleId: string): boolean {
+  return DECLARED_SPRITE_DEPTS.has(roleId);
+}
+
 /** 楼里每层散步小人轮换使用的精灵键（集中在场景声明）。 */
 export const WALKER_SPRITES: readonly string[] = ["product.agent", "engineering.agent", "quality.agent"];
 
-/** 按场景声明解析角色精灵键：未登记的职能或角色种类回退到安全默认精灵。 */
+/** 按场景声明解析角色精灵键：未登记专属外观的职能使用通用中性灰米小人配色。 */
 export function characterSprite(department: string, roleKind: string): string {
-  const dept = DECLARED_SPRITE_DEPTS.has(department) ? department : "engineering";
+  const dept = DECLARED_SPRITE_DEPTS.has(department) ? department : "generic";
   const kind = DECLARED_ROLE_KINDS.has(roleKind) ? roleKind : "agent";
   return `${dept}.${kind}`;
 }
@@ -218,7 +239,12 @@ export function declarationsFromTopology(
   let roleW = 110;
   const roomCount = 2 + roleTopology.length + (hasOps ? 1 : 0);
   const totalGaps = Math.max(0, roomCount - 1) * gap;
-  if (hallW + libW + opsW + roleTopology.length * roleW + totalGaps > maxSpan && roleTopology.length > 0) {
+  if (roleTopology.length > 0 && roleTopology.length < 3) {
+    // 单职能或两职能时在大厅与成果库之间自适应铺开，保持楼层右缘规整且不留空屋
+    const standardGaps = (2 + 3 + (hasOps ? 1 : 0) - 1) * gap;
+    const standardSpan = hallW + libW + opsW + 3 * 110 + standardGaps;
+    roleW = Math.floor((standardSpan - hallW - libW - opsW - totalGaps) / roleTopology.length);
+  } else if (hallW + libW + opsW + roleTopology.length * roleW + totalGaps > maxSpan && roleTopology.length > 0) {
     hallW = 86;
     libW = hasOps ? 72 : 90;
     opsW = hasOps ? 74 : 0;

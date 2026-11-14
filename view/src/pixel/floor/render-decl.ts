@@ -60,14 +60,22 @@ export function roomShellOf(roomId: string): RoomShell {
   return DECLARED_ROOM_SHELLS[roomId] ?? GENERIC_ROOM_SHELL;
 }
 
+/** 判断角色标识在楼层渲染声明里是否有专属外壳与陈设外观。 */
+export function hasDeclaredRoomVisual(roomId: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DECLARED_ROOM_SHELLS, roomId);
+}
+
 function drawStampStation(c: CanvasRenderingContext2D, r: Room): void {
   RB(c, r.x + r.w - 36, GEO.FLOOR_LINE + 24, 22, 12, PAL.white2);
   drawBitmap(c, "magnifier", r.x + r.w - 29, GEO.FLOOR_LINE + 14);
 }
 
 function drawExitTray(c: CanvasRenderingContext2D, r: Room): void {
-  RB(c, r.x + r.w - 34, GEO.FLOOR_LINE + 26, 20, 10, PAL.wood3);
-  R(c, r.x + r.w - 31, GEO.FLOOR_LINE + 23, 14, 4, PAL.paper);
+  const tx = r.x + r.w - 36;
+  const ty = GEO.FLOOR_LINE + 25;
+  RB(c, tx, ty, 22, 11, PAL.wood3);
+  R(c, tx + 2, ty + 2, 18, 7, PAL.paper);
+  R(c, tx + 4, ty - 2, 14, 4, PAL.paper2);
 }
 
 function drawGenericCabinet(c: CanvasRenderingContext2D, r: Room): void {
@@ -75,12 +83,16 @@ function drawGenericCabinet(c: CanvasRenderingContext2D, r: Room): void {
   R(c, r.x + r.w - 31, GEO.FLOOR_LINE + 20, 12, 4, PAL.paper2);
 }
 
-/** 房间的陈设画法：与 floor-decl.ts 的声明对应；盖章台只在核验角色屋里画出。 */
+/** 房间的陈设画法：与 floor-decl.ts 的声明对应；盖章台只在核验角色屋里画出，出口托盘在交完成角色屋里画出。 */
 export const ROOM_VISUALS: Record<string, RoomVisual> = {
   product: {
     props(c, r) {
       if (r.def.verifier) {
         drawStampStation(c, r);
+        return;
+      }
+      if (r.def.exitTray) {
+        drawExitTray(c, r);
         return;
       }
       RB(c, r.x + r.w - 34, GEO.FLOOR_LINE + 8, 20, 30, PAL.wood3);
@@ -91,6 +103,10 @@ export const ROOM_VISUALS: Record<string, RoomVisual> = {
     props(c, r) {
       if (r.def.verifier) {
         drawStampStation(c, r);
+        return;
+      }
+      if (r.def.exitTray) {
+        drawExitTray(c, r);
         return;
       }
       RB(c, r.x + r.w - 36, GEO.FLOOR_LINE + 22, 22, 16, PAL.metal3);

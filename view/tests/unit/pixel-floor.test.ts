@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import { chromium } from "@playwright/test";
 
-import { buildCatalog, sayCatalogTypes } from "../../src/pixel/world/floor-decl.ts";
+import { buildCatalog } from "../../src/pixel/world/floor-decl.ts";
 import { declareLinks, declareRooms, createWorld, polyLength, pointAt, route } from "../../src/pixel/world/declare.ts";
 import { bubbleFor, dispatch, dropAction, enqueue, stepCharacters, stepPackages, stepPipes } from "../../src/pixel/world/characters.ts";
 import { mountMachines, syncCharacters } from "../../src/pixel/world/scene.ts";
@@ -29,7 +29,7 @@ import type { DecisionFace, FloorModel, LoopItem, RoleInfo, Task } from "../../s
 import type { PixelAction } from "../../src/pixel/contract.ts";
 import { COVERAGE } from "../../src/translate/coverage.ts";
 import { floorActions, type FloorEvent } from "../../src/translate/floor.ts";
-import { say } from "../../src/translate/say.ts";
+import { say, sayCatalog } from "../../src/translate/say.ts";
 import { LINK_HIT_PAD, hitRect } from "../../src/pixel/floor/card-hit.ts";
 
 // ---------------------------------------------------------------------------
@@ -432,7 +432,7 @@ const SILENT = ["model_stream_progress", "structure_accepted", "ask_started", "a
   "user_input_received", "work_item_created", "deliverable_adopted", "baseline_adopted",
   "run_resumed", "run_continued", "product_decision_accepted", "decision_requested", "decision_answered"];
 test("说话气泡：楼层翻成动作的事件都在说话目录里（不说话的几类除外）", () => {
-  const missing = COVERAGE.floor.drawn.filter((k) => !SILENT.includes(k) && !sayCatalogTypes.includes(k));
+  const missing = COVERAGE.floor.drawn.filter((k) => !SILENT.includes(k) && !sayCatalog.includes(k));
   assert.deepEqual(missing, [], `说话目录缺少：${missing.join(",")}`);
 });
 

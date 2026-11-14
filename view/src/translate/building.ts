@@ -13,10 +13,10 @@
 // 哪些事件在楼上翻成动作、哪些不画，写在 translate/coverage.ts；这个文件只实现其中楼「翻成动作」的那一组。
 
 import type { EventObject, ProjectLoopResult, ProjectRow, WorkItemLoop } from "../api/generated/types.gen.ts";
-import type { BuildingFloor, BuildingModel, BuildingRoomLight, FlashColor, ItemState, PixelAction } from "../pixel/contract.ts";
+import type { BuildingFloor, BuildingModel, BuildingRoomLight, BuildingStamp, FlashColor, ItemState, PixelAction } from "../pixel/contract.ts";
 import { buildingState as checkBuildingState } from "../pixel/contract.ts";
-import { busyOf, deriveFloorTopology } from "./floor.ts";
-import { floorSignOf, itemStateOf } from "./tables.ts";
+import { busyOf, DEFAULT_ORGANIZATION, deriveFloorTopology } from "./floor.ts";
+import { floorSignOf, itemStateOf, resolveWorkItemStamp } from "./tables.ts";
 
 // ---------------------------------------------------------------------------
 // 状态
@@ -94,6 +94,17 @@ function floorOf(project: ProjectRow, items: readonly WorkItemLoop[]): BuildingF
       color_index: row.color_index ?? index + 1,
       department: row.department as string,
     }));
+  const stamps: BuildingStamp[] = [];
+  for (const row of items) {
+    const info = resolveWorkItemStamp(row as never, row.organization ?? DEFAULT_ORGANIZATION);
+    if (info.stamp_kind) {
+      stamps.push({
+        work_item_id: row.work_item_id,
+        kind: info.stamp_kind,
+        ...(info.outsourced ? { outsourced: true } : {}),
+      });
+    }
+  }
   return {
     project_id: project.project_id,
     name: project.name,
@@ -103,6 +114,7 @@ function floorOf(project: ProjectRow, items: readonly WorkItemLoop[]): BuildingF
     lit,
     has_ops: hasOps,
     flags,
+    ...(stamps.length > 0 ? { stamps } : {}),
     valve_closed: items.some((row) => stateOf(row) === "waiting_slot"),
     // 用着机器时通往机房的管线在流动：机房不画，管线也不画
     machine_ids: [],

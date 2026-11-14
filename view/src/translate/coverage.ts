@@ -123,6 +123,7 @@ const FLOOR_DRAWN: readonly string[] = [
   "product_decision_accepted",
   "delivery_accepted",
   "structure_accepted",
+  "artifact_accepted",
   "qa_submitted",
   "independent_judgement_committed",
   "ask_started",
@@ -167,8 +168,6 @@ const FLOOR_NONE: Readonly<Record<string, string>> = none({
   tool_called: STATE_ONLY,
   // 成果失效（骨架事件，S1b，工单 #858）：失效以后「当前交付」由下一份状态给出，没有一次性的动作
   artifact_invalidated: STATE_ONLY,
-  // 通用的成果接纳（骨架事件，S2c，工单 #1098）：新种类的成果由下一份状态给出，没有一次性的动作
-  artifact_accepted: STATE_ONLY,
 });
 
 /** 房间：翻成动作的事件种类（画面 4 按 v13 的 ROOM 表落成动作）。 */
@@ -193,6 +192,7 @@ const ROOM_DRAWN: readonly string[] = [
   "product_decision_accepted",
   "delivery_accepted",
   "structure_accepted",
+  "artifact_accepted",
   "qa_submitted",
   "independent_judgement_committed",
   "ask_started",
@@ -238,8 +238,6 @@ const ROOM_NONE: Readonly<Record<string, string>> = none({
   project_decision_answered: STATE_ONLY,
   // 成果失效（骨架事件，S1b，工单 #858）：房间里挂着的交付换成失效状态，由状态表示
   artifact_invalidated: STATE_ONLY,
-  // 通用的成果接纳（骨架事件，S2c，工单 #1098）：新种类的成果由下一份状态给出，没有一次性的动作
-  artifact_accepted: STATE_ONLY,
 });
 
 /** 楼：翻成动作的事件种类（画面 5 按 v13 的 BUILDING 表落成闪光与包裹）。 */
