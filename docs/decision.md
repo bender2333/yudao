@@ -805,4 +805,4 @@
 - 决定：
   1. 新增需求记录 `docs/requirements/external-ops-agent.md`（D42）与设计说明 `docs/design/external-ops-agent.md`，明确页面边界、画面独立推进、通用命令行五类网络操作（能力清单、单项合同说明、查询、幂等命令、有界事件流）、随包运维技能与三条改动通道。
   2. 同步更新 `docs/program-roadmap.md` 第 1、2 节、`CONTEXT.md`、`README.md`、`docs/design/app-and-interface.md`、`docs/design/web-interface-and-release.md`、`docs/design/architecture/overall-architecture.md` 与 `docs/design/architecture/name-map.md`。
-  3. 在里程碑 `0 围绕循环与阶段总览（非发布）` 建立父工单与两张切片子工单，交执行者实现。
+  3. 在里程碑 `0 围绕循环与阶段总览（非发布）` 建立父工单 #1749 与两张切片子工单 #1750、#1751，交执行者实现。
