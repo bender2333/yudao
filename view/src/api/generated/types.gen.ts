@@ -320,6 +320,26 @@ export type ActionView = {
     after_snapshot_ref?: {
         [key: string]: unknown;
     } | null;
+    /**
+     * Mark
+     */
+    mark?: '读' | '写' | '运行' | '询问' | '提交' | null;
+    /**
+     * Title
+     */
+    title?: string;
+    /**
+     * Title Source
+     */
+    title_source?: '系统' | '作者';
+    /**
+     * Facts
+     */
+    facts?: Array<'失败' | '超时' | '结果未知' | '被拒绝' | '改了文件'>;
+    /**
+     * Task
+     */
+    task?: number | null;
 };
 
 /**
@@ -342,6 +362,14 @@ export type ActivationView = {
      * Step Count
      */
     step_count: number;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Cycle
+     */
+    cycle?: number | null;
 };
 
 /**
@@ -470,6 +498,14 @@ export type AskView = {
      */
     question: string;
     /**
+     * Background
+     */
+    background?: string | null;
+    /**
+     * Expected
+     */
+    expected?: string | null;
+    /**
      * Status
      */
     status: '进行中' | '已回答' | '没能回答';
@@ -477,6 +513,14 @@ export type AskView = {
      * Answer
      */
     answer?: string | null;
+    /**
+     * Answer Facts
+     */
+    answer_facts?: string | null;
+    /**
+     * Answer Explanation
+     */
+    answer_explanation?: string | null;
     /**
      * Reason
      */
@@ -1214,6 +1258,7 @@ export type CatalogCandidate = {
     source_details?: {
         [key: string]: CatalogCandidateSource;
     };
+    test?: CatalogCandidateTestState | null;
 };
 
 /**
@@ -1232,6 +1277,66 @@ export type CatalogCandidateSource = {
      * Revision
      */
     revision?: string | null;
+};
+
+/**
+ * CatalogCandidateTest
+ */
+export type CatalogCandidateTest = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model
+     */
+    model: string;
+};
+
+/**
+ * CatalogCandidateTestState
+ */
+export type CatalogCandidateTestState = {
+    /**
+     * Status
+     */
+    status: 'waiting' | 'testing' | 'passed' | 'failed';
+    /**
+     * Sequence
+     */
+    sequence: number;
+    /**
+     * Elapsed Ms
+     */
+    elapsed_ms?: number | null;
+    /**
+     * Actual Model
+     */
+    actual_model?: string | null;
+    /**
+     * Accepts Required Tool Call
+     */
+    accepts_required_tool_call?: boolean | null;
+    /**
+     * Failure Group
+     */
+    failure_group?: string | null;
+    /**
+     * Failure Step
+     */
+    failure_step?: string | null;
+    /**
+     * Error
+     */
+    error?: string | null;
 };
 
 /**
@@ -2389,7 +2494,7 @@ export type DepartmentSettingsSaveRefs = {
 /**
  * DepartmentState
  *
- * 一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」）。
+ * 一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」）。
  *
  * state 取总图外环的五个词；note 是一句话，没有原因时为空。
  */
@@ -3057,6 +3162,10 @@ export type FlowRecord = {
      */
     direction_to: string | null;
     /**
+     * Round
+     */
+    round: number;
+    /**
      * Run Id
      */
     run_id: string | null;
@@ -3080,6 +3189,16 @@ export type FlowRecord = {
      * Created At
      */
     created_at: string;
+};
+
+/**
+ * FormCatalogResult
+ */
+export type FormCatalogResult = {
+    /**
+     * Forms
+     */
+    forms: Array<FormChoice>;
 };
 
 /**
@@ -3139,6 +3258,10 @@ export type FormChoice = {
      */
     form: string;
     /**
+     * Label
+     */
+    label: string;
+    /**
      * Description
      */
     description: string;
@@ -3154,6 +3277,23 @@ export type FormChoice = {
      * Open Loop
      */
     open_loop: boolean;
+    /**
+     * Routing
+     */
+    routing: string;
+    /**
+     * Routing Label
+     */
+    routing_label: string;
+    /**
+     * Ending
+     */
+    ending: string;
+    /**
+     * Card Line
+     */
+    card_line: string;
+    organization: DraftOrganization;
 };
 
 /**
@@ -3534,6 +3674,32 @@ export type InstanceUpgradeRequested = {
      */
     facts: Array<string>;
     report: InstanceUpgradeReport;
+};
+
+/**
+ * ItemOrganization
+ */
+export type ItemOrganization = {
+    /**
+     * Work Item Id
+     */
+    work_item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Differences
+     */
+    differences?: Array<FormDifference>;
 };
 
 /**
@@ -4400,7 +4566,11 @@ export type OrganizationDepartment = {
     /**
      * Origin
      */
-    origin?: 'release' | 'changed' | 'added';
+    origin?: 'release' | 'changed' | 'added' | 'running_item';
+    /**
+     * Running Items
+     */
+    running_items?: number;
 };
 
 /**
@@ -4687,11 +4857,15 @@ export type ProjectCreate = {
     /**
      * Goal
      */
-    goal: string;
+    goal?: string | null;
     /**
      * Initial Directory
      */
     initial_directory?: string | null;
+    /**
+     * Form
+     */
+    form?: string | null;
 };
 
 /**
@@ -4777,7 +4951,7 @@ export type ProjectOnboard = {
     /**
      * Goal
      */
-    goal: string;
+    goal?: string | null;
     /**
      * Source Name
      */
@@ -4786,6 +4960,10 @@ export type ProjectOnboard = {
      * Source Path
      */
     source_path: string;
+    /**
+     * Form
+     */
+    form?: string | null;
 };
 
 /**
@@ -4800,6 +4978,10 @@ export type ProjectOrganizationResult = {
      * Form
      */
     form: string;
+    /**
+     * Label
+     */
+    label: string | null;
     /**
      * Version
      */
@@ -4843,6 +5025,7 @@ export type ProjectOrganizationResult = {
     remove_verifier?: {
         [key: string]: unknown;
     } | null;
+    previous_item?: ItemOrganization | null;
 };
 
 /**
@@ -5029,6 +5212,10 @@ export type ProjectRow = {
      * Waiting Resume Count
      */
     waiting_resume_count: number;
+    /**
+     * Department Count
+     */
+    department_count: number;
 };
 
 /**
@@ -5050,7 +5237,7 @@ export type ProjectSetGoal = {
     /**
      * Goal
      */
-    goal: string;
+    goal?: string | null;
 };
 
 /**
@@ -5415,6 +5602,36 @@ export type ReplayCheckResult = {
 };
 
 /**
+ * ReportEntry
+ */
+export type ReportEntry = {
+    /**
+     * Work Item Id
+     */
+    work_item_id?: string | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Layer
+     */
+    layer?: string | null;
+    /**
+     * State From
+     */
+    state_from?: string | null;
+    /**
+     * State To
+     */
+    state_to?: string | null;
+    /**
+     * Open Criteria
+     */
+    open_criteria?: Array<string> | null;
+};
+
+/**
  * ReportFact
  */
 export type ReportFact = {
@@ -5476,6 +5693,10 @@ export type ReportItem = {
      * Detail
      */
     detail?: string | null;
+    /**
+     * Entries
+     */
+    entries?: Array<ReportEntry> | null;
 };
 
 /**
@@ -6045,6 +6266,18 @@ export type RunStepView = {
      * Actions
      */
     actions: Array<ActionView>;
+    /**
+     * Attempt Ids
+     */
+    attempt_ids?: Array<string>;
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Title Source
+     */
+    title_source?: '系统' | '作者' | null;
 };
 
 /**
@@ -6071,6 +6304,10 @@ export type RunStepsResult = {
      * Background Commands
      */
     background_commands: Array<BackgroundCommandView>;
+    /**
+     * Tasks
+     */
+    tasks?: Array<TaskView>;
 };
 
 /**
@@ -6252,6 +6489,17 @@ export type SnapshotExternalSourceEvidenceResult = {
      */
     position: number;
     data: ExternalSourceEvidenceResult;
+};
+
+/**
+ * Snapshot[FormCatalogResult]
+ */
+export type SnapshotFormCatalogResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: FormCatalogResult;
 };
 
 /**
@@ -6737,6 +6985,24 @@ export type SystemStatus = {
     drain: DrainStatus;
     recovery: RecoveryStatus;
     home: HomeStatus;
+};
+
+/**
+ * TaskView
+ */
+export type TaskView = {
+    /**
+     * Number
+     */
+    number: number;
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Status
+     */
+    status: '待做' | '进行中' | '完成' | '已从计划里去掉';
 };
 
 /**
@@ -7727,6 +7993,10 @@ export type WorkItemCreate = {
      * Title
      */
     title?: string | null;
+    /**
+     * Form
+     */
+    form?: string | null;
 };
 
 /**
@@ -7923,12 +8193,20 @@ export type WorkItemOrganization = {
      * Rejections
      */
     rejections: Array<RejectionRelation>;
+    /**
+     * Version
+     */
+    version?: string;
+    /**
+     * Same As Project
+     */
+    same_as_project?: boolean | null;
 };
 
 /**
  * WorkItemProgress
  *
- * 事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。
+ * 事项的进度：从成果推算（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）。
  *
  * 阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
  * 最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
@@ -9553,7 +9831,7 @@ export type CatalogTestFinishedPayload = {
     /**
      * Kind
      */
-    kind: 'connection' | 'model';
+    kind: 'connection' | 'model' | 'candidate';
     /**
      * Provider Id
      */
@@ -17269,6 +17547,11 @@ export type RunCreatedPayload = {
      * Round
      */
     round?: number;
+    definitions_ref?: ArtifactRef | null;
+    /**
+     * Form Version
+     */
+    form_version?: string | null;
 };
 
 /**
@@ -20237,6 +20520,7 @@ export type WorkItemCreatedPayload = {
      * Form
      */
     form?: string;
+    definitions_ref?: ArtifactRef | null;
 };
 
 /**
@@ -21168,7 +21452,7 @@ export type CommandProjectCreateData = {
 
 export type CommandProjectCreateErrors = {
     /**
-     * 命令被拒绝，可能的原因：source_invalid, command_id_reused
+     * 命令被拒绝，可能的原因：source_invalid, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -21197,7 +21481,7 @@ export type CommandProjectOnboardData = {
 
 export type CommandProjectOnboardErrors = {
     /**
-     * 命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, command_id_reused
+     * 命令被拒绝，可能的原因：source_invalid, busy, provider_unavailable, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -21458,7 +21742,7 @@ export type CommandWorkItemAppendInputData = {
 
 export type CommandWorkItemAppendInputErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, run_terminal, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, run_terminal, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -21487,7 +21771,7 @@ export type CommandWorkItemCancelData = {
 
 export type CommandWorkItemCancelErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, run_terminal, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, run_terminal, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -21999,6 +22283,35 @@ export type CommandCatalogModelTestResponses = {
 };
 
 export type CommandCatalogModelTestResponse = CommandCatalogModelTestResponses[keyof CommandCatalogModelTestResponses];
+
+export type CommandCatalogCandidateTestData = {
+    body: CatalogCandidateTest;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.candidate.test';
+};
+
+export type CommandCatalogCandidateTestErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, not_allowed, catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogCandidateTestError = CommandCatalogCandidateTestErrors[keyof CommandCatalogCandidateTestErrors];
+
+export type CommandCatalogCandidateTestResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandCatalogCandidateTestResponse = CommandCatalogCandidateTestResponses[keyof CommandCatalogCandidateTestResponses];
 
 export type CommandCatalogDepartmentDefaultsSaveData = {
     body: CatalogDepartmentDefaultsSave;
@@ -23523,6 +23836,22 @@ export type QueryProjectOrganizationResponses = {
 };
 
 export type QueryProjectOrganizationResponse = QueryProjectOrganizationResponses[keyof QueryProjectOrganizationResponses];
+
+export type QueryFormsListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/queries/forms.list';
+};
+
+export type QueryFormsListResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotFormCatalogResult;
+};
+
+export type QueryFormsListResponse = QueryFormsListResponses[keyof QueryFormsListResponses];
 
 export type QueryOrganizationDraftData = {
     body?: never;

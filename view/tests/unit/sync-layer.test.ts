@@ -40,7 +40,7 @@ test("连接：录下的能力清单给出两边的接口版本；401 是没有�
   const connected = await connect("http://view.test", "token-7", { fetch: ok.fetch });
   assert.equal(connected.state, "connected");
   if (connected.state === "connected") {
-    assert.deepEqual(connected.versions, { view: 15, server: recorded.deployment.api_version });
+    assert.deepEqual(connected.versions, { view: 17, server: recorded.deployment.api_version });
     assert.equal(connected.access.identity, "token-7");
     // 令牌放在请求头里，不出现在地址里
     assert.equal(ok.calls[0]?.url, "http://view.test/api/capabilities");
