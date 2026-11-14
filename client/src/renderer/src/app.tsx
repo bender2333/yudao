@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, ProjectWritebackResult, SystemStatus } from "./api/generated/types.gen";
 import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
+import type { ViewSync } from "./contract/view-sync";
 import { callQuery } from "./contract/invoke";
 import { mismatchAdvice } from "./contract/page-version";
 import { optionalRead } from "./contract/read-failure.ts";
@@ -30,6 +31,65 @@ import { SettingsPage } from "./views/project/settings";
 import { projectDepartments, type DepartmentView } from "./views/project/organization";
 import { useSnapshot } from "./views/project/use-snapshot";
 import { projectsListParams } from "./views/project/project-list";
+
+/** 外壳视图的已连接条件：事件流状态切换或服务重启更新能力清单期间保持同一个布尔值，维持已打开的外壳视图。 */
+export function isShellConnected(state: ClientState): boolean {
+  return state.kind === "connected";
+}
+
+export function openShellProjects(
+  views: ViewSync,
+  includeArchived: boolean,
+  onData: (projects: ProjectRow[]) => void,
+  onError: (reason: string) => void,
+): () => void {
+  void views.open<ProjectList>(
+    "shell.projects",
+    { query: "projects.list", params: projectsListParams(includeArchived) },
+    (data) => onData(data.projects),
+    onError,
+  );
+  return () => {
+    views.close("shell.projects");
+  };
+}
+
+export function openShellGlobalViews(
+  views: ViewSync,
+  onDecisions: (decisions: DecisionView[], pendingByProject: Record<string, number>) => void,
+  onStatus: (status: SystemStatus) => void,
+): () => void {
+  void views.open<DecisionList>("shell.decisions", { query: "decisions.list", params: { status: ["open"] } }, (data) => {
+    const grouped: Record<string, number> = {};
+    for (const decision of data.decisions) {
+      if (decision.project_id) {
+        grouped[decision.project_id] = (grouped[decision.project_id] ?? 0) + 1;
+      }
+    }
+    onDecisions(data.decisions, grouped);
+  });
+  void views.open<SystemStatus>("shell.status", { query: "system.status", params: undefined }, onStatus);
+  return () => {
+    views.close("shell.decisions");
+    views.close("shell.status");
+  };
+}
+
+export function openShellProjectDecisions(
+  views: ViewSync,
+  projectId: string,
+  onDecisions: (decisions: DecisionView[]) => void,
+): () => void {
+  const viewId = "shell.project.decisions";
+  void views.open<DecisionList>(
+    viewId,
+    { query: "decisions.list", params: { project_id: projectId, status: ["open"] } },
+    (data) => onDecisions(data.decisions),
+  );
+  return () => {
+    views.close(viewId);
+  };
+}
 
 export function App() {
   const [state, setState] = useState<ClientState>({ kind: "connecting" });
@@ -99,8 +159,8 @@ export function App() {
       document.body.classList.remove("is-disconnected");
     };
   }, [disconnected]);
-  // 已连接以后读取项目列表与系统状态；这些视图按事件种类重新查询
-  const connected = state.kind === "connected" ? state : null;
+  // 已连接以后读取项目列表与系统状态；布尔连接态保持不变时外壳视图按事件种类与重连同步刷新
+  const connected = isShellConnected(state);
   // 项目现在的组织（工单 #1457）：部门页签、部门页的默认部门与部门显示名都从这里取。
   // 没有项目、还没有连上或者服务没有登记这条查询时不打开，部门页签因此不出现——不拿写死的三个顶替
   const organization = useSnapshot<ProjectOrganizationResult>(
@@ -125,40 +185,26 @@ export function App() {
     if (!connected || !views) {
       return;
     }
-    void views.open<ProjectList>("shell.projects", { query: "projects.list", params: projectsListParams(includeArchived) }, (data) => {
-      setProjects(data.projects);
+    return openShellProjects(views, includeArchived, (nextProjects) => {
+      setProjects(nextProjects);
       setProjectsError(null);
     }, (reason) => {
       // 读取失败：状态以查询为准，清掉旧的项目，失败的原因留给界面说（工单 #728）
       setProjects([]);
       setProjectsError(reason);
     });
-    return () => {
-      views.close("shell.projects");
-    };
   }, [app, connected, includeArchived]);
   useEffect(() => {
     const views = app.viewSync;
     if (!connected || !views) {
       return;
     }
-    void views.open<DecisionList>("shell.decisions", { query: "decisions.list", params: { status: ["open"] } }, (data) => {
-      const grouped: Record<string, number> = {};
-      for (const decision of data.decisions) {
-        if (decision.project_id) {
-          grouped[decision.project_id] = (grouped[decision.project_id] ?? 0) + 1;
-        }
-      }
+    return openShellGlobalViews(views, (nextDecisions, grouped) => {
       setPendingByProject(grouped);
-      setDecisions(data.decisions);
-    });
-    void views.open<SystemStatus>("shell.status", { query: "system.status", params: undefined }, (data) => {
+      setDecisions(nextDecisions);
+    }, (data) => {
       setSystemStatus(data);
     });
-    return () => {
-      views.close("shell.decisions");
-      views.close("shell.status");
-    };
   }, [app, connected]);
 
   // 项目标签栏右侧的「待你决定」（原型 v8 设计说明第 3.2 节）：本项目的等待回答的决定请求；
@@ -170,15 +216,7 @@ export function App() {
       setProjectDecisions([]);
       return;
     }
-    const viewId = "shell.project.decisions";
-    void views.open<DecisionList>(
-      viewId,
-      { query: "decisions.list", params: { project_id: route.projectId, status: ["open"] } },
-      (data) => setProjectDecisions(data.decisions),
-    );
-    return () => {
-      views.close(viewId);
-    };
+    return openShellProjectDecisions(views, route.projectId, setProjectDecisions);
   }, [app, connected, route.projectId]);
 
   const navigate = useCallback((hash: string) => {

@@ -12,9 +12,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  LONG_TEXT_LIMIT, ORGANIZATION_CHANGE_NOTE, afterSend, chosenRecipient, decisionsForItem,
-  defaultRecipient, draftChanged, isLongText, itemThread, organizationChangeAfter, projectDecisions,
-  receiverOf, recipientHint, recipientOptions, shortText,
+  LONG_TEXT_LIMIT, ORGANIZATION_CHANGE_NOTE, activeChanged, afterSend, chosenRecipient, decisionsForItem,
+  defaultRecipient, draftChanged, focusRecipient, isLongText, itemThread, organizationChangeAfter, pickRecipient,
+  projectDecisions, receiverOf, recipientHint, recipientOptions, shortText,
   type ComposerInput, type ComposerState, type ThreadAsk, type ThreadDecision, type ThreadFlowRecord,
   type ThreadItemView, type ThreadOrganization, type ThreadOrganizationChange,
 } from "../../src/renderer/src/views/project/thread-model.ts";
@@ -458,3 +458,94 @@ test("组织改过的这一句只按事项开始以后的改动取，结束的�
   assert.equal(organizationChangeAfter(running, []), null);
   assert.equal(organizationChangeAfter(running, undefined), null);
 });
+
+// ---------------------------------------------------------------- 空草稿选择药丸、无事项回退与空项目说明（工单 #1781）
+
+test("空草稿显式选择追加输入或新事项药丸后保持选中，提交后回到状态默认", () => {
+  const organization = three();
+  const input: ComposerInput = {
+    frozen: organization, roles: organization.roles, routing: organization.routing,
+    receiver: "product", working: "engineering", focus: null, active: true,
+  };
+  let state: ComposerState = { manual: null, hold: null };
+  assert.equal(chosenRecipient(input, state), "guide:engineering");
+
+  state = pickRecipient(input, state, "append", "");
+  assert.equal(chosenRecipient(input, state), "append");
+  assert.equal(chosenRecipient({ ...input, working: "quality" }, state), "append");
+  state = draftChanged(state, "补充一条导出字段", chosenRecipient(input, state));
+  assert.equal(chosenRecipient({ ...input, working: "product" }, state), "append");
+  state = afterSend(state, "append");
+  assert.equal(chosenRecipient(input, state), "guide:engineering");
+
+  state = pickRecipient(input, state, "new", "");
+  assert.equal(chosenRecipient(input, state), "new");
+  assert.equal(chosenRecipient({ ...input, working: "quality" }, state), "new");
+  state = afterSend(state, "new");
+  assert.equal(chosenRecipient(input, state), "guide:engineering");
+
+  state = afterSend(pickRecipient(input, state, "guide:quality", ""), "guide:quality");
+  assert.equal(chosenRecipient(input, state), "guide:quality");
+});
+
+test("没有在跑事项时：运行期间的指导记忆自动回退到新事项，点击循环图节点保持新事项", () => {
+  const organization = three();
+  const runningInput: ComposerInput = {
+    frozen: organization, roles: organization.roles, routing: organization.routing,
+    receiver: "product", working: "engineering", focus: null, active: true,
+  };
+  const idleInput: ComposerInput = {
+    ...runningInput, frozen: null, working: null, active: false,
+  };
+
+  const fromSend = afterSend({ manual: null, hold: null }, "guide:quality");
+  assert.equal(chosenRecipient(runningInput, fromSend), "guide:quality");
+  assert.equal(chosenRecipient(idleInput, fromSend), "new");
+  const cleared = activeChanged(fromSend, false);
+  assert.equal(chosenRecipient(idleInput, cleared), "new");
+  assert.equal(
+    chosenRecipient({ ...runningInput, working: "product" }, activeChanged(cleared, true)),
+    "guide:product",
+  );
+
+  const fromFocus = focusRecipient(runningInput, { manual: null, hold: null }, "quality", "");
+  assert.equal(chosenRecipient({ ...runningInput, focus: "quality" }, fromFocus), "guide:quality");
+  assert.equal(chosenRecipient({ ...idleInput, focus: "quality" }, fromFocus), "new");
+
+  const idleFocus = focusRecipient(idleInput, { manual: null, hold: null }, "quality", "");
+  assert.equal(chosenRecipient({ ...idleInput, focus: "quality" }, idleFocus), "new");
+
+  const idlePick = pickRecipient(idleInput, { manual: null, hold: null }, "guide:quality", "");
+  assert.equal(chosenRecipient(idleInput, idlePick), "guide:quality");
+  assert.equal(chosenRecipient(runningInput, activeChanged(idlePick, true)), "guide:engineering");
+});
+
+test("接手职能为空串时收件人说明与选项文案保持主语完整", () => {
+  const emptyIdle: ComposerInput = {
+    frozen: null, roles: [], routing: "direct",
+    receiver: "", working: null, focus: null, active: false,
+  };
+  assert.equal(recipientHint(emptyIdle, "new", ""), "写下意图，马上开始");
+
+  const emptyWatchedActive: ComposerInput = {
+    frozen: null, roles: [], routing: "watched_outputs",
+    receiver: "", working: null, focus: null, active: true,
+  };
+  assert.equal(
+    recipientOptions(emptyWatchedActive).find((option) => option.id === "append")?.label,
+    "追加输入（重新验收）",
+  );
+  assert.equal(recipientHint(emptyWatchedActive, "append", ""), "已有的交付要重新验收");
+  assert.equal(recipientHint(emptyWatchedActive, "new", "做导出"), "排在「做导出」后面，它做完才开始");
+
+  const organization = three();
+  assert.equal(
+    recipientHint({ ...emptyIdle, roles: organization.roles, receiver: "product" }, "new", ""),
+    "产品接，马上开始",
+  );
+  assert.equal(
+    recipientHint({ ...emptyWatchedActive, roles: organization.roles, receiver: "product" }, "append", "做导出"),
+    "产品接，已有的交付要重新验收",
+  );
+});
+
