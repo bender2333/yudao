@@ -18897,6 +18897,16 @@
               }
             ],
             "title": "Same As Project"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

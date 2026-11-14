@@ -500,7 +500,7 @@ class WorkItemOrganization(Contract):
     routing: str
     roles: list[OrganizationRole]
     verifiers: list[OrganizationVerifier]
-    # 直做时交完成的角色（它的屋里有出口托盘）；成果驱动以核验角色的放行结束，为空
+    # 开环完成时交出最终采纳成果的角色（它的屋里有出口托盘）；最终成果有核验角色核验时为空值
     completing: OrganizationRole | None
     watched: list[WatchedRelation]
     asks: list[AskRelation]
@@ -511,6 +511,8 @@ class WorkItemOrganization(Contract):
     # 和项目现在的组织相同或不同（按设计说明「冻结与升级」比职能、角色、成果、核验与轮转五项，与「高级」里
     # `previous_item.differences` 的取法一致；不含观察者，观察者不在冻结的内容里）：项目现在的组织取不到时为空
     same_as_project: bool | None = None
+    # 接收本事项来源的入口角色（工单 #1753）：按事项种类与冻结定义的来源声明推导得出，附带同一份来源引用
+    entry: OrganizationRole | None = None
 
 
 class WorkItemLoop(Contract):
@@ -896,10 +898,27 @@ def _item_definitions(forms: dict[str, Any], store: Any, item: Any, through: int
     return cache[key] or definitions
 
 
+def _completing_role(definitions: Any, kind: str,
+                     role_by_id: dict[str, OrganizationRole]) -> OrganizationRole | None:
+    """开环完成时交出最终采纳成果的角色（工单 #1753，形态与核验角色设计说明「直做」「开环完成」「定义的校验」）。
+
+    路由声明了最终采纳成果且没有核验角色核验该成果时，从本事项种类能够提交该成果的角色里匹配组织角色；
+    有核验角色核验最终成果时返回空值。
+    """
+    routing_def = definitions.routing_definition()
+    final = None if routing_def is None else routing_def.final_outcome
+    if final is None or not definitions.is_open_loop(final):
+        return None
+    for role_id in _handed_in(definitions, kind).get(final, ()):
+        if role_id in role_by_id:
+            return role_by_id[role_id]
+    return None
+
+
 def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
                             through: int | None = None, *, project_definitions: Any = None,
                             definitions: Any | None = None) -> WorkItemOrganization | None:
-    """这个事项冻结定义里的组织（工单 #1381、#1517）。
+    """这个事项冻结定义里的组织（工单 #1381、#1517、#1753）。
 
     取法与工具许可、提案校验读事项所用定义的做法相同（工单 #1165、#1392）：按事项创建时记下的形态名，
     在这一版发布加载的那几份里取那一份，不读进程加载时的模块级定义；项目后来换了形态、换了定义都不影响它。
@@ -917,6 +936,8 @@ def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
     ref = _organization_ref(definitions, event)
     roles = [OrganizationRole(id=role, label=definitions.department_labels.get(role, role), ref=ref)
              for role in definitions.departments]
+    role_by_id = {role.id: role for role in roles}
+    entry_id = definitions.source_department(definitions.item_source(item.kind))
     return WorkItemOrganization(
         form=form, routing=definitions.routing, roles=roles,
         verifiers=[OrganizationVerifier(
@@ -924,9 +945,7 @@ def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
             verifies=[VerifiedRole(role=verified.role, outcomes=list(verified.outcomes))
                       for verified in verifier.verifies],
             ref=ref) for verifier in definitions.verification.verifiers],
-        # 直做（一个角色的组织）由它自己交完成，它的屋里有出口托盘；成果驱动以核验角色的放行结束，
-        # 没有交完成的角色（设计说明「直做」第 3 条、「开环完成」与「画面跟着定义伸缩」的推出规则表）
-        completing=roles[0] if len(roles) == 1 else None,
+        completing=_completing_role(definitions, item.kind, role_by_id),
         watched=_watched_relations(definitions, item.kind, ref),
         asks=[AskRelation(requester=requester, recipient=recipient, ref=ref)
               for requester in definitions.departments if "ask" in definitions.tools_for(requester, item.kind)
@@ -936,6 +955,7 @@ def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
         version=definitions.version,
         same_as_project=(None if project_definitions is None
                          else not definitions_difference(definitions, project_definitions)),
+        entry=role_by_id.get(entry_id),
     )
 
 
