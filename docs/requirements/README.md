@@ -49,5 +49,6 @@
 | D39 | 黑板编排（暂缓；编号保留） |
 | D41 | [三个空间：楼、机房、城](game-world-three-spaces.md) |
 | D40 | [骨架与应用](skeleton-and-application.md) |
+| D42 | [进程外运维代理与页面的边界](external-ops-agent.md) |
 
 每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。

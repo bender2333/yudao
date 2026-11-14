@@ -86,7 +86,7 @@ flowchart LR
 
 - `yudao api`：与 `python -m harness api` 相同，参数为 `--data-dir`、`--host`、`--port`、`--access`、`--provider-config`、`--no-browser`；数据目录的默认值按第 3.3 节，端口默认 8765。
 - `yudao --version`：输出发布版本号。
-- `replay`、`project`、`smoke`、`demo` 等子命令见[应用层与接口层设计说明](app-and-interface.md)「命令行」。
+- `replay`、`project`、`smoke`、`demo` 等进程内子命令见[应用层与接口层设计说明](app-and-interface.md)「命令行」；连接运行中服务的通用查询、通用命令、有界事件流与随包运维技能子命令见[进程外运维代理与通用命令行设计说明](external-ops-agent.md)。
 
 ### 4.2 启动与停止
 
