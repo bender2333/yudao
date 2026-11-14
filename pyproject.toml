@@ -51,7 +51,7 @@ include = ["harness*"]
 # 发布带的形态各是一份完整的定义（工单 #1392、#1395）：definitions/forms/<名字>/ 里的定义文件
 # 也要随 wheel 发布，否则发布出来的实例加载不了那一份形态
 [tool.setuptools.package-data]
-harness = ["definitions/*.json", "definitions/forms/**/*.json", "release_assets/*", "release_assets/**/*"]
+harness = ["definitions/*.json", "definitions/forms/**/*.json", "ops_skill/*.md", "release_assets/*", "release_assets/**/*"]
 
 # 分层的依赖规则（应用层与接口层设计说明第 2.4 节），由 harness/tests/test_layers.py 检查
 [tool.importlinter]
@@ -69,6 +69,13 @@ forbidden_modules = ["harness.*"]
 name = "命令行客户端模块不导入 Yudao 的其他模块"
 type = "forbidden"
 source_modules = ["harness.cli_client"]
+forbidden_modules = ["harness.*"]
+
+# 工单 #1751：随包运维技能模块位于接口缝外侧，只使用标准库，不导入 Yudao 的其他模块（docs/design/external-ops-agent.md「接口」「随包运维技能」）
+[[tool.importlinter.contracts]]
+name = "随包运维技能模块不导入 Yudao 的其他模块"
+type = "forbidden"
+source_modules = ["harness.ops_skill"]
 forbidden_modules = ["harness.*"]
 
 [[tool.importlinter.contracts]]

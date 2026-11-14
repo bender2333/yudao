@@ -1,4 +1,4 @@
-# 通用命令行网络客户端（docs/design/external-ops-agent.md「接口」「连接、认证与请求头规则」「零维护的单项合同自省」「查询读取与幂等命令提交」）。
+# 通用命令行网络客户端（docs/design/external-ops-agent.md「接口」「连接、认证与请求头规则」「零维护的单项合同自省」「查询读取与幂等命令提交」「有界事件流订阅」）。
 # 位于总图第四节「接口」的缝外侧，只使用标准库与 httpx，不导入 harness 内的其他模块（由 pyproject.toml 的 import-linter 合同守卫）。
 
 from __future__ import annotations
@@ -23,17 +23,26 @@ DEFAULT_TIMEOUT_SEC = 30.0
 MIN_TIMEOUT_SEC = 5.0
 MAX_TIMEOUT_SEC = 600.0
 
+DEFAULT_EVENTS_TIMEOUT_SEC = 60.0
+MIN_EVENTS_TIMEOUT_SEC = 1.0
+MAX_EVENTS_TIMEOUT_SEC = 3600.0
+DEFAULT_EVENTS_LIMIT = 50
+MIN_EVENTS_LIMIT = 1
+MAX_EVENTS_LIMIT = 1000
+
 # 本机回环主机名集合（docs/design/app-and-interface.md「能力清单与认证」）
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
-# 退出码（docs/design/external-ops-agent.md「查询读取与幂等命令提交」）
+# 退出码（docs/design/external-ops-agent.md「查询读取与幂等命令提交」「有界事件流订阅」）
 EXIT_OK = 0
 EXIT_REJECTED = 1
 EXIT_INVALID = 2
 EXIT_CONNECTION_OR_AUTH = 3
+EXIT_EVENT_TIMEOUT = 4
+EXIT_RESYNC = 5
 
-# 本工单接入的网络子命令集合；结构预留后续子命令扩展
-NETWORK_SUBCOMMANDS = frozenset({"capabilities", "describe", "query", "command"})
+# 通用命令行网络子命令集合
+NETWORK_SUBCOMMANDS = frozenset({"capabilities", "describe", "query", "command", "events"})
 
 
 class _OrderedParamAction(argparse.Action):
@@ -62,6 +71,20 @@ class ClientConfig:
     is_loopback: bool
 
 
+@dataclass(frozen=True)
+class _EventsOptions:
+    after: int
+    projects: tuple[str, ...]
+    work_items: tuple[str, ...]
+    runs: tuple[str, ...]
+    departments: tuple[str, ...]
+    roles: tuple[str, ...]
+    event_types: tuple[str, ...]
+    limit: int
+    until_position: int | None
+    until_types: frozenset[str]
+
+
 class _CliArgumentError(Exception):
     # 命令行参数冲突、格式非法或超出常量界限（对应退出码 2）
     pass
@@ -79,7 +102,12 @@ class _SyncTransportAdapter(httpx.AsyncBaseTransport):
         self._inner.close()
 
 
-def _add_common_network_arguments(parser: argparse.ArgumentParser, *, is_subparser: bool) -> None:
+def _add_common_network_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    is_subparser: bool,
+    timeout_help: str = "single request timeout in seconds (default 30, allowed 5-600)",
+) -> None:
     str_default: Any = argparse.SUPPRESS if is_subparser else None
     bool_default: Any = argparse.SUPPRESS if is_subparser else False
     parser.add_argument("--url", default=str_default, help="running Yudao server URL (overrides YUDAO_URL)")
@@ -93,7 +121,7 @@ def _add_common_network_arguments(parser: argparse.ArgumentParser, *, is_subpars
     parser.add_argument(
         "--timeout",
         default=str_default,
-        help="single request timeout in seconds (default 30, allowed 5-600)",
+        help=timeout_help,
     )
 
 
@@ -102,7 +130,11 @@ def register_network_subcommands(
     subparsers: Any,
 ) -> None:
     # 在根解析器与各网络子命令上同时登记公共连接参数，使选项写在子命令前后均生效
-    _add_common_network_arguments(root_parser, is_subparser=False)
+    _add_common_network_arguments(
+        root_parser,
+        is_subparser=False,
+        timeout_help="request or event-stream timeout in seconds (default 30 for requests, 60 for events)",
+    )
 
     cap = subparsers.add_parser("capabilities", help="fetch server capabilities over HTTP")
     _add_common_network_arguments(cap, is_subparser=True)
@@ -156,6 +188,90 @@ def register_network_subcommands(
     )
     cmd.add_argument("--command-id", dest="command_id", default=None, help="explicit idempotency command UUID")
 
+    evt = subparsers.add_parser("events", help="subscribe to bounded server-sent events over HTTP")
+    _add_common_network_arguments(
+        evt,
+        is_subparser=True,
+        timeout_help="bounded event-stream wait timeout in seconds (default 60, allowed 1-3600)",
+    )
+    evt.add_argument(
+        "--after",
+        dest="after_position",
+        default=None,
+        metavar="POSITION",
+        help="starting global event position (default 0)",
+    )
+    evt.add_argument(
+        "--project",
+        dest="projects",
+        action="append",
+        default=None,
+        metavar="PROJECT_ID",
+        help="filter by project ID (repeatable)",
+    )
+    evt.add_argument(
+        "--work-item",
+        dest="work_items",
+        action="append",
+        default=None,
+        metavar="WORK_ITEM_ID",
+        help="filter by work item ID",
+    )
+    evt.add_argument(
+        "--run",
+        dest="runs",
+        action="append",
+        default=None,
+        metavar="RUN_ID",
+        help="filter by run ID",
+    )
+    evt.add_argument(
+        "--department",
+        dest="departments",
+        action="append",
+        default=None,
+        metavar="DEPARTMENT",
+        help="filter by department",
+    )
+    evt.add_argument(
+        "--role",
+        dest="roles",
+        action="append",
+        default=None,
+        metavar="ROLE",
+        help="filter by role",
+    )
+    evt.add_argument(
+        "--type",
+        dest="event_types",
+        action="append",
+        default=None,
+        metavar="EVENT_TYPE",
+        help="filter by event type (repeatable)",
+    )
+    evt.add_argument(
+        "--limit",
+        dest="limit",
+        default=None,
+        metavar="COUNT",
+        help="maximum matching events to emit (default 50, allowed 1-1000)",
+    )
+    evt.add_argument(
+        "--until-position",
+        dest="until_position",
+        default=None,
+        metavar="POSITION",
+        help="stop when received event or checkpoint position reaches this value",
+    )
+    evt.add_argument(
+        "--until-type",
+        dest="until_types",
+        action="append",
+        default=None,
+        metavar="EVENT_TYPE",
+        help="stop immediately after emitting an event of this type (repeatable)",
+    )
+
 
 def _resolve_config(
     args: argparse.Namespace,
@@ -180,7 +296,20 @@ def _resolve_config(
         raw_url = str(raw_url).strip()
 
     base_url, is_loopback = _normalize_server_url(raw_url)
-    timeout_sec = _parse_timeout(getattr(args, "timeout", None))
+    if getattr(args, "command", None) == "events":
+        timeout_sec = _parse_timeout(
+            getattr(args, "timeout", None),
+            default_sec=DEFAULT_EVENTS_TIMEOUT_SEC,
+            min_sec=MIN_EVENTS_TIMEOUT_SEC,
+            max_sec=MAX_EVENTS_TIMEOUT_SEC,
+        )
+    else:
+        timeout_sec = _parse_timeout(
+            getattr(args, "timeout", None),
+            default_sec=DEFAULT_TIMEOUT_SEC,
+            min_sec=MIN_TIMEOUT_SEC,
+            max_sec=MAX_TIMEOUT_SEC,
+        )
 
     token: str | None
     if explicit_token is not None:
@@ -218,20 +347,99 @@ def _normalize_server_url(raw_url: str) -> tuple[str, bool]:
     return normalized, is_loopback
 
 
-def _parse_timeout(raw_timeout: Any) -> float:
+def _parse_timeout(
+    raw_timeout: Any,
+    *,
+    default_sec: float = DEFAULT_TIMEOUT_SEC,
+    min_sec: float = MIN_TIMEOUT_SEC,
+    max_sec: float = MAX_TIMEOUT_SEC,
+) -> float:
     if raw_timeout is None:
-        return DEFAULT_TIMEOUT_SEC
+        return default_sec
     try:
         value = float(raw_timeout)
     except (TypeError, ValueError) as exc:
         raise _CliArgumentError(
-            f"参数错误：--timeout 须为 {int(MIN_TIMEOUT_SEC)} 到 {int(MAX_TIMEOUT_SEC)} 秒之间的数值：{raw_timeout}"
+            f"参数错误：--timeout 须为 {int(min_sec)} 到 {int(max_sec)} 秒之间的数值：{raw_timeout}"
         ) from exc
-    if not math.isfinite(value) or value < MIN_TIMEOUT_SEC or value > MAX_TIMEOUT_SEC:
+    if not math.isfinite(value) or value < min_sec or value > max_sec:
         raise _CliArgumentError(
-            f"参数错误：--timeout 超出有效范围（允许 {int(MIN_TIMEOUT_SEC)}–{int(MAX_TIMEOUT_SEC)} 秒，收到 {raw_timeout}）"
+            f"参数错误：--timeout 超出有效范围（允许 {int(min_sec)}–{int(max_sec)} 秒，收到 {raw_timeout}）"
         )
     return value
+
+
+def _parse_strict_int(raw_value: Any, flag_name: str) -> int:
+    if isinstance(raw_value, bool):
+        raise _CliArgumentError(f"参数错误：{flag_name} 须为整数：{raw_value}")
+    text = str(raw_value).strip()
+    if not text:
+        raise _CliArgumentError(f"参数错误：{flag_name} 不能为空：{raw_value}")
+    try:
+        return int(text)
+    except ValueError as exc:
+        raise _CliArgumentError(f"参数错误：{flag_name} 须为整数：{raw_value}") from exc
+
+
+def _normalize_filter_values(raw_items: Sequence[Any] | None, flag_name: str) -> tuple[str, ...]:
+    if not raw_items:
+        return ()
+    cleaned: list[str] = []
+    for item in raw_items:
+        value = str(item).strip()
+        if not value:
+            raise _CliArgumentError(f"参数错误：{flag_name} 不能为空字符串")
+        cleaned.append(value)
+    return tuple(cleaned)
+
+
+def _parse_events_options(args: argparse.Namespace) -> _EventsOptions:
+    raw_after = getattr(args, "after_position", None)
+    after = 0 if raw_after is None else _parse_strict_int(raw_after, "--after")
+    if after < 0:
+        raise _CliArgumentError(f"参数错误：--after 起始位置不能小于 0：{raw_after}")
+
+    raw_limit = getattr(args, "limit", None)
+    limit = DEFAULT_EVENTS_LIMIT if raw_limit is None else _parse_strict_int(raw_limit, "--limit")
+    if limit < MIN_EVENTS_LIMIT or limit > MAX_EVENTS_LIMIT:
+        raise _CliArgumentError(
+            f"参数错误：--limit 超出有效范围（允许 {MIN_EVENTS_LIMIT}–{MAX_EVENTS_LIMIT} 条，收到 {raw_limit}）"
+        )
+
+    raw_until_pos = getattr(args, "until_position", None)
+    until_position: int | None = None
+    if raw_until_pos is not None:
+        until_position = _parse_strict_int(raw_until_pos, "--until-position")
+        if until_position < 0:
+            raise _CliArgumentError(f"参数错误：--until-position 目标位置不能小于 0：{raw_until_pos}")
+
+    return _EventsOptions(
+        after=after,
+        projects=_normalize_filter_values(getattr(args, "projects", None), "--project"),
+        work_items=_normalize_filter_values(getattr(args, "work_items", None), "--work-item"),
+        runs=_normalize_filter_values(getattr(args, "runs", None), "--run"),
+        departments=_normalize_filter_values(getattr(args, "departments", None), "--department"),
+        roles=_normalize_filter_values(getattr(args, "roles", None), "--role"),
+        event_types=_normalize_filter_values(getattr(args, "event_types", None), "--type"),
+        limit=limit,
+        until_position=until_position,
+        until_types=frozenset(_normalize_filter_values(getattr(args, "until_types", None), "--until-type")),
+    )
+
+
+def _build_events_query_params(opts: _EventsOptions) -> list[tuple[str, str]]:
+    params: list[tuple[str, str]] = [("after", str(opts.after))]
+    for key, values in (
+        ("project", opts.projects),
+        ("work_item", opts.work_items),
+        ("run", opts.runs),
+        ("department", opts.departments),
+        ("role", opts.roles),
+        ("type", opts.event_types),
+    ):
+        for val in values:
+            params.append((key, val))
+    return params
 
 
 def _split_key_value(pair: str, flag_name: str) -> tuple[str, str]:
@@ -734,6 +942,181 @@ def _write_json(stdout: TextIO, data: Any) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2), file=stdout)
 
 
+def _build_sse_headers(config: ClientConfig) -> dict[str, str]:
+    headers: dict[str, str] = {"Accept": "text/event-stream"}
+    if config.token is not None:
+        headers["Authorization"] = f"Bearer {config.token}"
+    return headers
+
+
+def _extract_frame_position(payload: Mapping[str, Any] | None, event_id: str | None) -> int | None:
+    if isinstance(payload, Mapping):
+        pos = payload.get("position")
+        if isinstance(pos, int) and not isinstance(pos, bool):
+            return pos
+    if event_id is not None:
+        text = event_id.strip()
+        if text:
+            try:
+                return int(text)
+            except ValueError:
+                return None
+    return None
+
+
+def _dispatch_sse_frame(
+    event_name: str,
+    event_id: str | None,
+    raw_data: str,
+    *,
+    opts: _EventsOptions,
+    latest_position: int,
+    emitted_count: int,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> tuple[int | None, int, int]:
+    if event_name == "event":
+        event_obj = json.loads(raw_data)
+        frame_pos = _extract_frame_position(event_obj if isinstance(event_obj, Mapping) else None, event_id)
+        if frame_pos is not None and frame_pos > latest_position:
+            latest_position = frame_pos
+        stdout.write(json.dumps(event_obj, ensure_ascii=False) + "\n")
+        stdout.flush()
+        emitted_count += 1
+        if emitted_count >= opts.limit:
+            return EXIT_OK, latest_position, emitted_count
+        if opts.until_position is not None and latest_position >= opts.until_position:
+            return EXIT_OK, latest_position, emitted_count
+        event_type = str(event_obj.get("type", "")) if isinstance(event_obj, Mapping) else ""
+        if opts.until_types and event_type in opts.until_types:
+            return EXIT_OK, latest_position, emitted_count
+        return None, latest_position, emitted_count
+
+    if event_name == "checkpoint":
+        cp_obj = json.loads(raw_data) if raw_data else {}
+        frame_pos = _extract_frame_position(cp_obj if isinstance(cp_obj, Mapping) else None, event_id)
+        if frame_pos is not None and frame_pos > latest_position:
+            latest_position = frame_pos
+        if opts.until_position is not None and latest_position >= opts.until_position:
+            return EXIT_OK, latest_position, emitted_count
+        return None, latest_position, emitted_count
+
+    if event_name == "resync":
+        rs_obj = json.loads(raw_data) if raw_data else {}
+        reason = rs_obj.get("reason", "unknown") if isinstance(rs_obj, Mapping) else "unknown"
+        end_pos = rs_obj.get("end_position") if isinstance(rs_obj, Mapping) else None
+        print(
+            f"事件流需要重新同步（原因：{reason}，末尾位置 end_position={end_pos}）：请重新读取查询快照后再续订",
+            file=stderr,
+        )
+        stderr.flush()
+        return EXIT_RESYNC, latest_position, emitted_count
+
+    return None, latest_position, emitted_count
+
+
+async def _run_events_stream(
+    client: httpx.AsyncClient,
+    config: ClientConfig,
+    opts: _EventsOptions,
+    *,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    params = _build_events_query_params(opts)
+    headers = _build_sse_headers(config)
+    latest_position = opts.after
+    emitted_count = 0
+    stream_opened = False
+    deadline = asyncio.get_running_loop().time() + config.timeout_sec
+
+    try:
+        async with client.stream("GET", "/api/events", params=params, headers=headers) as resp:
+            if resp.status_code != 200:
+                await resp.aread()
+                err_code = _handle_common_http_errors(
+                    resp,
+                    config=config,
+                    target_desc="GET /api/events",
+                    stderr=stderr,
+                )
+                return EXIT_INVALID if err_code is None else err_code
+
+            stream_opened = True
+            event_name = "message"
+            event_id: str | None = None
+            data_lines: list[str] = []
+            has_fields = False
+
+            async with asyncio.timeout_at(deadline):
+                async for line in resp.aiter_lines():
+                    if line == "":
+                        if has_fields:
+                            exit_code, latest_position, emitted_count = _dispatch_sse_frame(
+                                event_name,
+                                event_id,
+                                "\n".join(data_lines),
+                                opts=opts,
+                                latest_position=latest_position,
+                                emitted_count=emitted_count,
+                                stdout=stdout,
+                                stderr=stderr,
+                            )
+                            if exit_code is not None:
+                                return exit_code
+                            event_name = "message"
+                            event_id = None
+                            data_lines = []
+                            has_fields = False
+                        continue
+                    if line.startswith(":"):
+                        continue
+                    field, sep, value = line.partition(":")
+                    if sep and value.startswith(" "):
+                        value = value[1:]
+                    has_fields = True
+                    if field == "event":
+                        event_name = value
+                    elif field == "id":
+                        event_id = value
+                    elif field == "data":
+                        data_lines.append(value)
+
+                if has_fields:
+                    exit_code, latest_position, emitted_count = _dispatch_sse_frame(
+                        event_name,
+                        event_id,
+                        "\n".join(data_lines),
+                        opts=opts,
+                        latest_position=latest_position,
+                        emitted_count=emitted_count,
+                        stdout=stdout,
+                        stderr=stderr,
+                    )
+                    if exit_code is not None:
+                        return exit_code
+
+    except (TimeoutError, httpx.ReadTimeout) as exc:
+        if stream_opened:
+            print(
+                f"事件流等待超时（{config.timeout_sec:g} 秒）：未命中停止条件，最新扫描位置 position={latest_position}",
+                file=stderr,
+            )
+            stderr.flush()
+            return EXIT_EVENT_TIMEOUT
+        print(
+            f"请求超时：连接目标服务 {config.base_url} 超过时限（{config.timeout_sec:g} 秒）：{exc}",
+            file=stderr,
+        )
+        return EXIT_CONNECTION_OR_AUTH
+
+    print(
+        f"连接中断：目标服务 {config.base_url} 在满足停止条件前关闭了事件流（最新扫描位置 position={latest_position}）",
+        file=stderr,
+    )
+    return EXIT_CONNECTION_OR_AUTH
+
+
 async def _run_async_command(
     args: argparse.Namespace,
     config: ClientConfig,
@@ -746,10 +1129,13 @@ async def _run_async_command(
     command = args.command
     query_params: list[tuple[str, str]] = []
     command_payload: dict[str, Any] = {}
+    events_opts: _EventsOptions | None = None
     if command == "query":
         query_params = _build_query_params(args)
     elif command == "command":
         command_payload = _build_command_payload(args, stdin=stdin)
+    elif command == "events":
+        events_opts = _parse_events_options(args)
 
     client_kwargs: dict[str, Any] = {
         "base_url": config.base_url,
@@ -762,6 +1148,15 @@ async def _run_async_command(
 
     try:
         async with httpx.AsyncClient(**client_kwargs) as client:
+            if command == "events":
+                assert events_opts is not None
+                return await _run_events_stream(
+                    client,
+                    config,
+                    events_opts,
+                    stdout=stdout,
+                    stderr=stderr,
+                )
             if command == "capabilities":
                 resp = await client.get("/api/capabilities", headers=_build_headers(config))
                 err_code = _handle_common_http_errors(

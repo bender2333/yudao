@@ -15,10 +15,10 @@ import { ACTIVE, IN_ROOM, busyItems, createFloorDriver, createFloorState, itemCo
 import { createScene } from "./../world/scene.ts";
 import { FloorRenderer, H, W, type FactRect } from "./render.ts";
 import { createDecisionCard, type DecisionCard } from "./card.ts";
-import { ROOM_VISUALS } from "./render-decl.ts";
+import { ROOM_VISUALS, roomVisualOf } from "./render-decl.ts";
 import type { DecisionAnswer, DecisionResult } from "./card.ts";
 import type { DecisionFace, FloorModel, SceneLike, TimeText } from "../world/types.ts";
-import type { FactElement, OpenSourceCallback, PixelAction } from "../contract.ts";
+import type { CoverageOverlayData, FactElement, OpenSourceCallback, PixelAction } from "../contract.ts";
 
 /** 概览页与测试共用的时间写法（原型 Y13.time）。 */
 export const FLOOR_TIME: TimeText = {
@@ -95,13 +95,21 @@ export interface FloorChannels {
   position: number;
   /** 事项在哪个房间或在大厅、事项的颜色。 */
   items: { id: string; department: string | null; status: string; where: "room" | "hall" | "other"; color: string }[];
-  /** 部门 → 房间的亮灯、屏幕与门口的小旗；label 是门口的牌子文字。 */
+  /** 职能标识 → 房间的亮灯、屏幕、门口小旗、盖章台与出口托盘；label 是门口的牌子文字。 */
   rooms: Record<string, {
     label: string;
     lit: boolean;
     screen: "off" | "code" | "idle";
     flags: { id: string; color: string; status: string }[];
+    verifier: boolean;
+    exit_tray: boolean;
   }>;
+  /** 来自定义的楼层连接：关注与交接管道、传信管、红色回流管。 */
+  links: {
+    handoffs: string[];
+    tubes: string[];
+    returns: string[];
+  };
   /** 大厅板上的决定单。 */
   board: { id: string; kind: string; title: string; color: string | null }[];
   /** 成果库里的成果：已采纳的全部与货架上摆得下的那几个。 */
@@ -112,6 +120,8 @@ export interface FloorChannels {
   waiting: { department: string; text: string }[];
   /** 部门 → 角色与角色的状态。 */
   roles: Record<string, { id: string; kind: string; status: string | null }[]>;
+  /** 覆盖层「检验」的状态（未开启或无数据时为空；工单 #1420）。 */
+  coverage: CoverageOverlayData | null;
 }
 
 /** 读一份状态承载事实的视觉通道：与渲染层取同一份状态数据（渲染层在动作期间另加的临时效果不算）。 */
@@ -138,8 +148,16 @@ function floorChannels(driver: FloorDriver): FloorChannels {
       lit: here.some((it) => ACTIVE.includes(it.status) || it.status === "done") || Boolean(room.def.lit?.(ctx)),
       screen: model.interrupted ? "off" : here.some((it) => ACTIVE.includes(it.status)) ? "code" : "idle",
       flags: itemsOf(id).map((it) => ({ id: it.id, color: it.color, status: it.status })),
+      verifier: Boolean(room.def.verifier),
+      exit_tray: Boolean(room.def.exitTray),
     };
   }
+  const allLinks = Object.values(world.links);
+  const links: FloorChannels["links"] = {
+    handoffs: allLinks.filter((l) => l.linkKind === "handoff").map((l) => `${l.from}>${l.to}`).sort(),
+    tubes: allLinks.filter((l) => l.linkKind === "tube").map((l) => `${l.from}~${l.to}`).sort(),
+    returns: allLinks.filter((l) => l.linkKind === "return").map((l) => `${l.from}>${l.to}`).sort(),
+  };
   const adopted = model.shelves.adopted.slice();
   const per = shelfRoom ? Math.max(1, Math.floor((shelfRoom.w - 26) / 18)) : adopted.length;
   const itemById = (id: string | null): (typeof model.items)[number] | null =>
@@ -162,6 +180,7 @@ function floorChannels(driver: FloorDriver): FloorChannels {
       color: itemColor(it),
     })),
     rooms,
+    links,
     board: (model.decisions ?? []).map((d) => {
       const item = itemById(d.work_item_id ?? null);
       return { id: d.id, kind: d.kind, title: d.title, color: item ? itemColor(item) : null };
@@ -174,6 +193,7 @@ function floorChannels(driver: FloorDriver): FloorChannels {
       text: "等待模型服务" + (w.retry_text ? " · " + w.retry_text : ""),
     })),
     roles,
+    coverage: model.coverage ?? null,
   };
 }
 
@@ -226,7 +246,13 @@ export interface FloorTestHooks {
 /** 建立给端到端测试用的读取入口：读的是画面里世界的当前状态。 */
 export function floorTestHooks(view: FloorView, onResync: () => void): FloorTestHooks {
   return {
-    overlay: () => view.inspect().renderer.overlay,
+    overlay: () => {
+      const { renderer, driver } = view.inspect();
+      if (renderer.overlay.id === "coverage" && renderer.overlay.data === null && driver.model.coverage) {
+        return { id: "coverage", data: driver.model.coverage as unknown as Record<string, unknown> };
+      }
+      return renderer.overlay;
+    },
     overlayLabels: () => view.inspect().renderer.overlayLabels.map((r) => ({ ...r })),
     state: () => {
       const { driver, scene } = view.inspect();
@@ -303,7 +329,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   const surface = createPixelSurface({ host: opts.host, W, H });
   const canvas = surface.canvas;
 
-  const catalog = buildCatalog(ROOM_VISUALS);
+  const catalog = buildCatalog(ROOM_VISUALS, roomVisualOf);
   const scene = createScene({
     W,
     H,
@@ -444,7 +470,10 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
       draw();
     },
     setOverlay(id, data) {
-      renderer.overlay = { id: id ?? null, data: (data as Record<string, unknown>) ?? null };
+      const resolved = id === "coverage" && (data === undefined || data === null)
+        ? (driver.model.coverage ?? null)
+        : data;
+      renderer.overlay = { id: id ?? null, data: (resolved as Record<string, unknown>) ?? null };
       draw();
     },
     performance(on) {

@@ -24,6 +24,7 @@ from .data_directory import default_dotenv as default_dotenv_path
 from .data_directory import default_provider_config as default_provider_config_path
 from .demo import run_demo
 from .models import utc_now
+from .ops_skill import execute_skill_command, register_skill_subcommands
 from .release_check import check_repository, request_instance_upgrade
 from .runtime import LoopSystem, configure_fetch_tools
 from .smoke import DEFAULT_DIR as SMOKE_DIR
@@ -102,8 +103,10 @@ def build_parser() -> argparse.ArgumentParser:
     release_check = sub.add_parser("release-check", help="check a pending release commit and request the upgrade")
     release_check.add_argument("repository", help="the repository holding the pending release commit")
     release_check.add_argument("--data-dir", default=argparse.SUPPRESS)
-    # 通用命令行网络子命令（工单 #1750，docs/design/external-ops-agent.md「接口」）：经网络访问运行中的服务，不接触数据目录
+    # 通用命令行网络子命令（工单 #1750、#1751，docs/design/external-ops-agent.md「接口」）：经网络访问运行中的服务，不接触数据目录
     register_network_subcommands(parser, sub)
+    # 随包运维技能子命令（工单 #1751，docs/design/external-ops-agent.md「随包运维技能」）：输出或安装随包 SKILL.md，不接触数据目录
+    register_skill_subcommands(sub)
     return parser
 
 def _stop_on_ctrl_c() -> None:
@@ -138,6 +141,8 @@ def main(
     args = parser.parse_args(argv)
     # 不写子命令时启动新接口（应用层与接口层 docs/design/app-and-interface.md「命令行」）
     command = args.command or "api"
+    if command == "skill":
+        return execute_skill_command(args, stdout=stdout, stderr=stderr)
     if command in NETWORK_SUBCOMMANDS:
         return execute_network_command(
             args,

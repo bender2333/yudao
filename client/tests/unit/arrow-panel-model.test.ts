@@ -181,6 +181,59 @@ test("材料里没有这一份结论时写明没有，不写成没有缺陷", ()
   assert.deepEqual(view.conclusion?.defects, []);
 });
 
+test("直做核验的打回与放行箭头给出结论词与核验理由", () => {
+  // 保护 R3（路线图已走到的直做与独立核验）：work_item.materials 收录直做核验的 rework 与 release 后，
+  // 箭头面板模型对打回箭头与放行箭头均给出对应结论词与理由
+  const directMaterials = materials({
+    reviews: [
+      {
+        event_id: "ev-direct-rework",
+        verdict: "rework",
+        rationale: "缺少无参数保护",
+        defects: [],
+        checks: [],
+        criteria: [],
+        trial_cases: [],
+        unverified: [],
+      },
+      {
+        event_id: "ev-direct-release",
+        verdict: "release",
+        rationale: "无参数与带参数均通过",
+        defects: [],
+        checks: [],
+        criteria: [],
+        trial_cases: [],
+        unverified: [],
+      },
+    ],
+  });
+  const reworkArrow = arrow({
+    key: "flow-direct-1",
+    version: 1,
+    eventId: "ev-delivery-1",
+    verdict: { tone: "reject", by: "质检", text: "质检打回" },
+  });
+  const releaseArrow = arrow({
+    key: "flow-direct-2",
+    version: 2,
+    eventId: "ev-delivery-2",
+    verdict: { tone: "release", by: "质检", text: "放行 · 质检" },
+  });
+
+  const reworkConclusion = conclusionOf(reworkArrow, directMaterials, null);
+  assert.equal(reworkConclusion?.missing, false);
+  assert.equal(reworkConclusion?.verdictName, "打回");
+  assert.equal(reworkConclusion?.rationale, "缺少无参数保护");
+  assert.equal(reworkConclusion?.reviewEventId, "ev-direct-rework");
+
+  const releaseConclusion = conclusionOf(releaseArrow, directMaterials, null);
+  assert.equal(releaseConclusion?.missing, false);
+  assert.equal(releaseConclusion?.verdictName, "放行");
+  assert.equal(releaseConclusion?.rationale, "无参数与带参数均通过");
+  assert.equal(releaseConclusion?.reviewEventId, "ev-direct-release");
+});
+
 // ---------------------------------------------------------------------------
 // 没有核验角色的完成
 

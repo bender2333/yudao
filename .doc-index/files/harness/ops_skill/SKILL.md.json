@@ -1,0 +1,33 @@
+{
+"schema":1,
+"path":"harness/ops_skill/SKILL.md",
+"hash":"f4ea01c8d9d45107",
+"nodes":[
+{"hash":"f4ea01c8d9d45107","id":"harness/ops_skill/SKILL.md","kind":"file","title":"harness/ops_skill/SKILL.md"},
+{"hash":"cb3f91d54eee30e5","id":"harness/ops_skill/SKILL.md#(开头)","kind":"section","parent":"harness/ops_skill/SKILL.md","title":"(开头)"},
+{"hash":"46c797cc704e83ce","id":"harness/ops_skill/SKILL.md#name: yudao-opsdescription: 协助用户配置、巡检与维护运行中的 Yudao（枢道）服务：经通用命令行执行能力发现、单项合同自省、先读取基准版本后提交幂等命令、有界事件流等待，并遵守凭据隔离规程、用户决定确认规程与三条改动通道分流规程。","kind":"section","parent":"harness/ops_skill/SKILL.md","title":"name: yudao-opsdescription: 协助用户配置、巡检与维护运行中的 Yudao（枢道）服务：经通用命令行执行能力发现、单项合同自省、先读取基准版本后提交幂等命令、有界事件流等待，并遵守凭据隔离规程、用户决定确认规程与三条改动通道分流规程。"},
+{"hash":"80af373f346b2259","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程","kind":"section","parent":"harness/ops_skill/SKILL.md","title":"Yudao 进程外运维规程"},
+{"hash":"04879249ddab12f8","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程","title":"一、先读取后修改与基准版本规程"},
+{"hash":"2a43b25aeb3ea12e","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程 > 1. 连接与认证设置","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程","title":"1. 连接与认证设置"},
+{"hash":"f98adbc3a1050ebb","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程 > 2. 标准六步操作闭环","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程","title":"2. 标准六步操作闭环"},
+{"hash":"984bb48f1bbf3f1f","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程 > 3. 退出码处置规则","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 一、先读取后修改与基准版本规程","title":"3. 退出码处置规则"},
+{"hash":"3f2412b3c9df67c8","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 二、凭据安全与隔离规程","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程","title":"二、凭据安全与隔离规程"},
+{"hash":"461e479fb862696d","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程","title":"三、三条改动通道分流规程"},
+{"hash":"80229d082ff3af03","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程 > 第一条通道：数据定义与参数命令","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程","title":"第一条通道：数据定义与参数命令"},
+{"hash":"0ba82be0766e9fba","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程 > 第二条通道：隔离动作与外部工具","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程","title":"第二条通道：隔离动作与外部工具"},
+{"hash":"d6baad856a10f24e","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程 > 第三条通道：修改 Yudao 自身代码","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 三、三条改动通道分流规程","title":"第三条通道：修改 Yudao 自身代码"},
+{"hash":"98a660c00a7d17f4","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程","title":"四、用户决定请求拍板规程与常见运维操作序列"},
+{"hash":"c96df0a1a73c1103","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 1. 决定请求用户拍板确认规程","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列","title":"1. 决定请求用户拍板确认规程"},
+{"hash":"47da5573c5619928","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列","title":"2. 常见运维操作序列"},
+{"hash":"d14ebe29b45b446b","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （1）一步连接模型服务、选用模型并完成准入","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（1）一步连接模型服务、选用模型并完成准入"},
+{"hash":"8e8299c497ffa905","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （2）新建或接入已有项目并切换组织形态","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（2）新建或接入已有项目并切换组织形态"},
+{"hash":"9c20bc0b9ec6c23c","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （3）在规则界限内调整运行参数与按记录撤回","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（3）在规则界限内调整运行参数与按记录撤回"},
+{"hash":"a1e95616ca8fc685","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （4）探测并登记独立外部 MCP 工具服务器（第二条通道）","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（4）探测并登记独立外部 MCP 工具服务器（第二条通道）"},
+{"hash":"b2bac007aaff4cc9","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （5）发起事项、有界跟踪进展与故障排查","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（5）发起事项、有界跟踪进展与故障排查"},
+{"hash":"475d8a16225c99d4","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （6）巡检待回答决定请求并在取得用户确认后提交回答","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（6）巡检待回答决定请求并在取得用户确认后提交回答"},
+{"hash":"4bd21924be1da28b","id":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列 > （7）实例升级前排空与发布检查（第三条通道）","kind":"section","parent":"harness/ops_skill/SKILL.md#Yudao 进程外运维规程 > 四、用户决定请求拍板规程与常见运维操作序列 > 2. 常见运维操作序列","title":"（7）实例升级前排空与发布检查（第三条通道）"}
+],
+"edges":[
+
+]
+}

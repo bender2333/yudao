@@ -13,8 +13,8 @@
 // 不重建画面（同一场景对象挂载一次）。单元测试用假的地面与假的像素画面驱动这一层。
 
 import type {
-  Capabilities, DecisionList, DecisionView, DepartmentWorkspaceResult, EventObject, ProjectList, ProjectLoopResult,
-  ProjectRow, RunAsksResult,
+  AcceptanceCoverageResult, Capabilities, DecisionList, DecisionView, DepartmentWorkspaceResult, EventObject,
+  ProjectList, ProjectLoopResult, ProjectRow, RunAsksResult, WorkItemOrganization,
 } from "./api/generated/types.gen.ts";
 import type { CommandOutcome } from "./sync/connection.ts";
 import type {
@@ -23,7 +23,7 @@ import type {
 import type { DecisionAnswer, DecisionResult } from "./pixel/floor/card.ts";
 import type { Clock } from "./pixel/clock.ts";
 import { buildingActions, buildingState, toBuildingEvent } from "./translate/building.ts";
-import { belongsTo, floorActions, floorCards, floorInterrupted, floorState, streamText, toFloorEvent } from "./translate/floor.ts";
+import { belongsTo, coverageOverlay, floorActions, floorCards, floorInterrupted, floorState, streamText, toFloorEvent } from "./translate/floor.ts";
 import * as room from "./translate/room.ts";
 import { DEPARTMENT_NAMES } from "./translate/face.ts";
 import { classOf, COVERAGE, eventGaps, gapLines as formatEventGaps, OVERLAY_LABELS, overlayProblems, SCENES, type EventGap } from "./translate/coverage.ts";
@@ -49,6 +49,7 @@ export interface SceneSurface {
   play(action: PixelAction): void;
   setDecisions?(faces: DecisionFace[]): void;
   stream?(who: { room: string | null; role: string | null }, text: string): void;
+  setOverlay?(id: string | null, data: unknown): void;
   destroy?(): void;
 }
 
@@ -71,6 +72,8 @@ export type ShellState = {
   decisionsOperable: boolean;
   /** 面包屑：楼 / 项目名 / 部门名，每一项都能回到那一层（不经页面）。 */
   crumbs: { label: string; scene: SceneRef }[];
+  /** 当前开启的楼层覆盖层标识；未开启时为空。 */
+  overlay: string | null;
   /** 画面还没有数据时的一句话（读不出来、没有项目、服务少一条查询）。 */
   note: string | null;
 };
@@ -91,6 +94,7 @@ const QUERIES = {
   decisions: "decisions.list",
   workspace: "department.workspace",
   asks: "run.asks",
+  coverage: "acceptance.coverage",
 } as const;
 
 /** 画面要发的命令（只发能力清单里列出的；以后拖包裹调优先级时加在这里）。 */
@@ -212,6 +216,11 @@ export class Shell {
   private asks: RunAsksResult | null = null;
   private askPosition = 0;
   private asksRunId = "";
+  // 楼层按需覆盖层「检验」：开启时拉取 acceptance.coverage
+  private overlayId: string | null = null;
+  private coverage: AcceptanceCoverageResult | null = null;
+  private coveragePosition = 0;
+  private coverageRunId = "";
   // 房间：department.workspace
   private workspace: DepartmentWorkspaceResult | null = null;
   private workspacePosition = 0;
@@ -244,8 +253,45 @@ export class Shell {
       versionNote: versionNote(this.versions),
       decisionsOperable: this.decisionsOperable,
       crumbs: this.crumbs(),
+      overlay: this.overlayId,
       note: this.note,
     };
+  }
+
+  /** 当前开启的楼层覆盖层标识。 */
+  get overlay(): string | null {
+    return this.overlayId;
+  }
+
+  /**
+   * 切换楼层覆盖层（工单 #1420）：默认关闭，进入楼层时不额外发查询；
+   * 开启「检验」（coverage）时按聚焦事项的运行标识按需订阅 acceptance.coverage，关闭时撤销订阅并清除覆盖层。
+   */
+  setOverlay(id: string | null): void {
+    const next = id !== null && id.trim() !== "" ? id : null;
+    if (next === this.overlayId) return;
+    const previous = this.overlayId;
+    this.overlayId = next;
+    if (this.scene.kind === "floor") {
+      const views = this.engine.viewSync;
+      const capabilities = this.capabilities;
+      if (views && capabilities && this.loop !== null) {
+        this.ensureCoverageView(views, capabilities, this.loop, this.scene.workItemId);
+      } else if (next !== "coverage") {
+        this.closeCoverageView();
+      }
+      if (next === null && previous !== null) {
+        this.bindings.get(sceneKey(this.scene))?.surface?.setOverlay?.(null, null);
+      }
+      if (this.loop !== null) {
+        this.rebuildFloor();
+      } else {
+        if (next === "coverage") this.applyOverlayToSurface();
+        this.notify();
+      }
+      return;
+    }
+    this.notify();
   }
 
   /** 大厅决定板的选项此刻可操作：能力清单里有回答决定的命令。 */
@@ -467,6 +513,7 @@ export class Shell {
     if (surface === null) return;
     if (this.model !== null) surface.jump(this.model);
     surface.setDecisions?.(this.decisions);
+    if (this.overlayId !== null) this.applyOverlayToSurface(binding);
   }
 
   /** 重新同步、从后台切回：清空时间线，直接显示最新的状态（不补播）。 */
@@ -536,7 +583,7 @@ export class Shell {
         surface.stream?.({ room: stream.room, role: stream.role }, stream.text);
         return;
       }
-      for (const action of floorActions(floorEvent, this.roleContext())) surface.play(action);
+      for (const action of floorActions(floorEvent, this.roleContext(floorEvent.work_item_id))) surface.play(action);
       return;
     }
     const roomEvent = room.eventOf(event, event.position);
@@ -562,15 +609,23 @@ export class Shell {
     this.notify();
   }
 
-  /** 翻译层说话时用的角色名（房间里的角色；楼层上没有角色表时返回空）。 */
-  private roleContext(): { roleName: (role: string | null) => string | null } {
+  /** 翻译层说话与动作派发上下文：房间角色名称与当前事项冻结定义的组织（工单 #1383）。 */
+  private roleContext(workItemId?: string | null): {
+    roleName: (role: string | null) => string | null;
+    organization: WorkItemOrganization | null;
+  } {
     const roles = this.workspace?.room?.roles ?? [];
+    const loop = this.loop ?? this.lastLoop;
+    const item = workItemId
+      ? loop?.work_items.find((row) => row.work_item_id === workItemId)
+      : loop?.work_items[0];
     return {
       roleName: (id: string | null): string | null => {
         if (!id) return null;
         const hit = roles.find((role) => role.id === id || role.kind === id || role.name === id);
         return hit ? hit.name : null;
       },
+      organization: item?.organization ?? null,
     };
   }
 
@@ -588,6 +643,9 @@ export class Shell {
     this.loop = null;
     this.asks = null;
     this.asksRunId = "";
+    this.coverage = null;
+    this.coveragePosition = 0;
+    this.coverageRunId = "";
     this.workspace = null;
     this.decisionRows = [];
   }
@@ -676,6 +734,7 @@ export class Shell {
         this.lastLoop = data;
         this.loopPosition = position;
         this.ensureAsksView(views, capabilities, data, workItemId);
+        this.ensureCoverageView(views, capabilities, data, workItemId);
         this.rebuildFloor();
       },
       (reason) => this.setNote(`楼层读不出来：${reason}`),
@@ -722,10 +781,58 @@ export class Shell {
     );
   }
 
+  /**
+   * 覆盖层「检验」按需读取 acceptance.coverage（工单 #1420）：
+   * 未开启 coverage 时不发起查询；开启后按聚焦事项的运行标识订阅，运行切换或覆盖层关闭时撤销旧订阅。
+   */
+  private ensureCoverageView(views: ViewSync, capabilities: Capabilities, loop: ProjectLoopResult, focus: string | null): void {
+    if (this.overlayId !== "coverage" || !this.hasQuery(capabilities, QUERIES.coverage)) {
+      this.closeCoverageView();
+      return;
+    }
+    const runId = this.focusItem(loop, focus)?.run_id ?? "";
+    if (runId === "") {
+      this.closeCoverageView();
+      return;
+    }
+    if (runId === this.coverageRunId && views.openViewIds.includes("floor.coverage")) return;
+    this.coverageRunId = runId;
+    views.close("floor.coverage");
+    this.coverage = null;
+    this.coveragePosition = 0;
+    void views.open<AcceptanceCoverageResult>(
+      "floor.coverage",
+      { query: QUERIES.coverage, params: { run_id: runId } },
+      (data, position) => {
+        this.coverage = data;
+        this.coveragePosition = position;
+        this.rebuildFloor();
+      },
+      () => {
+        // 该运行尚未提交检验记录或查询不可读：展示空状态提示，楼层其余部分照常
+        this.coverage = null;
+        this.coveragePosition = 0;
+        this.rebuildFloor();
+      },
+    );
+  }
+
+  private closeCoverageView(): void {
+    this.engine.viewSync?.close("floor.coverage");
+    this.coverage = null;
+    this.coveragePosition = 0;
+    this.coverageRunId = "";
+  }
+
   private rebuildFloor(): void {
     const loop = this.loop;
     if (loop === null) return;
-    const positions = [this.loopPosition, this.askPosition, this.decisionPosition].filter((value) => value > 0);
+    const positions = [
+      this.loopPosition,
+      this.askPosition,
+      this.decisionPosition,
+      this.overlayId === "coverage" ? this.coveragePosition : 0,
+    ].filter((value) => value > 0);
     const position = positions.length === 0 ? 0 : Math.max(...positions);
     const asks = this.asksRunId === "" || this.asks === null ? null : { [this.asksRunId]: this.asks.asks };
     const model = floorState({
@@ -738,6 +845,7 @@ export class Shell {
       machines: null,
       interrupted: floorInterrupted(loop, this.status.kind === "connected" && this.status.stream === "interrupted"),
       focus: this.scene.kind === "floor" ? this.scene.workItemId : null,
+      ...(this.overlayId === "coverage" ? { coverage: this.coverage } : {}),
     });
     const cards = floorCards(this.decisionRows, (decision) => ({
       projectName: this.projectName(decision.project_id),
@@ -795,8 +903,22 @@ export class Shell {
     if (binding?.surface) {
       if (model !== null) binding.surface.setState(model);
       binding.surface.setDecisions?.(decisions);
+      if (this.overlayId !== null) this.applyOverlayToSurface(binding);
     }
     this.notify();
+  }
+
+  private applyOverlayToSurface(target?: Binding): void {
+    if (this.scene.kind !== "floor") return;
+    const binding = target ?? this.bindings.get(sceneKey(this.scene));
+    const surface = binding?.surface;
+    if (!surface) return;
+    if (this.overlayId === "coverage") {
+      const data = (this.model as FloorModel | null)?.coverage ?? coverageOverlay(this.coverage);
+      surface.setOverlay?.("coverage", data);
+    } else if (this.overlayId !== null) {
+      surface.setOverlay?.(this.overlayId, null);
+    }
   }
 
   private setNote(note: string): void {
@@ -816,7 +938,7 @@ export class Shell {
     return row?.sign ?? "";
   }
 
-  /** 面包屑：楼 / 项目名 / 部门名；每一项都能回到那一层。 */
+  /** 面包屑：楼 / 项目名 / 职能显示名；每一项都能回到那一层。 */
   private crumbs(): { label: string; scene: SceneRef }[] {
     const items: { label: string; scene: SceneRef }[] = [{ label: "楼", scene: { kind: "building" } }];
     if (this.scene.kind === "building") return items;
@@ -825,8 +947,12 @@ export class Shell {
       scene: { kind: "floor", projectId: this.scene.projectId, workItemId: this.scene.workItemId },
     });
     if (this.scene.kind === "room") {
+      const dept = this.scene.department;
+      const orgLabel = (this.lastLoop?.work_items ?? [])
+        .flatMap((row) => row.organization?.roles ?? [])
+        .find((role) => role.id === dept)?.label;
       items.push({
-        label: DEPARTMENT_NAMES[this.scene.department] ?? this.scene.department,
+        label: orgLabel ?? DEPARTMENT_NAMES[dept] ?? dept,
         scene: this.scene,
       });
     }

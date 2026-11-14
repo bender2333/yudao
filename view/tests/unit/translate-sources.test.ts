@@ -81,10 +81,11 @@ test("来源：五种来源都有中文名，页面不出现内部标识", () =>
 
 test("来源：每个覆盖层都有中文名，缺一行就失败", () => {
   // 服务端能力清单里的覆盖层（harness/app/registry.py 的 OVERLAYS），页面按名字取这一份里的中文名
-  const server = ["flow", "waiting", "recovery", "context_usage", "semantic_records", "sources"];
+  const server = ["flow", "waiting", "recovery", "context_usage", "semantic_records", "sources", "loops", "coverage"];
   assert.deepEqual(overlayProblems(server), []);
   assert.deepEqual(overlayProblems(["sources", "no_such_overlay"]), ["覆盖层 no_such_overlay 在翻译层没有中文名"]);
   assert.equal(OVERLAY_LABELS.sources, "来源");
+  assert.equal(OVERLAY_LABELS.coverage, "检验");
   // 检验方式的核对仍在（同一份覆盖核对的另一半，工单 #151）
   assert.equal(typeof checkMethodProblems, "function");
 });

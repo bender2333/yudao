@@ -2891,6 +2891,9 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     completed = [_completion_version(application, event, stream) for event in stream
                  if event.type == EventType.ARTIFACT_ACCEPTED
                  and (event.payload or {}).get("artifact_kind") == COMPLETION_KIND]
+    completion_reviews = [_completion_review_entry(event) for event in stream
+                          if event.type == EventType.ARTIFACT_ACCEPTED
+                          and (event.payload or {}).get("artifact_kind") == COMPLETION_REVIEW_KIND]
     return Snapshot[WorkItemMaterialsResult](
         position=store.end_position(),
         data=WorkItemMaterialsResult(
@@ -2904,7 +2907,7 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
                                          value.content_hash, value.summary, list(value.files),
                                          launch=_launch_methods(value))
                            for value in run.delivery_specs], *completed],
-            reviews=[_review_entry(value, trial_cases) for value in run.reviews],
+            reviews=[*[_review_entry(value, trial_cases) for value in run.reviews], *completion_reviews],
             inputs=[
                 InputView(
                     input_id=value.id, version=value.version, text=value.text, kind=value.kind,
@@ -2922,6 +2925,21 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
             onboarding_rounds=_onboarding_rounds(application, state, item.work_item_id),
             old_runs=_old_runs(application, state, item.work_item_id),
         ),
+    )
+
+
+def _completion_review_entry(event: Any) -> ReviewEntry:
+    # 直做核验结论在资料里的条目（工单 #1759）：事件编号、结论与理由来自成果接纳事件载荷，其余列表为空
+    payload = event.payload or {}
+    return ReviewEntry(
+        event_id=event.event_id,
+        verdict=str(payload.get("verdict") or ""),
+        rationale=str(payload.get("rationale") or ""),
+        defects=[],
+        checks=[],
+        criteria=[],
+        trial_cases=[],
+        unverified=[],
     )
 
 
@@ -3977,7 +3995,7 @@ WORK_ITEM_MATERIALS = QueryDefinition(
     handle=_work_item_materials,
     changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.CONTRACT_ACCEPTED,
                 EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
-                # 直做交完成的那一版在交付各版本里（工单 #1699）
+                # 直做交完成的那一版与直做核验结论都在这一份材料里（工单 #1699、#1759）
                 EventType.ARTIFACT_ACCEPTED,
                 # 成果失效（S1b，工单 #858）：交付的失效状态在这一页的交付清单里
                 EventType.ARTIFACT_INVALIDATED,

@@ -24,6 +24,7 @@ declare global {
      */
     __floorViewForTest?: FloorTestHooks & {
       setOverlay: (id: string | null, data: unknown) => void;
+      selectOverlay: (id: string | null) => void;
       goRoom: (department: string) => void;
     };
     /** 房间场景的读数：状态、角色、物件与流式文字，以及播放时间线。 */

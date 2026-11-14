@@ -50,6 +50,7 @@ export function FloorScene(props: { shell: Shell; projectId: string; workItemId:
           void shell.open(window.location.origin, shell.identity);
         }),
         setOverlay: (id, data) => view.setOverlay(id, data),
+        selectOverlay: (id) => shell.setOverlay(id),
         goRoom: (department) => shell.goRoom(department),
       };
       return {
@@ -61,6 +62,7 @@ export function FloorScene(props: { shell: Shell; projectId: string; workItemId:
         play: (action) => view.play(action),
         setDecisions: (faces: DecisionFace[]) => view.setDecisions(faces),
         stream: (who, text) => view.stream({ room: who.room, role: who.role }, text),
+        setOverlay: (id, data) => view.setOverlay(id, data),
         destroy: () => view.destroy(),
       };
     });

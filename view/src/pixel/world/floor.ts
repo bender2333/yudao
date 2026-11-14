@@ -16,6 +16,7 @@ import {
 import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
 import { asText, dispatch, dropAction, enqueue, nextPackageId, progressOf, sayMs, sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
 import { declareLinks, declareRooms, linkBetween, route, roomOf } from "./declare.ts";
+import { characterSprite, declarationsFromTopology } from "./floor-decl.ts";
 import { actorOf, charFor, primaryOf, syncCharacters, mountMachines } from "./scene.ts";
 import { signal, signalOn } from "./signals.ts";
 import type {
@@ -159,7 +160,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
   const catalog = opts.catalog;
   let model = opts.model;
   let decisions: DecisionFace[] = model.decisions ?? [];
-  let flags = flagsOf(model, catalog);
+  let declSig = declSigOf(model, catalog);
   let world = declareWorld(model, catalog);
 
   function flagsOf(m: FloorModel, cat: Catalog): Record<string, boolean> {
@@ -168,19 +169,25 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     return out;
   }
 
+  function declSigOf(m: FloorModel, cat: Catalog): string {
+    return JSON.stringify({ flags: flagsOf(m, cat), topology: m.topology ?? null });
+  }
+
   function declareWorld(m: FloorModel, cat: Catalog): World {
     const w = createWorld(cat);
-    declareRooms(w, cat.roomDefs, flagsOf(m, cat));
-    declareLinks(w, cat.linkDefs);
+    const { roomDefs, linkDefs } = m.topology
+      ? declarationsFromTopology(m.topology, cat)
+      : { roomDefs: cat.roomDefs, linkDefs: cat.linkDefs };
+    declareRooms(w, roomDefs, flagsOf(m, cat));
+    declareLinks(w, linkDefs);
     return w;
   }
 
-  function rooms(): { hall: NonNullable<ReturnType<typeof roomOf>>; lib: NonNullable<ReturnType<typeof roomOf>>; depts: NonNullable<ReturnType<typeof roomOf>>[]; out: World["links"][string]; door: NonNullable<World["machineDoor"]> } {
+  function rooms(): { hall: NonNullable<ReturnType<typeof roomOf>>; lib: NonNullable<ReturnType<typeof roomOf>>; depts: NonNullable<ReturnType<typeof roomOf>>[]; out: World["links"][string] | null; door: NonNullable<World["machineDoor"]> } {
     const list = world.roomOrder.map((id) => world.rooms[id]);
     const hall = list.find((r) => r.roomKind === "hall");
     if (!hall) throw new Error("楼层没有声明大厅");
-    const out = Object.values(world.links).find((l) => l.from === hall.id && l.linkKind === "handoff");
-    if (!out) throw new Error("大厅没有交接管道");
+    const out = Object.values(world.links).find((l) => l.from === hall.id && l.linkKind === "handoff") ?? null;
     if (!world.machineDoor) throw new Error("楼层没有声明通往机房的门");
     const lib = list.find((r) => r.roomKind === "shelf");
     if (!lib) throw new Error("楼层没有声明成果库");
@@ -223,7 +230,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     ctx.model = model;
     ctx.order = world.roomOrder;
     const specs = specsFor();
-    syncCharacters(world, scene, specs, (s) => `${s.department}.${s.roleKind}`);
+    syncCharacters(world, scene, specs, (s) => characterSprite(s.department, s.roleKind));
     mountMachines(scene, Object.values(world.characters), Object.values(world.links));
     for (const spec of specs) {
       const ch = world.characters[spec.id];
@@ -428,7 +435,11 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
         return;
       case "parcel_enter":
         flash(lay.hall.id, PAL_MAP.green2, 900);
-        send(lay.out.pts, "box", { itemId: asText(a.item), color, linkKey: lay.out.id, run, onDone: () => trip(run, lay.out.to, "package_handoff_in", run.finish) });
+        if (!lay.out) {
+          run.finish();
+          return;
+        }
+        send(lay.out.pts, "box", { itemId: asText(a.item), color, linkKey: lay.out.id, run, onDone: () => trip(run, lay.out!.to, "package_handoff_in", run.finish) });
         return;
       case "queue_moved":
         flash(lay.hall.id, PAL_MAP.blue1, 900);
@@ -578,8 +589,10 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
       case "parcel_in":
       case "queue_moved":
         return ["room:" + rooms().hall.id];
-      case "parcel_enter":
-        return ["room:" + rooms().hall.id, laneOf(rooms().out.to)].filter((x): x is string => typeof x === "string");
+      case "parcel_enter": {
+        const out = rooms().out;
+        return ["room:" + rooms().hall.id, out ? laneOf(out.to) : null].filter((x): x is string => typeof x === "string");
+      }
       case "resume":
         return Object.keys(world.characters);
       default:
@@ -637,10 +650,12 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
 
   function applyState(next: FloorModel): void {
     model = { ...next, decisions };
-    const nextFlags = flagsOf(model, catalog);
-    if (JSON.stringify(nextFlags) !== JSON.stringify(flags)) {
-      // 快照里的运维数据出现或消失：房间与管道按新的条件重新声明，角色、包裹、信号与管道的流动状态原样带过去
-      flags = nextFlags;
+    const nextSig = declSigOf(model, catalog);
+    let redeclared = false;
+    if (nextSig !== declSig) {
+      // 快照里的拓扑或开关变化：房间与管道按新声明重新排布，角色、包裹、信号与管道的流动状态原样带过去
+      declSig = nextSig;
+      redeclared = true;
       const old = world;
       world = declareWorld(model, catalog);
       world.characters = old.characters;
@@ -649,8 +664,25 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
       for (const key of Object.keys(world.links)) {
         if (old.links[key]) world.links[key].flow = old.links[key].flow;
       }
+      for (const key of Object.keys(old.links)) {
+        if (!world.links[key]) {
+          scene.machines.get(`pipe:${key}`)?.stop();
+          scene.machines.delete(`pipe:${key}`);
+          scene.pipeStates.delete(key);
+        }
+      }
     }
     syncWorkers();
+    if (redeclared) {
+      for (const ch of Object.values(world.characters)) {
+        const actor = actorOf(scene, ch.id);
+        if (actor?.seat) {
+          actor.x = actor.seat.seatX;
+          actor.y = actor.seat.seatY;
+          ch.spot = { x: actor.seat.seatX, y: actor.seat.seatY };
+        }
+      }
+    }
     // 角色被撤走（状态里的角色变了）：用到它们的动作不会再演完，时间线不再等它们
     for (const run of Array.from(runs.values())) {
       if (run.lanes.some((l) => !l.startsWith("room:") && !world.characters[l])) run.finish();
@@ -685,7 +717,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
   /** 管道通不通：快照里两端有活跃事项，或者管道上有包裹在移动。 */
   function pipeState(pipe: World["links"][string]): "flowing" | "idle" | "stopped" {
     if (model.interrupted) return "stopped";
-    const [a, b] = pipe.id.split(/[>~]/);
+    const [a, b] = pipe.id.split(/[>~<]/);
     if (waitingDept(a) || waitingDept(b)) return "stopped";
     const active = (department: string): boolean => busyItems(model, department).some((it) => ACTIVE.includes(it.status));
     if (Object.values(world.packages).some((pk) => pk.transit && pk.transit.linkKey === pipe.id)) return "flowing";

@@ -249,6 +249,10 @@ export interface RoomDef extends RoomVisual {
   w: number | ((flags: Record<string, boolean>) => number);
   when?: string;
   agentKind?: string;
+  /** 核验角色房间标记：盖章台、实心放行章与覆盖层「检验」牌子只落在这个房间。 */
+  verifier?: boolean;
+  /** 出口托盘标记：交完成角色房间带出口托盘。 */
+  exitTray?: boolean;
   ports?: string[];
   pipeOutX?: number;
   spots?: Record<string, (room: Room) => number>;
@@ -291,13 +295,15 @@ export interface Catalog {
   idle: IdleDef[];
   /** 画面上认的动作种类：级别与声明时长（原型 v13 floor-decl.js 的 KINDS，来自 TASKS 与 EFFECTS）。 */
   kinds: Record<string, { tier: "key" | "normal" | "progress"; ms: number }>;
-  /** 部门声明（运维房间的声明也在这里）。 */
+  /** 房间声明。 */
   roomDefs: RoomDef[];
   linkDefs: LinkDef[];
   flags: string[];
   deptRest: RestFn;
   roleRest: RoleRestFn;
   geo: Geo;
+  /** 按角色标识与拓扑标记给出陈设画法（由渲染层场景声明提供，纯逻辑世界可省略）。 */
+  visualOf?: (roomId: string, flags: { verifier: boolean; exitTray: boolean }) => RoomVisual;
 }
 
 /** 声明读取画面数据的窗口（原型 floor-decl.js 的 ctx）。 */

@@ -19,10 +19,12 @@ export interface SayEvent {
   payload?: Record<string, unknown> | null;
 }
 
-/** 说话时的上下文：side 为 "to" 表示这个小人是收东西的一方，roleName 给出角色名称。 */
+/** 说话时的上下文：side 为 "to" 表示这个小人是收东西的一方，roleName 给出角色名称，deptLabel 与 isVerifier 来自定义组织。 */
 export interface SayContext {
   side?: "to" | null;
   roleName?: (role: string | null) => string | null;
+  deptLabel?: (department: string) => string | null;
+  isVerifier?: (department: string | null | undefined) => boolean;
 }
 
 /** 事件载荷是按种类不同的字段集合，取值时先收窄。 */
@@ -110,7 +112,11 @@ const SUBMIT_NAME: Readonly<Record<string, string>> = {
   submit_guidance_response: "指导回复",
 };
 
-function toolText(ev: SayEvent, pl: Payload): string | null {
+function toolText(
+  ev: SayEvent,
+  pl: Payload,
+  x: { isVerifier: (department: string | null | undefined) => boolean },
+): string | null {
   const tool = text(ev.tool ?? pl.tool ?? pl.name);
   const file = fileOf(ev, pl);
   const named = (prefix: string, fallback: string): string =>
@@ -136,7 +142,7 @@ function toolText(ev: SayEvent, pl: Payload): string | null {
     const name = argOf(pl, "name");
     return "现在检查交付" + (name ? "：" + cut(name, 12) : "");
   }
-  if (/^browser/.test(tool)) return ev.department === "quality" ? "现在试用网页" : "现在自测网页";
+  if (/^browser/.test(tool)) return x.isVerifier(ev.department) ? "现在试用网页" : "现在自测网页";
   if (/^(fetch|http|net|url)/.test(tool)) return "现在取回网络资料";
   if (/^mcp/.test(tool)) return "现在调用工具";
   return null;
@@ -151,7 +157,14 @@ function fromLabel(ev: SayEvent): string | null {
 }
 
 /** 目录里的一句话：返回 null 表示这件事没有小人说话，返回 undefined 表示按事件说明写。 */
-type SayText = (ev: SayEvent, pl: Payload, x: Required<Pick<SayContext, "side">> & { roleName: (role: string | null) => string | null }) => string | null | undefined;
+type SayText = (
+  ev: SayEvent,
+  pl: Payload,
+  x: Required<Pick<SayContext, "side">> & {
+    roleName: (role: string | null) => string | null;
+    isVerifier: (department: string | null | undefined) => boolean;
+  },
+) => string | null | undefined;
 
 // 目录：事件种类 → 一句话（与原型 v13 say.js 的 TEXT 相同；x_ 前缀的原型事件没有搬）
 const TEXT: Readonly<Record<string, SayText>> = {
@@ -219,6 +232,8 @@ export function say(ev: SayEvent, x?: SayContext): string | null {
   const ctx = {
     side: x?.side ?? null,
     roleName: (role: string | null): string | null => (x?.roleName ? x.roleName(role) : null),
+    isVerifier: (department: string | null | undefined): boolean =>
+      x?.isVerifier ? x.isVerifier(department) : department === "quality",
   };
   const f = TEXT[ev.type];
   if (!f) return fromLabel(ev);
@@ -229,26 +244,48 @@ export function say(ev: SayEvent, x?: SayContext): string | null {
 /** 说话目录（画面 3、4 的动作表按它核对每种动作有没有话）。 */
 export const sayCatalog: readonly string[] = Object.keys(TEXT);
 
+const resolveDept = (id: unknown, deptLabel?: (department: string) => string | null): string => {
+  const key = text(id);
+  return (deptLabel ? deptLabel(key) : null) ?? deptName(key);
+};
+
 /** 交接的两端：交出方说把什么送给谁，接收方说收到什么。 */
-export function sayHandoff(artifact: string, from: string, to: string): { say: string; sayTo: string } {
+export function sayHandoff(
+  artifact: string,
+  from: string,
+  to: string,
+  deptLabel?: (department: string) => string | null,
+): { say: string; sayTo: string } {
   return {
-    say: "现在把" + (ARTIFACT[artifact] ?? artifact) + "送给" + deptName(to),
-    sayTo: "收到" + (ARTIFACT[artifact] ?? artifact) + "，来自" + deptName(from),
+    say: "现在把" + (ARTIFACT[artifact] ?? artifact) + "送给" + resolveDept(to, deptLabel),
+    sayTo: "收到" + (ARTIFACT[artifact] ?? artifact) + "，来自" + resolveDept(from, deptLabel),
   };
 }
 
 /** 询问的两端：发信的一方与收信的一方。 */
-export function sayAsk(ev: SayEvent): { say: string; sayTo: string } {
+export function sayAsk(
+  ev: SayEvent,
+  deptLabel?: (department: string) => string | null,
+): { say: string; sayTo: string } {
   const pl = ev.payload ?? {};
   const q = typeof pl.question === "string" && pl.question ? pl.question : afterColon(ev.label);
   const tail = q ? "：" + cut(q, 14) : "";
-  return { say: "现在向" + deptName(pl.recipient) + "发出询问" + tail, sayTo: "收到" + deptName(pl.requester) + "的询问" + tail };
+  return {
+    say: "现在向" + resolveDept(pl.recipient, deptLabel) + "发出询问" + tail,
+    sayTo: "收到" + resolveDept(pl.requester, deptLabel) + "的询问" + tail,
+  };
 }
 
 /** 回答的两端：回答的一方与收到回答的一方。 */
-export function sayAnswer(ev: SayEvent): { say: string; sayTo: string } {
+export function sayAnswer(
+  ev: SayEvent,
+  deptLabel?: (department: string) => string | null,
+): { say: string; sayTo: string } {
   const pl = ev.payload ?? {};
   const a = typeof pl.answer === "string" && pl.answer ? pl.answer : afterColon(ev.label);
   const tail = a ? "：" + cut(a, 14) : "";
-  return { say: "现在回答" + deptName(pl.requester) + "的询问", sayTo: "收到" + deptName(pl.recipient) + "的回答" + tail };
+  return {
+    say: "现在回答" + resolveDept(pl.requester, deptLabel) + "的询问",
+    sayTo: "收到" + resolveDept(pl.recipient, deptLabel) + "的回答" + tail,
+  };
 }

@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"c572db950bf178fe",
+"hash":"b62992a94970af28",
 "nodes":[
-{"hash":"c572db950bf178fe","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"b62992a94970af28","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"d7ebe3540ac0333e","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"bf40f8579f154897","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -38,7 +38,7 @@
 {"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"3d2a33c5305f251b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"3dad447c8949d8f3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"3dad447c8949d8f3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"bd54ab321c08e7c4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"d66f17067bcff879","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md#Yudao Loop System > 当前状态","kind":"section-ref","raws":["README.md"],"seen":"f7744adb2cf357e2","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f8d59912b2110a6c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/README.md","kind":"code-path","raws":["client/README.md"],"seen":"65ba0f28c0354bd6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -75,9 +75,9 @@
 {"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"43359f256dea6a3f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["design/app-and-interface.md"],"seen":"43359f256dea6a3f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","kind":"section-ref","raws":["docs/design/app-and-interface.md"],"seen":"76e2b152bf5a7095","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"841f09e7262186c3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/architecture/name-map.md","kind":"section-ref","raws":["docs/design/architecture/name-map.md"],"seen":"841f09e7262186c3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 1. 系统里的九道缝 > 接口","kind":"section-ref","raws":["docs/design/architecture/name-map.md"],"seen":"249d0066e0c98e7a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"a2caf83a65334f7a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/architecture/name-map.md","kind":"section-ref","raws":["docs/design/architecture/name-map.md"],"seen":"a2caf83a65334f7a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 1. 系统里的九道缝 > 接口","kind":"section-ref","raws":["docs/design/architecture/name-map.md"],"seen":"e37dd8c987361aed","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"code-path","raws":["design/architecture/overall-architecture.md","docs/design/architecture/overall-architecture.md"],"seen":"f27c34ba69683e5a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"section-ref","raws":["docs/design/architecture/overall-architecture.md"],"seen":"f27c34ba69683e5a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"code-path","raws":["design/browser-and-computer-use.md","docs/design/browser-and-computer-use.md"],"seen":"4f2f768d3257e006","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -90,7 +90,7 @@
 {"dst":"docs/design/existing-project-onboarding.md","kind":"code-path","raws":["docs/design/existing-project-onboarding.md"],"seen":"6bf95c92f574df11","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件","kind":"section-ref","raws":["docs/design/existing-project-onboarding.md"],"seen":"74133bc1017b1124","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.1 总体","kind":"section-ref","raws":["docs/design/existing-project-onboarding.md"],"seen":"16bc60d3a816d7e4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/external-ops-agent.md","kind":"code-path","raws":["docs/design/external-ops-agent.md"],"seen":"335d860d81ffcea6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/external-ops-agent.md","kind":"code-path","raws":["docs/design/external-ops-agent.md"],"seen":"df7f9dd4be99e54a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/forms-and-verifier-role.md","kind":"code-path","raws":["design/forms-and-verifier-role.md","docs/design/forms-and-verifier-role.md"],"seen":"7b73327b618ca36e","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"section-ref","raws":["docs/design/forms-and-verifier-role.md"],"seen":"5f846e4e9b633577","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.5 形态随事项冻结","kind":"section-ref","raws":["docs/design/forms-and-verifier-role.md"],"seen":"73bc7c4b18b70652","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -199,7 +199,7 @@
 {"dst":"harness/tests/event_scenarios.py","kind":"code-path","raws":["harness/tests/event_scenarios.py"],"seen":"aa82fb29fce68744","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/helpers.py","kind":"code-path","raws":["harness/tests/helpers.py"],"seen":"d9ee8b37264fbe09","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/kernel/mutation_reasons.json","kind":"code-path","raws":["harness/tests/kernel/mutation_reasons.json"],"seen":"215b1329f2cbed25","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"e7e8ff5a5b47ad77","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"2bf45437d796e2d2","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"e72bcfe6c0db898f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/prompt_snapshot.json","kind":"code-path","raws":["harness/tests/prompt_snapshot.json"],"seen":"b062ccbb336c210d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/protocol_helpers.py","kind":"code-path","raws":["harness/tests/protocol_helpers.py"],"seen":"ee39d49ac46328e7","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -210,7 +210,7 @@
 {"dst":"harness/tests/test_provider_candidate_prefill.py","kind":"code-path","raws":["harness/tests/test_provider_candidate_prefill.py"],"seen":"b322e65a24e22e29","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/test_provider_model_test.py","kind":"code-path","raws":["harness/tests/test_provider_model_test.py"],"seen":"d500eac29eb4a32a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/write_path.py","kind":"code-path","raws":["harness/write_path.py"],"seen":"5d3d60abea7d4b13","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"08a7ce7e61a441b6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"d2818876d112f868","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"scripts/ci_layers.py","kind":"code-path","raws":["scripts/ci_layers.py"],"seen":"b8f397890254c317","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"tools/doc-consistency/README.md#文档一致性工具 > 测试","kind":"section-ref","raws":["tools/doc-consistency/README.md"],"seen":"5e3a0834596ade1a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"}
 ]

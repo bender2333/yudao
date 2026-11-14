@@ -7,7 +7,8 @@
 import { bitmapDef } from "../char.ts";
 import { rgba } from "../grid.ts";
 import { paint } from "../paint.ts";
-import { DEPTS, ITEM_COLORS, ITEM_SHADES, PAL, PIXEL_FONT_STACK } from "../registry.ts";
+import { ITEM_COLORS, ITEM_SHADES, PAL, PIXEL_FONT_STACK } from "../registry.ts";
+import { roomShellOf, type ShellPaint } from "./render-decl.ts";
 import {
   drawActor, drawArrow, drawBitmap, drawBubble, drawIcon, drawPixelText, drawSign, drawText, headTop, measure, signStyle,
 } from "../shapes.ts";
@@ -15,7 +16,7 @@ import { polyLength, pointAt, roomOf } from "../world/declare.ts";
 import { ACTIVE, IN_ROOM, busyItems, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
-import type { FactElement, LoopsOverlayData, Source, SourceOverlayData } from "../contract.ts";
+import type { CoverageOverlayData, FactElement, LoopsOverlayData, Source, SourceOverlayData } from "../contract.ts";
 
 // 收敛状态的颜色（工单 #400）：文字与颜色同时给，五种状态与「不判定」各一种
 const LOOP_STATE_BG: Readonly<Record<string, string>> = Object.freeze({
@@ -84,28 +85,6 @@ const STATUS_CHIP: Record<string, string> = {
   waiting_resume: PAL.yellow2, upgrade_stopped: PAL.orange2, adopted: PAL.green3,
 };
 
-/** 房间外壳的画法配色（部门配色取 DEPTS 的子集）。 */
-interface ShellPaint {
-  wall: string;
-  wall2: string;
-  trim: string;
-  floor: string;
-  floor2?: string;
-}
-
-/** 部门配色（与原型 sprites.js 的 DEPTS 一致）。 */
-interface Shell extends ShellPaint {
-  name: string;
-  main: string;
-  shade: string;
-  light: string;
-  wall: string;
-  wall2: string;
-  trim: string;
-  floor: string;
-  floor2?: string;
-}
-
 /** 画一个实心矩形（画面与决定卡片共用的画布原语，坐标取整保证像素清晰）。 */
 export const R = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string): void => {
   c.fillStyle = col;
@@ -165,18 +144,19 @@ export class FloorRenderer {
     this.card?.draw(c);
   }
 
-  private rooms(): { hall: Room; lib: Room; depts: Room[]; door: NonNullable<World["machineDoor"]>; gate: Room } {
+  private rooms(): { hall: Room; lib: Room; depts: Room[]; door: NonNullable<World["machineDoor"]>; gate: Room | null } {
     const world = this.driver.world;
     const list = world.roomOrder.map((id) => world.rooms[id]);
     const hall = list.find((r) => r.roomKind === "hall");
-    const out = Object.values(world.links).find((l) => l.from === hall?.id && l.linkKind === "handoff");
-    if (!hall || !out || !world.machineDoor) throw new Error("楼层缺少大厅、交接管道或者通往机房的门");
+    const lib = list.find((r) => r.roomKind === "shelf");
+    const out = hall ? Object.values(world.links).find((l) => l.from === hall.id && l.linkKind === "handoff") : undefined;
+    if (!hall || !lib || !world.machineDoor) throw new Error("楼层缺少大厅、成果库或者通往机房的门");
     return {
       hall,
-      lib: list.find((r) => r.roomKind === "shelf")!,
+      lib,
       depts: list.filter((r) => r.roomKind === "dept"),
       door: world.machineDoor,
-      gate: world.rooms[out.to],
+      gate: out ? (world.rooms[out.to] ?? null) : null,
     };
   }
 
@@ -211,7 +191,7 @@ export class FloorRenderer {
     for (let y = 58; y < 150; y += 14) R(c, hall.x, y, hall.w, 1, "#ddd4c1");
     R(c, hall.x, 150, hall.w, 64, "#c9a77a");
     for (let x = hall.x; x < hall.x + hall.w; x += 10) R(c, x, 150, 1, 64, "#b8966a");
-    for (const room of lay.depts) this.roomShell(c, room, DEPT_SHELL[room.id]);
+    for (const room of lay.depts) this.roomShell(c, room, roomShellOf(room.id));
     this.roomShell(c, lay.lib, { wall: "#efe6d2", wall2: "#e2d5b8", floor: "#b88a58", floor2: "#a37748", trim: "#6a4a2e" });
     this.bg = cv;
     return cv;
@@ -246,9 +226,9 @@ export class FloorRenderer {
       if (ports.includes("tubeIn")) this.port(c, r.inPort, TUBE_Y, "tube");
       if (ports.includes("tubeOut")) this.port(c, r.outPort, TUBE_Y, "tube");
     }
-    // Stage 6 的判定阀门位置：交接管道上的空卡座
+    // Stage 6 的判定阀门位置：相邻交接管道上的空卡座
     for (const p of Object.values(world.links)) {
-      if (!p.def.valve) continue;
+      if (!p.def.valve || p.pts[0][1] !== PIPE_Y || p.pts[1][1] !== PIPE_Y) continue;
       const mx = Math.round((p.pts[0][0] + p.pts[1][0]) / 2);
       R(c, mx - 3, PIPE_Y - 9, 6, 2, PAL.metal4);
     }
@@ -360,8 +340,9 @@ export class FloorRenderer {
     // 队列：管道入口前的一串包裹；修复事项带红色十字
     const queue = this.queueItems();
     const slotWait = queue.some((it) => it.status === "waiting_slot");
+    const gateInX = lay.gate ? lay.gate.inPort : hall.x + hall.w + 18;
     queue.forEach((it, i) => {
-      const target = lay.gate.inPort - 20 - i * 15;
+      const target = gateInX - 20 - i * 15;
       const cur = this.driver.state.queueX[it.work_item_id] ?? target;
       const next = this.scene.reduced ? target : cur + (target - cur) * 0.12;
       this.driver.state.queueX[it.work_item_id] = next;
@@ -376,12 +357,14 @@ export class FloorRenderer {
       if (it.queue_pos) drawPixelText(c, String(it.queue_pos), px, PIPE_Y - 24, PAL.ink, "center");
     });
     // 入口阀门：等待执行槽位时关闭
-    const vx = lay.gate.inPort - 8;
-    RB(c, vx - 2, PIPE_Y - 7, 4, 14, PAL.metal3);
-    RB(c, vx - 5, PIPE_Y - 12, 10, 3, slotWait ? PAL.red2 : PAL.green2);
+    if (lay.gate) {
+      const vx = lay.gate.inPort - 8;
+      RB(c, vx - 2, PIPE_Y - 7, 4, 14, PAL.metal3);
+      RB(c, vx - 5, PIPE_Y - 12, 10, 3, slotWait ? PAL.red2 : PAL.green2);
+    }
     if (slotWait) drawSign(c, x + hall.w / 2 + 6, PIPE_Y + 38, "等待执行槽位", { size: 5.5, bg: PAL.yellow1, stripe: PAL.orange2, maxW: hall.w });
     if ((this.driver.state.flash[hall.id]?.until ?? 0) > this.scene.realT) {
-      paint.blinkFrame(c, x + 26, PIPE_Y - 20, { w: lay.gate.inPort - x - 30, h: 22 });
+      paint.blinkFrame(c, x + 26, PIPE_Y - 20, { w: gateInX - x - 30, h: 22 });
     }
     // 长椅与植物
     RB(c, x + 30, 200, 34, 4, PAL.wood2);
@@ -442,7 +425,7 @@ export class FloorRenderer {
       const a = actorOf(this.scene, ch.id);
       if (!a) continue;
       const desk = (r.seats && r.seats[ch.seatIndex]) || r.desk;
-      paint.chair(c, desk.seatX, desk.seatY, { color: DEPT_SHELL[r.id]?.shade ?? PAL.metal3 });
+      paint.chair(c, desk.seatX, desk.seatY, { color: roomShellOf(r.id).shade });
       const sitting = a.seat === desk;
       if (sitting) drawActor(c, this.scene, a, "base");
       paint.desk(c, desk.x, desk.seatY, { w: desk.w });
@@ -630,8 +613,8 @@ export class FloorRenderer {
 
   private roomLabels(c: CanvasRenderingContext2D, t: number): void {
     for (const r of this.rooms().depts) {
-      const dept = DEPT_SHELL[r.id];
-      drawSign(c, r.x + r.w / 2, 54, dept?.name ?? r.label, { size: 7, bg: dept?.main ?? PAL.paper, fg: PAL.white, hi: dept?.light, lo: dept?.shade, minW: 30 });
+      const dept = roomShellOf(r.id);
+      drawSign(c, r.x + r.w / 2, 54, r.label || dept.name, { size: 7, bg: dept.main, fg: PAL.white, hi: dept.light, lo: dept.shade, minW: 30 });
       const here = this.itemsIn(r.id);
       here.forEach((it, i) => {
         const fx = r.door - 22 - i * 9;
@@ -673,10 +656,10 @@ export class FloorRenderer {
     this.stamps(c);
   }
 
-  /** 质检屋里盖章台旁的实心放行章（工单 #1382）：随放行到来，登记进事实元件命中矩形。 */
+  /** 核验角色屋里盖章台旁的实心放行章（工单 #1382、#1383）：随放行到来，登记进事实元件命中矩形。 */
   private stamps(c: CanvasRenderingContext2D): void {
-    const qRoom = roomOf(this.driver.world, "quality");
-    if (!qRoom) return;
+    const verifierRoom = this.rooms().depts.find((r) => Boolean(r.def.verifier)) ?? null;
+    if (!verifierRoom) return;
     const stamped = this.driver.model.items.filter(
       (it) => Boolean(it.refs?.stamp) || it.status === "done" || it.status === "adopted",
     );
@@ -685,7 +668,7 @@ export class FloorRenderer {
       const missing = noSource(refs, "stamp");
       const sw = 22;
       const sh = 9;
-      const sx = qRoom.x + qRoom.w - 36;
+      const sx = verifierRoom.x + verifierRoom.w - 36;
       const sy = 190 - idx * 12;
       this.factRects.push({
         work_item_id: it.work_item_id,
@@ -742,7 +725,10 @@ export class FloorRenderer {
 
   private overlayLayer(c: CanvasRenderingContext2D): void {
     const overlay = this.overlay;
-    if (!overlay.id || !overlay.data) return;
+    const data = overlay.id === "coverage"
+      ? ((this.driver.model.coverage as unknown as Record<string, unknown> | null | undefined) ?? overlay.data)
+      : overlay.data;
+    if (!overlay.id || !data) return;
     this.overlayLabels = [];
     c.fillStyle = "rgba(12,14,30,0.35)";
     c.fillRect(0, BAR, W, H - BAR);
@@ -751,7 +737,6 @@ export class FloorRenderer {
       const rect = drawSign(c, x, y, text, { size: 6, bg: bg ?? PAL.white, stripe: PAL.blue2, maxW: 150 });
       this.overlayLabels.push({ ...rect, key });
     };
-    const data = overlay.data;
     if (overlay.id === "flow") {
       const segments = (data.segments ?? []) as { from: string; to: string; count: number; last_at: string; kind: string }[];
       // 同一对部门的非返工行与返工行走同一条路径（工单 #415 的分组），方向相反的两段也走同一条路径
@@ -801,6 +786,93 @@ export class FloorRenderer {
       this.sourceOverlay(c, data as unknown as SourceOverlayData);
     } else if (overlay.id === "loops") {
       this.loopsOverlay(label, data as unknown as LoopsOverlayData);
+    } else if (overlay.id === "coverage") {
+      this.coverageOverlay(c, data as unknown as CoverageOverlayData);
+    }
+  }
+
+  /**
+   * 覆盖层「检验」（工单 #1420，画面与播放 docs/design/visualization.md「七种元件与对照表」「开环完成与放行」）：
+   * 信息条下方横幅显示检验覆盖比例与开环条件条数，核验角色房间列出每条验收条件的检验方式与结果，
+   * 右上角给出通过、不通过、未核验与开环条件计数图例；文字与色带同时表达状态，不单靠颜色区分。
+   */
+  private coverageOverlay(c: CanvasRenderingContext2D, data: CoverageOverlayData): void {
+    const summaryBg = data.bar.criteria_total === 0
+      ? PAL.paper
+      : data.bar.open === 0 && data.bar.covered === data.bar.criteria_total
+        ? PAL.green1
+        : PAL.yellow1;
+    const summaryStripe = data.bar.criteria_total === 0
+      ? PAL.grey3
+      : data.bar.open === 0 && data.bar.covered === data.bar.criteria_total
+        ? PAL.green3
+        : PAL.orange1;
+    const summaryRect = drawSign(c, 250, 35, data.bar.text, {
+      size: 6,
+      bg: summaryBg,
+      stripe: summaryStripe,
+      maxW: 460,
+    });
+    this.overlayLabels.push({ ...summaryRect, key: "coverage:summary" });
+
+    const legendStyle = (key: CoverageOverlayData["legend"][number]["key"]): { bg: string; stripe: string } => {
+      if (key === "passed") return { bg: PAL.green1, stripe: PAL.green3 };
+      if (key === "failed") return { bg: PAL.red1, stripe: PAL.red3 };
+      if (key === "open") return { bg: PAL.yellow1, stripe: PAL.orange1 };
+      return { bg: PAL.paper, stripe: PAL.grey3 };
+    };
+    data.legend.forEach((row, index) => {
+      const style = legendStyle(row.key);
+      const rect = drawSign(c, W - 58, 35 + index * 15, row.text, {
+        size: 6,
+        bg: style.bg,
+        stripe: style.stripe,
+        minW: 72,
+        maxW: 104,
+      });
+      this.overlayLabels.push({ ...rect, key: `coverage:legend:${row.key}` });
+    });
+
+    const depts = this.rooms().depts;
+    const verifierRoom = depts.find((r) => Boolean(r.def.verifier))
+      ?? (depts.length > 0 ? depts[depts.length - 1]! : null);
+    const singleColumn = data.criteria.length <= 8;
+    const maxSlots = singleColumn ? 8 : 16;
+    const overflow = data.criteria.length > maxSlots;
+    const visible = overflow ? data.criteria.slice(0, maxSlots - 1) : data.criteria;
+    const baseCx = Math.max(128, Math.min(396, verifierRoom ? verifierRoom.x + verifierRoom.w / 2 : W / 2));
+
+    visible.forEach((entry, index) => {
+      const bg = entry.result === "passed" ? PAL.green1 : entry.result === "failed" ? PAL.red1 : PAL.paper;
+      const stripe = entry.open
+        ? PAL.orange1
+        : entry.result === "passed"
+          ? PAL.green3
+          : entry.result === "failed"
+            ? PAL.red3
+            : PAL.grey3;
+      const cx = singleColumn ? baseCx : (index % 2 === 0 ? 186 : 412);
+      const rowIndex = singleColumn ? index : Math.floor(index / 2);
+      const rect = drawSign(c, cx, 98 + rowIndex * 15, entry.text, {
+        size: 6,
+        bg,
+        stripe,
+        maxW: singleColumn ? 236 : 212,
+      });
+      this.overlayLabels.push({ ...rect, key: `coverage:criterion:${entry.criterion}` });
+    });
+
+    if (overflow) {
+      const lastIndex = maxSlots - 1;
+      const cx = singleColumn ? baseCx : (lastIndex % 2 === 0 ? 186 : 412);
+      const rowIndex = singleColumn ? lastIndex : Math.floor(lastIndex / 2);
+      const rect = drawSign(c, cx, 98 + rowIndex * 15, `其余 ${data.criteria.length - visible.length} 条见页面`, {
+        size: 6,
+        bg: PAL.paper,
+        stripe: PAL.grey3,
+        maxW: singleColumn ? 236 : 212,
+      });
+      this.overlayLabels.push({ ...rect, key: "coverage:more" });
     }
   }
 
@@ -892,7 +964,7 @@ export class FloorRenderer {
     }
   }
 
-  /** 上传不进行中的事项的信息条：轮次、已用时间与上限、当前部门、状态。 */
+  /** 上方进行中的事项信息条：轮次、已用时间与上限、所在职能、状态。 */
   private infoBar(c: CanvasRenderingContext2D): void {
     R(c, 0, 0, W, BAR, "#1f2230");
     R(c, 0, BAR - 1, W, 1, "#3a3f52");
@@ -928,8 +1000,10 @@ export class FloorRenderer {
         drawn: !noSource(refs, "round"),
       });
     }
-    const dept = it.department ? DEPT_SHELL[it.department] : null;
-    if (dept) chip(`当前部门：${dept.name}`, dept.light);
+    const deptRoom = it.department ? roomOf(this.driver.world, it.department) : null;
+    const deptShell = it.department ? roomShellOf(it.department) : null;
+    const deptLabel = deptRoom?.label || deptShell?.name || it.department;
+    if (it.department && deptLabel && deptShell) chip(`所在职能：${deptLabel}`, deptShell.light);
     chip(STATUS_TEXT[it.status] ?? it.status, STATUS_CHIP[it.status] ?? PAL.grey2, ["working", "failed", "adopted", "asking"].includes(it.status) ? PAL.white : PAL.ink);
     if (it.time_limit_sec) {
       const k = Math.min(1, (it.elapsed_sec ?? 0) / it.time_limit_sec);
@@ -1003,9 +1077,6 @@ export class FloorRenderer {
   }
 }
 
-/** 部门配色：与原型 sprites.js 的 DEPTS 一致。 */
-const DEPT_SHELL: Record<string, Shell> = DEPTS as unknown as Record<string, Shell>;
-
 /** 一句话在头顶停留的毫秒数（原型 say.js 的 P.sayMs）。 */
 export function sayMs(text: string): number {
   return Math.min(4600, 1800 + String(text).length * 170);
@@ -1074,9 +1145,9 @@ function tubePts(world: World, from: string, to: string): [number, number][] | n
 }
 
 function pathFor(world: World, from: string, to: string): [number, number][] | null {
-  const direct = world.links[from + ">" + to];
+  const direct = world.links[from + ">" + to] ?? world.links[from + "<" + to];
   if (direct) return direct.pts;
-  const back = world.links[to + ">" + from];
+  const back = world.links[to + ">" + from] ?? world.links[to + "<" + from];
   if (back) return back.pts.slice().reverse();
   return tubePts(world, from, to);
 }

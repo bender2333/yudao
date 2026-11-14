@@ -335,6 +335,35 @@ curl -X POST http://localhost:8765/api/commands/department_settings.save \
 
 Prompt 在该职能的下一轮工作开始时生效，正在进行的一轮工作不受影响。
 
+### 8. 通用命令行与随包运维技能
+
+除直接发送 HTTP 请求外，`yudao` 提供连接运行中服务的通用命令行子命令（默认连接 `http://127.0.0.1:8765`，可通过 `--url` 或环境变量 `YUDAO_URL` 指定；局域网模式支持 `YUDAO_TOKEN`、`--token-stdin` 或 `--token`），以及面向外部通用智能体的随包运维技能（见[进程外运维代理与通用命令行设计说明](docs/design/external-ops-agent.md)）：
+
+```bash
+# 读取运行中实例的能力清单（部署身份、访问方式、已登记查询与命令）
+yudao capabilities
+
+# 查看单个命令或查询的完整调用说明（输入字段、必填约束、枚举、返回结构与拒绝原因）
+yudao describe project.create
+yudao describe project.overview
+
+# 读取任意已登记查询（支持重复 --param、--json 与历史位置 --at）
+yudao query project.overview --param project_id={project_id}
+
+# 提交幂等命令（未指定 --command-id 时自动生成 UUID；敏感载荷经 --stdin 从标准输入传入）
+yudao command project.create --string-param name="我的项目" --string-param goal="构建统计工具"
+yudao command work_item.create --string-param project_id={project_id} --string-param text="创建 hello world 脚本"
+
+# 有界订阅事件流：逐行输出独立 JSON，满足条数、目标位置或目标事件种类后立即以退出码 0 结束
+# （到达 --timeout 未命中条件时向标准错误输出最新扫描位置并以退出码 4 结束；收到 resync 时以退出码 5 结束）
+yudao events --after {position} --work-item {work_item_id} --until-type run_done --until-type decision_requested --timeout 120
+
+# 查看随包分发的进程外三通道运维技能全文，或将其安装到外部智能体的技能目录
+yudao skill show
+yudao skill install ~/.claude/skills/yudao-ops
+yudao skill install ~/.claude/skills/yudao-ops --force
+```
+
 ## HTTP 接口
 
 `python -m harness api`（无参启动相同）提供的应用接口：`POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）、`GET /api/queries/{名称}`（快照与位置）、`GET /api/events`（按范围筛选、从位置补齐的事件流）、`GET /api/capabilities`（能力清单）、`GET /openapi.json`；已登记的命令与查询以能力清单为准。查询只读，创建事项与取消走命令，界面不能直接改 spec、投影或完成状态。
