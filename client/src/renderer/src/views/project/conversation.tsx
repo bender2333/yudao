@@ -179,16 +179,52 @@ export function ConversationPage(props: {
   const graphPick: LoopPanelPick = pick === null || pick === ITEM_PANEL_PICK || pick === ALL_ITEMS_PICK
     ? null
     : (pick.kind === "node" || pick.kind === "arrow") ? pick : null;
-  const open = (value: LoopPanelTarget): void => setPanel({ item: itemId, value });
+  // 用户收起面板、切换面板或收起来源详情时立即抑制当前路由对象的 at，等待新路由到达（工单 #1745）
+  const [clearedForRoute, setClearedForRoute] = useState<Route | null>(null);
+  const effectiveAt = clearedForRoute === props.route ? null : props.route.at;
+  const openedAtKeyRef = useRef<string | null>(null);
+  const clearRoutePosition = (): void => {
+    if (props.route.at === null) {
+      return;
+    }
+    openedAtKeyRef.current = null;
+    setClearedForRoute(props.route);
+    const workItem = itemId !== "" ? itemId : props.route.workItemId;
+    props.onNavigate(paths.conversation(projectId, { workItem }));
+  };
+  const open = (value: LoopPanelTarget): void => {
+    setPanel({ item: value === null ? null : itemId, value });
+    clearRoutePosition();
+  };
   // 事项面板（工单 #1708）：点选事项一行里选中那件的标题，同一个位置换成这一件事项的面板
   const openItem = (): void => setPanel({ item: itemId, value: ITEM_PANEL_PICK });
   // 全部事项（工单 #1709）：同一个位置换成这个项目的分组列表
-  const openAllItems = (): void => setPanel({ item: itemId, value: ALL_ITEMS_PICK });
+  const openAllItems = (): void => {
+    setPanel({ item: itemId, value: ALL_ITEMS_PICK });
+    clearRoutePosition();
+  };
+  // 回链地址带有 ?at= 时，在选中事项就绪后自动展开事项面板读取对应位置的原始事件（工单 #1745）
+  useEffect(() => {
+    if (effectiveAt === null) {
+      openedAtKeyRef.current = null;
+      return;
+    }
+    if (loop.data === null) {
+      return;
+    }
+    const key = `${projectId}:${props.route.workItemId ?? ""}:${effectiveAt}`;
+    if (openedAtKeyRef.current === key) {
+      return;
+    }
+    openedAtKeyRef.current = key;
+    setPanel({ item: itemId, value: ITEM_PANEL_PICK });
+  }, [loop.data, projectId, props.route.workItemId, effectiveAt, itemId]);
   // 从全部事项里点了一件：已经画着的那件直接换面板，别的那件先切过去（切过去以后才开面板）
   const [pendingItem, setPendingItem] = useState<string | null>(null);
   const pickFromAllItems = (workItem: string): void => {
     if (workItem === itemId) {
       setPanel({ item: itemId, value: ITEM_PANEL_PICK });
+      clearRoutePosition();
       return;
     }
     setPendingItem(workItem);
@@ -345,7 +381,24 @@ export function ConversationPage(props: {
       {loop.data === null ? null : (
         <>
           {items.length === 0 ? (
-            <Empty text="这个项目还没有事项。在下面写一句，就开始做。" />
+            <>
+              <Empty text="这个项目还没有事项。在下面写一句，就开始做。" />
+              {pick === ITEM_PANEL_PICK ? (
+                <div ref={panelRef}>
+                  <ItemPanel
+                    app={props.app}
+                    projectId={projectId}
+                    workItemId={itemId}
+                    loop={loop}
+                    overview={overview}
+                    initialPosition={effectiveAt}
+                    onClearPosition={clearRoutePosition}
+                    onClose={() => open(null)}
+                    onNavigate={props.onNavigate}
+                  />
+                </div>
+              ) : null}
+            </>
           ) : (
             <>
               <ItemPicker
@@ -447,6 +500,8 @@ export function ConversationPage(props: {
                       workItemId={itemId}
                       loop={loop}
                       overview={overview}
+                      initialPosition={effectiveAt}
+                      onClearPosition={clearRoutePosition}
                       onClose={() => open(null)}
                       onNavigate={props.onNavigate}
                     />
