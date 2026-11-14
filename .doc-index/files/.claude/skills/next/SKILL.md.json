@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/next/SKILL.md",
-"hash":"cfc8aa3766c93a70",
+"hash":"52ef7ce51b6726ce",
 "nodes":[
-{"hash":"cfc8aa3766c93a70","id":".claude/skills/next/SKILL.md","kind":"file","title":".claude/skills/next/SKILL.md"},
+{"hash":"52ef7ce51b6726ce","id":".claude/skills/next/SKILL.md","kind":"file","title":".claude/skills/next/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/next/SKILL.md#(开头)","kind":"section","parent":".claude/skills/next/SKILL.md","title":"(开头)"},
 {"hash":"288bd57cc6e3f8a4","id":".claude/skills/next/SKILL.md#name: nextdescription: 子架构师在用户在场时的入口：从 GitHub 读整个项目的状态，按固定顺序找到第一件能做的事（等用户的事、交接点、达到的薄片、设计未写的桶、等拆的父工单、前提已成立的等待、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论，一次做一件、先出一张等用户的卡。交接点（到期的 waiting、needs-triage、解除阻塞的 ready-for-human、子工单全关的父工单）按架构师循环技能做。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。argument-hint: \"[范围：里程碑名 | 里程碑编号 | 标签 | 全部]\"","kind":"section","parent":".claude/skills/next/SKILL.md","title":"name: nextdescription: 子架构师在用户在场时的入口：从 GitHub 读整个项目的状态，按固定顺序找到第一件能做的事（等用户的事、交接点、达到的薄片、设计未写的桶、等拆的父工单、前提已成立的等待、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论，一次做一件、先出一张等用户的卡。交接点（到期的 waiting、needs-triage、解除阻塞的 ready-for-human、子工单全关的父工单）按架构师循环技能做。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。argument-hint: \"[范围：里程碑名 | 里程碑编号 | 标签 | 全部]\""},
 {"hash":"6e3ef128ebc5e2a5","id":".claude/skills/next/SKILL.md#下一件事","kind":"section","parent":".claude/skills/next/SKILL.md","title":"下一件事"},
@@ -20,7 +20,7 @@
 {"hash":"017f22ec7abbd2ac","id":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 6","kind":"row","parent":".claude/skills/next/SKILL.md#下一件事 > 找下一件事","title":"6"},
 {"hash":"32180dbd692c4751","id":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 7","kind":"row","parent":".claude/skills/next/SKILL.md#下一件事 > 找下一件事","title":"7"},
 {"hash":"e17a6692d6df0f68","id":".claude/skills/next/SKILL.md#下一件事 > 做一件事","kind":"section","parent":".claude/skills/next/SKILL.md#下一件事","title":"做一件事"},
-{"hash":"448ae0b59bc4d0bd","id":".claude/skills/next/SKILL.md#下一件事 > 长运行","kind":"section","parent":".claude/skills/next/SKILL.md#下一件事","title":"长运行"},
+{"hash":"7e039a6cc18b0f83","id":".claude/skills/next/SKILL.md#下一件事 > 长运行","kind":"section","parent":".claude/skills/next/SKILL.md#下一件事","title":"长运行"},
 {"hash":"2616fdebab463ddc","id":".claude/skills/next/SKILL.md#下一件事 > 交给用户","kind":"section","parent":".claude/skills/next/SKILL.md#下一件事","title":"交给用户"},
 {"hash":"a3a0634fcfffb4d8","id":".claude/skills/next/SKILL.md#下一件事 > 常见借口","kind":"section","parent":".claude/skills/next/SKILL.md#下一件事","title":"常见借口"},
 {"hash":"a787b8c608c3da79","id":".claude/skills/next/SKILL.md#下一件事 > 常见借口 > 表1 > 「这一项上一轮看过，结论还记得」","kind":"row","parent":".claude/skills/next/SKILL.md#下一件事 > 常见借口","title":"「这一项上一轮看过，结论还记得」"},

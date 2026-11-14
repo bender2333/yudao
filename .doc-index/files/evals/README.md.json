@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"evals/README.md",
-"hash":"b491be7bb749b652",
+"hash":"75f893ad95102686",
 "nodes":[
-{"hash":"b491be7bb749b652","id":"evals/README.md","kind":"file","title":"evals/README.md"},
+{"hash":"75f893ad95102686","id":"evals/README.md","kind":"file","title":"evals/README.md"},
 {"hash":"9b652f34d4875a7c","id":"evals/README.md#评测工具","kind":"section","parent":"evals/README.md","title":"评测工具"},
 {"hash":"ac83a2bac697b875","id":"evals/README.md#评测工具 > 目录结构","kind":"section","parent":"evals/README.md#评测工具","title":"目录结构"},
 {"hash":"36cd928f14a11951","id":"evals/README.md#评测工具 > 材料版本","kind":"section","parent":"evals/README.md#评测工具","title":"材料版本"},
@@ -11,8 +11,9 @@
 {"hash":"4adbb5735445273a","id":"evals/README.md#评测工具 > 运行评分器","kind":"section","parent":"evals/README.md#评测工具","title":"运行评分器"},
 {"hash":"db6c233f00f3a610","id":"evals/README.md#评测工具 > 运行评分器自己的测试","kind":"section","parent":"evals/README.md#评测工具","title":"运行评分器自己的测试"},
 {"hash":"0c4d94a102f080e3","id":"evals/README.md#评测工具 > 运行一次评测","kind":"section","parent":"evals/README.md#评测工具","title":"运行一次评测"},
+{"hash":"a9840d613b7dfd8a","id":"evals/README.md#评测工具 > 运行一次评测 > 按形态运行","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"按形态运行"},
 {"hash":"a6f7098a509e6b21","id":"evals/README.md#评测工具 > 运行一次评测 > 场景 2 的运行","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"场景 2 的运行"},
-{"hash":"e5a29bfb7113d87c","id":"evals/README.md#评测工具 > 运行一次评测 > 五项过程检查点","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"五项过程检查点"},
+{"hash":"a518307c4540739a","id":"evals/README.md#评测工具 > 运行一次评测 > 五项过程检查点","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"五项过程检查点"},
 {"hash":"86e9e426c6a62613","id":"evals/README.md#评测工具 > 运行一次评测 > 第一次与最终两份交付","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"第一次与最终两份交付"},
 {"hash":"87b676cab0ab38ed","id":"evals/README.md#评测工具 > 运行一次评测 > Yudao 对 OpenCode 的对照（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"Yudao 对 OpenCode 的对照（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）"},
 {"hash":"e51cc479bbe159fa","id":"evals/README.md#评测工具 > 运行一次评测 > 用量的未知值","kind":"section","parent":"evals/README.md#评测工具 > 运行一次评测","title":"用量的未知值"},

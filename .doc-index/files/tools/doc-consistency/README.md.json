@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"tools/doc-consistency/README.md",
-"hash":"30f0bd0116c3e26b",
+"hash":"6fe8d1c385c5e236",
 "nodes":[
-{"hash":"30f0bd0116c3e26b","id":"tools/doc-consistency/README.md","kind":"file","title":"tools/doc-consistency/README.md"},
+{"hash":"6fe8d1c385c5e236","id":"tools/doc-consistency/README.md","kind":"file","title":"tools/doc-consistency/README.md"},
 {"hash":"b1cdd98b215851f3","id":"tools/doc-consistency/README.md#文档一致性工具","kind":"section","parent":"tools/doc-consistency/README.md","title":"文档一致性工具"},
 {"hash":"fb17a25e25161fdd","id":"tools/doc-consistency/README.md#文档一致性工具 > 运行","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"运行"},
 {"hash":"44bdc022c1ab7523","id":"tools/doc-consistency/README.md#文档一致性工具 > 命令","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"命令"},
@@ -15,7 +15,7 @@
 {"hash":"f711ebd5c512d0c5","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 以谁为准的正本","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","title":"以谁为准的正本"},
 {"hash":"d23df772f468b20c","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 基线（rules baseline）","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","title":"基线（rules baseline）"},
 {"hash":"c23f3c23f1b22291","id":"tools/doc-consistency/README.md#文档一致性工具 > 阅读范围怎么算","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"阅读范围怎么算"},
-{"hash":"ab4d5b7ad90caa35","id":"tools/doc-consistency/README.md#文档一致性工具 > 测试","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"测试"},
+{"hash":"5e3a0834596ade1a","id":"tools/doc-consistency/README.md#文档一致性工具 > 测试","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"测试"},
 {"hash":"2de97049add11367","id":"tools/doc-consistency/README.md#文档一致性工具 > 依赖","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"依赖"}
 ],
 "edges":[
@@ -29,7 +29,7 @@
 {"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"2466257a69985e0f","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"tools/doc-consistency/data/record-docs.json","kind":"code-path","raws":["data/record-docs.json"],"seen":"eaf7cfe5858ba800","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
-{"dst":"tools/doc-consistency/pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"6609bf8d44ed2680","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
+{"dst":"tools/doc-consistency/pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"e579af3cd0f9d47c","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
 {"dst":"agents_jour/其他.md","kind":"code-path","raws":["agents_jour/其他.md"],"seen":"6059a5deb866c6de","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"ffc6ac98d65b00b1","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"2466257a69985e0f","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},

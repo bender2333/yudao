@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"claude_jour.md",
-"hash":"6b244e05e8380ff0",
+"hash":"ef335177a9e70cad",
 "nodes":[
-{"hash":"6b244e05e8380ff0","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
+{"hash":"ef335177a9e70cad","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
 {"hash":"028833a01631910c","id":"claude_jour.md#Claude 执行日记 (Claude Journal)","kind":"section","parent":"claude_jour.md","title":"Claude 执行日记 (Claude Journal)"},
 {"hash":"48043ae754efd878","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 记录格式规范","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"记录格式规范"},
 {"hash":"16623160c7b059eb","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:10 状态文档与一次改完","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:10 状态文档与一次改完"},
@@ -54,7 +54,7 @@
 {"hash":"db9002ec4821f2d7","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表"},
 {"hash":"315a635e388ebc10","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 13:32 第 4 步：事实层过线，提醒层没过","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 13:32 第 4 步：事实层过线，提醒层没过"},
 {"hash":"f3a7507cbd076e00","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 13:57 第 5 步：正本与写法进规则","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 13:57 第 5 步：正本与写法进规则"},
-{"hash":"643fffb6ef1561d7","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"}
+{"hash":"f5d1547cbc41df37","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"}
 ],
 "edges":[
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 19:40 规则文件与技能的历史清理"},
@@ -102,19 +102,21 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
 {"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md:16"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表"},
 {"dst":".claude/skills/README.md","kind":"code-path","raws":[".claude/skills/README.md"],"seen":"d27211c6b7ef68d6","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":".claude/skills/next/SKILL.md","kind":"code-path","raws":[".claude/skills/next/SKILL.md"],"seen":"cfc8aa3766c93a70","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"5f7d027a73bc7026","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":".claude/skills/next/SKILL.md","kind":"code-path","raws":[".claude/skills/next/SKILL.md"],"seen":"52ef7ce51b6726ce","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"bafadb9df23df544","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"553d8bfa97603bab","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"553d8bfa97603bab","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"a8c6892a917172d5","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"CLAUDE.md#思考模式 > 文档地址与结构","kind":"section-ref","raws":["CLAUDE.md"],"seen":"d903c0a9144e8fe4","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"a3bc50edde9feef5","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"4882a9976309e8ac","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"1743191019dc8933","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"dd9de092371019e9","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"86e6e47666a17977","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/agents/autopilot-runtime.md","kind":"code-path","raws":["docs/agents/autopilot-runtime.md"],"seen":"9bbb7c43a33e4456","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"docs/consistency-scan-2026-11-03.md","kind":"code-path","raws":["docs/consistency-scan-2026-11-03.md"],"seen":"33cc4b05e042e29d","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"63399292dc0d3bce","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["docs/design/app-and-interface.md"],"seen":"d22af4ab7e05f4ca","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"docs/design/project-organization.md","kind":"code-path","raws":["docs/design/project-organization.md"],"seen":"28e55440fa3bb002","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"docs/design/project-organization.md","kind":"link","raws":["docs/design/project-organization.md"],"seen":"28e55440fa3bb002","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"c22ab21af0ded60f","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["docs/design/app-and-interface.md"],"seen":"1f56412394c8caa4","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/design/project-organization.md","kind":"code-path","raws":["docs/design/project-organization.md"],"seen":"fbbf58b3b731d4cb","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["docs/design/project-organization.md"],"seen":"fbbf58b3b731d4cb","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"docs/design/rules-and-parameters.md","kind":"code-path","raws":["docs/design/rules-and-parameters.md"],"seen":"d4442d7c71888e2a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 测试按三环留 > 12.2 新增测试怎么进来","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"5ed6460f3109f5ea","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.4 用例的变化","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"ccd563fa226fa879","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
@@ -123,8 +125,9 @@
 {"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"3c6c4db3a13db887","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"docs/prototypes/CHANGELOG.md","kind":"code-path","raws":["docs/prototypes/CHANGELOG.md"],"seen":"da96aa1a92d4a15d","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"docs/research/uncle-bob-ub-mode.md","kind":"code-path","raws":["docs/research/uncle-bob-ub-mode.md"],"seen":"2507f5137b9b3647","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"a1fbef327d601d9d","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"22e90d61811ac478","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
 {"dst":"harness/thin_driver.py","kind":"code-path","raws":["harness/thin_driver.py"],"seen":"3861d4f1bd0163c2","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
-{"dst":"scripts/release.py","kind":"code-path","raws":["scripts/release.py"],"seen":"c462d8e5effb2c45","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"}
+{"dst":"scripts/release.py","kind":"code-path","raws":["scripts/release.py"],"seen":"c462d8e5effb2c45","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"},
+{"dst":"tools/doc-consistency/tests/rulefacts/test_planted.py","kind":"code-path","raws":["tools/doc-consistency/tests/rulefacts/test_planted.py"],"seen":"cb5feb13da94ee2f","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 15:54 第 6 步：迁移存量，自己的尾巴被翻出来"}
 ]
 }

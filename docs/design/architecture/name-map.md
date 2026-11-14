@@ -14,7 +14,7 @@
 
 内环六步各对应一道缝，不另列行：1 路由与边界 → 路由、写入口内侧（边界）；2 装配 → 装配；3 模型 / 外包 → 模型、执行（外包角色）；4 工具与环境 → 动作；5 裁决与写入口 → 写入口；6 投影 → 投影。
 
-路径省略的前缀：Python 在 `harness/` 下，TypeScript 在 `client/src/renderer/src/` 下。
+路径省略的前缀：Python 在 `harness/` 下，页面的 TypeScript 在 `client/src/renderer/src/` 下，画面的 TypeScript 在 `view/src/` 下。
 
 ## 1. 系统里的九道缝
 
@@ -160,19 +160,19 @@
 
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
-| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | 还在 `client/src/renderer/src/` 里，与页面同一个目录、同一份依赖与构建：`pixel/`、`translate/`，挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx`，图鉴 `views/pixel/gallery.tsx`，开发挂载 `pixel/floor/dev-mount`（`main.tsx` 引入） | 画面；画面的阶段步 0 | 不一致：没有单独的目录、依赖与构建；页面取画面的文字与颜色（`views/project/labels.ts`、`materials.tsx`），翻译层反过来取页面的职能名与卡片文字（`translate/floor.ts`） |
-| 壳 | 画面总图第一节「壳」、第四节「回调」 | 没有单独的壳：三个挂载兼做连接，回调直接调页面的函数 | 画面 | 不一致：回调不经命令发现，点开回链在画布上画卡片 |
-| 画面的同步层 | 画面总图第四节「读事实」 | 与页面共用 `contract/view-sync.ts` | 画面 | 不一致：画面没有自己的一份 |
-| 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类取自客户端夹具 `client/tests/fixtures/event-types.json`，由服务端的 `harness/tests/test_event_type_fixture.py` 与 `EVENT_TYPES` 核对；`translate/coverage.ts` 缺一种事件就测试失败；缺口清单：无 | 画面 | 不一致：服务端为画面维护夹具；不认识的事件让测试失败，不进缺口清单 |
-| 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属） | 画面 | 一致 |
-| 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`）；页面里的挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx` | 画面；道 09 | 不一致：叫 pixel，不叫画面层；输入类型带 Pixel 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
+| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | `view/`：单独的依赖（`view/package.json`）、构建（`view/vite.config.ts`）、生成的接口类型（`api/generated/`、`api/interface-version.ts` 的 `VIEW_API_VERSION`）、场景挂载（`scenes/building.tsx`、`scenes/floor.tsx`、`scenes/room.tsx`）、入口（`main.tsx`）、图鉴（`gallery.tsx`）与测试（`view/tests/`）；发布脚本 `scripts/release.py` 构建画面放进 `harness/release_assets/view/`，地址 `/view/` | 画面；画面的阶段步 0 | 一致 |
+| 壳 | 画面总图第一节「壳」、第四节「回调」 | `shell.ts`（`createShell`、`ShellState`、`SceneSurface`）：从能力清单发现命令并带命令身份发出，把点开回链变成 Yudao 页面带位置的路径在新标签页打开，场景切换在壳内完成，提示接口版本与连接状态 | 画面 | 一致 |
+| 画面的同步层 | 画面总图第四节「读事实」 | `sync/sync.ts` 的 `SyncEngine`、`ViewSync`，`sync/connection.ts`，`sync/stream.ts` 的 `EventStream`（画面独立的一份，不导入 `client/`） | 画面 | 一致 |
+| 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类在运行时取自能力清单 `/api/capabilities` 的 `event_types`，测试里取自接口描述 `harness/tests/openapi/openapi.json`；`translate/coverage.ts` 的 `COVERAGE`、`eventGaps`、`gapLines`、`overlayProblems`，未归类的事件进缺口清单并在 `ShellState.eventGaps` 与 `ShellState.gap` 显示，新增事件不让测试失败 | 画面 | 一致 |
+| 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`face.ts`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属与缺口清单） | 画面 | 一致 |
+| 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`、`timeline.ts`），场景挂载在 `scenes/` | 画面；道 09 | 不一致：目录叫 `pixel`，输入类型带 `Pixel` 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
 | 元件断言、回链 | 第四节画面的规矩（回链）；画面总图第四节「映射」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
 | 播放参数 | 画面总图第二节「调节参数」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
 | 七种元件的对照表 | 画面总图第四节「映射」 | `translate/coverage.ts`：事件在三个场景的归属 `COVERAGE`、覆盖层的中文名 `OVERLAY_LABELS`；概念到元件的行：无 | 画面；道 09 | 不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对 |
 | 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个职能字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按职能名分支 |
 | 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按职能 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按职能名取，不按核验角色 |
 | 章（放行、开环完成） | 画面总图第五节 | 合同 `pixel/contract.ts` 的 `Stamp`（楼层状态的 `stamp`）；动作 `stamp_release`、`stamp_defect`、`stamp_valid`（`translate/floor.ts`）；开环完成章：无 | 画面 | 不一致：开环完成章代码里还没有 |
-| 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布上的来源卡片 `pixel/floor/card.ts` 的 `createSourceCard`，卡片内容 `SourceCardFace`（`pixel/contract.ts`）画原始事件与差异 | 画面（页面一侧） | 不一致：细内容画在画布上，没有交给页面 |
+| 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布点击事实元件交出回调 `onOpenSource`（`pixel/floor/view.ts`），壳 `shell.ts` 生成带项目、事项与位置的页面路径在新标签页打开；页面 `views/project/conversation.tsx` 与 `views/project/item-panel.tsx`（`item-panel-model.ts` 的 `sourceAtPosition`）读取 `route.at` 自动展开事项面板并调用 `event.positions` 显示原始事件 | 画面（页面一侧） | 一致 |
 
 ## 3. 外环的九个状态
 
@@ -204,7 +204,7 @@
 | 动作 | 工具 `tools.py`、`engine.py` ↔ `environment.py`、`actions.py`、`workspace.py`、`snapshot.py` | `test_action_contract.py`（模块）、`test_tool_contracts.py`（单元）、`kernel/test_only_grows.py`（单元）、`test_workspace_boundary.py`（单元） | 两种环境（本机与测试里的第二种）接受同一份动作合同、给出同样的回执；回执带前后公开树摘要与终点快照的引用，旧回执照常读；动作类别与回执字段只增；控制核心不直接读写工作区 |
 | 投影 | `event_store.py` → `projection.py`、`project_projection.py`、`app/read_models.py`；内核的 `minimal_projection.py` | `test_replay.py`（模块）、`test_saved_projections.py`（集成）、`kernel/test_minimal_projection.py`（模块）、`kernel/test_minimal_projection_baselines.py`（集成）、`kernel/test_skeleton_events.py`（单元）、`test_event_classification.py`（单元） | 从头重算得到同一状态；最小投影与应用投影逐项一致；骨架事件有登记表；每种事件声明所属的流 |
 | 接口 | 页面 `client/`、命令行、`evals/`、画面 ↔ 应用层 `app/`，经接口层 `api/` | `test_layers.py`（单元，导入方向合同，定义在 `pyproject.toml` 的 `[tool.importlinter]`）、`test_openapi_snapshot.py`（模块）、`test_event_stream.py`（模块）、`test_capabilities.py`（模块）、`test_department_names.py`（模块） | 接口层只导入应用层、应用层只导入控制核心的公开接口；合同快照不偷偷改；事件流按位置续；能力清单列出改变每条查询的事件；对外合同里的职能是字符串、取值由定义给出，换一份改了名的定义载荷照样通过，定义里没有的职能命令拒绝 |
-| 画面 | 接口 `harness/api/` ↔ 画面（现在还在 `client/src/renderer/src/` 的 `translate/`、`pixel/` 与三个挂载里）；里面一道是翻译层 ↔ 画面层，合同 `pixel/contract.ts` | 客户端 `client/tests/unit/pixel-imports.test.ts`、`pixel-contract.test.ts`、`translate-coverage.test.ts`（都在合并门里）；逐场景回放 `pixel-floor-replay.test.ts`、`pixel-room-replay.test.ts`、`pixel-building-replay.test.ts`（不在 CI 里，手动跑） | 画面层只导入画面合同与自己的声明表；合同取值逐项校验；每种事件在三个场景里都有归属（缺一种就失败）；回放的每个检查点与原型逐像素相同。画面与基础部分互不导入、画面的测试不进合并门、认不出的事件进缺口清单：没有守卫 |
+| 画面 | 接口 `harness/api/` ↔ 画面 `view/`（壳 `shell.ts`、同步层 `sync/`、翻译层 `translate/`、生成的接口类型 `api/`）；里面一道是翻译层 `translate/` ↔ 画面层 `pixel/`，合同 `pixel/contract.ts` | 页面 `client/tests/unit/page-imports.test.ts`（合并门客户端作业）；发布脚本 `test_release_script.py`（模块）；画面（CI「画面」作业，不进合并门）`view/tests/unit/view-imports.test.ts`、`pixel-imports.test.ts`、`pixel-contract.test.ts`、`pixel-honesty.test.ts`、`translate-coverage.test.ts`、`sync-layer.test.ts`、`shell.test.ts`，端到端 `view/tests/e2e/`（录制的接口响应），以及生成接口类型与快照一致核对 | 基础部分与画面互不导入；画面层只导入画面合同与自己的声明表；合同取值逐项校验；事实层与视觉通道诚实性（H1 至 H4、H6 至 H9）；事件种类从接口读取，未归类的事件进缺口清单且测试照常通过；生成的接口类型与接口快照一致；画面的测试单独一个 CI 作业，不进合并门；画面构建失败不阻断发布，`/view/` 返回「这一版没有画面」 |
 | 定义 | 文件 `harness/definitions/*.json` ↔ `definitions/__init__.py` | `test_definitions.py`（集成）、`test_definition_rules.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_definitions_decide.py`（单元）、`test_frozen_parameters.py`（集成） | 加载与校验；版本是内容摘要；裁决读事项所用的那份定义；参数建 run 时冻结；核验声明的校验（核验角色与被核验角色在定义里、成果种类有定义、谁能拒绝谁无环、写入范围的角色在定义里）与开环的判断；没有声明的旧定义读成「产品 · 工程 · 质检」 |
 | 评价 | `evals/`、`release_check.py` → 系统（经接口） | `evals/tests/test_no_harness_import.py`、`evals/tests/test_no_harness_paths.py`；内核清单的 `material` 条目由 `path_guard.py` 在采纳前比较（`test_projects.py` 的内核守卫用例，集成）；`test_release_check.py`（模块） | 评测工具不导入 `harness`、不引用它的内部路径；改动评价材料的交付不自动采纳；发布检查的清单与检查取自运行中的实例，改待发布提交里的清单与检查不改变结果 |
 | 观察者 | 无 | 无 | 无 |

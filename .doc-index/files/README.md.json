@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"README.md",
-"hash":"4882a9976309e8ac",
+"hash":"dd9de092371019e9",
 "nodes":[
-{"hash":"4882a9976309e8ac","id":"README.md","kind":"file","title":"README.md"},
-{"hash":"5de1584cdce15786","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
+{"hash":"dd9de092371019e9","id":"README.md","kind":"file","title":"README.md"},
+{"hash":"66611e43282bb188","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
 {"hash":"21a5a85634da9e34","id":"README.md#Yudao Loop System > 当前状态","kind":"section","parent":"README.md#Yudao Loop System","title":"当前状态"},
 {"hash":"e15a4c464ae802ff","id":"README.md#Yudao Loop System > 当前状态 > 现在能试什么","kind":"section","parent":"README.md#Yudao Loop System > 当前状态","title":"现在能试什么"},
 {"hash":"45bf8e193824bc7c","id":"README.md#Yudao Loop System > 参与开发","kind":"section","parent":"README.md#Yudao Loop System","title":"参与开发"},
@@ -20,7 +20,7 @@
 {"hash":"9dcc2e2c37c393fb","id":"README.md#Yudao Loop System > 安装与启动 > 控制主机上的 Yudao 服务","kind":"section","parent":"README.md#Yudao Loop System > 安装与启动","title":"控制主机上的 Yudao 服务"},
 {"hash":"d48401bf058d1379","id":"README.md#Yudao Loop System > 安装与启动 > 网页界面","kind":"section","parent":"README.md#Yudao Loop System > 安装与启动","title":"网页界面"},
 {"hash":"bba55ebaffb55372","id":"README.md#Yudao Loop System > 安装与启动 > 升级","kind":"section","parent":"README.md#Yudao Loop System > 安装与启动","title":"升级"},
-{"hash":"9d49f570f9244355","id":"README.md#Yudao Loop System > 测试","kind":"section","parent":"README.md#Yudao Loop System","title":"测试"},
+{"hash":"1e790a2d33ebc1b8","id":"README.md#Yudao Loop System > 测试","kind":"section","parent":"README.md#Yudao Loop System","title":"测试"},
 {"hash":"8077bdc1810dc9f7","id":"README.md#Yudao Loop System > 如何使用","kind":"section","parent":"README.md#Yudao Loop System","title":"如何使用"},
 {"hash":"e0a8554ee676db9f","id":"README.md#Yudao Loop System > 如何使用 > 1. 创建项目与任务","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"1. 创建项目与任务"},
 {"hash":"859de9392a26c048","id":"README.md#Yudao Loop System > 如何使用 > 2. 观察三个职能协作","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"2. 观察三个职能协作"},
@@ -55,6 +55,6 @@
 {"dst":"docs/requirements/provider-layer.md","kind":"link","raws":["docs/requirements/provider-layer.md"],"seen":"dc90aa56fbb7be00","src":"README.md#Yudao Loop System > 模型配置"},
 {"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["docs/requirements/provider-retries.md"],"seen":"5cb45887013b5437","src":"README.md#Yudao Loop System > 模型配置"},
 {"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"fa1e1ab66f669cbb","src":"README.md#Yudao Loop System > 测试"},
-{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"152ba90d379a3279","src":"README.md#Yudao Loop System > 测试"}
+{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"a25064a63ace15cb","src":"README.md#Yudao Loop System > 测试"}
 ]
 }
