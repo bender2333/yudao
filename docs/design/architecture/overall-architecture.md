@@ -29,7 +29,7 @@
 | 模型 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | [模型管理](../model-management.md)（含「统一调用、取消与观测」） |
 | 动作 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
 | 投影 | 一份事实 → 读的人 | 骨架自己折叠的最小投影（裁决读）、应用层的投影（应用层读取模型读） | [骨架与应用设计说明](../skeleton-and-application.md)、[应用层与接口层设计说明](../app-and-interface.md)、[语义系统设计说明](../semantic-system.md)（知识层） |
-| 接口 | 页面、命令行、评测、观察者、画面 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md)、[项目的组织](../project-organization.md) |
+| 接口 | 页面、命令行、评测、观察者、画面 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md)、[项目的组织](../project-organization.md)、[进程外运维代理与通用命令行](../external-ops-agent.md) |
 | 定义 | 定义 ↔ 加载与校验 | 定义文件的结构；角色的写入范围、是否核验角色及核验谁、成果种类与提案合同；路由自己的定义 | [规则登记与参数](../rules-and-parameters.md)、[项目的组织](../project-organization.md) |
 | 评价 | 评价材料 → 应用 | 只经接口层 | [评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md) |
 | 观察者 | 观察者 ↔ 接口（读）与写入口（写） | 按读取范围读，证据、提案与振荡信号经写入口 | 第 7.2、7.5 至 7.7 节；振荡信号见[循环与收敛](../loops-and-convergence.md)「收敛的检测」 |
@@ -58,7 +58,7 @@
 
 **内核内部（不是缝）**：裁决（写入口 ↔ 裁决，路由 → 裁决的收紧检查：工具许可、合同的通用条件、收紧接口），细化在[可信内核](../trusted-kernel.md)与[骨架与应用](../skeleton-and-application.md)「裁决的分工：内核的通用检查与路由的收紧检查」。最小投影（骨架事件 → 裁决、边界、薄驱动：固定的几样事实），细化在[骨架与应用](../skeleton-and-application.md)「最小投影」。
 
-**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)、[项目的组织](../project-organization.md)。外包角色：[外包角色](../outsourced-roles.md)。路由实现：[产品 · 工程 · 质检的循环结构](../department-loop.md)、[职能指导的处理设计](../department-guidance.md)、[职能内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明；它是路由的一个实现，见[骨架与应用](../skeleton-and-application.md)「路由契约」。
+**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)、[项目的组织](../project-organization.md)。外包角色：[外包角色](../outsourced-roles.md)。路由实现：[产品 · 工程 · 质检的循环结构](../department-loop.md)、[职能指导的处理设计](../department-guidance.md)、[职能内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面与命令行：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[进程外运维代理与通用命令行](../external-ops-agent.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明；它是路由的一个实现，见[骨架与应用](../skeleton-and-application.md)「路由契约」。
 
 **总图的词与代码名的对照**：[name-map.md](name-map.md)，按缝列出总图的词、代码里现在的名字与一致、不一致、代码里还没有；代码名随立缝工单改成总图的词，立缝工单关闭时由子架构师改那一行。
 
@@ -182,6 +182,7 @@ flowchart TB
     EOther["baseline/ · context/<br/>（其他）"]
   end
   subgraph H["harness/"]
+    CliClient["cli_client · ops_skill<br/>（命令行客户端与运维技能）"]
     Api["api/<br/>（接口层）"]
     App["app/<br/>（应用层）"]
     Rt["runtime.py<br/>（组装处）"]
@@ -216,6 +217,7 @@ flowchart TB
   Sync -.->|"HTTP"| Api
   VSync -.->|"HTTP"| Api
   Runner -.->|"HTTP"| Api
+  CliClient -.->|"HTTP"| Api
   Gen ~~~ Api
   VGen ~~~ Api
   Scen ~~~ Api
@@ -249,7 +251,7 @@ flowchart TB
 
 **依据。** 方向由下面的检查守着，它们都在合并前的 CI 里运行，失败不能合并（[测试分层设计说明](../test-pyramid.md)「缝的合同检查」一节）：
 
-- `harness/tests/test_layers.py` 运行 `pyproject.toml` 里的五条 import-linter 合同：接口层只导入应用层；控制核心不导入应用层与接口层，应用层不导入接口层；应用层只导入控制核心的公开接口（[应用层与接口层设计说明](../app-and-interface.md)「依赖规则」一节按类列出）；契约模块只导入内核与标准库；应用层与三个实现的主要文件不导入薄驱动。
+- `harness/tests/test_layers.py` 运行 `pyproject.toml` 里的导入方向合同：接口层只导入应用层；控制核心不导入应用层与接口层，应用层不导入接口层；应用层只导入控制核心的公开接口（[应用层与接口层设计说明](../app-and-interface.md)「依赖规则」一节按类列出）；契约模块只导入内核与标准库；应用层与三个实现的主要文件不导入薄驱动；MCP 客户端模块与命令行客户端模块各自不导入 Yudao 的其他模块。
 - 契约：`harness/tests/test_contract_modules.py` 再核对一遍契约模块只导入内核清单里的模块、标准库与契约模块自己；`harness/tests/kernel/test_contract_surface.py` 守契约的公开名称与版本只增不删（这是兼容，不是导入方向）。
 - 内核：`harness/tests/kernel/test_manifest.py` 核对内核清单（`harness/definitions/kernel-manifest.json`）里 kind 为 module 的文件只导入内核文件、标准库与 pydantic；发布检查（`harness/release_check.py`）对待发布的提交再做一次（[可信内核设计说明](../trusted-kernel.md)「发布检查与探针」一节）。最小投影模块的同一条限制另有 `harness/tests/kernel/test_minimal_projection.py`；`harness/tests/kernel/test_single_write_path.py` 核对只有写入口调用事件日志的写入函数，只有事件日志打开数据库（应用的读取模型有自己可重建的数据库，除外）。
 - 路由与决定请求：`harness/tests/test_routing_contract.py` 核对路由实现不导入薄驱动与最小投影；`harness/tests/test_decision_flow.py` 核对决定请求与建档的流转不导入薄驱动。
@@ -271,6 +273,7 @@ flowchart TB
 
 | 包 | 总图里的位置 | 备注 |
 | --- | --- | --- |
+| `cli_client`、`harness/ops_skill/` | 接口缝读者与命令方一侧：通用命令行与随包运维技能 | 不导入 `harness` 里的其他模块，只经 HTTP 与 SSE 访问运行中的接口层（[进程外运维代理与通用命令行设计说明](../external-ops-agent.md)） |
 | `harness/api/` | 接口缝的外侧：接口层 | 只导入 `app/`；HTTP 接口、事件流、认证与界面的页面文件 |
 | `harness/app/` | 接口缝的内侧：应用层 | 命令处理、查询与读取模型；只导入控制核心的公开接口 |
 | `runtime.py` | 薄驱动与插件加载：组装处 | 启动时把路由、装配、执行三个实现接上薄驱动 |

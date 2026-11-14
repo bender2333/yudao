@@ -1,0 +1,19 @@
+{
+"schema":1,
+"path":"docs/requirements/external-ops-agent.md",
+"hash":"fcf75a42e7218523",
+"nodes":[
+{"hash":"fcf75a42e7218523","id":"docs/requirements/external-ops-agent.md","kind":"file","title":"docs/requirements/external-ops-agent.md"},
+{"hash":"7e63a351045d16a8","id":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界","kind":"section","parent":"docs/requirements/external-ops-agent.md","title":"D42 进程外运维代理与页面的边界"},
+{"hash":"2b41f285ad94e32e","id":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界 > 已确认","kind":"section","parent":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界","title":"已确认"},
+{"hash":"5b58023f0c4100fa","id":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界 > 验收标准","kind":"section","parent":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界","title":"验收标准"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"35e4ecd5be5ddb3d","src":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"43359f256dea6a3f","src":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界"},
+{"dst":"docs/design/external-ops-agent.md","kind":"link","raws":["../design/external-ops-agent.md"],"seen":"335d860d81ffcea6","src":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"6efbf1cc3a80ea0d","src":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"de70a53b154f077f","src":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"de70a53b154f077f","src":"docs/requirements/external-ops-agent.md#D42 进程外运维代理与页面的边界 > 已确认"}
+]
+}

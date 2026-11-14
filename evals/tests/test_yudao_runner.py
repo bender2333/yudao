@@ -4,11 +4,15 @@ Offline tests never call a model; the real-run tests need the model service
 credentials in the environment and skip without them.
 """
 
+import base64
+import contextlib
+import http.server
 import json
 import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 import pytest
@@ -168,13 +172,15 @@ def _stub_run_once(monkeypatch, tmp_path, export, calls=None):
     monkeypatch.setattr(yudao, "export_run", lambda client, run_id: export)
     monkeypatch.setattr(yudao, "stop_service", lambda process, timeout_seconds=60: ("", ""))
 
-    def fetch_delivery(client, delivery_event, target_dir):
+    def fetch_delivery(client, delivery_event, target_dir, *, project_id=None, work_item_id=None):
         """取回封存的交付：把它的树摘要写成一个文件，评分时按这个文件区分两份交付。"""
-        digest = delivery_event["payload"]["code_tree_digest"]
+        payload = delivery_event["payload"]
+        digest = payload.get("code_tree_digest") or payload.get("artifact_tree_digest")
         os.makedirs(target_dir, exist_ok=True)
         with open(os.path.join(target_dir, "tree.txt"), "w", encoding="utf-8") as handle:
             handle.write(digest)
         calls.setdefault("fetched", []).append(digest)
+        calls.setdefault("fetch_targets", []).append((project_id, work_item_id))
         return ["tree.txt"]
 
     def score_delivery(delivery_dir, evidence_dir):
@@ -2130,3 +2136,356 @@ def test_a_form_run_stays_out_of_the_single_agent_comparison():
     assert FORM in comparison["block_reason"]
     assert "不进与单个 agent 的对照" in comparison["block_reason"]
     assert comparison["pairs"] == []
+
+
+# ---------------------------------------------------------------------------
+# 按项目当前组织保存职能设置与直做交完成文件取回（工单 #1743）
+
+SEVERAL_FORM = "several_roles_direct"
+DIRECT_BINARY_BYTES = b"\x89PNG\r\n\x1a\n\x00\xff"
+DIRECT_CLI_SOURCE = "print('direct ok')\n"
+
+
+class _DepartmentSettingsClient:
+    """记录 `project.settings` 查询与 `department_settings.save` 命令的脚本客户端。"""
+
+    def __init__(self, departments):
+        self.departments = dict(departments)
+        self.queries = []
+        self.saved = []
+
+    def query(self, name, params=None):
+        self.queries.append((name, dict(params or {})))
+        assert name == "project.settings"
+        return {"data": {"departments": {key: dict(value)
+                                         for key, value in self.departments.items()}}}
+
+    def command(self, name, body):
+        assert name == "department_settings.save"
+        self.saved.append(dict(body))
+        department = body["department"]
+        return {"refs": {"reminders": ["reminder-" + department]}}
+
+
+class _MaterialsDeliveryClient:
+    """记录 `work_item.materials` 与 `delivery.file` 查询并返回文本与二进制文件的脚本客户端。"""
+
+    def __init__(self, deliveries, files_by_event):
+        self.deliveries = list(deliveries)
+        self.files_by_event = dict(files_by_event)
+        self.queries = []
+
+    def query(self, name, params=None):
+        recorded = dict(params or {})
+        self.queries.append((name, recorded))
+        if name == "work_item.materials":
+            return {"data": {"deliveries": list(self.deliveries)}}
+        if name == "delivery.file":
+            raw = self.files_by_event[(recorded["event_id"], recorded["path"])]
+            try:
+                text = raw.decode("utf-8")
+                return {"data": {"path": recorded["path"], "content": text, "base64": None}}
+            except UnicodeDecodeError:
+                encoded = base64.b64encode(raw).decode("ascii")
+                return {"data": {"path": recorded["path"], "content": None, "base64": encoded}}
+        raise AssertionError("unexpected query: " + name)
+
+
+@contextlib.contextmanager
+def _local_chat_completions_server():
+    """本地 Chat Completions 流式模拟服务：供真实 Yudao 服务完成模型准入与一次直做交完成。"""
+
+    def _sse_chunk(delta, finish_reason):
+        chunk = {
+            "id": "chatcmpl-local",
+            "object": "chat.completion.chunk",
+            "created": 1700000000,
+            "model": MODEL,
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}],
+            "usage": {"prompt_tokens": 12, "completion_tokens": 6, "total_tokens": 18},
+        }
+        return ("data: " + json.dumps(chunk, ensure_ascii=False) + "\n\ndata: [DONE]\n\n").encode("utf-8")
+
+    def _tool_delta(call_id, name, arguments):
+        return {
+            "role": "assistant",
+            "tool_calls": [{
+                "index": 0,
+                "id": call_id,
+                "type": "function",
+                "function": {"name": name, "arguments": json.dumps(arguments, ensure_ascii=False)},
+            }],
+        }
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or "0")
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            tools = [item.get("function", {}).get("name") for item in (body.get("tools") or [])]
+            messages = body.get("messages") or []
+            has_tool_output = any(entry.get("role") == "tool" for entry in messages)
+            if "yudao_model_test" in tools and not has_tool_output:
+                payload = _sse_chunk(_tool_delta("call-probe-1", "yudao_model_test", {}), "tool_calls")
+            elif "submit_completion" in tools and not has_tool_output:
+                payload = _sse_chunk(
+                    _tool_delta("call-write-1", "write_file",
+                                {"path": "src/cli.py", "content": DIRECT_CLI_SOURCE}),
+                    "tool_calls",
+                )
+            elif "submit_completion" in tools:
+                payload = _sse_chunk(
+                    _tool_delta("call-complete-1", "submit_completion",
+                                {"summary": "完成直做文本与二进制产物"}),
+                    "tool_calls",
+                )
+            else:
+                payload = _sse_chunk({"role": "assistant", "content": "pong"}, "stop")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, format_string, *args):
+            return None
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield "http://127.0.0.1:" + str(server.server_address[1]) + "/v1"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5.0)
+
+
+def _direct_completion_export(completions=2):
+    """构造含直做交完成 `artifact_accepted` 事件的开环运行导出。"""
+    events = [{"type": "run_created",
+               "payload": {"open_loop": True, "definitions_version": "defs-direct",
+                           "parameters_version": "params-direct"}}]
+    for index in range(1, completions + 1):
+        events.append({
+            "type": "artifact_accepted",
+            "event_id": "evt-completion-%d" % index,
+            "project_id": "project-1",
+            "work_item_id": "work-item-1",
+            "payload": {
+                "artifact_kind": "completion",
+                "artifact_version": index,
+                "artifact_tree_digest": "direct-tree-%d" % index,
+                "artifact_ref": {"hash": "archive-%d" % index, "path": "trees/%d" % index},
+                "content_hash": "completion-hash-%d" % index,
+                "summary": "第 %d 版直做完成" % index,
+            },
+        })
+    events.append({"type": "run_done", "state_after": "done", "stop_reason": "open_loop",
+                   "payload": {"stop_reason": "open_loop"}})
+    return {"run_id": "yudao-run-1",
+            "projection": {"status": "done", "stop_reason": "open_loop"},
+            "events": events, "usage": {}}
+
+
+def test_save_department_settings_only_submits_the_departments_in_project_settings():
+    """守 R2：`save_department_settings` 按 `project.settings` 返回的字典键与版本保存，不提交组织外职能。"""
+    single_client = _DepartmentSettingsClient({"engineering": {"version": 4}})
+    single_reminders = yudao.save_department_settings(single_client, "project-single")
+    assert single_reminders == {"engineering": ["reminder-engineering"]}
+    assert single_client.queries == [("project.settings", {"project_id": "project-single"})]
+    assert single_client.saved == [{
+        "base_version": 4,
+        "project_id": "project-single",
+        "department": "engineering",
+        "provider_id": yudao.PROVIDER_ID,
+        "model_id": yudao.MODEL_DEFINITION_ID,
+    }]
+
+    several_client = _DepartmentSettingsClient({"product": {"version": 1},
+                                                "engineering": {"version": 2}})
+    several_reminders = yudao.save_department_settings(several_client, "project-several")
+    assert set(several_reminders) == {"product", "engineering"}
+    assert [entry["department"] for entry in several_client.saved] == ["product", "engineering"]
+    assert [entry["base_version"] for entry in several_client.saved] == [1, 2]
+
+
+def test_archived_delivery_and_metrics_recognise_direct_completion_and_ignore_other_artifacts():
+    """守 R2：运行器与指标同时识别直做交完成 `artifact_accepted`，忽略无关成果与无封存引用的旧事件。"""
+    export = _direct_completion_export(2)
+    export["events"].insert(1, {
+        "type": "artifact_accepted",
+        "event_id": "evt-unarchived-legacy",
+        "payload": {"artifact_kind": "completion", "artifact_ref": None,
+                    "artifact_tree_digest": "legacy-tree"},
+    })
+    export["events"].insert(3, {
+        "type": "artifact_accepted",
+        "event_id": "evt-review",
+        "payload": {"artifact_kind": "completion_review", "verdict": "rework"},
+    })
+
+    first = yudao.first_archived_delivery(export)
+    last = yudao.last_archived_delivery(export)
+    assert first["event_id"] == "evt-completion-1"
+    assert last["event_id"] == "evt-completion-2"
+
+    single = _direct_completion_export(1)
+    assert yudao.first_archived_delivery(single) is yudao.last_archived_delivery(single)
+
+    empty = _direct_completion_export(0)
+    assert yudao.first_archived_delivery(empty) is None
+    assert yudao.last_archived_delivery(empty) is None
+
+    scores = _delivery_scores(3, total=5, completion=0.6)
+    delivery = yudao_metrics.delivery_metrics(single, scores, scores)
+    assert delivery["first"]["delivered"] is True
+    assert delivery["final"]["delivered"] is True
+    assert delivery["final"]["passed_checks"] == 3
+
+    metrics = yudao_metrics.collect(single, OUTCOME)
+    run = _run(form=FORM, metrics=metrics, score=scores, first_score=scores, delivery=delivery)
+    section = "\n".join(yudao_report.run_section(run, scores))
+    assert "| 第一次交付通过的隐藏检查 | 3/5 |" in section
+    assert "| 最终交付通过的隐藏检查 | 3/5 |" in section
+    assert "没有做（没有交付）" not in section
+
+
+def test_fetch_delivery_reads_materials_manifest_and_writes_text_and_binary_files(tmp_path):
+    """守 R2：直做交完成事件不含 `files` 时，先查询 `work_item.materials` 读取文件清单，再经 `delivery.file` 取回文本与二进制文件。"""
+    event = {
+        "type": "artifact_accepted",
+        "event_id": "evt-completion-2",
+        "project_id": "project-envelope",
+        "work_item_id": "item-envelope",
+        "payload": {
+            "artifact_kind": "completion",
+            "artifact_tree_digest": "direct-tree-2",
+            "artifact_ref": {"hash": "archive-2", "path": "trees/2"},
+        },
+    }
+    deliveries = [
+        {"event_id": "evt-completion-1", "files": ["old.txt"]},
+        {"event_id": "evt-completion-2", "files": ["src/cli.py", "docs/empty.txt", "assets/logo.bin"]},
+    ]
+    files_by_event = {
+        ("evt-completion-2", "src/cli.py"): DIRECT_CLI_SOURCE.encode("utf-8"),
+        ("evt-completion-2", "docs/empty.txt"): b"",
+        ("evt-completion-2", "assets/logo.bin"): DIRECT_BINARY_BYTES,
+    }
+    client = _MaterialsDeliveryClient(deliveries, files_by_event)
+    target_explicit = str(tmp_path / "explicit")
+
+    written = yudao.fetch_delivery(client, event, target_explicit,
+                                   project_id="project-explicit", work_item_id="item-explicit")
+
+    assert written == ["src/cli.py", "docs/empty.txt", "assets/logo.bin"]
+    assert client.queries[0] == ("work_item.materials",
+                                 {"project_id": "project-explicit", "work_item": "item-explicit"})
+    assert [name for name, _params in client.queries[1:]] == [
+        "delivery.file", "delivery.file", "delivery.file"]
+    with open(os.path.join(target_explicit, "src", "cli.py"), encoding="utf-8") as handle:
+        assert handle.read() == DIRECT_CLI_SOURCE
+    with open(os.path.join(target_explicit, "docs", "empty.txt"), "rb") as handle:
+        assert handle.read() == b""
+    with open(os.path.join(target_explicit, "assets", "logo.bin"), "rb") as handle:
+        assert handle.read() == DIRECT_BINARY_BYTES
+
+    # 未显式传入关键字参数时从事件信封读取项目与事项编号；两个来源都缺失时抛出 ValueError
+    client_fallback = _MaterialsDeliveryClient(deliveries, files_by_event)
+    target_fallback = str(tmp_path / "fallback")
+    yudao.fetch_delivery(client_fallback, event, target_fallback)
+    assert client_fallback.queries[0] == ("work_item.materials",
+                                          {"project_id": "project-envelope",
+                                           "work_item": "item-envelope"})
+
+    bare_event = {"type": "artifact_accepted", "event_id": "evt-completion-2",
+                  "payload": {"artifact_kind": "completion"}}
+    with pytest.raises(ValueError, match="project_id and work_item_id"):
+        yudao.fetch_delivery(client_fallback, bare_event, str(tmp_path / "missing"))
+
+
+def test_run_once_fetches_and_scores_first_and_final_direct_completions(runs_root, tmp_path,
+                                                                        monkeypatch):
+    """守 R2：`run_once` 在直做交完成导出上传入项目与事项编号，取回两份完成版本并标记已交付。"""
+    export = _direct_completion_export(2)
+    calls = {}
+    _stub_form_run(monkeypatch, tmp_path, export, calls)
+
+    run = run_yudao_eval.run_once("run-direct-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS, form=FORM)
+
+    assert calls["fetched"] == ["direct-tree-2", "direct-tree-1"]
+    assert calls["fetch_targets"] == [("project-1", "work-item-1"), ("project-1", "work-item-1")]
+    assert calls["scored"] == ["direct-tree-1", "direct-tree-2"]
+    assert run["delivery"]["first"]["delivered"] is True
+    assert run["delivery"]["final"]["delivered"] is True
+
+
+def test_real_service_saves_current_organization_settings_and_fetches_direct_completion(
+        runs_root, tmp_path, monkeypatch):
+    """守 R2、R3：真实 HTTP 服务上 `single_role_direct` 与 `several_roles_direct` 按当前组织保存设置，直做交完成经对外查询取回文本与二进制文件。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.05)
+    start = yudao.fresh_start_dir(runs_root, "real-direct")
+    os.makedirs(os.path.join(start, "assets"), exist_ok=True)
+    with open(os.path.join(start, "assets", "logo.bin"), "wb") as handle:
+        handle.write(DIRECT_BINARY_BYTES)
+    data_dir = yudao.data_dir_for(runs_root, "real-direct")
+
+    with _local_chat_completions_server() as base_url:
+        monkeypatch.setenv(model_service.MODEL_SERVICE_BASE_URL_ENV, base_url)
+        monkeypatch.setenv(model_service.MODEL_SERVICE_API_KEY_ENV, "local-test-secret")
+        process, client = yudao.start_service(data_dir, yudao.free_port())
+        try:
+            client.wait_ready()
+            yudao.register_model(client, MODEL, LIMITS)
+
+            single_project = yudao.create_project(client, "单角色直做验收", "验证单角色职能设置与交完成取回",
+                                                  initial_directory=start, form=FORM)
+            single_reminders = yudao.save_department_settings(client, single_project)
+            single_settings = client.query("project.settings",
+                                           {"project_id": single_project})["data"]["departments"]
+            assert set(single_reminders) == {"engineering"}
+            assert set(single_settings) == {"engineering"}
+            assert single_settings["engineering"]["provider_id"] == yudao.PROVIDER_ID
+            assert single_settings["engineering"]["model_id"] == yudao.MODEL_DEFINITION_ID
+
+            several_project = yudao.create_project(client, "两角色直做验收", "验证两角色职能设置",
+                                                   form=SEVERAL_FORM)
+            several_reminders = yudao.save_department_settings(client, several_project)
+            several_settings = client.query("project.settings",
+                                            {"project_id": several_project})["data"]["departments"]
+            assert set(several_reminders) == {"product", "engineering"}
+            assert set(several_settings) == {"product", "engineering"}
+            for department in ("product", "engineering"):
+                assert several_settings[department]["provider_id"] == yudao.PROVIDER_ID
+                assert several_settings[department]["model_id"] == yudao.MODEL_DEFINITION_ID
+
+            work_item_id, run_id = yudao.submit_requirement(client, single_project,
+                                                            "写出 src/cli.py 并提交完成")
+            card, timed_out = yudao.wait_for_end(client, single_project, work_item_id, 60.0)
+            assert timed_out is False
+            assert card["stop_reason"] == "open_loop"
+
+            export = yudao.export_run(client, run_id)
+            first_event = yudao.first_archived_delivery(export)
+            last_event = yudao.last_archived_delivery(export)
+            assert first_event is not None and last_event is not None
+            assert first_event["event_id"] == last_event["event_id"]
+            assert last_event["type"] == "artifact_accepted"
+            assert last_event["payload"]["artifact_kind"] == "completion"
+
+            fetched_dir = str(tmp_path / "fetched-real")
+            written = yudao.fetch_delivery(client, last_event, fetched_dir,
+                                           project_id=single_project, work_item_id=work_item_id)
+        finally:
+            client.stop()
+            yudao.stop_service(process)
+
+    assert sorted(written) == ["assets/logo.bin", "src/cli.py", "subway_data.json"]
+    with open(os.path.join(fetched_dir, "src", "cli.py"), encoding="utf-8") as handle:
+        assert handle.read() == DIRECT_CLI_SOURCE
+    with open(os.path.join(fetched_dir, "assets", "logo.bin"), "rb") as handle:
+        assert handle.read() == DIRECT_BINARY_BYTES
+    delivery = yudao_metrics.delivery_metrics(export, _delivery_scores(2), _delivery_scores(2))
+    assert delivery["first"]["delivered"] is True
+    assert delivery["final"]["delivered"] is True

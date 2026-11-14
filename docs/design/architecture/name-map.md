@@ -121,6 +121,7 @@
 | 等用户、决定请求 | 第三节外环「等用户」 | `decisions.py`（`DecisionKind`、`blocks_run`）、`kernel_events.py` 的 `DecisionRequest`；事件 `decision_requested`、`decision_answered`、`decision_withdrawn`；命令 `decision.answer`，查询 `decisions.list` | 接口、写入口 | 一致 |
 | 同步层（页面一侧） | 第一节「页面」悬停 | `contract/view-sync.ts` 的 `ViewSync`、`contract/event-stream.ts`、`contract/stream-state.ts`（目录叫 contract） | 接口（读者一侧） | 一致 |
 | 页面 | 第一节「页面」 | `client/`：页面 `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、壳 `shell/` | 接口（读者一侧） | 一致 |
+| 命令行（接口外侧） | 第四节接口「页面、命令行、评测、观察者、画面」 | `__main__.py` 只有服务启动入口 `api` 与进程内离线子命令（`project`、`replay`、`demo`、`smoke`、`token`、`release-check`）；经网络访问运行中服务的通用命令行客户端与随包运维技能还没有 | 接口 | 代码里还没有（通用命令行客户端与随包运维技能） |
 
 ### 定义
 

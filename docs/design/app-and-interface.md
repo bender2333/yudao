@@ -81,8 +81,9 @@ flowchart TB
   ProvM["Provider 模块：目录与凭据管理"]
   Page -->|"加载"| Files
   Page -->|"HTTP 与 SSE"| Routes
-  Cli -->|"进程内调用"| Cmd
-  Cli -->|"进程内调用"| Qry
+  Cli -->|"HTTP 与 SSE（运行中服务）"| Routes
+  Cli -->|"进程内调用（离线只读与演示）"| Cmd
+  Cli -->|"进程内调用（离线只读与演示）"| Qry
   Routes --> Auth
   Routes --> Cmd
   Routes --> Qry
@@ -125,7 +126,7 @@ flowchart TB
   | 决定、路径规则、脱敏与重放核对 | `decisions`、`path_rules`、`redact`、`replay_check` |
 
 - `pyproject.toml` 的合同「应用层只导入控制核心的公开接口」按这张表列全部模块：清单以外多一行导入即失败，并报出是哪一个。
-- 命令行在进程内调用应用层的同一套命令与查询，输出查询结果（快照与位置）或命令结果的 JSON。
+- 离线只读与演示子命令在进程内调用应用层的同一套命令与查询，输出查询结果（快照与位置）或命令结果的 JSON；连接运行中服务的通用命令行作为接口缝外侧的客户端，经 HTTP 与有界事件流访问接口层，不导入应用层与控制核心模块（[进程外运维代理与通用命令行设计说明](external-ops-agent.md)「接口」）。
 - 单机部署时接口层、应用层与控制核心在一个进程、一个事件循环中运行（[总体架构](architecture/overall-architecture.md)「十项长期决定」第 2 条）；uvicorn 的事件循环就是控制核心的事件循环。
 - 执行环境放到登记的其他机器上时，接口层、应用层与接口合同不变（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)）。
 
@@ -805,9 +806,10 @@ sequenceDiagram
 
 | 命令行 | 做法 |
 | --- | --- |
-| `project list`、`project show` | 调用 `projects.list`、`project.overview` |
-| `replay <run>`、`replay --project` | 调用 `replay.check` |
-| `demo`、`smoke` | 通过应用层的命令新建项目与事项 |
+| `project list`、`project show` | 进程内只读调用 `projects.list`、`project.overview` |
+| `replay <run>`、`replay --project` | 进程内只读调用 `replay.check` |
+| `demo`、`smoke` | 进程内通过应用层的命令新建项目与事项 |
+| 面向运行中服务的通用操作与随包运维技能 | 经网络访问运行中服务的能力清单、单项合同说明、任意已登记查询、任意已登记命令与有界事件流，并提供随包运维技能的读取与安装（[进程外运维代理与通用命令行设计说明](external-ops-agent.md)） |
 | `api`（无参启动相同） | 启动接口 |
 | `token create`、`token list`、`token revoke` | 第 6.3 节 |
 

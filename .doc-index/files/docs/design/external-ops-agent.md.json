@@ -1,0 +1,34 @@
+{
+"schema":1,
+"path":"docs/design/external-ops-agent.md",
+"hash":"335d860d81ffcea6",
+"nodes":[
+{"hash":"335d860d81ffcea6","id":"docs/design/external-ops-agent.md","kind":"file","title":"docs/design/external-ops-agent.md"},
+{"hash":"61fb69324bfa4851","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明","kind":"section","parent":"docs/design/external-ops-agent.md","title":"进程外运维代理与通用命令行设计说明"},
+{"hash":"c8e42c70a9de4214","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 1. 功能与依据","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明","title":"1. 功能与依据"},
+{"hash":"7d7b1be7d5e3b799","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 2. 边界与范围","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明","title":"2. 边界与范围"},
+{"hash":"2097f5c0c30a0bdf","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 3. 接口","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明","title":"3. 接口"},
+{"hash":"e564975b8dd7eb44","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明","title":"4. 方案"},
+{"hash":"fa854ce925e65d23","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.1 连接、认证与请求头规则","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","title":"4.1 连接、认证与请求头规则"},
+{"hash":"f5f4e7cbd173a2c1","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.2 零维护的单项合同自省","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","title":"4.2 零维护的单项合同自省"},
+{"hash":"3fcac55586757201","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.3 查询读取与幂等命令提交","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","title":"4.3 查询读取与幂等命令提交"},
+{"hash":"f7e838a6ed6fbd4e","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.4 有界事件流订阅","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","title":"4.4 有界事件流订阅"},
+{"hash":"2b506fcca795ec00","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.5 随包运维技能","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","title":"4.5 随包运维技能"},
+{"hash":"b5a9e1378a818310","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.6 三条改动通道与失败处理","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案","title":"4.6 三条改动通道与失败处理"},
+{"hash":"70feb7de93180c7b","id":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 5. 验收","kind":"section","parent":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明","title":"5. 验收"}
+],
+"edges":[
+{"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"bb852bc64f44ccbd","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/architecture.html#s4 > 定义","kind":"map-position","raws":["「定义」"],"seen":"aba57fe30f8efc7f","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/architecture.html#s4 > 接口","kind":"map-position","raws":["「接口」"],"seen":"e63f6205412e3598","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["第五节"],"seen":"d65fb409d4abd20a","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令","kind":"link","raws":["app-and-interface.md"],"seen":"ac81ecb940494813","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 3. 安装 > 3.2 控制主机上的 Yudao 服务","kind":"link","raws":["web-interface-and-release.md"],"seen":"4b73df3a215d3378","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/requirements/external-ops-agent.md","kind":"link","raws":["../requirements/external-ops-agent.md"],"seen":"fcf75a42e7218523","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"452174d475741d3e","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明"},
+{"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","kind":"link","raws":["skeleton-and-application.md"],"seen":"d697a9c7a0bdcdd7","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 2. 边界与范围"},
+{"dst":"docs/requirements/skeleton-and-application.md","kind":"link","raws":["../requirements/skeleton-and-application.md"],"seen":"eda94aafe079627d","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 2. 边界与范围"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.4A 包图","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"ab09615ca132fd6b","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 3. 接口"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 6. 能力清单与认证 > 6.2 访问方式与认证","kind":"link","raws":["app-and-interface.md"],"seen":"f03abef70c72668f","src":"docs/design/external-ops-agent.md#进程外运维代理与通用命令行设计说明 > 4. 方案 > 4.1 连接、认证与请求头规则"}
+]
+}
