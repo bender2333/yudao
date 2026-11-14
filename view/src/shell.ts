@@ -348,6 +348,10 @@ export class Shell {
 
   private setScene(next: SceneRef): void {
     if (sceneKey(next) === sceneKey(this.scene)) return;
+    if (next.kind === "room" && (this.lastLoop === null || this.lastLoop.project_id !== next.projectId)) {
+      const cached = this.loops.get(next.projectId);
+      if (cached) this.lastLoop = cached;
+    }
     this.closeSceneViews();
     this.scene = next;
     // 换场景对象：清掉上一个对象的模型与决定卡片，新对象的画面挂上来以前不会拿到旧数据
@@ -596,7 +600,9 @@ export class Shell {
       surface.stream?.(stream.who, stream.text);
       return;
     }
-    for (const action of room.actions(roomEvent, scene.department, this.roleContext())) surface.play(action);
+    for (const action of room.actions(roomEvent, scene.department, this.roleContext(roomEvent.work_item_id ?? scene.workItemId))) {
+      surface.play(action);
+    }
   }
 
   /** 运行时收到画面还不认识的事件：缺口清单多一行，不打断画面。 */
@@ -868,30 +874,65 @@ export class Shell {
       this.setNote(`服务没有登记 ${QUERIES.workspace}：部门房间不画`);
       return;
     }
-    // 房间读的是这个部门在一个事项上的工作间：带上事项，画面才画得出这个事项的角色与状态；
-    // 没有指定事项时取楼层上正在工作的那一项（从楼进来时楼层还没有打开时为空）
     const scoped = this.scene.kind === "room" ? this.scene.workItemId : null;
     const fallback = this.lastLoop !== null && this.lastLoop.project_id === projectId
       ? this.focusItem(this.lastLoop, null)?.work_item_id ?? null
       : null;
-    const workItem = scoped ?? fallback;
-    const params: Record<string, unknown> = { project_id: projectId, department };
-    if (workItem !== null) params.work_item = workItem;
-    void views.open<DepartmentWorkspaceResult>(
-      "room.workspace",
-      { query: QUERIES.workspace, params },
-      (data, position) => {
-        this.workspace = data;
-        this.workspacePosition = position;
-        this.rebuildRoom();
-      },
-      (reason) => this.setNote(`部门房间读不出来：${reason}`),
-    );
+    let activeWorkItem = scoped ?? fallback;
+    const openWorkspace = (workItem: string | null): void => {
+      const params: Record<string, unknown> = { project_id: projectId, department };
+      if (workItem !== null) params.work_item = workItem;
+      void views.open<DepartmentWorkspaceResult>(
+        "room.workspace",
+        { query: QUERIES.workspace, params },
+        (data, position) => {
+          this.workspace = data;
+          this.workspacePosition = position;
+          this.rebuildRoom();
+        },
+        (reason) => this.setNote(`部门房间读不出来：${reason}`),
+      );
+    };
+    openWorkspace(activeWorkItem);
+    if (this.hasQuery(capabilities, QUERIES.loop)) {
+      void views.open<ProjectLoopResult>(
+        "room.loop",
+        { query: QUERIES.loop, params: { project_id: projectId } },
+        (data) => {
+          this.loop = data;
+          this.lastLoop = data;
+          if (scoped === null && activeWorkItem === null) {
+            const focused = this.focusItem(data, null)?.work_item_id ?? null;
+            if (focused !== null) {
+              activeWorkItem = focused;
+              views.close("room.workspace");
+              openWorkspace(activeWorkItem);
+              return;
+            }
+          }
+          this.rebuildRoom();
+          this.notify();
+        },
+        () => {
+          // 楼层快照读不出来：房间照常按工作间与默认回退定义渲染
+        },
+      );
+    }
   }
 
   private rebuildRoom(): void {
     if (this.workspace === null) return;
-    const model = room.state({ position: this.workspacePosition, workspace: { room: this.workspace.room } });
+    const projectId = this.sceneProjectId();
+    const department = this.scene.kind === "room" ? this.scene.department : undefined;
+    const workItemId = this.scene.kind === "room" ? this.scene.workItemId : null;
+    const activeLoop = this.loop ?? (projectId !== null && this.lastLoop?.project_id === projectId ? this.lastLoop : null);
+    const model = room.state({
+      position: this.workspacePosition,
+      workspace: { room: this.workspace.room },
+      department,
+      loop: activeLoop,
+      workItemId,
+    });
     this.setModel(model, []);
   }
 

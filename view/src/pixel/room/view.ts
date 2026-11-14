@@ -9,6 +9,7 @@ import type { Clock } from "../clock.ts";
 import { createPixelSurface } from "../surface.ts";
 import { createRoomDriver, type RoomDriver } from "./driver.ts";
 import { RoomRenderer } from "./render.ts";
+import { roomAppearanceOf } from "./decl.ts";
 import { emptyRoomData } from "./room.ts";
 import { H, W, STATUS_TEXT } from "./layout.ts";
 import type { PixelAction, PixelState } from "../contract.ts";
@@ -23,7 +24,8 @@ export interface RoomStreamWho {
 }
 
 /**
- * 房间承载事实的视觉通道（画面与播放 docs/design/visualization.md「视觉通道表」的房间那一行）：房间状态与状态文字、状态给出的姿势、
+ * 房间承载事实的视觉通道（画面与播放 docs/design/visualization.md「视觉通道表」的房间那一行）：
+ * 房间的角色标识与门顶显示名、有没有检验台与出口托盘、房间状态与状态文字、状态给出的姿势、
  * 角色与角色的状态、信箱与卷轴等物件的数量、头顶的流式文字。
  *
  * 只读状态给出的东西：工作台上的零件、抽屉、灯、动作的姿势与说话气泡属于表演层，不在这里。
@@ -31,11 +33,19 @@ export interface RoomStreamWho {
 export interface RoomChannels {
   /** 上画面的状态来自的查询快照的位置。 */
   position: number;
+  /** 房间的角色标识。 */
+  department: string;
+  /** 房间的角色显示名。 */
+  label: string;
+  /** 房间里有没有检验台（核验角色）。 */
+  verifier: boolean;
+  /** 房间里有没有出口托盘（开环完成角色）。 */
+  exit_tray: boolean;
   /** 房间状态与 CRT 上的状态文字。 */
   status: { value: string; text: string };
   /** 状态给出的姿势（哪个角色摆的、什么姿势）。 */
   pose: { role_id: string | null; anim: string } | null;
-  /** 角色与角色的状态（状态给出的那一个，不是正在演的动作）。 */
+  /** 角色与角色的状态（状态给出的那一个）。 */
   roles: { id: string; kind: string; status: string | null }[];
   /** 信箱、卷轴等物件的数量。 */
   objects: {
@@ -55,8 +65,13 @@ function roomChannels(driver: RoomDriver): RoomChannels {
   const model = driver.model;
   const status = model.status || "idle";
   const actors = driver.actors();
+  const defaultLabel = roomAppearanceOf(model.department).defaultLabel;
   return {
     position: model.position,
+    department: model.department,
+    label: model.label || defaultLabel || model.department,
+    verifier: Boolean(model.verifier),
+    exit_tray: Boolean(model.exit_tray),
     status: { value: status, text: STATUS_TEXT[status] ?? status },
     pose: model.pose ? { role_id: model.pose.role_id ?? null, anim: model.pose.anim } : null,
     roles: model.roles
