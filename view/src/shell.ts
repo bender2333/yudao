@@ -4,7 +4,7 @@
 // 壳只做连接：把同步层的数据交给翻译层，把翻译层的输出交给画面层，把画面层的回调变成现有的命令或 Yudao 页面的地址。
 //   - 命令只从能力清单里发现：只发清单里列出的命令，带这次连接的身份；同一个 command_id 重发只生效一次。
 //     能力清单里没有某条命令时，对应的物件不可操作，并写进缺口清单。
-//   - 点开回链：画面交出哪个元件、哪个事项，壳从当前状态取到位置，得出 Yudao 页面现有带位置的地址
+//   - 点开回链：画面交出被点中的元件、事件位置与事项标识，壳得出 Yudao 页面现有带位置的地址
 //     （#/p/<项目>/overview?at=<位置>&w=<事项>），只写路径、同一来源，在新的标签页打开；细内容在页面上看。
 //   - 跳转与聚焦：楼、楼层、房间之间的切换在壳里做，不经页面。
 //   - 接口版本与连接状态的提示由壳写出来（画布以外的文字，不属于画面合同）。
@@ -18,7 +18,7 @@ import type {
 } from "./api/generated/types.gen.ts";
 import type { CommandOutcome } from "./sync/connection.ts";
 import type {
-  DecisionFace, FactElement, FloorModel, LoopItem, PixelAction, PixelState, SourceRef,
+  DecisionFace, FactElement, FloorModel, LoopItem, PixelAction, PixelState, SourceLink, SourceRef,
 } from "./pixel/contract.ts";
 import type { DecisionAnswer, DecisionResult } from "./pixel/floor/card.ts";
 import type { Clock } from "./pixel/clock.ts";
@@ -376,13 +376,15 @@ export class Shell {
   // 画面回调 → 页面地址（点开回链）
 
   /**
-   * 点开回链：画面交出哪个事项、哪个元件，壳从当前楼层状态取到位置，
-   * 得出 Yudao 页面的地址并在新标签页打开。返回打开的地址（测试与排查用）。
+   * 点开回链：画面交出被点中的元件、事件位置与事项标识，壳优先用回调携带的位置
+   * （回调位置为空时再回退读当前楼层状态），得出 Yudao 页面的地址并在新标签页打开。
+   * 返回打开的地址（测试与排查用）。
    */
-  openFactLink(workItemId: string, element: FactElement): string | null {
+  openFactLink(link: SourceLink): string | null {
     const projectId = this.sceneProjectId();
     if (projectId === null) return null;
-    return this.openPageLink({ projectId, workItemId, position: this.factPosition(workItemId, element) });
+    const position = link.position ?? this.factPosition(link.workItemId, link.element);
+    return this.openPageLink({ projectId, workItemId: link.workItemId, position });
   }
 
   /** 决定卡片上的一个页面链接（页面现有写法：以 # 开头的路径）：在新标签页打开页面。 */
@@ -393,22 +395,11 @@ export class Shell {
     this.openPage(`/${hash}`);
   }
 
-  /** 来源卡片上的「在时间轴上查看」：页面概览按位置打开。 */
-  openTimelineLink(position: number): void {
-    const projectId = this.sceneProjectId();
-    if (projectId === null) return;
-    this.openPageLink({ projectId, workItemId: this.sceneWorkItemId(), position });
-  }
-
   /** 打开一个 Yudao 页面的地址（只写路径，同一来源；细内容在页面上看）。 */
   openPageLink(target: { projectId: string; workItemId: string | null; position: number | null }): string {
     const path = pagePathFor(target);
     this.openPage(path);
     return path;
-  }
-
-  private sceneWorkItemId(): string | null {
-    return this.scene.kind === "building" ? null : this.scene.workItemId;
   }
 
   private factPosition(workItemId: string, element: FactElement): number | null {

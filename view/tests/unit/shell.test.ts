@@ -121,12 +121,18 @@ test("点开回链：带上项目、事项与位置，得出页面现有带位�
     const detach = shell.attachHost(fakeHost, fakeClock, async () => surface);
     try {
       await until(() => surface.jumped.length + surface.states.length > 0, "楼层的状态");
-      // 门牌（sign）的来源事件在录下的位置 2
-      const path = shell.openFactLink(ids.work_item_id, "sign");
+      // 门牌（sign）的来源事件在录下的位置 2：画面回调携带元件、位置与事项标识（工单 #1382，R3：壳与画面回调边界）
+      const path = shell.openFactLink({ element: "sign", position: 2, workItemId: ids.work_item_id });
       const expected = `/#/p/${ids.project_id}/overview?at=2&w=${ids.work_item_id}`;
       assert.equal(path, expected);
       assert.equal(pagePathFor({ projectId: ids.project_id, workItemId: ids.work_item_id, position: 2 }), expected);
-      assert.deepEqual(opened, [{ url: expected, target: "_blank", features: "noopener" }]);
+      // 回调携带 position 为 null 时，壳回退读当前楼层状态里的位置
+      const fallback = shell.openFactLink({ element: "sign", position: null, workItemId: ids.work_item_id });
+      assert.equal(fallback, expected);
+      assert.deepEqual(opened, [
+        { url: expected, target: "_blank", features: "noopener" },
+        { url: expected, target: "_blank", features: "noopener" },
+      ]);
       // 只写路径、同一来源：地址以 / 开头，不写来源
       assert.ok(expected.startsWith("/"));
       assert.ok(!expected.includes("://"));
@@ -137,7 +143,7 @@ test("点开回链：带上项目、事项与位置，得出页面现有带位�
   });
 });
 
-test("决定卡片上的页面链接与「在时间轴上查看」：都打开 Yudao 页面的地址", async () => {
+test("决定卡片上的页面链接：打开 Yudao 页面的地址", async () => {
   const fixtures = loadFixtures();
   const ids = recordingOf(fixtures, "demo").ids;
   const server = new FakeServer(fixtures, "demo");
@@ -148,11 +154,9 @@ test("决定卡片上的页面链接与「在时间轴上查看」：都打开 Y
     try {
       shell.openPageTarget("#/sys/models");
       shell.openPageTarget("#/p/demo/settings?section=departments");
-      shell.openTimelineLink(34);
       assert.deepEqual(opened.map((entry) => entry.url), [
         "/#/sys/models",
         "/#/p/demo/settings?section=departments",
-        `/#/p/${ids.project_id}/overview?at=34&w=${ids.work_item_id}`,
       ]);
       assert.ok(opened.every((entry) => entry.target === "_blank" && entry.features === "noopener"));
     } finally {
