@@ -22,6 +22,8 @@ CONTRACT_NAMES = (
     "MCP 客户端模块不导入 Yudao 的其他模块",
     # 工单 #1750：命令行客户端模块位于接口缝外侧，不导入 Yudao 的其他模块（docs/design/external-ops-agent.md「接口」）
     "命令行客户端模块不导入 Yudao 的其他模块",
+    # 工单 #1751：随包运维技能模块位于接口缝外侧，只使用标准库，不导入 Yudao 的其他模块（docs/design/external-ops-agent.md「接口」「随包运维技能」）
+    "随包运维技能模块不导入 Yudao 的其他模块",
 )
 
 
