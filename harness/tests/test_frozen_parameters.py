@@ -9,13 +9,12 @@
 #    三个部门都改名的定义下，每个角色的可见范围参数照常冻结、照常生效；
 # 6. 中断（事项已提交、run 未创建）与定义版本差异两条恢复路径。
 #
-# 层：集成层（有两条用例要起真实进程验证命令与检查的时限上限；其余用例只用到工作区文件与一次激活，
-# 整个文件按测试分层 docs/design/test-pyramid.md「三层的定义」登记为其中最高的一层）。守 R1（边界与冻结）与 R2（run_created 的交换字段）。
+# 层：模块层（全部用例只用到工作区文件、单次 activate_once 与重新加载恢复，按 docs/design/test-pyramid.md「三层的定义」
+# 登记为模块层；启动真实子进程等待时间限额到期的两条用例见 test_frozen_parameter_timeouts.py）。守 R1（边界与冻结）与 R2（run_created 的交换字段）。
 
 from __future__ import annotations
 
 import json
-import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -64,11 +63,6 @@ def _created(system: LoopSystem, run_id: str) -> dict:
 
 def _frozen(system: LoopSystem, run_id: str) -> dict:
     return _created(system, run_id)["parameters"]
-
-
-def _python(command: str) -> str:
-    # 命令串交给 bash 执行：解释器取当前进程的 sys.executable，路径写成正斜杠并加引号（helpers 的同一做法）
-    return f'"{sys.executable.replace(chr(92), "/")}" {command}'
 
 
 def _tool_called(system: LoopSystem, run_id: str, identity: str) -> dict:
@@ -241,38 +235,6 @@ def test_compaction_stalled_limit_comes_from_the_frozen_value(tmp_path):
 
     payloads = json.dumps([event.payload for event in system.store.list_events(run_id)], ensure_ascii=False)
     assert "compaction.stalled_limit=1" in payloads
-    system.close()
-
-
-def test_bash_timeouts_come_from_the_frozen_values(tmp_path):
-    slow = _python('-c "import time; time.sleep(30)"')
-    script = {"product": [_respond(_call("slow-default", "bash", command=slow)),
-                          _respond(_call("slow-max", "bash", command=slow, timeout_sec=100)), product_spec()]}
-    system = _system(tmp_path, script)
-    project_id = system.projects.register("命令时限", GOAL)
-    _set(system, "bash_timeout_default_sec", 1)
-    _set(system, "bash_timeout_max_sec", 10)
-    _item, run_id = system.projects.start_work_item(project_id, GOAL)
-    system.activate_once(run_id)
-
-    assert _tool_called(system, run_id, "slow-default")["output"]["status"] == "timeout"
-    # 请求里的 100 秒按冻结的上限压到 2 秒
-    assert _tool_called(system, run_id, "slow-max")["output"]["status"] == "timeout"
-    system.close()
-
-
-def test_check_timeout_max_comes_from_the_frozen_value(tmp_path):
-    script = {"product": [_respond(_call("slow-check", "run_check", name="slow", command=_python("sleep.py"),
-                                         timeout_sec=100)),
-                          product_spec()]}
-    system = _system(tmp_path, script)
-    project_id = system.projects.register("检查时限", GOAL)
-    _set(system, "check_timeout_max_sec", 10)
-    _item, run_id = system.projects.start_work_item(project_id, GOAL)
-    system.workspace(run_id).write_file("sleep.py", "import time\ntime.sleep(30)\n")
-    system.activate_once(run_id)
-
-    assert "check timed out after 10s" in _tool_called(system, run_id, "slow-check")["output"]["summary"]
     system.close()
 
 
