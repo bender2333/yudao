@@ -32,6 +32,7 @@ from harness.app.contracts import (
     StreamCapability,
 )
 from harness.app.event_stream import StreamResync
+from harness.app.payloads import APPLICATION_EVENT_OWNER
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR
 from harness.kernel_events import SKELETON_EVENTS, application_event_types
 from harness.ops_skill import SKILL_FILENAME, install_skill, read_skill_text
@@ -110,7 +111,10 @@ def _validate_skill_contracts(skill_text: str) -> None:
 
     registered_events = set(EVENT_TYPES)
     assert registered_events == set(DECLARED_EVENT_TYPES)
-    assert registered_events == (SKELETON_EVENTS | set(application_event_types()))
+    default_app_events = {
+        kind for kind, owner in application_event_types().items() if owner == APPLICATION_EVENT_OWNER
+    }
+    assert registered_events == (SKELETON_EVENTS | default_app_events)
 
     built_in_forms = set(FORM_REGISTRY)
     disk_forms = {DEFAULT_FORM} | {p.name for p in (DEFINITIONS_DIR / "forms").iterdir() if p.is_dir()}
