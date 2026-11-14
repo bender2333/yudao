@@ -7,7 +7,7 @@
 // 这里只做操作与读数，不断言；断言在七个 spec 里。
 
 import type { Page } from "@playwright/test";
-import { readCanvas, waitFor, type CanvasRead, type ViewServer } from "./fixtures.ts";
+import { readCanvas, responseOf, waitFor, type CanvasRead, type ViewServer } from "./fixtures.ts";
 
 /** 画面自己的钩子与壳的读数（形状见 view/src/test-hooks.d.ts）。 */
 interface BuildingRead {
@@ -32,6 +32,11 @@ interface FloorStateRead {
 
 interface RoomChannelsRead {
   position: number;
+  department: string;
+  label: string;
+  verifier: boolean;
+  exit_tray: boolean;
+  stamp: { kind: "release" | "open_loop"; outsourced: boolean; text: string } | null;
   status: { value: string; text: string };
   pose: { role_id: string | null; anim: string } | null;
   roles: { id: string; kind: string; status: string | null }[];
@@ -193,14 +198,54 @@ export class ViewPage {
     }, { id, data });
   }
 
-  /** 从楼层进入一个部门房间（走壳的 goRoom 入口）。 */
+  /** 从楼层进入一个部门房间（走壳的 goRoom 入口），等待初始工作间快照到达并完成房间状态渲染后返回。 */
   async openRoom(department: string): Promise<void> {
+    const queryStart = this.server.queries.length;
     await this.page.evaluate((value) => {
       const hooks = window.__floorViewForTest;
       if (!hooks) throw new Error("楼层没有装上测试钩子");
       hooks.goRoom(value);
     }, department);
-    await waitFor(() => this.page.evaluate(() => Boolean(window.__roomViewForTest)), "房间画面挂上");
+    await waitFor(() => this.page.evaluate(() => Boolean(window.__roomViewForTest)), "房间测试钩子挂载");
+    await this.waitForCanvas("room");
+    await this.waitForRoomState(department, queryStart);
+  }
+
+  /** 等待部门房间的初始工作间快照到达、反映到房间状态通道并完成动画帧绘制。 */
+  async waitForRoomState(department: string, queryStart = 0): Promise<void> {
+    const queriesCap = (this.server.fixtures.capabilities as { queries?: { name?: unknown }[] }).queries ?? [];
+    const expectsLoopQuery = queriesCap.some((item) => item.name === "project.loop");
+    await waitFor(async () => {
+      const recentQueries = this.server.queries.slice(queryStart);
+      const workspaceQueries = recentQueries.filter(
+        (entry) => entry.name === "department.workspace" && entry.params.department?.[0] === department,
+      );
+      const latestWorkspaceQuery = workspaceQueries.at(-1);
+      if (!latestWorkspaceQuery) return null;
+      if (expectsLoopQuery && !recentQueries.some((entry) => entry.name === "project.loop")) {
+        return null;
+      }
+      let expectedPosition: number | null = null;
+      try {
+        expectedPosition = responseOf(this.server.recording, "department.workspace", latestWorkspaceQuery.params).position;
+      } catch {
+        expectedPosition = null;
+      }
+      const ready = await this.page.evaluate(async ({ targetDepartment, targetPosition }) => {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const hooks = window.__roomViewForTest;
+        if (!hooks) return false;
+        const channels = hooks.channels();
+        const timeline = hooks.timeline();
+        if (channels.department !== targetDepartment) return false;
+        if (timeline.shown === null || timeline.pending > 0) return false;
+        const positionMatched = targetPosition !== null
+          ? channels.position === targetPosition
+          : channels.position > 0;
+        return positionMatched && timeline.shown === channels.position;
+      }, { targetDepartment: department, targetPosition: expectedPosition }).catch(() => false);
+      return ready ? true : null;
+    }, `房间 ${department} 收到录下的工作间状态`);
   }
 
   /** 房间的读数（状态、角色、物件、流式文字与播放时间线）。 */
