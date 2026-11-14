@@ -275,11 +275,32 @@ class McpServersInvalid(ValueError):
     """MCP 服务器设置的字段错误（工单 #236）：文字写明是哪一项、要求是什么。"""
 
 
+COMPLETION_KIND = "completion"
+COMPLETION_REVIEW_KIND = "completion_review"
+COMPLETION_RELEASE_VERDICT = "release"
+
+
+@dataclass(frozen=True)
+class _SettleCandidate:
+    # 待采纳结算的一版成果（直做交完成封存树）：字段与 DeliverySpec 采纳与路径守卫读取的属性一致
+    created_event_id: str
+    tree_ref: ArtifactRef
+    code_tree_digest: str
+    summary: str
+    files: list[str]
+    check_names: list[str]
+    known_risks: list[str]
+    issuer: str
+
+
 def _adoption_payload(delivery: Any, release: Any, run: Any, item: WorkItem) -> dict[str, Any]:
-    # 采纳交付的载荷（工单 #354）：照常采纳与批准以后采纳写的是同一份内容，由结算与被批准的请求共用
+    # 采纳交付的载荷（工单 #354、#1742）：照常采纳与批准以后采纳写的是同一份内容，由结算与被批准的请求共用；
+    # 开环完成没有放行结论事件时 qa_event_id 记空串
+    qa_event_id = (release if isinstance(release, str)
+                   else ("" if release is None else release.created_event_id))
     return {
         "adoption_id": new_id("adopt"), "work_item_id": item.work_item_id, "run_id": run.run_id,
-        "delivery_event_id": delivery.created_event_id, "qa_event_id": release.created_event_id,
+        "delivery_event_id": delivery.created_event_id, "qa_event_id": qa_event_id,
         "tree_ref": asdict(delivery.tree_ref), "code_tree_digest": delivery.code_tree_digest,
         "summary": delivery.summary, "files": list(delivery.files), "check_names": list(delivery.check_names),
         "known_risks": list(delivery.known_risks),
@@ -1724,6 +1745,61 @@ class ProjectService:
         events = self.store.list_events(run_id)
         return next((event for event in reversed(events) if event.type == event_type), None)
 
+    def _settle_candidate(self, run: RunProjection) -> tuple[Any, str] | None:
+        # 待采纳结算的交付与放行结论编号：成果驱动读最近一份交付（放行评审或开环完成），
+        # 直做读最近一条带封存树的交完成（开环完成或当前版对应的放行核验结论）
+        if run.delivery_specs:
+            delivery = run.delivery_specs[-1]
+            release = next((review for review in reversed(run.reviews) if review.verdict == "release"), None)
+            if release is not None:
+                return delivery, release.created_event_id
+            if run.stop_reason == OPEN_LOOP_STOP_REASON:
+                return delivery, ""
+            return None
+        events = self.store.list_events(run.run_id)
+        completion = next(
+            (event for event in reversed(events)
+             if event.type == EventType.ARTIFACT_ACCEPTED
+             and (event.payload or {}).get("artifact_kind") == COMPLETION_KIND
+             and isinstance((event.payload or {}).get("artifact_ref"), dict)),
+            None,
+        )
+        if completion is None:
+            return None
+        payload = completion.payload or {}
+        if run.stop_reason == OPEN_LOOP_STOP_REASON:
+            qa_event_id = ""
+        elif run.stop_reason == "released":
+            review = next(
+                (event for event in reversed(events)
+                 if event.type == EventType.ARTIFACT_ACCEPTED
+                 and (event.payload or {}).get("artifact_kind") == COMPLETION_REVIEW_KIND
+                 and (event.payload or {}).get("verdict") == COMPLETION_RELEASE_VERDICT
+                 and (event.payload or {}).get("completion") == payload.get("content_hash")),
+                None,
+            )
+            if review is None:
+                return None
+            qa_event_id = review.event_id
+        else:
+            return None
+        tree_ref = ArtifactRef(**payload["artifact_ref"])
+        archived = load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
+        digest = str(payload.get("artifact_tree_digest") or "")
+        if archived.digest != digest:
+            raise ValueError("archived tree does not match its accepted completion")
+        issuer = str(payload.get("artifact_issuer") or payload.get("issuer") or completion.department or "")
+        return _SettleCandidate(
+            created_event_id=completion.event_id,
+            tree_ref=tree_ref,
+            code_tree_digest=digest,
+            summary=str(payload.get("summary") or ""),
+            files=[entry.path for entry in archived.files],
+            check_names=[],
+            known_risks=[str(entry) for entry in payload.get("known_risks") or ()],
+            issuer=issuer,
+        ), qa_event_id
+
     def _settle_run(self, transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
         project = transaction.projection
         if run.status != "done":
@@ -1737,12 +1813,10 @@ class ProjectService:
             # 建档 run 以基线核验或开环完成结束：提出初始 PRD 候选并请求用户确认（工单 #136、#1510，
             #）。建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
             return self._propose_initial_prd(transaction, run, item)
-        if not run.delivery_specs:
+        settled = self._settle_candidate(run)
+        if settled is None:
             return None
-        delivery = run.delivery_specs[-1]
-        release = next((review for review in reversed(run.reviews) if review.verdict == "release"), None)
-        if release is None:
-            return None
+        delivery, qa_event_id = settled
         expected = None if item.baseline is None else item.baseline["adoption_id"]
         current = None if project.current_adoption is None else project.current_adoption.adoption_id
         if expected != current:
@@ -1751,7 +1825,7 @@ class ProjectService:
                 "delivery_event_id": delivery.created_event_id, "code_tree_digest": delivery.code_tree_digest,
                 "reason": "baseline_changed", "expected_adoption_id": expected, "current_adoption_id": current,
             }, actor="system"))[0]
-        adoption = _adoption_payload(delivery, release, run, item)
+        adoption = _adoption_payload(delivery, qa_event_id, run, item)
         blocked = self._guard_kernel_paths(transaction, run, item, delivery, adoption)
         if blocked is True:
             # 已经发出过内核修改请求：批准或拒绝以前不再采纳，也不重复请求

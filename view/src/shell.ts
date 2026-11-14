@@ -201,6 +201,7 @@ export class Shell {
   private projectPosition = 0;
   private readonly loops = new Map<string, ProjectLoopResult>();
   private readonly loopPositions = new Map<string, number>();
+  private readonly pendingLoops = new Set<string>();
   // 楼层：project.loop、大厅的决定请求与这次运行的询问链
   private loop: ProjectLoopResult | null = null;
   /** 最近一次读到的楼层（换场景时留着：从楼层进房间时按它取正在工作的事项）。 */
@@ -587,10 +588,12 @@ export class Shell {
 
   private closeSceneViews(): void {
     const views = this.engine.viewSync;
-    if (!views) return;
-    for (const viewId of views.openViewIds) views.close(viewId);
+    if (views) {
+      for (const viewId of views.openViewIds) views.close(viewId);
+    }
     this.loops.clear();
     this.loopPositions.clear();
+    this.pendingLoops.clear();
     this.loop = null;
     this.asks = null;
     this.asksRunId = "";
@@ -630,31 +633,37 @@ export class Shell {
   private syncProjectLoops(views: ViewSync, capabilities: Capabilities): void {
     if (!this.hasQuery(capabilities, QUERIES.loop)) return;
     const wanted = new Set(this.projects.map((project) => project.project_id));
-    for (const projectId of [...this.loops.keys()]) {
+    for (const projectId of [...new Set([...this.loops.keys(), ...this.pendingLoops])]) {
       if (!wanted.has(projectId)) {
         views.close(`building.loop.${projectId}`);
         this.loops.delete(projectId);
         this.loopPositions.delete(projectId);
+        this.pendingLoops.delete(projectId);
       }
     }
     for (const project of this.projects) {
-      if (this.loops.has(project.project_id)) continue;
+      if (this.loops.has(project.project_id) || this.pendingLoops.has(project.project_id)) continue;
+      this.pendingLoops.add(project.project_id);
       void views.open<ProjectLoopResult>(
         `building.loop.${project.project_id}`,
         { query: QUERIES.loop, params: { project_id: project.project_id } },
         (data, position) => {
+          this.pendingLoops.delete(project.project_id);
           this.loops.set(project.project_id, data);
           this.loopPositions.set(project.project_id, position);
           this.rebuildBuilding();
         },
         () => {
           // 这一层读不出来：楼照常画其余各层，层上的事项为空
+          this.pendingLoops.delete(project.project_id);
+          this.rebuildBuilding();
         },
       );
     }
   }
 
   private rebuildBuilding(): void {
+    if (this.pendingLoops.size > 0) return;
     const positions = [this.projectPosition, ...this.loopPositions.values()].filter((value) => value > 0);
     const position = positions.length === 0 ? 0 : Math.max(...positions);
     const loops: Record<string, ProjectLoopResult> = {};

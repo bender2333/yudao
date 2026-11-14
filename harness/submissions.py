@@ -69,6 +69,7 @@ def render_structure(description: dict[str, Any]) -> str:
 # 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
 # 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用 docs/design/skeleton-and-application.md「薄驱动」）
 REVIEW_KIND = "qa_review"
+COMPLETION_KIND = "completion"
 # 质检无法核验的结论（工单 #1179）：薄驱动只问这一句，不写成果种类与结论的字面值
 CANNOT_VERIFY_VERDICT = "cannot_verify"
 REWORK_VERDICT = "rework_engineering"
@@ -156,15 +157,19 @@ def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
 
 
 def generic_acceptance(artifact: dict[str, Any], *,
-                       tree_digest: str | None = None) -> tuple[str, dict[str, Any], list[str]]:
+                       tree_digest: str | None = None,
+                       ref: dict[str, Any] | None = None) -> tuple[str, dict[str, Any], list[str]]:
     # 通用种类的接纳事件（S2c，工单 #1098）：内容就是收紧检查给出的那一份，再盖上统一字段
-    # （种类、版本、依据、作者部门、记下的树摘要）。内核不认识这一类成果的内容，最小投影按统一字段折叠；
+    # （种类、版本、依据、作者部门、记下的树摘要、附带工件引用）。内核不认识这一类成果的内容，最小投影按统一字段折叠；
     # 记下的树摘要由接纳时的工作区快照给出——成果的内容里带了自己的树摘要时用它
     artifact["id"] = new_id("artifact")
     if tree_digest and not artifact.get("tree_digest"):
         artifact["tree_digest"] = tree_digest
-    artifact.update(acceptance_fields(str(artifact["kind"]), artifact, version=int(artifact["revision"])))
-    return EventType.ARTIFACT_ACCEPTED, artifact, [artifact["content_hash"]]
+    artifact.update(acceptance_fields(str(artifact["kind"]), artifact, version=int(artifact["revision"]), ref=ref))
+    hashes = [artifact["content_hash"]]
+    if isinstance(ref, dict) and isinstance(ref.get("content_hash"), str):
+        hashes.append(ref["content_hash"])
+    return EventType.ARTIFACT_ACCEPTED, artifact, hashes
 
 
 def invalidation(current: RunProjection, reason: str) -> tuple[str, dict[str, Any]] | None:
@@ -322,9 +327,13 @@ class SubmissionWriter:
             event = append(EventType.INDEPENDENT_JUDGEMENT_COMMITTED, payload)
         else:
             # 新种类的成果写一种通用的接纳事件（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：载荷是收紧检查给出的
-            # 内容加统一字段。材料文件、Git 版本与 PRD 渲染这些附带写入仍按上面的种类做，
-            # 通用种类只写这一条事件
-            event = append(*generic_acceptance(artifact, tree_digest=snapshot.digest))
+            # 内容加统一字段。直做交完成封存当前工作区公开树并核对工作区未变，引用记进既有统一字段 artifact_ref
+            ref_dict: dict[str, Any] | None = None
+            if kind == COMPLETION_KIND:
+                ref = store_tree(self.artifacts, run_id, snapshot.tree)
+                environment.verify_tree(snapshot)
+                ref_dict = asdict(ref)
+            event = append(*generic_acceptance(artifact, tree_digest=snapshot.digest, ref=ref_dict))
 
         if kind in {"product_spec", "product_decision"}:
             contract = contract_payload(current)
@@ -352,7 +361,7 @@ class SubmissionWriter:
             for event_type, payload, _hashes in prepared:
                 if event_type not in {EventType.SPEC_SUPERSEDED, EventType.ARTIFACT_INVALIDATED}:
                     payload["git_version"] = revision
-        if kind in {"delivery_spec", "qa_review", "structure", "baseline_review"}:
+        if kind in {"delivery_spec", "qa_review", "structure", "baseline_review", COMPLETION_KIND}:
             environment.verify_tree(snapshot)
         previous_materials: dict[str, bytes | None] = {}
 

@@ -358,7 +358,8 @@ class WatchedOutputsTightening:
         if launch is not None:
             # 启动方式属于交付说明的事实部分（工单 #148）：随 delivery_accepted 写出，旧交付没有这一项
             content["launch"] = launch
-        return Tightened(content=content)
+        # 没有核验角色核验交付时，这一版交付被接纳即结束事项（薄驱动按路由给出的结束原因记作开环完成）
+        return Tightened(content=content, ends_run=in_force(request.definitions).is_open_loop("delivery_spec"))
 
     def _review(self, request: TightenRequest) -> Tightened:
         # 核验角色的结论是对当前交付的核验（循环结构 docs/design/department-loop.md「各职能在什么时候工作」）：这一轮开始时没有交付就没有可以核验的对象；
