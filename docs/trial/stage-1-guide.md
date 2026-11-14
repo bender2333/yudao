@@ -1,8 +1,8 @@
-# 「职能之间：转实」试用指南：网页上跑完一个事项（0.2.0）
+# 「职能之间：转实」试用指南：网页上跑完一个事项（0.2.1）
 
-试用版本 0.2.0，main 的发布提交 `_______`（发布时填）。试用工单 [#994](https://github.com/bender2333/yudao/issues/994)。这次要你回答的是「职能之间：转实」这个阶段的问题：**一个小的新项目，循环能不能在网页上用真实模型自己把它从意图转到放行，中间的询问、决定请求、打回与返工走得通不通，页面与按位置读出的事实一致不一致。**
+试用版本 0.2.1（标签 `v0.2.1` 指向的 main 发布提交）。试用工单 [#994](https://github.com/bender2333/yudao/issues/994)、[#1706](https://github.com/bender2333/yudao/issues/1706)、[#1717](https://github.com/bender2333/yudao/issues/1717)。这次要你回答的是「职能之间：转实」这个阶段的问题：**一个小的新项目，循环能不能在网页上用真实模型自己把它从意图转到放行，中间的询问、决定请求、打回与返工走得通不通，页面与按位置读出的事实一致不一致。**
 
-这一步只看你亲手用得怎么样。上一轮的机器试用（[#1153](https://github.com/bender2333/yudao/discussions/1153)）找出的十二个问题已经修完，九张工单合并进 main；这次不再让你重复跑那些已修的东西。
+这一步只看你亲手用得怎么样。前序机器试用（[#1153](https://github.com/bender2333/yudao/discussions/1153)、[#1780](https://github.com/bender2333/yudao/discussions/1780)）找出的明确缺陷都已经修完合并进 main；这次不再让你重复跑那些已修的东西。
 
 ## 1. 试用前的准备
 
@@ -13,12 +13,12 @@
 
 ## 2. 安装与启动
 
-1. 取得安装包：`gh release download v0.2.0 --repo bender2333/yudao --pattern "*.whl" --dir <下载目录>`。
+1. 取得安装包：`gh release download v0.2.1 --repo bender2333/yudao --pattern "*.whl" --dir <下载目录>`。
 2. 装进独立环境（不动你已经装的那一份）：
 
    ```powershell
    uv venv $env:TEMP\yudao-trial
-   uv pip install --python $env:TEMP\yudao-trial\Scripts\python.exe <下载目录>\yudao_harness-0.2.0-py3-none-any.whl
+   uv pip install --python $env:TEMP\yudao-trial\Scripts\python.exe <下载目录>\yudao_harness-0.2.1-py3-none-any.whl
    ```
 
 3. 启动（在当前目录**不在**仓库里的窗口里跑）：`$env:TEMP\yudao-trial\Scripts\python.exe -m harness api --data-dir <数据目录> --port 8766`。服务就绪以后会自动打开页面；没有自动打开就自己打开 `http://127.0.0.1:8766/`。
@@ -41,7 +41,7 @@
 
 按顺序走，每件都记一下你看到的现象（做得到、做不到、卡在哪一步）：
 
-1. **新建一个事项**：填项目名称与目标，说一句想法，作为新事项开始。看到工程写代码的同时质检按 PRD 起草测试；事项只在质检放行时完成。
+1. **新建一个事项**：填项目名称、点选形态卡（「产品 · 工程 · 质检」）建立项目，在对话输入框说一句想法，作为新事项开始。看到工程写代码的同时质检按 PRD 起草测试；事项只在质检放行时完成。
 2. **让工程去问产品**：工程问一句，产品在回答里改 PRD，回答回到工程，质检收到 PRD 新版本的通知；页面上能看到进行中与已结束的询问。
 3. **给职能发指导**：给正在工作的职能发一段，下一步按指导调整；给不在工作的职能发一段，看到它的回答，其他职能照常跑。
 4. **不登记任何命令**：工程用 `bash` 装依赖、构建、在后台起服务并访问它；质检在交付快照的全新副本上跑自己的测试，凭检查回执放行。
