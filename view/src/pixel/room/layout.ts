@@ -68,11 +68,6 @@ export function levelAtLeast(level: string | undefined, min: string): boolean {
   return a >= b;
 }
 
-/** 各部门工作台的名字（原型 room.js 的 BENCH_LABEL）。 */
-export const BENCH_LABEL: Record<string, string> = {
-  product: "卷轴台", engineering: "封存台", quality: "检验台",
-};
-
 /** 走路与动作的脚本步骤（原型 room.js 的 S）。 */
 export type RoomStep =
   | { t: "go"; x: number; y: number; gait?: string; speed?: number }
@@ -117,7 +112,3 @@ export const S = {
   seat: (seat: RoomSeat | null): RoomStep => ({ t: "seat", seat }),
   fade: (to: number, ms: number): RoomStep => ({ t: "fade", to, ms }),
 };
-
-/** 房间里的部门（原型支持 product、engineering、quality、operations）。 */
-export const ROOM_DEPTS = ["product", "engineering", "quality", "operations"] as const;
-export type RoomDept = (typeof ROOM_DEPTS)[number];

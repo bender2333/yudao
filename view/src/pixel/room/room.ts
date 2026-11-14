@@ -18,9 +18,12 @@ export interface RoomPoseData {
   anim: string;
 }
 
-/** 房间的数据：画面合同的状态（带位置）加上部门与档位。 */
+/** 房间的数据：画面合同的状态（带位置）加上角色显示名、核验与出口托盘标记及档位。 */
 export interface RoomData extends PixelState {
   department: string;
+  label: string;
+  verifier: boolean;
+  exit_tray: boolean;
   level: string;
   status: RoomStatus;
   crt: { target?: string; model?: string; protocol?: string; status?: string; cycle?: number | null };
@@ -41,12 +44,15 @@ export interface RoomData extends PixelState {
   trial: Record<string, unknown> | null;
   tool_panel: { buttons?: string[]; lit?: number } | null;
   self_test: Record<string, unknown> | null;
+  ops?: Record<string, unknown> | null;
+  monitor_alarm?: boolean;
 }
 
-/** 一份空房间：画面建立时用，状态到达之前的样子（一个部门一个 Agent 由 rolesOf 补上）。 */
+/** 一份空房间：画面建立时用，状态到达之前的样子（默认单角色由 rolesOf 补上）。 */
 export function emptyRoomData(department: string): RoomData {
   return {
-    position: 0, department, level: "ui", status: "idle", crt: {}, roles: [], pose: null, door: null,
+    position: 0, department, label: "", verifier: false, exit_tray: false, level: "ui", status: "idle",
+    crt: {}, roles: [], pose: null, door: null,
     hold_card: null, mailbox: 0, summaries: 0, scrolls: 0, pinned_notes: 0, semantic_cards: 0,
     machine: null, remote_unknown: false, waiting_provider: false, pipes: null, existing_read: false,
     trial: null, tool_panel: null, self_test: null,

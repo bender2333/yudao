@@ -8,12 +8,12 @@ import { hash } from "../anims.ts";
 import { bitmapDef } from "../char.ts";
 import { mix, rgba } from "../grid.ts";
 import { paint } from "../paint.ts";
-import { DEPTS, PAL } from "../registry.ts";
+import { PAL } from "../registry.ts";
 import { drawActor, drawBitmap, drawIcon, drawSign, drawStampMark, drawText, headTop, signStyle } from "../shapes.ts";
 import { drawSpeeches } from "../floor/render.ts";
 import type { Actor, SceneLike } from "../world/types.ts";
-import { BASE, BENCH_LABEL, H, L, ROW_A, ROW_B, STATUS_COLOR, STATUS_TEXT, W, levelAtLeast, type RoomSeat } from "./layout.ts";
-import { rolesOf } from "./decl.ts";
+import { BASE, H, L, ROW_A, ROW_B, STATUS_COLOR, STATUS_TEXT, W, levelAtLeast, type RoomSeat } from "./layout.ts";
+import { VERIFIER_BENCH_LABEL, rolesOf, roomAppearanceOf, type RoomAppearance } from "./decl.ts";
 import type { RoomDriver } from "./driver.ts";
 import type { DeskState } from "./room.ts";
 
@@ -26,22 +26,6 @@ const RB = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
   R(c, x, y, w, h, col);
 };
 
-interface Shell {
-  name: string;
-  main: string;
-  shade: string;
-  light: string;
-  wall: string;
-  wall2: string;
-  wall3?: string;
-  trim: string;
-  floor: string;
-  floor2?: string;
-  floor3?: string;
-  rug: string;
-  rug2: string;
-}
-
 /** 部门房间的绘制：每帧按驱动的房间数据与场景里 actor 的状态画一遍。 */
 export class RoomRenderer {
   private bg: HTMLCanvasElement | null = null;
@@ -52,11 +36,19 @@ export class RoomRenderer {
 
   constructor(private readonly driver: RoomDriver, private readonly scene: SceneLike) {}
 
+  private appearance(): RoomAppearance {
+    return roomAppearanceOf(this.driver.model.department);
+  }
+
+  private roomTitle(): string {
+    return this.driver.model.label || this.appearance().defaultLabel || this.driver.model.department;
+  }
+
   draw(c: CanvasRenderingContext2D): void {
     const sc = this.scene;
     const t = sc.animT;
-    const dept = this.driver.model.department;
-    const D = (DEPTS as Record<string, Shell>)[dept];
+    const app = this.appearance();
+    const D = app.shell;
     const status = this.effStatus();
     const off = status === "interrupted";
     const level = this.driver.model.level ?? "S5";
@@ -111,13 +103,13 @@ export class RoomRenderer {
     items.push({ y: L.pipe.base, draw: () => paint.pipe(c, L.pipe.x, L.pipe.base, { out: this.pipeMode(), letters: 0 }, t) });
     items.push({ y: L.tube.base, draw: () => paint.tube(c, L.tube.x, L.tube.base, { letters: this.lettersWaiting() }) });
     if (levelAtLeast(level, "3.2B")) items.push({ y: L.post.base, draw: () => paint.postbox(c, L.post.x, L.post.base, { flag: this.driver.state.postFlag }) });
-    if (dept === "quality" && this.driver.state.trialSeat) items.push({ y: L.trial.y + 0.5, draw: () => this.drawTrialTable(c, t) });
+    if (this.driver.model.verifier && this.driver.state.trialSeat) items.push({ y: L.trial.y + 0.5, draw: () => this.drawTrialTable(c, t) });
     if (this.isOps()) {
       if (this.opsRoom()) {
         items.push({ y: L.mdoor.base, draw: () => paint.machineDoor(c, L.mdoor.x, L.mdoor.base, { w: L.mdoor.w, h: L.mdoor.h, glow: this.driver.state.mdoorGlow }, t) });
       }
     }
-    if (dept !== "operations") items.push({ y: ROW_A + 0.5, draw: () => this.drawBench(c, t) });
+    if (app.hasBench) items.push({ y: ROW_A + 0.5, draw: () => this.drawBench(c, t) });
     else if (this.opsRoom()) {
       const cp = this.cartPos();
       items.push({ y: cp[1] - 1, draw: () => paint.cart(c, Math.round(cp[0]), Math.round(cp[1]), { box: this.driver.state.cart.box }) });
@@ -152,7 +144,7 @@ export class RoomRenderer {
     // 发光物件：画在灯光之上
     paint.crt(c, L.crt.x, L.crt.y, this.crtOpts(), t);
     this.drawScreens(c, t);
-    if (dept === "engineering" && levelAtLeast(level, "3.2D") && (this.driver.state.selfShot || this.driver.model.self_test)) this.drawSelfShot(c, t);
+    if (app.selfTestShot && levelAtLeast(level, "3.2D") && (this.driver.state.selfShot || this.driver.model.self_test)) this.drawSelfShot(c, t);
     if (this.isOps()) paint.beaconLight(c, L.back.x + 11, 50, { on: this.alarmOn(), color: "red", reduced: sc.reduced, len: 120 }, t);
     if (this.mailInfo && this.mailCount() > 0) paint.glow(c, this.mailInfo.lamp[0], this.mailInfo.lamp[1], 7, PAL.yellow2, 0.7);
 
@@ -162,7 +154,7 @@ export class RoomRenderer {
       const ss = signStyle(doorText);
       drawSign(c, this.doorInfo.nail[0], this.doorInfo.nail[1] + 18, doorText, { size: 7, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, nail: this.doorInfo.nail[1], maxW: 96 });
     }
-    drawText(c, `${D.name}部门`, L.door.x + L.door.w / 2, L.door.base - L.door.h - 8, { size: 5.5, weight: 700, align: "center", color: PAL.white });
+    drawText(c, this.roomTitle(), L.door.x + L.door.w / 2, L.door.base - L.door.h - 8, { size: 5.5, weight: 700, align: "center", color: PAL.white });
     for (const a of sc.actors) {
       if (!a.visible) continue;
       if (a.sign && a.anim === "hold_sign") this.drawHeldSign(c, sc, a, a.sign);
@@ -184,7 +176,7 @@ export class RoomRenderer {
   }
 
   private isOps(): boolean {
-    return this.driver.model.department === "operations";
+    return this.appearance().machineRoomStyle;
   }
 
   private opsRoom(): boolean {
@@ -266,7 +258,7 @@ export class RoomRenderer {
 
   private drawTrialTable(c: CanvasRenderingContext2D, t: number): void {
     const tb = L.trial;
-    const D = (DEPTS as Record<string, Shell>)["quality"];
+    const D = this.appearance().shell;
     const a = this.scene.actors.find((x) => (x.seat as unknown) === this.driver.state.trialSeat && x.visible);
     if (a) drawActor(c, this.scene, a, "base");
     paint.table(c, tb.x, tb.y, tb.w, { top: PAL.white, face: D.light, edge: mix(D.light, PAL.ink, 0.3), label: "试用台" });
@@ -289,18 +281,22 @@ export class RoomRenderer {
 
   private drawBackPiece(c: CanvasRenderingContext2D, t: number): void {
     const x = L.back.x;
-    const dept = this.driver.model.department;
-    if (dept === "product") {
-      paint.scrollRack(c, x, BASE, { count: Math.max(0, (this.driver.model.scrolls || 0) - (this.driver.state.scrollHide > this.scene.realT ? 1 : 0)), flash: this.scene.realT < this.driver.state.scrollFlash, label: "卷轴架" }, t);
-    } else if (dept === "engineering") {
+    const app = this.appearance();
+    if (app.backPiece === "scroll_rack") {
+      paint.scrollRack(c, x, BASE, {
+        count: Math.max(0, (this.driver.model.scrolls || 0) - (this.driver.state.scrollHide > this.scene.realT ? 1 : 0)),
+        flash: this.scene.realT < this.driver.state.scrollFlash,
+        label: app.backPieceTitle,
+      }, t);
+    } else if (app.backPiece === "delivery_rack") {
       RB(c, x, BASE - 50, 60, 50, PAL.metal3);
       R(c, x, BASE - 50, 60, 2, PAL.metal2);
       [BASE - 34, BASE - 17].forEach((sy) => R(c, x, sy, 60, 2, PAL.metal4));
       [[x + 4, BASE - 48], [x + 20, BASE - 48], [x + 38, BASE - 48], [x + 8, BASE - 31], [x + 30, BASE - 31], [x + 14, BASE - 14]].forEach(([bx, by], i) => {
         drawBitmap(c, i % 3 === 0 ? "box_sealed" : "box", bx, by + 3);
       });
-      drawText(c, "交付存放", x + 30, BASE - 56, { size: 6, weight: 700, align: "center", color: PAL.ink2 });
-    } else if (dept === "quality") {
+      drawText(c, app.backPieceTitle, x + 30, BASE - 56, { size: 6, weight: 700, align: "center", color: PAL.ink2 });
+    } else if (app.backPiece === "sample_cabinet") {
       RB(c, x, BASE - 50, 60, 50, PAL.white2);
       R(c, x, BASE - 50, 60, 2, PAL.white);
       [BASE - 34, BASE - 17].forEach((sy) => R(c, x, sy, 60, 2, PAL.grey2));
@@ -313,10 +309,19 @@ export class RoomRenderer {
           R(c, jx + 1, jy + 1, 5, 2, PAL.grey3);
         }
       }
-      drawText(c, "样本柜", x + 30, BASE - 56, { size: 6, weight: 700, align: "center", color: PAL.ink2 });
-    } else {
+      drawText(c, app.backPieceTitle, x + 30, BASE - 56, { size: 6, weight: 700, align: "center", color: PAL.ink2 });
+    } else if (app.backPiece === "monitor_wall") {
       paint.monitor(c, L.monitor.x, L.monitor.y, { w: L.monitor.w, h: L.monitor.h, alarm: this.alarmOn() }, t);
       paint.backup(c, L.backup.x, L.backup.base, { lit: this.driver.state.backupLit || (this.driver.model.ops as { backup?: number } | undefined)?.backup || 0, flash: this.scene.realT < this.driver.state.backupFlash });
+    } else {
+      RB(c, x, BASE - 50, 60, 50, PAL.wood2);
+      R(c, x, BASE - 50, 60, 2, PAL.wood1);
+      [BASE - 34, BASE - 17].forEach((sy) => R(c, x, sy, 60, 2, PAL.wood3));
+      for (let i = 0; i < 4; i++) {
+        RB(c, x + 6 + i * 12, BASE - 46, 9, 10, PAL.paper2);
+        RB(c, x + 6 + i * 12, BASE - 29, 9, 10, PAL.paper);
+      }
+      drawText(c, app.backPieceTitle, x + 30, BASE - 56, { size: 6, weight: 700, align: "center", color: PAL.ink2 });
     }
   }
 
@@ -404,31 +409,36 @@ export class RoomRenderer {
       boot: this.driver.state.crtBoot < 1 ? this.driver.state.crtBoot : undefined,
       dim: status === "idle", cursor: status === "working",
       alert: status === "waiting_resume",
-      label: `${(DEPTS as Record<string, Shell>)[this.driver.model.department].name} CRT`,
+      label: `${this.roomTitle()} CRT`,
     };
   }
 
   private drawBench(c: CanvasRenderingContext2D, t: number): void {
-    const dept = this.driver.model.department;
-    const D = (DEPTS as Record<string, Shell>)[dept];
+    const app = this.appearance();
+    const D = app.shell;
+    const isVerifier = Boolean(this.driver.model.verifier);
     const b = L.bench;
     const bs = this.driver.state.bench;
-    const top = dept === "engineering" ? PAL.metal1 : dept === "quality" ? PAL.white : PAL.wood1;
-    const face = dept === "engineering" ? PAL.metal3 : dept === "quality" ? D.light : PAL.wood2;
-    paint.table(c, b.x, b.y, b.w, { top, face, edge: mix(face, PAL.ink, 0.3), label: BENCH_LABEL[dept] });
+    const benchSpec = app.nonVerifierBench;
+    const top = isVerifier ? PAL.white : benchSpec.top;
+    const face = isVerifier ? D.light : benchSpec.face;
+    const label = isVerifier ? VERIFIER_BENCH_LABEL : benchSpec.label;
+    paint.table(c, b.x, b.y, b.w, { top, face, edge: mix(face, PAL.ink, 0.3), label });
     const cx = b.x + Math.round(b.w / 2);
-    if (dept === "engineering") {
-      RB(c, b.x + b.w - 16, b.y - 9, 12, 5, PAL.red3);
-      drawBitmap(c, "tape", b.x + b.w - 13, b.y - 12);
-      RB(c, b.x + 5, b.y - 6, 10, 3, PAL.blue3);
-    }
-    if (dept === "quality") {
+    if (isVerifier) {
       R(c, b.x + b.w - 10, b.y - 26, 2, 21, PAL.grey3);
       R(c, b.x + b.w - 20, b.y - 28, 12, 2, PAL.grey3);
       RB(c, b.x + b.w - 26, b.y - 30, 9, 5, PAL.grey4);
       if (this.driver.state.darkTarget === 0 || bs.ticks) paint.lightCone(c, b.x + b.w - 22, b.y - 25, 18, 26, "#fff4c4", 0.28);
       RB(c, b.x + 5, b.y - 6, 14, 5, PAL.white);
       for (let i = 0; i < 3; i++) R(c, b.x + 7 + i * 4, b.y - 5, 2, 2, i < bs.ticks ? PAL.green2 : PAL.grey2);
+    } else if (benchSpec.style === "seal_table") {
+      RB(c, b.x + b.w - 16, b.y - 9, 12, 5, PAL.red3);
+      drawBitmap(c, "tape", b.x + b.w - 13, b.y - 12);
+      RB(c, b.x + 5, b.y - 6, 10, 3, PAL.blue3);
+    } else if (this.driver.model.exit_tray && benchSpec.style === "work_table") {
+      RB(c, b.x + 5, b.y - 7, 14, 5, PAL.wood3);
+      R(c, b.x + 7, b.y - 9, 10, 3, PAL.paper);
     }
     if (bs.item === "scroll_open") {
       RB(c, cx - 18, b.y - 6, 36, 5, PAL.paper);
@@ -464,11 +474,11 @@ export class RoomRenderer {
   private drawDesk(c: CanvasRenderingContext2D, d: RoomSeat, t: number): void {
     const actor = this.scene.actors.find((x) => x.id === d.roleId || x.id === `ch-${d.roleId}`);
     const s = this.ds(actor, d.roleId);
-    const dept = this.driver.model.department;
-    const D = (DEPTS as Record<string, Shell>)[dept];
+    const app = this.appearance();
+    const D = app.shell;
     const seated = actor && (actor.seat as unknown) === d && actor.visible;
     if (seated && actor) drawActor(c, this.scene, actor, "base");
-    paint.desk(c, d.x, d.seatY, { w: d.w, wood: dept === "operations" ? [PAL.grey2, PAL.grey3, PAL.grey4, PAL.grey5] : dept === "quality" ? [PAL.white, PAL.white2, PAL.white3, PAL.grey3] : null });
+    paint.desk(c, d.x, d.seatY, { w: d.w, wood: app.deskWood });
     const cancelled = this.effStatus() === "cancelled";
     const roomActor = this.driver.actors().find((ra) => ra.id === d.roleId || `ch-${ra.id}` === actor?.id);
     const writing = Boolean(roomActor?.persist?.write);
@@ -579,25 +589,26 @@ export class RoomRenderer {
     cv.height = H;
     const c = cv.getContext("2d")!;
     c.imageSmoothingEnabled = false;
-    const D = (DEPTS as Record<string, Shell>)[dept];
+    const app = this.appearance();
+    const D = app.shell;
     // 墙
     R(c, 0, 0, W, 120, D.wall);
-    if (dept === "product") {
+    if (app.wallPattern === "wainscot_stripes") {
       for (let x = 4; x < W; x += 12) R(c, x, 6, 2, 88, D.wall2);
       R(c, 0, 92, W, 3, D.trim);
       R(c, 0, 95, W, 21, D.wall3 ?? D.wall2);
       for (let x = 0; x < W; x += 20) R(c, x, 95, 1, 21, D.trim);
-    } else if (dept === "engineering") {
+    } else if (app.wallPattern === "brick_pipe") {
       for (let y = 6; y < 116; y += 16) R(c, 0, y, W, 1, D.wall2);
       for (let x = 0; x < W; x += 24) R(c, x, 6, 1, 110, D.wall2);
       R(c, 0, 7, W, 4, PAL.metal3);
       R(c, 0, 7, W, 1, PAL.metal2);
       for (let x = 30; x < W; x += 90) R(c, x, 5, 4, 8, PAL.metal4);
-    } else if (dept === "quality") {
+    } else if (app.wallPattern === "dado_band") {
       R(c, 0, 86, W, 5, D.rug);
       R(c, 0, 91, W, 25, D.wall2);
       for (let x = 6; x < W; x += 30) R(c, x, 20, 1, 60, mix(D.wall, D.wall2, 0.5));
-    } else {
+    } else if (app.wallPattern === "server_cables") {
       for (let x = 0; x < W; x += 24) {
         R(c, x, 6, 1, 110, D.wall3 ?? D.wall2);
         R(c, x + 3, 12, 1, 1, PAL.grey3);
@@ -608,6 +619,9 @@ export class RoomRenderer {
       [PAL.red3, PAL.blue3, PAL.yellow3, PAL.green3].forEach((col, i) => {
         for (let x = 0; x < W; x += 2) R(c, x, 12 + Math.round(2 + Math.sin(x / (18 + i * 5) + i) * 2) + i, 1, 1, col);
       });
+    } else {
+      R(c, 0, 90, W, 3, D.trim);
+      R(c, 0, 93, W, 23, D.wall2);
     }
     // 天花板与踢脚线
     R(c, 0, 0, W, 5, D.trim);
@@ -616,12 +630,12 @@ export class RoomRenderer {
     R(c, 0, 114, W, 1, mix(D.trim, PAL.white, 0.2));
     // 地面
     R(c, 0, 120, W, H - 120, D.floor);
-    if (dept === "product") {
+    if (app.floorPattern === "parquet") {
       for (let y = 120, i = 0; y < H; y += 8, i++) {
         R(c, 0, y, W, 1, D.floor3 ?? D.floor);
         for (let x = (i % 2) * 24; x < W; x += 48) R(c, x, y, 1, 8, D.floor2 ?? D.floor);
       }
-    } else if (dept === "engineering") {
+    } else if (app.floorPattern === "steel_tile") {
       for (let y = 120; y < H; y += 20) {
         for (let x = 0; x < W; x += 20) {
           R(c, x, y, 20, 20, ((x + y) / 20) % 2 ? D.floor : (D.floor2 ?? D.floor));
@@ -629,7 +643,7 @@ export class RoomRenderer {
           R(c, x, y, 1, 20, D.floor3 ?? D.floor);
         }
       }
-    } else if (dept === "quality") {
+    } else if (app.floorPattern === "small_tile") {
       for (let y = 120; y < H; y += 12) {
         for (let x = 0; x < W; x += 12) {
           R(c, x, y, 12, 12, ((x + y) / 12) % 2 ? D.floor : (D.floor2 ?? D.floor));
@@ -646,9 +660,9 @@ export class RoomRenderer {
     }
     R(c, 0, 120, W, 3, "rgba(0,0,0,0.12)");
     // 地毯：铺在工位下面
-    if (dept !== "operations") paint.rug(c, 4, 200, 300, 34, D.rug, D.rug2);
+    if (app.hasRug) paint.rug(c, 4, 200, 300, 34, D.rug, D.rug2);
     // 装饰
-    if (dept === "product") {
+    if (app.wallDecor === "idea_books") {
       paint.poster(c, 236, 20, 28, 34, PAL.white, (cc: CanvasRenderingContext2D, x: number, y: number) => {
         R(cc, x + 4, y + 5, 20, 14, "#ffe3a3");
         R(cc, x + 11, y + 8, 6, 6, PAL.yellow2);
@@ -658,7 +672,7 @@ export class RoomRenderer {
       });
       RB(c, 272, 44, 34, 3, PAL.wood3);
       [PAL.red2, PAL.blue2, PAL.green2, PAL.yellow2, D.main].forEach((col, i) => R(c, 274 + i * 6, 32 + (i % 2) * 2, 5, 12 - (i % 2) * 2, col));
-    } else if (dept === "engineering") {
+    } else if (app.wallDecor === "blueprint_tools") {
       paint.poster(c, 234, 18, 42, 36, "#2f5da8", (cc: CanvasRenderingContext2D, x: number, y: number, w = 42, h = 36) => {
         for (let i = 4; i < w; i += 6) R(cc, x + i, y + 2, 1, h - 4, "#4a78c2");
         for (let i = 4; i < h; i += 6) R(cc, x + 2, y + i, w - 4, 1, "#4a78c2");
@@ -671,7 +685,7 @@ export class RoomRenderer {
       R(c, 286, 26, 2, 10, PAL.grey3);
       R(c, 292, 28, 6, 2, PAL.red2);
       R(c, 298, 26, 2, 12, PAL.yellow3);
-    } else if (dept === "quality") {
+    } else if (app.wallDecor === "check_vials") {
       paint.poster(c, 236, 20, 30, 34, PAL.white, (cc: CanvasRenderingContext2D, x: number, y: number) => {
         [[6, 16], [8, 18], [10, 20], [12, 18], [14, 16], [16, 14], [18, 12], [20, 10]].forEach(([dx, dy]) => R(cc, x + dx, y + dy, 3, 3, PAL.green2));
         R(cc, x + 5, y + 27, 20, 1, PAL.pline);
@@ -681,7 +695,7 @@ export class RoomRenderer {
         R(c, 279 + i * 7, 30, 4, 12, [PAL.blue1, PAL.pink1, PAL.green1, PAL.yellow1][i]);
         R(c, 279 + i * 7, 29, 4, 1, PAL.grey3);
       }
-    } else {
+    } else if (app.wallDecor === "waveform_vents") {
       paint.poster(c, 236, 20, 40, 30, PAL.grey6, (cc: CanvasRenderingContext2D, x: number, y: number, w = 40) => {
         let py = y + 20;
         for (let i = 0; i < w - 6; i += 2) {
@@ -692,6 +706,12 @@ export class RoomRenderer {
       });
       for (let i = 0; i < 3; i++) RB(c, 12, 18 + i * 12, 46, 8, PAL.grey4);
       for (let i = 0; i < 3; i++) for (let x = 14; x < 56; x += 3) R(c, x, 20 + i * 12, 1, 4, PAL.grey6);
+    } else {
+      paint.poster(c, 238, 20, 30, 32, PAL.paper, (cc: CanvasRenderingContext2D, x: number, y: number) => {
+        R(cc, x + 5, y + 7, 20, 2, PAL.pline);
+        R(cc, x + 5, y + 13, 16, 2, PAL.pline);
+        R(cc, x + 5, y + 19, 18, 2, PAL.pline);
+      });
     }
     this.bg = cv;
     return cv;

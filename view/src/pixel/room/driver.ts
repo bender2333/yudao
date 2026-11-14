@@ -16,7 +16,7 @@ import { action as contractAction, roomState as contractRoomState } from "../con
 import type { PixelAction, PixelState } from "../contract.ts";
 import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
 import type { Actor, SceneLike, SceneOptions, Step } from "../world/types.ts";
-import { layoutDesks, rolesOf, spriteForRole } from "./decl.ts";
+import { centerRoleKindOf, layoutDesks, rolesOf, roomAppearanceOf, spriteForRole } from "./decl.ts";
 import { L, ROW_A, ROW_B, S, SPOT, levelAtLeast } from "./layout.ts";
 import type { RoomSeat } from "./layout.ts";
 import { createRoomState, emptyRoomData, type DeskState, type RoomData, type RoomRoleData, type RoomState as RoomTemp } from "./room.ts";
@@ -211,7 +211,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   const scene = createScene(opts.sceneOptions);
   const state = createRoomState();
   const actors = new Map<string, RoomActor>();
-  const blocks: Block[] = dept === "operations" ? [] : [{ x0: L.bench.x - 4, x1: L.bench.x + L.bench.w + 4, y0: ROW_A + 1, y1: ROW_A + 16 }];
+  const appearance = roomAppearanceOf(dept);
+  const blocks: Block[] = appearance.hasBench
+    ? [{ x0: L.bench.x - 4, x1: L.bench.x + L.bench.w + 4, y0: ROW_A + 1, y1: ROW_A + 16 }]
+    : [];
   let model = emptyRoomData(dept);
   let level = model.level;
   /** 墙钟时间（毫秒）：时间线的时钟，不受画面加快倍率影响。 */
@@ -259,7 +262,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     return state.desks.map((d) => actors.get(d.roleId)).filter((a): a is RoomActor => Boolean(a));
   }
   function primary(): RoomActor | null {
-    const centerKind = dept === "quality" ? "tester" : dept === "operations" ? "ops" : "architect";
+    const centerKind = centerRoleKindOf(dept, model.verifier);
     return roleActors().find((a) => a.role.kind === centerKind)
       ?? roleActors().find((a) => a.role.kind === "manager") ?? roleActors()[0] ?? null;
   }
@@ -306,7 +309,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     return state.eventStatus || model.status || "idle";
   }
   function isOps(): boolean {
-    return dept === "operations";
+    return appearance.machineRoomStyle;
   }
   function waitingProvider(): boolean {
     return Boolean(model.waiting_provider || state.eventWaiting);
@@ -350,7 +353,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         actors.delete(id);
       }
     }
-    const lay = layoutDesks(dept, list, level);
+    const lay = layoutDesks(dept, list, level, model.verifier);
     state.desks = list.map((r, i) => ({
       i, x: lay[i].x, w: lay[i].w, seatX: lay[i].x + 18, seatY: ROW_B, roleId: r.id, role: r,
     }));
@@ -386,8 +389,8 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     const prim = primary();
     state.bin = { x: state.desks[0].x + state.desks[0].w + 2, y: ROW_B + 9 };
     if (prim) state.bin.x = prim.desk.x + prim.desk.w + 2;
-    // 质检的试用台座位（3.2D）：档位达到且房间有试用数据时，测试工程师坐在试用台前
-    state.trialSeat = dept === "quality" && levelAtLeast(level, "3.2D")
+    // 核验角色的试用台座位（3.2D）：档位达到且属于核验角色时保留试用座位
+    state.trialSeat = model.verifier && levelAtLeast(level, "3.2D")
       ? { x: SPOT.trial[0], w: 30, seatX: SPOT.trial[0], seatY: SPOT.trial[1], roleId: "", role: prim?.role ?? list[0], trial: true }
       : null;
   }
@@ -396,7 +399,14 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     const next = m as unknown as RoomData;
     if (next.department && next.department !== dept) throw new Error(`房间的状态与画面的部门不一致：${next.department}`);
     const prev = effStatus();
-    model = { ...emptyRoomData(dept), ...next };
+    model = {
+      ...emptyRoomData(dept),
+      ...next,
+      department: typeof next.department === "string" && next.department !== "" ? next.department : dept,
+      label: typeof next.label === "string" ? next.label : "",
+      verifier: Boolean(next.verifier),
+      exit_tray: Boolean(next.exit_tray),
+    };
     if (model.level && model.level !== level) {
       levelAtLeast(model.level, "ui");
       level = model.level;
@@ -598,7 +608,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const p = plan(a);
       p.stand();
       if (state.bench.item === bmp) p.add(S.call(() => { state.bench.item = null; state.bench.mark = null; }));
-      else if (dept === "quality" && state.bench.slip) p.add(S.call(() => { state.bench.slip = null; state.bench.slipMark = null; state.bench.item = null; }));
+      else if (model.verifier && state.bench.slip) p.add(S.call(() => { state.bench.slip = null; state.bench.slipMark = null; state.bench.item = null; }));
       p.add(S.hold(bmp));
       p.spot("pipe", "carry");
       p.add(S.call(() => scene.after(scene.reduced ? 0 : 260, () => {
