@@ -56,6 +56,7 @@
 "test_catalog_api.py" = "integration"
 "test_model_select.py" = "integration"
 "test_ci_layers.py" = "unit"
+"test_cli_client.py" = "module"
 "test_cli_entry.py" = "module"
 "test_compaction.py" = "unit"
 "test_compaction_engine.py" = "module"
