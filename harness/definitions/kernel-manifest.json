@@ -93,7 +93,11 @@
     {
       "path": "harness/contract_versions.py",
       "kind": "module",
-      "why": "契约版本：薄驱动在一个发布里接受当前版与上一版（骨架与应用设计说明「契约」）"
+      "why": "契约版本：薄驱动在一个发布里接受当前版与上一版（骨架与应用设计说明「契约」）",
+      "checks": {
+        "complexity": true,
+        "mutation": true
+      }
     },
     {
       "path": "harness/definitions/__init__.py",
