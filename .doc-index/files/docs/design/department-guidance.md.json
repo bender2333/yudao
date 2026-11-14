@@ -15,7 +15,7 @@
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「你」"],"seen":"762ce1eedbb2875f","src":"docs/design/department-guidance.md#职能指导的处理设计"},
 {"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「你中途的指导」"],"seen":"f18fdc934a1521ba","src":"docs/design/department-guidance.md#职能指导的处理设计"},
-{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"link","raws":["app-and-interface.md"],"seen":"87dd17a644df1e4d","src":"docs/design/department-guidance.md#职能指导的处理设计"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"link","raws":["app-and-interface.md"],"seen":"2084e8eaf28ddd69","src":"docs/design/department-guidance.md#职能指导的处理设计"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 6. 指导","kind":"link","raws":["department-loop.md"],"seen":"81f851739dc91ce9","src":"docs/design/department-guidance.md#职能指导的处理设计"},
 {"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["../requirements/department-guidance.md"],"seen":"646e562448a17fd9","src":"docs/design/department-guidance.md#职能指导的处理设计"},
 {"dst":"docs/design/department-loop.md#产品 · 工程 · 质检的循环结构 > 6. 指导","kind":"link","raws":["department-loop.md"],"seen":"81f851739dc91ce9","src":"docs/design/department-guidance.md#职能指导的处理设计 > 2. 送达"},

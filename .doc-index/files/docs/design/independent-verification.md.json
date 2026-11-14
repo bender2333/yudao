@@ -39,7 +39,7 @@
 {"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["../requirements/semantic-system.md"],"seen":"d02a872fc3efaba8","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 5. 验证密度"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"1ada2d0dec500130","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 6. 共享上下文的一组对照"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"d1aa18394662658a","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"},
-{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"97b93618619c8d9b","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"},
+{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"5f846e4e9b633577","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"},
 {"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"}
 ]
 }

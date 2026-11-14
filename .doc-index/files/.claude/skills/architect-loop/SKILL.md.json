@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/architect-loop/SKILL.md",
-"hash":"bd5b563f7f51e7af",
+"hash":"fb72bafe829cee0c",
 "nodes":[
-{"hash":"bd5b563f7f51e7af","id":".claude/skills/architect-loop/SKILL.md","kind":"file","title":".claude/skills/architect-loop/SKILL.md"},
+{"hash":"fb72bafe829cee0c","id":".claude/skills/architect-loop/SKILL.md","kind":"file","title":".claude/skills/architect-loop/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/architect-loop/SKILL.md#(开头)","kind":"section","parent":".claude/skills/architect-loop/SKILL.md","title":"(开头)"},
 {"hash":"f04f398e13448dad","id":".claude/skills/architect-loop/SKILL.md#name: architect-loopdescription: 架构师循环：一个单独的、可重复运行的状态转换。从 GitHub 读状态，对四种工单（子工单全关的父工单、needs-triage、到期的 waiting、等总架构师的 ready-for-human）各往前推一步：脚本放回到期的、核对证据，检查模型取证写证据包，架构师模型只做判断。定时唤醒与用户在场时的 /next 都按它做。argument-hint: \"[--dry-run]\"","kind":"section","parent":".claude/skills/architect-loop/SKILL.md","title":"name: architect-loopdescription: 架构师循环：一个单独的、可重复运行的状态转换。从 GitHub 读状态，对四种工单（子工单全关的父工单、needs-triage、到期的 waiting、等总架构师的 ready-for-human）各往前推一步：脚本放回到期的、核对证据，检查模型取证写证据包，架构师模型只做判断。定时唤醒与用户在场时的 /next 都按它做。argument-hint: \"[--dry-run]\""},
 {"hash":"1d2c6c104000fcc6","id":".claude/skills/architect-loop/SKILL.md#架构师循环","kind":"section","parent":".claude/skills/architect-loop/SKILL.md","title":"架构师循环"},
@@ -22,7 +22,7 @@
 {"hash":"8d3d076a30315368","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 脚本（scripts/，只用 node 标准库） > 表1 > check-evidence.mjs <工单号>","kind":"row","parent":".claude/skills/architect-loop/SKILL.md#架构师循环 > 脚本（scripts/，只用 node 标准库）","title":"check-evidence.mjs <工单号>"},
 {"hash":"40e4da09a77f68e9","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 脚本（scripts/，只用 node 标准库） > 表1 > wake.mjs","kind":"row","parent":".claude/skills/architect-loop/SKILL.md#架构师循环 > 脚本（scripts/，只用 node 标准库）","title":"wake.mjs"},
 {"hash":"ab24e8cb3c992572","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 唤醒与运行","kind":"section","parent":".claude/skills/architect-loop/SKILL.md#架构师循环","title":"唤醒与运行"},
-{"hash":"ae7a8c6f80ea74a2","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 取证","kind":"section","parent":".claude/skills/architect-loop/SKILL.md#架构师循环","title":"取证"},
+{"hash":"4910945956698096","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 取证","kind":"section","parent":".claude/skills/architect-loop/SKILL.md#架构师循环","title":"取证"},
 {"hash":"c418d101d47677ba","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 判断","kind":"section","parent":".claude/skills/architect-loop/SKILL.md#架构师循环","title":"判断"},
 {"hash":"6c0784cff5d3c7ff","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 重跑的规矩","kind":"section","parent":".claude/skills/architect-loop/SKILL.md#架构师循环","title":"重跑的规矩"},
 {"hash":"a3a0634fcfffb4d8","id":".claude/skills/architect-loop/SKILL.md#架构师循环 > 常见借口","kind":"section","parent":".claude/skills/architect-loop/SKILL.md#架构师循环","title":"常见借口"},

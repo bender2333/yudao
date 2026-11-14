@@ -103,3 +103,41 @@ test('防编造：分诊「还成立」没有一行核对过的证据、前提�
   assert.equal(r.mismatches, 3);
   assert.equal(checkComments([cm('EVIDENCE: 分诊 @ abc1234\n- 前提：甲 → 已经变了\n  - none: 没找到')], {}, d).mismatches, 0);
 });
+
+test('CI：证据含集成层用例时，「③ 集成层」未成功判无效', () => {
+  const intPack = `EVIDENCE: 验收 @ abc1234
+CI: 12345678
+1. 标准甲
+   - test: harness/tests/a.py::test_alpha（集成）
+— 架构师循环（取证，m）`;
+  const skipped = checkComments([cm(intPack)], {}, fakeDeps({
+    ci: { conclusion: 'success', headSha: 'abc1234', jobs: [{ name: '③ 集成层', conclusion: 'skipped' }] },
+  }));
+  assert.equal(skipped.valid, false);
+  assert.match(skipped.problems.join('\n'), /③ 集成层/);
+
+  const failed = checkComments([cm(intPack)], {}, fakeDeps({
+    ci: { conclusion: 'failure', headSha: 'abc1234', jobs: [{ name: '③ 集成层', conclusion: 'failure' }] },
+  }));
+  assert.equal(failed.valid, false);
+  assert.match(failed.problems.join('\n'), /③ 集成层/);
+
+  const ok = checkComments([cm(intPack)], {}, fakeDeps({
+    ci: { conclusion: 'success', headSha: 'abc1234', jobs: [{ name: '③ 集成层', conclusion: 'success' }] },
+  }));
+  assert.equal(ok.valid, true);
+});
+
+test('CI：运行提交早于最近关闭子工单时的 main 提交判无效', () => {
+  const pack = PACK.replace('abc1234', 'ccc3333');
+  const ctx = { lastChildClosedAt: '2026-11-06T00:00:00Z' };
+  const ancestors = [['ccc3333', 'origin/main'], ['aaa1111', 'ccc3333'], ['bbb2222', 'ccc3333']];
+  const r = checkComments([cm(pack)], ctx, fakeDeps({
+    mainBefore: 'bbb2222',
+    ci: { conclusion: 'success', headSha: 'aaa1111' },
+    ancestors,
+  }));
+  assert.equal(r.stale, false);
+  assert.equal(r.valid, false);
+  assert.match(r.problems[0], /早于最近关闭子工单时的 main 提交/);
+});

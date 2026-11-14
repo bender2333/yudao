@@ -108,7 +108,7 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | report | evidenc
 | 项 | 配在哪 | 值 |
 | --- | --- | --- |
 | worktree 根目录 | `state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root <路径>` 改 | 目录按[运行配置](../../../docs/agents/autopilot-runtime.md)第 1 节；Windows 上选尽量短的根目录（`node_modules` 的深路径会撞 260 的上限），类 Unix 用 `/tmp/w`；具体值写进 `handoff.md` |
-| 这个目录的写权限 | `.codebuddy/settings.json` 的 `permissions.allow` | `Edit(//<根目录>/**)` 与 `Read(//<根目录>/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
+| 这个目录的写权限 | `.claude/settings.local.json` 的 `permissions.allow` | `Edit(//<根目录>/**)` 与 `Read(//<根目录>/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
 | 依赖 | 写进 `handoff.md`，任务书里带一句 | Python 复用主仓库的环境：`UV_PROJECT_ENVIRONMENT=C:/code/yudao/.venv`。客户端的依赖不共用：要运行客户端测试或接口合同检查的 worktree 自己 `npm ci`，不建指向主仓库 `client/node_modules` 的链接（通过链接共用时，任何一处的 npm 安装改的都是同一个目录） |
 | 账本保护 | `hook.mjs` 已内置 | `state.json`、`tasks.md`、`active.json`、`.lock`、`.owner.json`、`.stop-guard.json` 只由命令改；`goal.md`、`handoff.md`、`notes/` 人可以改 |
 
