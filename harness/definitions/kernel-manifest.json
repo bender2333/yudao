@@ -34,7 +34,11 @@
     {
       "path": "harness/minimal_projection.py",
       "kind": "module",
-      "why": "最小投影：裁决只读这一份，由骨架事件折叠，纯函数、可重算（S1d，工单 #860）"
+      "why": "最小投影：裁决只读这一份，由骨架事件折叠，纯函数、可重算（S1d，工单 #860）",
+      "checks": {
+        "complexity": true,
+        "mutation": true
+      }
     },
     {
       "path": "harness/contracts.py",
