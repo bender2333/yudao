@@ -7,12 +7,16 @@ from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
+from harness.decisions import ROLE_CHOICE
+from harness.event_store import run_stream
 from harness.models import EventType, TERMINAL_STATUSES, Usage
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
+from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.helpers import quality_turns
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.write_path import NewEvent
 
 # 用户决定在应用层与接口层的行为（docs/design/app-and-interface.md「用户决定的回答」、「查询清单」）：未回答的请求由查询 decisions.list 读取，回答经命令
 # decision.answer 提交；回答「继续执行」时流程编排在服务的事件循环中把这个 run 继续运行到结束，「停止事项」时
@@ -355,3 +359,151 @@ def test_a_decision_request_and_its_answer_survive_deleting_the_saved_projection
                          base_version=1)
         assert closed.status_code == 409 and closed.json()["reason"] == "decision_closed"
         assert service.adapters[1].invocations == []
+
+
+def _role_choice_questions() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "q1",
+            "question": "配置格式采用哪一种？",
+            "options": [
+                {"id": "json", "label": "JSON 文件", "description": "零额外依赖"},
+                {"id": "toml", "label": "TOML 文件"},
+            ],
+            "recommended": "json",
+            "rationale": "标准库可直接读写",
+        },
+        {
+            "id": "q2",
+            "question": "默认端口选哪个？",
+            "options": [
+                {"id": "8080", "label": "8080 端口"},
+                {"id": "9000", "label": "9000 端口"},
+            ],
+            "recommended": "8080",
+            "rationale": "本地调试常用端口",
+        },
+    ]
+
+
+def _completed_script(runs: int = 1) -> dict[str, list[object]]:
+    return {
+        "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=60, output_tokens=15))] * runs,
+        "engineering": [delivery_turn()] * runs,
+        "quality": quality_turns("release", "checks passed on the current snapshot", times=4 * runs),
+    }
+
+
+def _emit_role_choice(system: LoopSystem, run_id: str) -> str:
+    questions = _role_choice_questions()
+    system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
+        EventType.DECISION_REQUESTED, actor="system", department="product",
+        state_before=transaction.projection.status, state_after=transaction.projection.status,
+        payload={
+            "kind": "role_choice",
+            "blocks": "round",
+            "options": [{"id": opt.id, "label": opt.label} for opt in ROLE_CHOICE.options],
+            "description": "请确认两项前置配置选择",
+            "facts": [],
+            "department": "product",
+            "questions": questions,
+            "input_version": 1,
+            "round": 1,
+            "note": "默认采用推荐项即可直接运行",
+        },
+    )))
+    [requested] = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DECISION_REQUESTED]
+    return requested.event_id
+
+
+def test_role_choice_decisions_list_and_three_answer_modes_survive_replay(data_dir):
+    # 守护 R1 与 R2：decisions.list 完整返回 role_choice 的题目清单，decision.answer 支持完整 answers、
+    # 部分 answers 自动补齐及 option="recommended" 无 answers 全推荐补齐；未知题号与未知选项拒绝为 option_invalid；
+    # 删掉保存的投影以后重放与原先查询结果一致
+    service = _Service(data_dir, [_completed_script(3), []])
+    expected_questions = _role_choice_questions()
+    submissions = [
+        ("submit", {"q1": "toml", "q2": "9000"}, "按项目需求选择", {"q1": "toml", "q2": "9000"}),
+        ("submit", {"q1": "toml"}, None, {"q1": "toml", "q2": "8080"}),
+        ("recommended", None, "全部采纳建议", {"q1": "json", "q2": "8080"}),
+    ]
+    with running_api(service) as client:
+        created = client.post("/api/commands/project.create", json={
+            "command_id": str(uuid.uuid4()), "name": "多题选择项目", "goal": "验证 role_choice 接口"})
+        assert created.status_code == 200, created.text
+        project_id = created.json()["refs"]["project_id"]
+        system = service.system
+
+        decision_ids: list[str] = []
+        for idx, (option, submitted_answers, note, expected_answers) in enumerate(submissions):
+            _item_id, run_id = system.projects.start_work_item(project_id, f"事项 {idx + 1}")
+            decision_id = _emit_role_choice(system, run_id)
+            decision_ids.append(decision_id)
+
+            [listed] = _list(client, project_id=project_id, status=["open"])["data"]["decisions"]
+            assert (listed["decision_id"], listed["kind"], listed["blocks"]) == (
+                decision_id, "role_choice", "round")
+            assert listed["request"]["questions"] == [
+                {
+                    **q,
+                    "options": [{"description": None, **opt} for opt in q["options"]],
+                }
+                for q in expected_questions
+            ]
+            assert (listed["request"]["input_version"], listed["request"]["round"]) == (1, 1)
+
+            if idx == 0:
+                end = system.store.end_position()
+                for bad_answers in ({"q_missing": "json"}, {"q1": "yaml"}):
+                    bad_cmd = str(uuid.uuid4())
+                    rejected = _answer(client, bad_cmd, decision_id=decision_id, option="submit",
+                                       base_version=1, answers=bad_answers)
+                    assert rejected.status_code == 409, rejected.text
+                    assert rejected.json()["reason"] == "option_invalid"
+                    assert system.store.command(bad_cmd) is None
+                assert system.store.end_position() == end
+
+            body: dict[str, object] = {"decision_id": decision_id, "option": option, "base_version": 1}
+            if submitted_answers is not None:
+                body["answers"] = submitted_answers
+            if note is not None:
+                body["note"] = note
+            accepted = _answer(client, str(uuid.uuid4()), **body)
+            assert accepted.status_code == 200, accepted.text
+            assert _wait_for_completion(system, run_id).status == "done"
+            system.projects.settle(run_id)
+            assert_payloads_follow_contract(system.store.list_events(run_id))
+
+            [answered] = [item for item in _list(client, project_id=project_id, status=["answered"])["data"]["decisions"]
+                          if item["decision_id"] == decision_id]
+            assert answered["answer"]["answers"] == expected_answers
+            assert answered["answer"]["note"] == note
+
+        before_replay = _list(client, project_id=project_id, kind="role_choice")
+
+    _delete_saved_projections(data_dir)
+    with running_api(service) as client:
+        assert service.adapters[1].invocations == []
+        after_replay = _list(client, project_id=project_id, kind="role_choice")
+        assert after_replay == before_replay
+        assert [item["answer"]["answers"] for item in after_replay["data"]["decisions"]] == [
+            entry[3] for entry in submissions]
+
+
+def test_non_role_choice_decision_rejects_non_empty_answers_with_option_invalid(data_dir):
+    # 守护 R1：非 role_choice 决定若传入非空 answers，返回 option_invalid 且不写入事件或登记命令
+    service = _Service(data_dir, [_unavailable_script()])
+    with running_api(service) as client:
+        project_id, _work_item_id, _run_id, _blocked = _blocked_run(client, service)
+        system = service.system
+        [decision] = _list(client, project_id=project_id)["data"]["decisions"]
+        end = system.store.end_position()
+        command_id = str(uuid.uuid4())
+        rejected = _answer(client, command_id, decision_id=decision["decision_id"], option="continue",
+                           base_version=1, answers={"q1": "a"})
+        assert rejected.status_code == 409, rejected.text
+        assert rejected.json()["reason"] == "option_invalid"
+        assert system.store.command(command_id) is None
+        assert system.store.end_position() == end
+        assert _list(client, project_id=project_id)["data"]["decisions"][0]["status"] == "open"

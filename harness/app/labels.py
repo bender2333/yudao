@@ -45,6 +45,7 @@ DECISION_KIND_NAMES: dict[str, str] = {
     "instance_upgrade": "实例升级等待批准",
     "kernel_modification": "交付改动了内核清单里的路径，等待批准",
     "qa_cannot_verify": "质检无法核验，等待回答",
+    "role_choice": "角色向你提问，等待选择",
 }
 
 
@@ -341,6 +342,7 @@ COMMAND_FIELD_NAMES: dict[str, str] = {
     "modified_by": "修改人",
     "decision_id": "决定请求",
     "option": "选项",
+    "answers": "逐题回答",
     "note": "说明",
     "models_url": "模型清单地址",
     "value": "取值",
