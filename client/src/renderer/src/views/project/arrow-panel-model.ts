@@ -17,7 +17,7 @@
 import type { AcceptanceCoverageResult, ReviewEntry } from "../../api/generated/types.gen";
 import type { LoopArrow } from "./loop-graph-model.ts";
 import { SOURCE } from "./loop-graph-model.ts";
-import { INPUT_KIND, formatTime, label, verdictName } from "./labels.ts";
+import { INPUT_KIND, formatTime, label, verdictName, versionStatusName } from "./labels.ts";
 import { coverageSummary, criterionRows } from "./materials-read.ts";
 import type { TrialCaseRow, TrialsView } from "./trials";
 
@@ -117,23 +117,158 @@ export function diffFiles(current: readonly string[], previous: readonly string[
   return { added, removed, kept, text: `与上一版相比 ${parts.join("；")}` };
 }
 
+const DISPOSITION_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  retain: "保留",
+  integrate: "纳入",
+  retire: "作废",
+});
+
+export interface PrdSourceInputLike {
+  version: number;
+  kind: string;
+  text: string;
+  created_event_id: string;
+}
+
+export interface PrdRequirementMappingLike {
+  requirement: number;
+  criteria?: readonly string[];
+  gap?: string | null;
+}
+
+export interface PrdDecisionLike {
+  decision_id: string;
+  content_hash: string;
+  statement: string;
+  rationale: string;
+  product_spec_hash: string;
+  created_event_id: string;
+}
+
+export interface PrdDecisionChangeLike {
+  decision_hash: string;
+  disposition: string;
+  rationale: string;
+}
+
+export interface PrdChangeRecordLike {
+  changed?: readonly string[];
+  retained?: readonly string[];
+  retired?: readonly string[];
+  rationale: string;
+}
+
+export interface ProductSpecLike {
+  spec_id: string;
+  spec_revision: number;
+  spec_status: string;
+  spec_event_id: string;
+  spec_hash: string;
+  parent_hash?: string | null;
+  input_version: number;
+  accepted_inputs?: readonly PrdSourceInputLike[];
+  goal: string;
+  non_goals?: readonly string[];
+  boundaries?: readonly string[];
+  constraints?: readonly string[];
+  requirements?: readonly string[];
+  acceptance_criteria?: readonly string[];
+  requirement_mapping?: readonly PrdRequirementMappingLike[];
+  fatal_conditions?: readonly string[];
+  decisions?: readonly PrdDecisionLike[];
+  decision_changes?: readonly PrdDecisionChangeLike[];
+  change_record?: PrdChangeRecordLike | null;
+}
+
+export interface PrdInputView {
+  version: number;
+  kindName: string;
+  text: string;
+}
+
+export interface PrdRequirementRowView {
+  number: number;
+  text: string;
+  criteria: string[];
+  gap: string | null;
+}
+
+export interface PrdDecisionRowView {
+  id: string;
+  hash: string;
+  statement: string;
+  rationale: string;
+}
+
+export interface PrdDecisionChangeRowView {
+  decisionHash: string;
+  dispositionName: string;
+  rationale: string;
+}
+
+export interface PrdChangeRecordViewModel {
+  changed: string[];
+  retained: string[];
+  retired: string[];
+  rationale: string;
+}
+
+export interface PrdDiffSectionView {
+  label: string;
+  added: string[];
+  removed: string[];
+}
+
+export interface PrdDiffView {
+  summary: string;
+  goalChanged: { before: string; after: string } | null;
+  sections: PrdDiffSectionView[];
+}
+
+export interface PrdView {
+  specId: string;
+  revision: number;
+  statusName: string;
+  inputVersion: number;
+  acceptedInputs: PrdInputView[];
+  goal: string;
+  nonGoals: string[];
+  boundaries: string[];
+  constraints: string[];
+  requirements: PrdRequirementRowView[];
+  acceptanceCriteria: string[];
+  fatalConditions: string[];
+  decisions: PrdDecisionRowView[];
+  decisionChanges: PrdDecisionChangeRowView[];
+  changeRecord: PrdChangeRecordViewModel | null;
+  /** 与上一版结构化 PRD 的差异（第一版或上一版没有结构化内容时为 null） */
+  diffFromPrevious: PrdDiffView | null;
+}
+
 export interface VersionView {
   /** 那一版的版本号：PRD 与交付取材料里的 revision，缺陷记录没有 */
   revision: number | null;
-  /** 那一版的一句话：交付的摘要、PRD 的改动说明、缺陷记录的内容 */
+  /** 那一版的一句话：交付的摘要、PRD 的目标、缺陷记录的内容 */
   summary: string;
+  /** 工程交付才附带代码文件清单；PRD 与缺陷记录不期待文件，也不显示无文件清单提示 */
+  expectsFiles: boolean;
   files: string[];
-  /** 与上一版的差异；第一版或没有上一版时为 null */
+  /** 与上一版的差异（仅工程交付比较文件差异；第一版或没有上一版时为 null） */
   diff: FileDiffView | null;
+  /** PRD 这一版的完整结构化产品规格；交付与缺陷记录为 null */
+  prd: PrdView | null;
   /** 材料里有这一版（查询读到了）；没有时文件清单退回箭头自带的那几个 */
   loaded: boolean;
 }
 
 export interface EntryLike {
   event_id: string;
+  spec_event_id?: string | null;
+  status?: string | null;
   revision: number | null;
   summary?: string | null;
   files?: readonly string[];
+  prd?: ProductSpecLike | null;
 }
 
 /** work_item.materials 里循环图与面板都用到的那几项（与 loop-graph-model 的 MaterialsView 同形）。 */
@@ -144,13 +279,24 @@ export interface MaterialsLike {
   onboarding_rounds?: readonly RoundLike[];
 }
 
-/** 材料里这一版那一条：按箭头带的事件编号找，找不到时为空（不按版本号猜，宁可退回箭头自带的）。 */
+/** 材料里这一版那一条：按箭头带的事件编号找（PRD 兼容合同事件编号与 SPEC_ACCEPTED 事件编号）。 */
 function entryOf(materials: MaterialsLike | null, arrow: LoopArrow): EntryLike | null {
   if (materials === null || arrow.eventId === null || arrow.eventId === undefined) {
     return null;
   }
-  const rows = arrow.outcome === "PRD" ? materials.contracts ?? [] : materials.deliveries ?? [];
-  return rows.find((entry) => entry.event_id === arrow.eventId) ?? null;
+  if (arrow.outcome !== "PRD") {
+    return (materials.deliveries ?? []).find((entry) => entry.event_id === arrow.eventId) ?? null;
+  }
+  const contracts = materials.contracts ?? [];
+  const direct = contracts.find((entry) => entry.event_id === arrow.eventId);
+  if (direct !== undefined) {
+    return direct;
+  }
+  const bySpec = contracts.filter((entry) => entry.spec_event_id === arrow.eventId);
+  if (bySpec.length === 0) {
+    return null;
+  }
+  return bySpec.find((entry) => entry.status === "active") ?? bySpec[bySpec.length - 1] ?? null;
 }
 
 function filesOf(materials: MaterialsLike | null, arrow: LoopArrow): string[] {
@@ -161,18 +307,157 @@ function filesOf(materials: MaterialsLike | null, arrow: LoopArrow): string[] {
   return [...arrow.files];
 }
 
-/** 面板上「这一版」一段：版本号、那一版的一句话、文件清单与与上一版的差异。 */
+function requirementsOf(spec: ProductSpecLike): PrdRequirementRowView[] {
+  const requirements = spec.requirements ?? [];
+  const mappings = spec.requirement_mapping ?? [];
+  const byNumber = new Map<number, PrdRequirementMappingLike>();
+  for (const row of mappings) {
+    byNumber.set(row.requirement, row);
+  }
+  const rows: PrdRequirementRowView[] = requirements.map((text, index) => {
+    const number = index + 1;
+    const mapping = byNumber.get(number);
+    const gap = mapping?.gap?.trim() ?? "";
+    return {
+      number,
+      text,
+      criteria: [...(mapping?.criteria ?? [])],
+      gap: gap === "" ? null : gap,
+    };
+  });
+  for (const mapping of mappings) {
+    if (mapping.requirement >= 1 && mapping.requirement <= requirements.length) {
+      continue;
+    }
+    const gap = mapping.gap?.trim() ?? "";
+    rows.push({
+      number: mapping.requirement,
+      text: "",
+      criteria: [...(mapping?.criteria ?? [])],
+      gap: gap === "" ? null : gap,
+    });
+  }
+  return rows;
+}
+
+function diffSection(labelText: string, current: readonly string[], previous: readonly string[]): PrdDiffSectionView | null {
+  const prevSet = new Set(previous);
+  const curSet = new Set(current);
+  const added = current.filter((item) => !prevSet.has(item));
+  const removed = previous.filter((item) => !curSet.has(item));
+  if (added.length === 0 && removed.length === 0) {
+    return null;
+  }
+  return { label: labelText, added, removed };
+}
+
+function prdDiffOf(current: ProductSpecLike, previous: ProductSpecLike | null): PrdDiffView | null {
+  if (previous === null) {
+    return null;
+  }
+  const prevGoal = previous.goal.trim();
+  const curGoal = current.goal.trim();
+  const goalChanged = prevGoal === curGoal ? null : { before: previous.goal, after: current.goal };
+  const candidates: (PrdDiffSectionView | null)[] = [
+    diffSection("非目标", current.non_goals ?? [], previous.non_goals ?? []),
+    diffSection("范围与边界", current.boundaries ?? [], previous.boundaries ?? []),
+    diffSection("约束与默认决定", current.constraints ?? [], previous.constraints ?? []),
+    diffSection("功能需求", current.requirements ?? [], previous.requirements ?? []),
+    diffSection("验收条件", current.acceptance_criteria ?? [], previous.acceptance_criteria ?? []),
+    diffSection("致命条件", current.fatal_conditions ?? [], previous.fatal_conditions ?? []),
+    diffSection(
+      "有效产品决定",
+      (current.decisions ?? []).map((item) => item.statement),
+      (previous.decisions ?? []).map((item) => item.statement),
+    ),
+  ];
+  const sections = candidates.filter((item): item is PrdDiffSectionView => item !== null);
+  if (goalChanged === null && sections.length === 0) {
+    return { summary: "与上一版相比结构化内容没有变化", goalChanged: null, sections: [] };
+  }
+  const parts: string[] = [];
+  if (goalChanged !== null) {
+    parts.push("目标有调整");
+  }
+  for (const section of sections) {
+    const counts: string[] = [];
+    if (section.added.length > 0) {
+      counts.push(`新增 ${section.added.length} 项`);
+    }
+    if (section.removed.length > 0) {
+      counts.push(`减少 ${section.removed.length} 项`);
+    }
+    parts.push(`${section.label} ${counts.join("、")}`);
+  }
+  return {
+    summary: `与上一版相比 ${parts.join("；")}`,
+    goalChanged,
+    sections,
+  };
+}
+
+function prdOf(spec: ProductSpecLike, previous: ProductSpecLike | null): PrdView {
+  const acceptedInputs = [...(spec.accepted_inputs ?? [])]
+    .sort((left, right) => left.version - right.version)
+    .map((item) => ({
+      version: item.version,
+      kindName: label(INPUT_KIND, item.kind),
+      text: item.text,
+    }));
+  const changeRecord = spec.change_record
+    ? {
+        changed: [...(spec.change_record.changed ?? [])],
+        retained: [...(spec.change_record.retained ?? [])],
+        retired: [...(spec.change_record.retired ?? [])],
+        rationale: spec.change_record.rationale,
+      }
+    : null;
+  return {
+    specId: spec.spec_id,
+    revision: spec.spec_revision,
+    statusName: versionStatusName(spec.spec_status),
+    inputVersion: spec.input_version,
+    acceptedInputs,
+    goal: spec.goal,
+    nonGoals: [...(spec.non_goals ?? [])],
+    boundaries: [...(spec.boundaries ?? [])],
+    constraints: [...(spec.constraints ?? [])],
+    requirements: requirementsOf(spec),
+    acceptanceCriteria: [...(spec.acceptance_criteria ?? [])],
+    fatalConditions: [...(spec.fatal_conditions ?? [])],
+    decisions: (spec.decisions ?? []).map((item) => ({
+      id: item.decision_id,
+      hash: item.content_hash,
+      statement: item.statement,
+      rationale: item.rationale,
+    })),
+    decisionChanges: (spec.decision_changes ?? []).map((item) => ({
+      decisionHash: item.decision_hash,
+      dispositionName: label(DISPOSITION_LABELS, item.disposition),
+      rationale: item.rationale,
+    })),
+    changeRecord,
+    diffFromPrevious: prdDiffOf(spec, previous),
+  };
+}
+
+/** 面板上「这一版」一段：版本号、那一版的一句话、结构化 PRD、工程交付文件清单与与上一版的差异。 */
 export function versionOf(arrow: LoopArrow, versions: readonly LoopArrow[], materials: MaterialsLike | null): VersionView {
   const entry = entryOf(materials, arrow);
-  const files = filesOf(materials, arrow);
+  const expectsFiles = arrow.outcome === "交付";
+  const files = expectsFiles ? filesOf(materials, arrow) : [];
   const at = versions.findIndex((item) => item.key === arrow.key);
   const before = at > 0 ? versions[at - 1] ?? null : null;
-  const summary = (entry?.summary ?? "").trim();
+  const previousEntry = before === null ? null : entryOf(materials, before);
+  const prd = arrow.outcome === "PRD" && entry?.prd ? prdOf(entry.prd, previousEntry?.prd ?? null) : null;
+  const summaryText = (entry?.prd?.goal ?? entry?.summary ?? "").trim();
   return {
-    revision: entry?.revision ?? arrow.version,
-    summary: summary === "" ? arrow.text : summary,
+    revision: entry?.prd?.spec_revision ?? entry?.revision ?? arrow.version,
+    summary: summaryText === "" ? arrow.text : summaryText,
+    expectsFiles,
     files,
-    diff: before === null ? null : diffFiles(files, filesOf(materials, before)),
+    diff: expectsFiles && before !== null ? diffFiles(files, filesOf(materials, before)) : null,
+    prd,
     loaded: entry !== null,
   };
 }

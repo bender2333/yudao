@@ -2673,6 +2673,69 @@ class LaunchMethodView(Contract):
     ready_timeout_sec: int | None = None
 
 
+class PrdSourceInputView(Contract):
+    # 这一版 PRD 纳入的用户输入（接纳来源与背景输入），按输入版本号列出
+    version: int
+    kind: str
+    text: str
+    created_event_id: str
+
+
+class RequirementMappingView(Contract):
+    # 单条功能需求与验收条件的对应声明，无法写验收条件时写明缺口原因
+    requirement: int
+    criteria: list[str] = Field(default_factory=list)
+    gap: str | None = None
+
+
+class PrdDecisionView(Contract):
+    # 这一版有效合同纳入的产品决定
+    decision_id: str
+    content_hash: str
+    statement: str
+    rationale: str
+    product_spec_hash: str
+    created_event_id: str
+
+
+class PrdDecisionChangeView(Contract):
+    # 修订 PRD 时对既有产品决定的处理（沿用、并入或停止沿用）
+    decision_hash: str
+    disposition: str
+    rationale: str
+
+
+class PrdChangeRecordView(Contract):
+    # PRD 修订说明（第 2 版及以后）
+    changed: list[str] = Field(default_factory=list)
+    retained: list[str] = Field(default_factory=list)
+    retired: list[str] = Field(default_factory=list)
+    rationale: str
+
+
+class ProductSpecView(Contract):
+    # 一版有效合同对应的结构化 PRD 正文（docs/design/app-and-interface.md「work_item.materials」）
+    spec_id: str
+    spec_revision: int
+    spec_status: str
+    spec_event_id: str
+    spec_hash: str
+    parent_hash: str | None = None
+    input_version: int
+    accepted_inputs: list[PrdSourceInputView] = Field(default_factory=list)
+    goal: str
+    non_goals: list[str] = Field(default_factory=list)
+    boundaries: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    requirement_mapping: list[RequirementMappingView] = Field(default_factory=list)
+    fatal_conditions: list[str] = Field(default_factory=list)
+    decisions: list[PrdDecisionView] = Field(default_factory=list)
+    decision_changes: list[PrdDecisionChangeView] = Field(default_factory=list)
+    change_record: PrdChangeRecordView | None = None
+
+
 class VersionEntry(Contract):
     event_id: str
     kind: str
@@ -2683,6 +2746,10 @@ class VersionEntry(Contract):
     files: list[str]
     # 交付说明中的启动方式（只有交付一项有；契约与旧事件没有这一项）
     launch: list[LaunchMethodView] = Field(default_factory=list)
+    # 这一版合同对应的 PRD 接纳事件编号（与流转记录里「PRD 新版本」的事件编号一致）
+    spec_event_id: str | None = None
+    # 这一版完整结构化 PRD 正文（只有合同条目有；交付与旧事件没有这一项）
+    prd: ProductSpecView | None = None
 
 
 class QaCriterionView(Contract):
@@ -2882,6 +2949,7 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     # PRD 各版显示真实状态（工单 #654、#683）与一句摘要（工单 #668）：
     # 每一版 PRD 在投影里有自己的内容与摘要。
     specs = {spec.content_hash: spec for spec in run.product_specs}
+    decisions = {item.content_hash: item for item in run.product_decisions}
     # 有效合同按它是不是当前有效的那一版标状态（工单 #683）：「产品决定修订 PRD」产生的新合同
     # 沿用同一条产品需求，按那条需求的状态会让两版都是 active
     current_contract = None if run.effective_contract is None else run.effective_contract.content_hash
@@ -2898,10 +2966,7 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
         position=store.end_position(),
         data=WorkItemMaterialsResult(
             work_item_id=item.work_item_id, run_id=run.run_id,
-            contracts=[_version_entry(value.created_event_id, "contract",
-                                      "active" if value.content_hash == current_contract else "superseded",
-                                      value.revision, value.content_hash,
-                                      _prd_summary(specs.get(value.product_spec_hash)), [])
+            contracts=[_contract_version_entry(value, specs, decisions, run.inputs, current_contract)
                        for value in run.effective_contracts],
             deliveries=[*[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
                                          value.content_hash, value.summary, list(value.files),
@@ -3088,12 +3153,96 @@ def _prd_summary(spec: Any) -> str | None:
     return f"目标：{spec.goal}；要求 {len(spec.requirements)} 条；边界 {len(spec.boundaries)} 条"
 
 
+def _prd_requirement_mapping(spec: Any) -> list[RequirementMappingView]:
+    rows: list[RequirementMappingView] = []
+    for entry in getattr(spec, "requirement_mapping", None) or []:
+        if not isinstance(entry, dict) or entry.get("requirement") is None:
+            continue
+        rows.append(RequirementMappingView(
+            requirement=int(entry["requirement"]),
+            criteria=[str(item) for item in entry.get("criteria") or []],
+            gap=None if entry.get("gap") is None else str(entry["gap"]),
+        ))
+    return rows
+
+
+def _prd_change_record(raw: Any) -> PrdChangeRecordView | None:
+    if not isinstance(raw, dict):
+        return None
+    return PrdChangeRecordView(
+        changed=[str(item) for item in raw.get("changed") or []],
+        retained=[str(item) for item in raw.get("retained") or []],
+        retired=[str(item) for item in raw.get("retired") or []],
+        rationale=str(raw.get("rationale") or ""),
+    )
+
+
+def _prd_view(spec: Any, contract: Any, decisions: dict[str, Any], inputs: Sequence[Any]) -> ProductSpecView | None:
+    if spec is None:
+        return None
+    accepted = sorted((item for item in inputs if item.version <= contract.input_version),
+                      key=lambda item: item.version)
+    effective_decisions = [decisions[hash_value] for hash_value in contract.decision_hashes
+                           if hash_value in decisions]
+    return ProductSpecView(
+        spec_id=spec.id,
+        spec_revision=spec.revision,
+        spec_status=spec.status,
+        spec_event_id=spec.created_event_id,
+        spec_hash=spec.content_hash,
+        parent_hash=spec.parent_hash,
+        input_version=contract.input_version,
+        accepted_inputs=[
+            PrdSourceInputView(version=item.version, kind=item.kind, text=item.text,
+                               created_event_id=item.created_event_id)
+            for item in accepted
+        ],
+        goal=spec.goal,
+        non_goals=list(spec.non_goals),
+        boundaries=list(spec.boundaries),
+        constraints=list(spec.constraints),
+        requirements=list(spec.requirements),
+        acceptance_criteria=list(spec.acceptance_criteria),
+        requirement_mapping=_prd_requirement_mapping(spec),
+        fatal_conditions=list(spec.fatal_conditions),
+        decisions=[
+            PrdDecisionView(decision_id=item.id, content_hash=item.content_hash, statement=item.statement,
+                            rationale=item.rationale, product_spec_hash=item.product_spec_hash,
+                            created_event_id=item.created_event_id)
+            for item in effective_decisions
+        ],
+        decision_changes=[
+            PrdDecisionChangeView(
+                decision_hash=str(item.get("decision_hash") or ""),
+                disposition=str(item.get("disposition") or ""),
+                rationale=str(item.get("rationale") or ""),
+            )
+            for item in spec.decision_changes if isinstance(item, dict)
+        ],
+        change_record=_prd_change_record(spec.change_record),
+    )
+
+
+def _contract_version_entry(contract: Any, specs: dict[str, Any], decisions: dict[str, Any],
+                            inputs: Sequence[Any], current_contract: str | None) -> VersionEntry:
+    spec = specs.get(contract.product_spec_hash)
+    status = "active" if contract.content_hash == current_contract else "superseded"
+    return _version_entry(
+        contract.created_event_id, "contract", status, contract.revision, contract.content_hash,
+        _prd_summary(spec), [],
+        spec_event_id=None if spec is None else spec.created_event_id,
+        prd=_prd_view(spec, contract, decisions, inputs),
+    )
+
+
 def _version_entry(event_id: str, kind: str, status: str, revision: int, content_hash: str,
                    summary: str | None, files: list[str],
-                   launch: list[LaunchMethodView] | None = None) -> VersionEntry:
+                   launch: list[LaunchMethodView] | None = None,
+                   spec_event_id: str | None = None,
+                   prd: ProductSpecView | None = None) -> VersionEntry:
     return VersionEntry(event_id=event_id, kind=kind, status=status, revision=revision,
                         content_hash=content_hash, summary=summary, files=files,
-                        launch=list(launch or []))
+                        launch=list(launch or []), spec_event_id=spec_event_id, prd=prd)
 
 
 # ---------------------------------------------------------------------------

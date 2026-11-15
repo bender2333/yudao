@@ -33,6 +33,9 @@ import {
   type ConclusionView,
   type InputsView,
   type MaterialsLike,
+  type PrdDiffView,
+  type PrdRequirementRowView,
+  type PrdView,
   type RoundView,
   type VersionView,
 } from "./arrow-panel-model";
@@ -200,17 +203,203 @@ function ConclusionSection(props: {
 }
 
 // ---------------------------------------------------------------------------
-// 这一版：那一版的一句话、与上一版的差异、文件清单与单个文件下载
+// 这一版：结构化 PRD、交付的一句话与差异、文件清单与单个文件下载
 
-function VersionSection(props: { app: ClientApp; version: VersionView; eventId: string | null }) {
+function PrdStringList(props: { items: readonly string[]; ordered?: boolean }) {
+  if (props.items.length === 0) {
+    return <span className="y10-muted">无</span>;
+  }
+  if (props.ordered) {
+    return (
+      <ol className="y10-list">
+        {props.items.map((item, index) => <li key={index}>{item}</li>)}
+      </ol>
+    );
+  }
+  return (
+    <ul className="y10-list">
+      {props.items.map((item, index) => <li key={index}>{item}</li>)}
+    </ul>
+  );
+}
+
+function PrdDiffBlock(props: { diff: PrdDiffView }) {
+  const diff = props.diff;
+  return (
+    <div className="v20-arrow-prd-diff" data-testid="arrow-panel-prd-diff">
+      <p className="y10-note note">{diff.summary}</p>
+      {diff.goalChanged === null && diff.sections.length === 0 ? null : (
+        <ul className="y10-list">
+          {diff.goalChanged === null ? null : (
+            <li>
+              <b>目标调整</b>：由「{diff.goalChanged.before}」改为「{diff.goalChanged.after}」
+            </li>
+          )}
+          {diff.sections.map((section) => (
+            <li key={section.label}>
+              <b>{section.label}</b>
+              {section.added.length === 0 ? "" : ` 新增：${section.added.join("；")}`}
+              {section.removed.length === 0 ? "" : ` 减少：${section.removed.join("；")}`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function PrdRequirementsList(props: { rows: readonly PrdRequirementRowView[] }) {
+  if (props.rows.length === 0) {
+    return <span className="y10-muted">无</span>;
+  }
+  return (
+    <ol className="y10-list">
+      {props.rows.map((row) => (
+        <li key={row.number}>
+          <b>#{row.number}</b> {row.text === "" ? <span className="y10-muted">（未写正文）</span> : row.text}
+          {row.criteria.length === 0 ? null : (
+            <span className="y10-muted"> · 对应验收：{row.criteria.join("、")}</span>
+          )}
+          {row.gap === null ? null : (
+            <span className="y10-muted"> · 缺口：{row.gap}</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function PrdSection(props: { prd: PrdView }) {
+  const prd = props.prd;
+  return (
+    <div className="v20-arrow-prd" data-testid="arrow-panel-prd">
+      <p className="y10-note note">
+        <b>PRD v{prd.revision}</b>
+        {" · "}
+        <Tag tone={prd.statusName === "当前版本" ? "ok" : "warn"}>{prd.statusName}</Tag>
+        <span className="y10-muted">{` · 规格 ${prd.specId} · 基于第 ${prd.inputVersion} 版输入`}</span>
+      </p>
+      {prd.diffFromPrevious === null ? null : <PrdDiffBlock diff={prd.diffFromPrevious} />}
+      <dl className="y10-kv is-rows">
+        <div>
+          <dt>接纳来源</dt>
+          <dd>
+            {prd.acceptedInputs.length === 0 ? <span className="y10-muted">无</span> : (
+              <ol className="y10-list">
+                {prd.acceptedInputs.map((item) => (
+                  <li key={item.version}>
+                    <span className="y10-muted">{`第 ${item.version} 版 · ${item.kindName}：`}</span>
+                    {item.text}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>目标</dt>
+          <dd>{prd.goal === "" ? <span className="y10-muted">未写明</span> : prd.goal}</dd>
+        </div>
+        <div>
+          <dt>非目标</dt>
+          <dd><PrdStringList items={prd.nonGoals} /></dd>
+        </div>
+        <div>
+          <dt>范围与边界</dt>
+          <dd><PrdStringList items={prd.boundaries} /></dd>
+        </div>
+        <div>
+          <dt>约束与默认决定</dt>
+          <dd><PrdStringList items={prd.constraints} /></dd>
+        </div>
+        <div>
+          <dt>功能需求</dt>
+          <dd><PrdRequirementsList rows={prd.requirements} /></dd>
+        </div>
+        <div>
+          <dt>验收条件清单</dt>
+          <dd><PrdStringList items={prd.acceptanceCriteria} ordered /></dd>
+        </div>
+        <div>
+          <dt>致命条件与风险边界</dt>
+          <dd><PrdStringList items={prd.fatalConditions} /></dd>
+        </div>
+        {prd.decisions.length === 0 ? null : (
+          <div>
+            <dt>有效产品决定</dt>
+            <dd>
+              <ul className="y10-list">
+                {prd.decisions.map((item) => (
+                  <li key={item.id}>
+                    <b>{item.id}</b> {item.statement}
+                    {item.rationale === "" ? null : <span className="y10-muted">{` · 理由：${item.rationale}`}</span>}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
+        {prd.decisionChanges.length === 0 ? null : (
+          <div>
+            <dt>既有决定处理</dt>
+            <dd>
+              <ul className="y10-list">
+                {prd.decisionChanges.map((item, index) => (
+                  <li key={`${item.decisionHash}-${index}`}>
+                    <Tag>{item.dispositionName}</Tag>
+                    {` ${item.decisionHash}`}
+                    {item.rationale === "" ? null : <span className="y10-muted">{` · ${item.rationale}`}</span>}
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
+        {prd.changeRecord === null ? null : (
+          <div>
+            <dt>修订说明</dt>
+            <dd>
+              {prd.changeRecord.rationale === "" ? null : (
+                <p className="y10-cv-panel-text">{prd.changeRecord.rationale}</p>
+              )}
+              {(prd.changeRecord.changed.length === 0
+                && prd.changeRecord.retained.length === 0
+                && prd.changeRecord.retired.length === 0) ? null : (
+                <ul className="y10-list">
+                  {prd.changeRecord.changed.length === 0 ? null : (
+                    <li>变更：{prd.changeRecord.changed.join("；")}</li>
+                  )}
+                  {prd.changeRecord.retained.length === 0 ? null : (
+                    <li>保留：{prd.changeRecord.retained.join("；")}</li>
+                  )}
+                  {prd.changeRecord.retired.length === 0 ? null : (
+                    <li>撤下：{prd.changeRecord.retired.join("；")}</li>
+                  )}
+                </ul>
+              )}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </div>
+  );
+}
+
+export function VersionSection(props: { app: ClientApp; version: VersionView; eventId: string | null }) {
   const version = props.version;
   return (
     <div className="v20-arrow-version" data-testid="arrow-panel-version">
-      {version.summary === "" ? null : <p className="y10-cv-panel-text">{version.summary}</p>}
+      {version.prd === null ? (
+        version.summary === "" ? null : <p className="y10-cv-panel-text">{version.summary}</p>
+      ) : (
+        <PrdSection prd={version.prd} />
+      )}
       {version.diff === null ? null : (
         <p className="y10-note note" data-testid="arrow-panel-diff">{version.diff.text}</p>
       )}
-      {version.files.length === 0 ? <p className="y10-note note">{NO_FILES_TEXT}</p> : (
+      {!version.expectsFiles ? null : version.files.length === 0 ? (
+        <p className="y10-note note">{NO_FILES_TEXT}</p>
+      ) : (
         <div className="y10-cv-files">
           <b>这一版的文件（{version.files.length} 个）</b>
           <ArrowFileList app={props.app} eventId={props.eventId} files={version.files} />

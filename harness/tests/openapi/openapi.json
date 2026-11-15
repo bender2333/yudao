@@ -12940,6 +12940,268 @@
         ],
         "title": "PlaywrightMcpView"
       },
+      "PrdChangeRecordView": {
+        "properties": {
+          "changed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed"
+          },
+          "retained": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retained"
+          },
+          "retired": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retired"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rationale"
+        ],
+        "title": "PrdChangeRecordView"
+      },
+      "PrdDecisionChangeView": {
+        "properties": {
+          "decision_hash": {
+            "type": "string",
+            "title": "Decision Hash"
+          },
+          "disposition": {
+            "type": "string",
+            "title": "Disposition"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision_hash",
+          "disposition",
+          "rationale"
+        ],
+        "title": "PrdDecisionChangeView"
+      },
+      "PrdDecisionView": {
+        "properties": {
+          "decision_id": {
+            "type": "string",
+            "title": "Decision Id"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "statement": {
+            "type": "string",
+            "title": "Statement"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "product_spec_hash": {
+            "type": "string",
+            "title": "Product Spec Hash"
+          },
+          "created_event_id": {
+            "type": "string",
+            "title": "Created Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decision_id",
+          "content_hash",
+          "statement",
+          "rationale",
+          "product_spec_hash",
+          "created_event_id"
+        ],
+        "title": "PrdDecisionView"
+      },
+      "PrdSourceInputView": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "created_event_id": {
+            "type": "string",
+            "title": "Created Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "kind",
+          "text",
+          "created_event_id"
+        ],
+        "title": "PrdSourceInputView"
+      },
+      "ProductSpecView": {
+        "properties": {
+          "spec_id": {
+            "type": "string",
+            "title": "Spec Id"
+          },
+          "spec_revision": {
+            "type": "integer",
+            "title": "Spec Revision"
+          },
+          "spec_status": {
+            "type": "string",
+            "title": "Spec Status"
+          },
+          "spec_event_id": {
+            "type": "string",
+            "title": "Spec Event Id"
+          },
+          "spec_hash": {
+            "type": "string",
+            "title": "Spec Hash"
+          },
+          "parent_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Hash"
+          },
+          "input_version": {
+            "type": "integer",
+            "title": "Input Version"
+          },
+          "accepted_inputs": {
+            "items": {
+              "$ref": "#/components/schemas/PrdSourceInputView"
+            },
+            "type": "array",
+            "title": "Accepted Inputs"
+          },
+          "goal": {
+            "type": "string",
+            "title": "Goal"
+          },
+          "non_goals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Non Goals"
+          },
+          "boundaries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Boundaries"
+          },
+          "constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Constraints"
+          },
+          "requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requirements"
+          },
+          "acceptance_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acceptance Criteria"
+          },
+          "requirement_mapping": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementMappingView"
+            },
+            "type": "array",
+            "title": "Requirement Mapping"
+          },
+          "fatal_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fatal Conditions"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/PrdDecisionView"
+            },
+            "type": "array",
+            "title": "Decisions"
+          },
+          "decision_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PrdDecisionChangeView"
+            },
+            "type": "array",
+            "title": "Decision Changes"
+          },
+          "change_record": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrdChangeRecordView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "spec_id",
+          "spec_revision",
+          "spec_status",
+          "spec_event_id",
+          "spec_hash",
+          "input_version",
+          "goal"
+        ],
+        "title": "ProductSpecView"
+      },
       "ProjectArchive": {
         "properties": {
           "command_id": {
@@ -14535,6 +14797,38 @@
           "requirement"
         ],
         "title": "RequirementMapping"
+      },
+      "RequirementMappingView": {
+        "properties": {
+          "requirement": {
+            "type": "integer",
+            "title": "Requirement"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requirement"
+        ],
+        "title": "RequirementMappingView"
       },
       "ReviewEntry": {
         "properties": {
@@ -18165,6 +18459,27 @@
             },
             "type": "array",
             "title": "Launch"
+          },
+          "spec_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec Event Id"
+          },
+          "prd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductSpecView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
