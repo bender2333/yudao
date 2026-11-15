@@ -1,21 +1,18 @@
-// 左侧栏（原型 v10 外壳，工单 #377）：品牌、首页、「从想法新建」、「接入已有项目」、
+// 左侧栏（原型 v10 外壳，工单 #377）：品牌、首页、「从想法新建」、「接入已有项目」导航入口、
 // 项目搜索、项目列表（名称、状态标记、待回答的决定数）与每项的重命名、置顶、归档、恢复；
-// 底部「系统」分组的入口按能力清单显示。新建项目用命令 project.create / project.onboard，
+// 底部「系统」分组的入口按能力清单显示。新建与接入独立页面在 views/home/new-project-page.tsx，
 // 项目列表本身由外壳的视图同步给出，命令被接受以后由事件到达时重新查询。
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Capabilities, DecisionView, ProjectRow } from "../api/generated/types.gen";
 import type { ClientApp } from "../contract/client-app";
-import { type CommandProblem } from "../contract/command-problem.ts";
 import { useCommand } from "../views/project/use-snapshot";
 import { visibleProjects } from "../views/project/project-list";
 import { drainNoticeText } from "../views/system/drain-text";
 import { emptyOrFailureText } from "../contract/read-failure";
 import { Icon, StatusMark } from "./kit";
-import { projectEntryNote, projectFormNote } from "./new-project-text";
-import { onboardingProblemText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
-import { FormCards } from "../views/project/form-cards";
-import { FORM_NAME_HINT, cardPickProblem, projectEntryBody } from "../views/project/form-cards-model";
+import { sidebarEntryItems } from "./new-project-text";
+import { projectOnboardingMark } from "../views/project/onboarding";
 
 export type SidebarProps = {
   app: ClientApp;
@@ -75,8 +72,12 @@ export function Sidebar(props: SidebarProps) {
   const has = (name: string) => props.capabilities.queries.some((query) => query.name === name);
   const can = (name: string) => props.capabilities.commands.some((command) => command.name === name);
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState<null | "idea" | "existing">(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const entryItems = sidebarEntryItems({
+    activeName: props.activeName,
+    canCreate: can("project.create"),
+    canOnboard: can("project.onboard"),
+  });
 
   // 项目列表由外壳打开（viewId "shell.projects"）：命令被接受以后事件到达，列表按事件种类重新查询
   const markKey = useMemo(() => JSON.stringify(props.decisions.map((decision) => [decision.decision_id, decision.status])), [props.decisions]);
@@ -112,40 +113,29 @@ export function Sidebar(props: SidebarProps) {
           <Icon name="home" />
           <span>首页</span>
         </button>
+        {/* 两个新建入口只留跳转与当前页高亮（工单 #1806）：完整表单与形态卡迁往右侧主工作区独立页面 */}
         <div className="y10-side-actions">
-          {can("project.create") ? (
-            <div className="y10-side-action">
-              <button type="button" className="y10-btn primary y10-new-project nav-item" onClick={() => setCreating(creating === "idea" ? null : "idea")}>
-                <Icon name="plus" />
-                <span>从想法新建</span>
+          {entryItems.map((item) => (
+            <div className="y10-side-action" key={item.mode}>
+              <button
+                type="button"
+                className={
+                  item.mode === "idea"
+                    ? `y10-btn primary y10-new-project nav-item${item.active ? " is-active" : ""}`
+                    : `y10-btn y10-onboard nav-item${item.active ? " is-active" : ""}`
+                }
+                aria-current={item.active ? "page" : undefined}
+                data-testid={`sidebar-entry-${item.mode}`}
+                onClick={() => props.onNavigate(item.hash)}
+              >
+                <Icon name={item.mode === "idea" ? "plus" : "import"} />
+                <span>{item.label}</span>
               </button>
               {/* 入口旁的场景说明（工单 #1240）：哪个入口从材料开始、哪个从已有代码目录开始 */}
-              <small className="y10-entry-note">{projectEntryNote("idea")}</small>
+              <small className="y10-entry-note">{item.note}</small>
             </div>
-          ) : null}
-          {can("project.onboard") ? (
-            <div className="y10-side-action">
-              <button type="button" className="y10-btn y10-onboard nav-item" onClick={() => setCreating(creating === "existing" ? null : "existing")}>
-                <Icon name="import" />
-                <span>接入已有项目</span>
-              </button>
-              <small className="y10-entry-note">{projectEntryNote("existing")}</small>
-            </div>
-          ) : null}
+          ))}
         </div>
-        {creating ? (
-          <NewProject
-            app={props.app}
-            mode={creating}
-            busy={command.busy}
-            submitted={command.submitted}
-            problem={command.problem}
-            accepted={command.accepted}
-            onClose={() => setCreating(null)}
-            onNavigate={props.onNavigate}
-            onSubmit={(name, body) => command.submit(name, body)}
-          />
-        ) : null}
         <label className="y10-search">
           <Icon name="search" />
           <input
@@ -230,152 +220,6 @@ export function Sidebar(props: SidebarProps) {
         </ul>
       </div>
     </aside>
-  );
-}
-
-// 命令受理回执里的标识：project.create 与 project.onboard 都带 refs.project_id，
-// 新建成功以后用它转到新项目的概览（工单 #1160）；没有这一项时返回空串
-function receiptId(accepted: Record<string, unknown> | null, key: string): string {
-  const refs = accepted?.["refs"];
-  if (refs === null || refs === undefined || typeof refs !== "object") {
-    return "";
-  }
-  const value = (refs as Record<string, unknown>)[key];
-  return typeof value === "string" ? value : "";
-}
-
-// 新建与接入都选形态卡（工单 #1648，docs/design/project-organization.md「形态一键选用」「新建的入口」）：
-// 只填名字、选一张卡，点卡就建好；名字还空着就点卡时不发命令，提示先写名字。起始文件夹收在「选起始文件夹」
-// 小入口里，长期目标不在这里填（可选，在设置页写）。接入已有项目另登记源目录的名称与路径。
-// 说明照 new-project-text.ts（工单 #1240）：建档与需求材料都不在选形态时提交。
-function NewProject(props: {
-  app: ClientApp | null;
-  mode: "idea" | "existing";
-  busy: boolean;
-  submitted: boolean;
-  problem: CommandProblem | null;
-  /** 最近一次被接受的受理回执：新建成功以后从它的 refs.project_id 转到新项目的对话 */
-  accepted: Record<string, unknown> | null;
-  onClose: () => void;
-  onNavigate: (hash: string) => void;
-  onSubmit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
-}) {
-  const [name, setName] = useState("");
-  const [sourceName, setSourceName] = useState("");
-  const [sourcePath, setSourcePath] = useState("");
-  const [initialDirectory, setInitialDirectory] = useState("");
-  const [hint, setHint] = useState<string | null>(null);
-  const commandName = props.mode === "idea" ? "project.create" : "project.onboard";
-
-  // 本次提交被接受以后等事件到达：项目列表由事件到达时重新查询，列表出现新内容以后「已提交」消失，
-  // 这时关闭表单，各字段随表单一起清空（工单 #295 第 1 项），并转到新项目的对话（工单 #1160）。
-  // 被拒绝时 submit 返回假，表单保留已填字段并显示原因；等待只记在这一次挂载上，
-  // 取消以后重新打开的表单不会因为上一次提交的余波自己关闭
-  const [waitingWrite, setWaitingWrite] = useState(false);
-  useEffect(() => {
-    if (waitingWrite && !props.submitted) {
-      const projectId = receiptId(props.accepted, "project_id");
-      props.onClose();
-      if (projectId !== "") {
-        props.onNavigate(`#/p/${projectId}/conversation`);
-      }
-    }
-  }, [waitingWrite, props.submitted]);
-
-  // 点卡：名字空着、或接入时缺源目录都不发命令，把那句话写在卡片上方
-  const pickForm = (form: string): void => {
-    if (props.busy) {
-      return;
-    }
-    const input = { mode: props.mode, name, sourceName, sourcePath };
-    const problem = cardPickProblem(input);
-    if (problem !== null) {
-      setHint(problem);
-      return;
-    }
-    const body = projectEntryBody({ ...input, form, initialDirectory });
-    if (body === null) {
-      return;
-    }
-    setHint(null);
-    void props.onSubmit(commandName, body).then((ok) => setWaitingWrite(ok));
-  };
-
-  return (
-    <form
-      className="y10-block is-compact card inline-form v20-new-project"
-      onSubmit={(event) => {
-        // 提交靠点卡：回车只核对名字，不发命令
-        event.preventDefault();
-        if (name.trim() === "") {
-          setHint(FORM_NAME_HINT);
-        }
-      }}
-    >
-      <header className="y10-block-head form-head">
-        <div className="y10-block-titles">
-          <h2 className="y10-block-title">{props.mode === "idea" ? "从想法新建项目" : "接入已有项目"}</h2>
-        </div>
-        <div className="y10-block-actions">
-          <button type="button" className="y10-btn small" onClick={props.onClose}>
-            取消
-          </button>
-        </div>
-      </header>
-      <div className="y10-block-body form">
-        <label className="y10-field field">
-          <span>项目名称</span>
-          <input className="y10-input" type="text" value={name} onChange={(event) => setName(event.target.value)} required />
-        </label>
-        {props.mode === "existing" ? (
-          <>
-            <label className="y10-field field">
-              <span>源目录名称</span>
-              <input className="y10-input" type="text" value={sourceName} onChange={(event) => setSourceName(event.target.value)} required />
-            </label>
-            <label className="y10-field field">
-              <span>源目录路径</span>
-              <input className="y10-input" type="text" value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} required />
-            </label>
-            <p className="y10-note note">接入以后会登记源目录、采集代码快照并开始建档事项（3.8）。</p>
-          </>
-        ) : null}
-        {/* 形态卡：一份形态一张卡，点卡就建好（发不发命令由名字与源目录决定） */}
-        <FormCards app={props.app} hint={hint} onPick={pickForm} />
-        {props.mode === "idea" ? (
-          // 起始文件夹是可选的一份快照，收在小入口里（原型 v13 的说明，工单 #1160）
-          <details className="y10-details v20-new-project-dir">
-            <summary>选起始文件夹（可选）</summary>
-            <label className="y10-field field">
-              <span>起始文件夹</span>
-              <input
-                className="y10-input"
-                type="text"
-                value={initialDirectory}
-                placeholder="控制主机上的文件夹路径，留空则从空项目开始"
-                onChange={(event) => setInitialDirectory(event.target.value)}
-              />
-              <small className="y10-muted">填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。</small>
-            </label>
-          </details>
-        ) : null}
-        {props.mode === "idea" ? (
-          <p className="y10-note note">{projectFormNote("idea")}</p>
-        ) : null}
-        {props.problem ? (
-          <div className="rejection" role="status">
-            <p className="error">
-              {onboardingProblemText(props.problem)}
-            </p>
-            <ul className="rejection-paths y10-list">
-              {sourceInvalidLines(props.problem).map((line) => <li key={line}>{line}</li>)}
-            </ul>
-          </div>
-        ) : null}
-        {props.busy ? <p className="y10-muted hint" role="status">正在提交</p> : null}
-        {props.submitted ? <p className="y10-muted hint" role="status">已提交，等待写入结果</p> : null}
-      </div>
-    </form>
   );
 }
 
