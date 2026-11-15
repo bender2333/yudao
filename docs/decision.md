@@ -831,7 +831,7 @@
   4. 无人值守评测运行器检测到待答 `role_choice` 决定请求时自动逐题选用其唯一推荐选项提交回答，确保自动化对照评测可顺利收敛完成。
 - 决定：
   1. 更新 `docs/requirements/domain-completion.md`（D12）、`docs/requirements/expert-ask-react.md`（D07）与 `docs/design/department-loop.md`、`docs/design/independent-verification.md`、`docs/design/app-and-interface.md`、`docs/design/rules-and-parameters.md`、`docs/design/evaluation-scenarios.md`、`docs/design/architecture/name-map.md`，补全规范与规则表条目。
-  2. 提交并推送设计说明至 `origin/main` 后，建立父工单与五张顺序切片子工单承接实现（工具定义与规则参数、安全节点与计时恢复、提示工程与共享用户决定上下文、客户端多题决定卡片界面、评测运行器自动选取推荐作答）。
+  2. 提交并推送设计说明至 `origin/main` 后，建立父工单与六张切片子工单承接实现（多题 role_choice 决定模型与接口合同、工具定义与规则参数及询问分支收紧、薄驱动本轮阻塞与计时暂停恢复、角色装配与共享用户决定上下文及自由互审指引、客户端多题决定卡片与线程气泡、评测运行器自动选取推荐作答与提问计数）。
 
 ## 2026-11-15 - 试用反馈（discussions/1796）前四项设计修订：输入方式规范化兜底、候选连通性测试瘦身、独立新建项目页与 PRD 全链路可见
 

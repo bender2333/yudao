@@ -68,8 +68,8 @@
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
 | 槽位：执行、执行实现 | 第一节「槽位：执行」；第四节执行 | `engine.py` 的 `StepDriver`（`start`、`cancel`）；`execution_contract.py` 的 `StepLimits`、`ActivationScope`；`recording.py` 的 `StepRecorder` | 执行 | 一致（方框的技术名词是步骤驱动） |
-| 执行契约、每一步先问边界 | 第四节执行 | `execution_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`；`StepDriver` 协议的 `start`、`cancel`、`result`；`SafeNode` 协议包含 `proceed`、`settle`、`wait`、`end`、`ask` 与向用户提问入口；按职能取模型与提示词随开始一轮工作的请求交进来，`RoundRequest.department_settings`，旧的 `PreviousSafeNode` 留一版）；`thin_driver.py` 的 `_SafeNode` 实现安全节点；实现 `engine.py` 的 `StepDriver` 声明 `CONTRACT_VERSION` | 执行 | 一致 |
-| 一轮工作 | 第三节外环「一轮工作中」；第一节方程 | `thin_driver.py` 的 `RoundWork`、`RoundPreparation`、`RoundDependencies`、`RoundFailure`，`bounds.round_bound`；旧名 `_Activation`、`bounds.activation_bound` 留别名一版。已经写进日志的事件种类 `department_activated`、`activation_finished` 与字段 `activation_id` 不改 | 执行、路由 | 一致 |
+| 执行契约、每一步先问边界 | 第四节执行 | `execution_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`；`StepDriver` 协议的 `start`、`cancel`、`result`；`SafeNode` 协议只有 `proceed`、`settle`、`wait`、`end`、`ask`；按职能取模型与提示词随开始一轮工作的请求交进来，`RoundRequest.department_settings`，旧的 `PreviousSafeNode` 留一版）；`thin_driver.py` 的 `_SafeNode` 实现安全节点；实现 `engine.py` 的 `StepDriver` 声明 `CONTRACT_VERSION` | 执行 | 一致 |
+| 一轮工作 | 第三节外环「一轮工作中」；第一节方程 | `thin_driver.py` 的 `RoundWork`、`RoundPreparation`、`RoundDependencies`（含向用户提问回调 `ask_user`）、`RoundFailure`，`bounds.round_bound`；旧名 `_Activation`、`bounds.activation_bound` 留别名一版。已经写进日志的事件种类 `department_activated`、`activation_finished` 与字段 `activation_id` 不改 | 执行、路由 | 一致 |
 | 职能成员（一个会话） | 第六节「可以多份」 | `sessions.py` 的 `DepartmentSession`、`SessionFactory`；`models.py` 的 `SessionRecord` | 执行 | 一致 |
 | 询问 | 第三节外环「询问中」；第四节执行「出」 | 事件 `ask_started`、`ask_answered`；`adjudication.ask_chain_decision`；`watched_outputs.py` 的 `pending_ask_department`、`ask_branch`、`ask_outcome`；`SafeNode.ask`；查询 `run.asks` | 执行、路由 | 一致 |
 | 外包角色 | 第一节「工程」；第四节执行 | 无 | 执行；道 02 | 代码里还没有 |

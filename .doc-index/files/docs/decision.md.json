@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/decision.md",
-"hash":"631000e0081e2e29",
+"hash":"bbe4b8a95ccf69d1",
 "nodes":[
-{"hash":"631000e0081e2e29","id":"docs/decision.md","kind":"file","title":"docs/decision.md"},
+{"hash":"bbe4b8a95ccf69d1","id":"docs/decision.md","kind":"file","title":"docs/decision.md"},
 {"hash":"c2a7f437ae1d1ae6","id":"docs/decision.md#决策记录","kind":"section","parent":"docs/decision.md","title":"决策记录"},
 {"hash":"cad38f6ac3bcdde9","id":"docs/decision.md#决策记录 > 2026-10-30 - 模型管理：填写地址与 Key，选择模型即可使用","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-10-30 - 模型管理：填写地址与 Key，选择模型即可使用"},
 {"hash":"fc4b759f2e346dcd","id":"docs/decision.md#决策记录 > 2026-10-30 - 模型能力表：按接入包登记协议，不排除记录；协议预填改回能力表优先","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-10-30 - 模型能力表：按接入包登记协议，不排除记录；协议预填改回能力表优先"},
@@ -78,7 +78,7 @@
 {"hash":"7dc92539c1514fff","id":"docs/decision.md#决策记录 > 2026-11-14 - CI 的「画面」作业：覆盖单元、类型、构建、端到端与接口类型核对，不进合并门","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-14 - CI 的「画面」作业：覆盖单元、类型、构建、端到端与接口类型核对，不进合并门"},
 {"hash":"eae66f1b9bb4fccf","id":"docs/decision.md#决策记录 > 2026-11-14 - 页面的配置边界、画面独立推进与进程外运维代理","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-14 - 页面的配置边界、画面独立推进与进程外运维代理"},
 {"hash":"cd13a619dd04190b","id":"docs/decision.md#决策记录 > 2026-11-14 - 进程外运维代理排入 1.2、奥卡姆剃刀精简高级编辑页、本体脚手架并入与排期","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-14 - 进程外运维代理排入 1.2、奥卡姆剃刀精简高级编辑页、本体脚手架并入与排期"},
-{"hash":"f48de386e0492ad0","id":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
+{"hash":"99dc4da9a7553f77","id":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
 {"hash":"171495b3e7f0c656","id":"docs/decision.md#决策记录 > 2026-11-15 - 试用反馈（discussions/1796）前四项设计修订：输入方式规范化兜底、候选连通性测试瘦身、独立新建项目页与 PRD 全链路可见","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-15 - 试用反馈（discussions/1796）前四项设计修订：输入方式规范化兜底、候选连通性测试瘦身、独立新建项目页与 PRD 全链路可见"}
 ],
 "edges":[
@@ -218,8 +218,8 @@
 {"dst":"docs/design/web-interface-and-release.md","kind":"code-path","raws":["docs/design/web-interface-and-release.md"],"seen":"6efbf1cc3a80ea0d","src":"docs/decision.md#决策记录 > 2026-11-14 - 页面的配置边界、画面独立推进与进程外运维代理"},
 {"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"de70a53b154f077f","src":"docs/decision.md#决策记录 > 2026-11-14 - 页面的配置边界、画面独立推进与进程外运维代理"},
 {"dst":"docs/requirements/external-ops-agent.md","kind":"code-path","raws":["docs/requirements/external-ops-agent.md"],"seen":"fcf75a42e7218523","src":"docs/decision.md#决策记录 > 2026-11-14 - 页面的配置边界、画面独立推进与进程外运维代理"},
-{"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["docs/design/app-and-interface.md"],"seen":"f5ee2e9dbf94036a","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
-{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"d6af5195c150f2f9","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
+{"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["docs/design/app-and-interface.md"],"seen":"3de0518fbe2fea4b","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"dcd678bdb9e79596","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
 {"dst":"docs/design/department-loop.md","kind":"code-path","raws":["docs/design/department-loop.md"],"seen":"a9279407a87c8c9d","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"code-path","raws":["docs/design/evaluation-scenarios.md"],"seen":"dffe49587685bba6","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
 {"dst":"docs/design/independent-verification.md","kind":"code-path","raws":["docs/design/independent-verification.md"],"seen":"96ba0858e1b75bd5","src":"docs/decision.md#决策记录 > 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计"},
