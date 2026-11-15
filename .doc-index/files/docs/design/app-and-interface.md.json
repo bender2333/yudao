@@ -121,6 +121,7 @@
 {"dst":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式","kind":"link","raws":["visualization.md"],"seen":"9ed1a930474bb409","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单"},
 {"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.2 版本号","kind":"link","raws":["web-interface-and-release.md"],"seen":"86c72df9d2141250","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单"},
 {"dst":"docs/design/work-process-titles.md","kind":"link","raws":["work-process-titles.md"],"seen":"76ab766041290382","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单"},
+{"dst":"docs/prototypes/v21/walkthrough.md","kind":"link","raws":["../prototypes/v21/walkthrough.md"],"seen":"91b726ecd9596104","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单"},
 {"dst":"docs/design/project-organization.md","kind":"link","raws":["project-organization.md"],"seen":"28e55440fa3bb002","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询"},
 {"dst":"docs/design/work-process-titles.md#工作过程的任务与动作标题设计说明 > 4. 方案 > 4.5 谁来读","kind":"link","raws":["work-process-titles.md"],"seen":"cb83e48253b8f314","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.4 项目页四层读哪个查询"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.2 五种合同","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"026b427162b0df59","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流 > 5.3 范围筛选"},

@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"94bf493e341eec96",
+"hash":"24e4d70169466e03",
 "nodes":[
-{"hash":"94bf493e341eec96","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"24e4d70169466e03","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"74481d6fcc8e2e39","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"9b1345077b07e2bb","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -42,7 +42,7 @@
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"68eda7f05b4fb7ec","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"009fd983a87377c7","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md#Yudao Loop System > 当前状态","kind":"section-ref","raws":["README.md"],"seen":"d066a96c076a70ab","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"6b4f2d3d7033e40a","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b7bd28b47d9fe02c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/README.md","kind":"code-path","raws":["client/README.md"],"seen":"65ba0f28c0354bd6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/package-lock.json","kind":"code-path","raws":["client/package-lock.json"],"seen":"0834cc657012dbc4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/package.json","kind":"code-path","raws":["client/package.json"],"seen":"6d385dc075e735a4","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -139,9 +139,11 @@
 {"dst":"docs/evaluation/scenario-3-yudao.md","kind":"code-path","raws":["docs/evaluation/scenario-3-yudao.md"],"seen":"4d480a3cea19b8a6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/evaluation/step-timeline-1235.png","kind":"code-path","raws":["docs/evaluation/step-timeline-1235.png"],"seen":"a4e84a1d79275f30","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/foundation-rules.md","kind":"code-path","raws":["docs/foundation-rules.md"],"seen":"7359eb9a655048af","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"3edf1708839d69a2","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/program-roadmap.md","kind":"section-ref","raws":["docs/program-roadmap.md","program-roadmap.md"],"seen":"3edf1708839d69a2","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"2a648c0810214554","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/program-roadmap.md","kind":"section-ref","raws":["docs/program-roadmap.md","program-roadmap.md"],"seen":"2a648c0810214554","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/prototypes/CHANGELOG.md","kind":"code-path","raws":["docs/prototypes/CHANGELOG.md","prototypes/CHANGELOG.md"],"seen":"128464c4a8a92e44","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/prototypes/v21-sketches.html","kind":"code-path","raws":["docs/prototypes/v21-sketches.html"],"seen":"9b21182f279035c7","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/prototypes/v21/walkthrough.md","kind":"code-path","raws":["docs/prototypes/v21/walkthrough.md"],"seen":"91b726ecd9596104","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/prototypes/view-step1-topology-sketch.html","kind":"code-path","raws":["docs/prototypes/view-step1-topology-sketch.html"],"seen":"5d057913e1f5f617","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/requirements/README.md","kind":"code-path","raws":["docs/requirements/README.md"],"seen":"2069a1f67016460e","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/requirements/browser-and-computer-use.md","kind":"code-path","raws":["docs/requirements/browser-and-computer-use.md"],"seen":"60938c471e8ed7ba","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
