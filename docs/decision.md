@@ -832,3 +832,13 @@
 - 决定：
   1. 更新 `docs/requirements/domain-completion.md`（D12）、`docs/requirements/expert-ask-react.md`（D07）与 `docs/design/department-loop.md`、`docs/design/independent-verification.md`、`docs/design/app-and-interface.md`、`docs/design/rules-and-parameters.md`、`docs/design/evaluation-scenarios.md`、`docs/design/architecture/name-map.md`，补全规范与规则表条目。
   2. 提交并推送设计说明至 `origin/main` 后，建立父工单与五张顺序切片子工单承接实现（工具定义与规则参数、安全节点与计时恢复、提示工程与共享用户决定上下文、客户端多题决定卡片界面、评测运行器自动选取推荐作答）。
+
+## 2026-11-15 - 试用反馈（discussions/1796）前四项设计修订：输入方式规范化兜底、候选连通性测试瘦身、独立新建项目页与 PRD 全链路可见
+
+- 事实：用户试用 `v0.2.1`（`discussions/1796`）明确不能放行，列出四类阻断或高摩擦问题：① 中转与代理服务（如带路由前缀或 `-thinking` 后缀的模型）选用或测试后输入方式仍落为默认仅文本；② 候选行点击「测试」发送两轮完整问答加工具往返，通过后按钮变为「重新测试」并在候选行堆砌耗时、实际模型与工具调用细节；③ 点击「新建项目」把表单与形态卡塞进 240px 左侧栏导致狭窄拥挤、信息被截断；④ 产品接纳 PRD 后页面上找不到完整 PRD（PRD 箭头落入文件清单分支报错，详情面板又被展开的时序图顶出首屏，项目头部显示「还没有成果」且线程主轴把 PRD 折叠进内部往来）。第 4 条另一半「产品部门为什么不会询问与跨职能审视」已由 `a4843ee0`（`ask_user / role_choice` 与自由跨视角 `ask`）补充设计。
+- 决定：
+  1. **输入方式规范化兜底与实际模型回填（1A）**：保持窗口与输出上限按服务商精确查找、绝不跨服务商借用配额；输入方式按「上游返回 -> 服务商内能力表精确匹配 -> 去掉 `/`、`：` 路由前缀与推理/渠道后缀后跨能力表全条目匹配（所有带声明条目对图像支持一致时采用，冲突或无命中落默认文本）」三层解析，且 `model_test` 返回非空 `actual_model` 时若定义输入方式来源仍为默认文本则按同一规范化能力表查找回填；补全 `select_model` 调用候选解析时漏传 `base_url` 的缺陷。
+  2. **候选连通性测试与准入模型测试职责分离**：候选行「测试」只发送单次无工具的最小文本 `"hello"` 请求核实连通可达，按钮文案始终保持「测试」，行内仅展示状态或失败原因，不展示耗时、`actual_model` 与工具能力详情；选用准入的 `model_test` 改为单轮带 `yudao_model_test` 测试工具并要求调用的真实请求（支持参数拒绝时退回 `auto` 重试一次），去掉前置文本问答与后置回传，降低延迟与费用。
+  3. **独立新建项目与接入页面**：新增 `#/projects/new` 与 `#/projects/onboard` 路由，将新建项目与接入已有项目表单从 240px 左侧栏移至右侧主工作区独立页面，全宽多列舒展展示形态卡与可选配置。
+  4. **PRD 全文可见、面板排序与进展呈现**：`work_item.materials` 为每版 `spec_versions` 返回完整结构化 PRD（标题、目标、背景、范围、验收条件与限制），箭头面板按类渲染 PRD 并取消缺少文件清单提示；详情区（节点、箭头、事项、全部事项面板）紧贴循环图下方、置于时序图上方；对话主轴直接呈现可就地展开的 PRD 版本卡片（不折叠进内部往来）；项目头部区分全空「还没有成果」与进行中的「尚未采纳交付 · 当前事项已立 PRD 第 N 版」。
+- 记录：修改 `docs/design/model-management.md`（1、4.1、4.3、9.1、9.5、10、13）、`docs/design/project-organization.md`（3、4.13、4.14、5）与 `docs/design/app-and-interface.md`（`catalog.model.test`、`catalog.candidate.test`、`work_item.materials`）；重开父工单 `#1264`（拆为模型能力表与单轮测试服务端切片、候选测试按钮与行内精简客户端切片）与 `#1707`（拆为结构化 PRD 查询/箭头面板/面板置顶切片、主轴 PRD 卡片与头部进展切片），并在 `#1683` 下建独立新建项目页缺陷工单，配合 `a4843ee0` 的 `ask_user / role_choice` 五张切片共同阻塞 `#994`、`#1706`、`#1717`。

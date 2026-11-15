@@ -98,6 +98,6 @@
 {"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["../requirements/meta-observer.md"],"seen":"80b76e6d1ce04995","src":"docs/design/semantic-system.md#语义系统设计说明 > 8. 抽象层与复盘"},
 {"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"3a2388972a6d25d6","src":"docs/design/semantic-system.md#语义系统设计说明 > 8. 抽象层与复盘"},
 {"dst":"docs/requirements/semantic-system.md#D25 语义系统 > TODO：惊讶机制与教训发现模块","kind":"link","raws":["../requirements/semantic-system.md"],"seen":"50e0595afaf6984a","src":"docs/design/semantic-system.md#语义系统设计说明 > 8. 抽象层与复盘"},
-{"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 2. 共享的与隔开的","kind":"link","raws":["independent-verification.md"],"seen":"392718659b386b6f","src":"docs/design/semantic-system.md#语义系统设计说明 > 9. 可见范围与跨事项"}
+{"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 2. 共享的与隔开的","kind":"link","raws":["independent-verification.md"],"seen":"90f4a63400755388","src":"docs/design/semantic-system.md#语义系统设计说明 > 9. 可见范围与跨事项"}
 ]
 }
