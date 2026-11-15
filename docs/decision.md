@@ -820,3 +820,15 @@
   2. 将 `#1651`、`#1652` 标为 `wontfix` 关闭，同步更新 `#1453` 范围及 `docs/design/project-organization.md` 第 3、4、5 节；保留 `#1650` 与 `#1654` 原计划不变。
   3. 更新 `docs/program-roadmap.md`、`CONTEXT.md`、`README.md`、`docs/requirements/external-ops-agent.md`、`docs/agents/acceptance-evidence.md`、`docs/agents/workflow.md`、`CLAUDE.md` 与 `#1683`，明确 `1.1` 结束时合并 `tools/yudao-ontology/` 与 `/ontology-next` 并运行阶段核对。
   4. 在里程碑 `1.2 职能之间：真实项目` 创建本体脚手架父工单 `#1772` 并关联为 `#977` 原生子工单。
+
+## 2026-11-15 - 用户前序多题追问（ask_user / role_choice）与职能间跨视角自由询问设计
+
+- 背景：围绕 `#1369` 意图同步缺失与 `discussions/1796` 第 4 条「产品部门为什么不会询问？」，分析发现两项相互耦合的原因：第一，目前仅靠单题模糊决定，且产品提示与规则层缺少先探索后向用户批量澄清高影响前沿分支以及依据首轮答案展开下层依赖追问的机制；第二，`department-loop.md` 曾误写质检看不到起始材料以外内容，同时提示规则中压制职能之间自由询问，导致工程与质检无法依据原始用户输入 `[intend]` 与用户拍板结论交叉审视 `ProductSpec` 中的过度收紧或遗漏。
+- 判断：
+  1. 向用户提问的能力开放给标准循环的三个职能及直做形态各角色，同时在工作流与角色指引上优先引导入口产品（或直做入口角色）在探索工作区与起始材料后再发出多题前沿决定请求（每题含题干、互斥选项、唯一推荐选项与推荐理由，用户可选附说明）；允许根据第一轮回答继续展开下一层依赖问题（同次输入最多轮数默认 2 轮、范围 0 至 5；单轮最多提问数默认 4 题、范围 1 至 8，均按输入版本分别统计）。
+  2. `role_choice` 决定请求的阻塞范围严格限定为发出它的职能或角色这一轮，其余活跃职能继续推进；等待用户回答期间挂起发起方的会话计时段与运行总时长计时器，重启恢复保持唯一等待请求而不重发；已回答决定保留事件记录并汇编为所有职能及角色只读共享的用户决定上下文段落，用户意图原文（`[intend]`）保持独立完整不被改写。
+  3. 解除职能间询问数量抑制条款，修正设计说明中关于质检与工程可见范围的矛盾表述：产品起草合同时可向工程与质检咨询约束与可验证性；工程领命与质检核验均对照共享的用户意图原文、起始材料与已回答用户决定审视合同，遇到缺出处具体值、未经要求的禁止项或遗漏需求时通过 `ask` 自由向产品核对并由产品在回答中修订合同。
+  4. 无人值守评测运行器检测到待答 `role_choice` 决定请求时自动逐题选用其唯一推荐选项提交回答，确保自动化对照评测可顺利收敛完成。
+- 决定：
+  1. 更新 `docs/requirements/domain-completion.md`（D12）、`docs/requirements/expert-ask-react.md`（D07）与 `docs/design/department-loop.md`、`docs/design/independent-verification.md`、`docs/design/app-and-interface.md`、`docs/design/rules-and-parameters.md`、`docs/design/evaluation-scenarios.md`、`docs/design/architecture/name-map.md`，补全规范与规则表条目。
+  2. 提交并推送设计说明至 `origin/main` 后，建立父工单与五张顺序切片子工单承接实现（工具定义与规则参数、安全节点与计时恢复、提示工程与共享用户决定上下文、客户端多题决定卡片界面、评测运行器自动选取推荐作答）。

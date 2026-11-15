@@ -68,7 +68,7 @@
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
 | 槽位：执行、执行实现 | 第一节「槽位：执行」；第四节执行 | `engine.py` 的 `StepDriver`（`start`、`cancel`）；`execution_contract.py` 的 `StepLimits`、`ActivationScope`；`recording.py` 的 `StepRecorder` | 执行 | 一致（方框的技术名词是步骤驱动） |
-| 执行契约、每一步先问边界 | 第四节执行 | `execution_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`；`StepDriver` 协议的 `start`、`cancel`、`result`；`SafeNode` 协议只有 `proceed`、`settle`、`wait`、`end`、`ask`；按职能取模型与提示词随开始一轮工作的请求交进来，`RoundRequest.department_settings`，旧的 `PreviousSafeNode` 留一版）；`thin_driver.py` 的 `_SafeNode` 实现安全节点；实现 `engine.py` 的 `StepDriver` 声明 `CONTRACT_VERSION` | 执行 | 一致 |
+| 执行契约、每一步先问边界 | 第四节执行 | `execution_contract.py`（`CURRENT_VERSION`、`PREVIOUS_VERSION`、`accept`；`StepDriver` 协议的 `start`、`cancel`、`result`；`SafeNode` 协议包含 `proceed`、`settle`、`wait`、`end`、`ask` 与向用户提问入口；按职能取模型与提示词随开始一轮工作的请求交进来，`RoundRequest.department_settings`，旧的 `PreviousSafeNode` 留一版）；`thin_driver.py` 的 `_SafeNode` 实现安全节点；实现 `engine.py` 的 `StepDriver` 声明 `CONTRACT_VERSION` | 执行 | 一致 |
 | 一轮工作 | 第三节外环「一轮工作中」；第一节方程 | `thin_driver.py` 的 `RoundWork`、`RoundPreparation`、`RoundDependencies`、`RoundFailure`，`bounds.round_bound`；旧名 `_Activation`、`bounds.activation_bound` 留别名一版。已经写进日志的事件种类 `department_activated`、`activation_finished` 与字段 `activation_id` 不改 | 执行、路由 | 一致 |
 | 职能成员（一个会话） | 第六节「可以多份」 | `sessions.py` 的 `DepartmentSession`、`SessionFactory`；`models.py` 的 `SessionRecord` | 执行 | 一致 |
 | 询问 | 第三节外环「询问中」；第四节执行「出」 | 事件 `ask_started`、`ask_answered`；`adjudication.ask_chain_decision`；`watched_outputs.py` 的 `pending_ask_department`、`ask_branch`、`ask_outcome`；`SafeNode.ask`；查询 `run.asks` | 执行、路由 | 一致 |
@@ -118,7 +118,7 @@
 | 事件流（从某个位置起） | 第四节接口 | `app/event_stream.py` 的 `EventStream`、`StreamCheckpoint`、`StreamResync`、`StreamDelta`；路径 `/api/events` | 接口 | 一致 |
 | 带版本号 | 第四节接口 | `api/app.py` 的 `contract_digest`；接口快照 `harness/tests/openapi/openapi.json`；客户端 `api/interface-version.ts` 的 `CLIENT_API_VERSION`；能力清单 `/api/capabilities`（`Capabilities`） | 接口 | 一致 |
 | 接口层 | 第一节「页面」悬停 | `api/`（`app.py` 的 `create_app`、`server.py`、`access.py`、`pages.py`） | 接口 | 一致 |
-| 等用户、决定请求 | 第三节外环「等用户」 | `decisions.py`（`DecisionKind`、`blocks_run`）、`kernel_events.py` 的 `DecisionRequest`；事件 `decision_requested`、`decision_answered`、`decision_withdrawn`；命令 `decision.answer`，查询 `decisions.list` | 接口、写入口 | 一致 |
+| 等用户、决定请求 | 第三节外环「等用户」 | `decisions.py`（`DecisionKind`、`Option`、`blocks_run`）、`kernel_events.py` 的 `DecisionRequest`；工具 `ask_user`、决定种类 `role_choice`、载荷字段 `questions`、`recommended`、`rationale`、`answers`、规则参数 `ask_user.max_questions_per_round`、`ask_user.max_rounds_per_input` 与共享上下文段落 `user_decisions`；事件 `decision_requested`、`decision_answered`、`decision_withdrawn`；命令 `decision.answer`（`DecisionAnswer`），查询 `decisions.list` | 接口、写入口 | 一致 |
 | 同步层（页面一侧） | 第一节「页面」悬停 | `contract/view-sync.ts` 的 `ViewSync`、`contract/event-stream.ts`、`contract/stream-state.ts`（目录叫 contract） | 接口（读者一侧） | 一致 |
 | 页面 | 第一节「页面」 | `client/`：页面 `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、壳 `shell/` | 接口（读者一侧） | 一致 |
 | 命令行（接口外侧） | 第四节接口「页面、命令行、评测、观察者、画面」 | `cli_client.py`（通用命令行网络客户端：`ClientConfig`、`NETWORK_SUBCOMMANDS`、`capabilities`、`describe`、`query`、`command`、`events`）；随包运维技能 `ops_skill/`（`__init__.py` 的 `read_skill_text`、`install_skill`，`SKILL.md`；子命令 `skill show`、`skill install`）；命令行入口 `__main__.py`（网络子命令、技能子命令、服务启动入口 `api` 与进程内离线子命令 `project`、`replay`、`demo`、`smoke`、`token`、`release-check`） | 接口 | 一致 |
