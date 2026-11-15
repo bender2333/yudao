@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yudao V21 结构草图对比（A / B / C / D）</title>
+  <style>
+    :root, :root[data-theme="dark"] {
+      --bg: #151821;
+      --bg-sub: #1a1e29;
+      --bg-card: #1d2230;
+      --bg-card-hi: #222838;
+      --dot: rgba(148, 163, 184, 0.16);
+      --fg: #e6ebf5;
+      --muted: #8b96ad;
+      --dim: #5d677c;
+      --line: #283042;
+      --line-hi: #39445c;
+      --ok: #5cd69a;
+      --ok-wash: rgba(92, 214, 154, 0.12);
+      --accent: #68b5ff;
+      --accent-wash: rgba(104, 181, 255, 0.13);
+      --warn: #ebb04d;
+      --warn-wash: rgba(235, 176, 77, 0.13);
+      --err: #ee7272;
+      --err-wash: rgba(238, 114, 114, 0.13);
+      --coral: #f08e72;
+      --bar-bg: rgba(15, 18, 25, 0.94);
+      --bar-fg: #eef2fa;
+      --bar-border: #3a455e;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #fbfaf7;
+      --bg-sub: #f4f1ea;
+      --bg-card: #ffffff;
+      --bg-card-hi: #f6f4ee;
+      --dot: rgba(47, 93, 80, 0.14);
+      --fg: #1f2421;
+      --muted: #626b66;
+      --dim: #8c9590;
+      --line: #dedad0;
+      --line-hi: #bcb6a8;
+      --ok: #257a55;
+      --ok-wash: rgba(37, 122, 85, 0.10);
+      --accent: #2266a8;
+      --accent-wash: rgba(34, 102, 168, 0.10);
+      --warn: #b36e0d;
+      --warn-wash: rgba(179, 110, 13, 0.11);
+      --err: #be3b3b;
+      --err-wash: rgba(190, 59, 59, 0.10);
+      --coral: #b85335;
+      --bar-bg: rgba(28, 34, 30, 0.94);
+      --bar-fg: #f8f6f1;
+      --bar-border: #3f4a43;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Microsoft YaHei UI", "PingFang SC", system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .mono {
+      font-family: "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: 0;
+      cursor: pointer;
+    }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 58px;
+      overflow: hidden;
+    }
+
+    .dot-bg {
+      background-image: radial-gradient(var(--dot) 1.15px, transparent 1.15px);
+      background-size: 18px 18px;
+    }
+
+    .muted { color: var(--muted); }
+    .dim { color: var(--dim); }
+    .ok { color: var(--ok); }
+    .accent { color: var(--accent); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
+    .coral { color: var(--coral); }
+
+    .btn-ghost {
+      padding: 4px 10px;
+      border: 1px solid var(--line-hi);
+      border-radius: 4px;
+      font-size: 12px;
+      background: var(--bg-card);
+    }
+    .btn-ghost:hover { border-color: var(--accent); }
+    .btn-primary {
+      padding: 5px 12px;
+      border: 1px solid var(--warn);
+      border-radius: 4px;
+      font-size: 12px;
+      background: var(--warn-wash);
+      color: var(--warn);
+      font-weight: 600;
+    }
+    .btn-primary:hover { background: var(--warn); color: #151821; }
+
+    /* ============================================================
+       Variant A: Troupe 极简原味（无框纯排版 + 静默折线 + 纵向展开）
+       ============================================================ */
+    .va-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .va-head {
+      padding: 8px 16px 6px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    .va-head-row1 {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+    }
+
+    .va-brand {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .va-head-row2 {
+      display: flex;
+      gap: 18px;
+      margin-top: 3px;
+      font-size: 12px;
+    }
+
+    .va-tab {
+      color: var(--muted);
+      padding: 1px 0;
+      border-bottom: 1.5px solid transparent;
+    }
+    .va-tab.is-on {
+      color: var(--fg);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .va-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+    }
+
+    .va-left {
+      border-right: 1px solid var(--line);
+      padding: 10px 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .va-sec-label {
+      font-size: 10.5px;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }
+
+    .va-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 12px;
+      text-align: left;
+    }
+    .va-row:hover { background: var(--bg-sub); }
+    .va-row.is-sel {
+      background: var(--accent-wash);
+      color: var(--fg);
+    }
+
+    .va-act-line {
+      font-size: 11.5px;
+      color: var(--muted);
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 6px;
+      padding: 1px 0;
+    }
+
+    .va-right {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .va-flow-zone {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    .va-flow-canvas {
+      position: relative;
+      width: 780px;
+      max-width: 100%;
+      height: 222px;
+      margin: 4px auto 0;
+    }
+
+    .va-flow-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .va-node {
+      position: absolute;
+      border: 1.5px solid var(--line-hi);
+      border-radius: 4px;
+      background: var(--bg);
+      padding: 6px 9px;
+      text-align: left;
+      transition: border-color 0.15s;
+    }
+    .va-node.is-working { border-color: var(--ok); box-shadow: inset 0 0 0 1px rgba(92, 214, 154, 0.25); }
+    .va-node.is-waits { border-color: var(--warn); box-shadow: inset 0 0 0 1px rgba(235, 176, 77, 0.25); }
+    .va-node.is-selected { outline: 1px solid var(--accent); outline-offset: 2px; }
+    .va-node.is-dashed { border-style: dashed; }
+
+    .va-exit {
+      position: absolute;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      background: var(--bg);
+    }
+    .va-exit.is-ver { border: 1.5px solid var(--ok); color: var(--ok); }
+    .va-exit.is-open { border: 1.5px dashed var(--warn); color: var(--warn); }
+
+    .va-live-zone {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 10px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .va-kv {
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr);
+      row-gap: 3px;
+      column-gap: 12px;
+      font-size: 12px;
+    }
+    .va-kv-k { color: var(--dim); }
+
+    .va-tree {
+      margin-top: 2px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .va-gate-inline {
+      padding: 8px 12px;
+      border-left: 3px solid var(--warn);
+      background: var(--warn-wash);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .va-prompt {
+      border-top: 1px solid var(--line);
+      padding: 7px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+      background: var(--bg);
+    }
+    .va-prompt input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--fg);
+      font: inherit;
+    }
+
+    /* ============================================================
+       Variant B: 环形回环台（围着一份事实转圈 · 单屏零页签）
+       ============================================================ */
+    .vb-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .vb-top {
+      height: 40px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .vb-grid {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 58fr) minmax(320px, 42fr);
+    }
+
+    .vb-orbit-pane {
+      border-right: 1px solid var(--line);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: auto;
+    }
+
+    .vb-stage {
+      position: relative;
+      width: 690px;
+      height: 410px;
+      flex-shrink: 0;
+    }
+
+    .vb-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .vb-core {
+      position: absolute;
+      left: 205px;
+      top: 152px;
+      width: 206px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--accent);
+      border-radius: 10px;
+      background: var(--bg-card);
+      text-align: left;
+      box-shadow: 0 0 0 4px var(--accent-wash);
+    }
+
+    .vb-node {
+      position: absolute;
+      padding: 8px 10px;
+      border: 1.5px solid var(--line-hi);
+      border-radius: 8px;
+      background: var(--bg-card);
+      text-align: left;
+    }
+    .vb-node.is-working { border-color: var(--ok); }
+    .vb-node.is-waits { border-color: var(--warn); }
+    .vb-node.is-selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .vb-node.is-dashed { border-style: dashed; }
+
+    .vb-feed {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .vb-feed-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .vb-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg-card);
+      padding: 10px 12px;
+    }
+
+    /* ============================================================
+       Variant C: 按轮展开泳道（第1轮 -> 第2轮 纵向展开 · 零交叉）
+       ============================================================ */
+    .vc-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .vc-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 66fr) minmax(300px, 34fr);
+    }
+
+    .vc-lanes {
+      border-right: 1px solid var(--line);
+      padding: 16px 20px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .vc-matrix {
+      width: 100%;
+      max-width: 820px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .vc-row {
+      display: grid;
+      align-items: stretch;
+      border-top: 1px solid var(--line);
+    }
+    .vc-row:first-child { border-top: 0; }
+
+    .vc-hdr {
+      background: var(--bg-sub);
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .vc-cell {
+      padding: 10px 10px;
+      border-left: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    .vc-cell:first-child { border-left: 0; }
+
+    .vc-pill {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 7px 9px;
+      border-radius: 5px;
+      border: 1px solid var(--line-hi);
+      background: var(--bg-card);
+      font-size: 12px;
+    }
+    .vc-pill.is-done { border-color: var(--line-hi); }
+    .vc-pill.is-reject { border-color: var(--err); background: var(--err-wash); }
+    .vc-pill.is-working { border-color: var(--ok); background: var(--ok-wash); }
+    .vc-pill.is-waits { border-color: var(--warn); background: var(--warn-wash); }
+    .vc-pill.is-open { border-style: dashed; border-color: var(--warn); color: var(--warn); }
+    .vc-pill.is-sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .vc-rework-band {
+      padding: 5px 14px;
+      border-top: 1px dashed var(--err);
+      background: var(--err-wash);
+      color: var(--err);
+      font-size: 11.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ============================================================
+       Variant D: 对话主轴 + 顶部紧凑循环脉冲条
+       ============================================================ */
+    .vd-shell {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 205px minmax(0, 1fr);
+    }
+
+    .vd-rail {
+      border-right: 1px solid var(--line);
+      padding: 12px;
+      background: var(--bg-sub);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .vd-item {
+      padding: 7px 9px;
+      border-radius: 5px;
+      text-align: left;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+    .vd-item.is-on {
+      background: var(--bg-card);
+      border-color: var(--line-hi);
+    }
+
+    .vd-main {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .vd-pulse-bar {
+      min-height: 70px;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg-sub);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .vd-track {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .vd-step {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line-hi);
+      background: var(--bg-card);
+      font-size: 12px;
+    }
+    .vd-step.is-working { border-color: var(--ok); color: var(--ok); }
+    .vd-step.is-waits { border-color: var(--warn); color: var(--warn); }
+    .vd-step.is-open { border-style: dashed; border-color: var(--warn); color: var(--warn); }
+
+    .vd-stream {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 24px;
+    }
+
+    .vd-stream-inner {
+      max-width: 740px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .vd-msg {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--bg-card);
+      padding: 11px 14px;
+    }
+
+    .vd-msg.is-fold {
+      background: transparent;
+      border-style: dashed;
+      padding: 8px 12px;
+    }
+
+    /* ============================================================
+       底部悬浮原型切换器（独立高对比胶囊，不混入应用界面）
+       ============================================================ */
+    .proto-dock {
+      position: fixed;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--bar-bg);
+      color: var(--bar-fg);
+      border: 1px solid var(--bar-border);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+      font-size: 12px;
+      max-width: calc(100vw - 20px);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .dock-sep {
+      width: 1px;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.16);
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+
+    .dock-btn {
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #c2cbe0;
+      border: 1px solid transparent;
+    }
+    .dock-btn:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+    .dock-btn.is-on {
+      background: #68b5ff;
+      color: #11151d;
+      font-weight: 600;
+    }
+    .dock-btn.is-scene.is-on {
+      background: #ebb04d;
+      color: #11151d;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <nav class="proto-dock" aria-label="原型方案切换条">
+    <button type="button" class="dock-btn" data-act="prev-variant" title="上一套草图 (←)">←</button>
+    <button type="button" class="dock-btn" data-act="set-variant" data-v="A">A 极简Troupe</button>
+    <button type="button" class="dock-btn" data-act="set-variant" data-v="B">B 环形回环</button>
+    <button type="button" class="dock-btn" data-act="set-variant" data-v="C">C 按轮展开</button>
+    <button type="button" class="dock-btn" data-act="set-variant" data-v="D">D 对话+脉冲条</button>
+    <button type="button" class="dock-btn" data-act="next-variant" title="下一套草图 (→)">→</button>
+    <span class="dock-sep"></span>
+    <button type="button" class="dock-btn is-scene" data-act="set-scene" data-s="rework">1 返工</button>
+    <button type="button" class="dock-btn is-scene" data-act="set-scene" data-s="gate">2 拍板</button>
+    <button type="button" class="dock-btn is-scene" data-act="set-scene" data-s="suborg">3 子组织</button>
+    <button type="button" class="dock-btn is-scene" data-act="set-scene" data-s="openloop">4 开环</button>
+    <span class="dock-sep"></span>
+    <button type="button" class="dock-btn" data-act="toggle-theme" title="切换深色蓝图与浅色纸面 (t)">◐ 深/浅</button>
+  </nav>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const VARIANT_ORDER = ["A", "B", "C", "D"];
+      const VARIANT_INFO = {
+        A: { name: "A 极简 Troupe", pitch: "无框纯排版 + 静默折线 + 子角色纵向展开" },
+        B: { name: "B 环形回环台", pitch: "角色围着中间「一份事实」顺时针运转 · 单屏零页签" },
+        C: { name: "C 按轮展开泳道", pitch: "第 1 轮 → 第 2 轮纵向平铺，打回顺阶落下零交叉" },
+        D: { name: "D 对话 + 脉冲条", pitch: "72px 顶部脉搏条 + 安静对话审查流" },
+      };
+
+      const SCENES = {
+        rework: {
+          id: "rework",
+          project: "订单系统重构",
+          item: "导出订单为 CSV",
+          form: "产品 · 工程 · 质检",
+          roundLabel: "第 2 / 6 轮",
+          elapsed: "4m 18s",
+          hasVerifier: true,
+          exitText: "✓ 质检放行",
+          exitSub: "等交付 v2 复测",
+          factChips: ["PRD v1 ✓", "缺陷 v1 ↺ 2项", "交付 v2 编写中"],
+          activeRole: "engineering",
+          roles: [
+            {
+              id: "product", name: "产品", glyph: "✓", tone: "ok", state: "done",
+              model: "claude sonnet", ctx: "18%", rate: "", spark: [0, 0, 18, 32, 28, 8, 0, 0],
+              goal: "定下 UTF-8 BOM、5000 行流式分片与公式前缀转义",
+              touches: "docs/prd-export.md", diff: "PRD v1 已定稿", verify: "已交工程与质检"
+            },
+            {
+              id: "engineering", name: "工程", glyph: "●", tone: "ok", state: "working",
+              model: "codex gpt-6.1-sol · high", ctx: "34%", rate: "87 tok/s", spark: [32, 45, 58, 72, 69, 84, 92, 87],
+              goal: "修复游标跨页漏行与 CSV 公式注入",
+              touches: "src/orders/export.py, tests/test_export.py",
+              diff: "2 个文件改动 · 范围内 ✓",
+              verify: "自测 14 passed · 待质检独立复测"
+            },
+            {
+              id: "qa", name: "质检·核", glyph: "○", tone: "muted", state: "idle",
+              model: "claude opus · high", ctx: "26%", rate: "", spark: [48, 62, 54, 15, 0, 0, 0, 0],
+              goal: "第 1 轮复测打回 2 项缺陷；等交付 v2 后在独立副本重跑验收",
+              touches: "tests/qa/ (独立只读副本)", diff: "上轮发现 2 项缺陷", verify: "等待交付 v2"
+            },
+          ],
+          subRoles: null,
+          stages: [
+            { text: "轮 1  PRD v1", state: "done" },
+            { text: "轮 1  质检打回 (2项)", state: "reject" },
+            { text: "轮 2  工程返工中", state: "working" },
+            { text: "轮 2  质检复测", state: "pending" },
+            { text: "放行 ?", state: "pending" },
+          ],
+          activity: [
+            ["14:22", "工程 改 export.py（范围内 ✓）"],
+            ["14:17", "质检 打回交付 v1 · 2 项缺陷"],
+            ["14:15", "工程 提交交付 v1"],
+            ["14:04", "产品 提交 PRD v1"],
+          ],
+          liveSteps: [
+            ["Read", "artifacts/defect-v1.md  （质检打回：跨页漏行 / 公式注入）", "muted"],
+            ["Edit", "src/orders/export.py  (+38 -14)  范围内 ✓", "ok"],
+            ["Edit", "tests/test_export.py  (+52 -4)  范围内 ✓", "ok"],
+            ["Run",  "uv run pytest tests/test_export.py  -> 14 passed", "ok"],
+          ],
+          diffFiles: [
+            { file: "src/orders/export.py", stat: "+38 -14", ok: true, line: "+ where (created_at, id) > (:cur_ts, :cur_id)" },
+            { file: "tests/test_export.py", stat: "+52 -4", ok: true, line: "+ assert sanitize_cell('=SUM(A1)') == \"'=SUM(A1)\"" },
+          ],
+          rounds: [
+            { r: 1, intent: "导出订单 CSV", product: { t: "PRD v1 ✓", cls: "is-done" }, eng: { t: "交付 v1", cls: "is-done" }, qa: { t: "✕ 复测打回 2 项", cls: "is-reject" }, exit: { t: "—", cls: "" } },
+            { r: 2, intent: "（接第 1 轮）", product: { t: "沿用 PRD v1", cls: "" }, eng: { t: "● 工程返工 87 tok/s", cls: "is-working" }, qa: { t: "○ 待重跑复测", cls: "" }, exit: { t: "✓ 放行（待达）", cls: "" } },
+          ],
+          gate: null,
+        },
+
+        gate: {
+          id: "gate",
+          project: "订单系统重构",
+          item: "订单列表分页",
+          form: "产品 · 工程 · 质检",
+          roundLabel: "第 2 / 6 轮",
+          elapsed: "6m 05s",
+          hasVerifier: true,
+          exitText: "✓ 质检放行",
+          exitSub: "等待工程恢复提交",
+          factChips: ["PRD v1 ✓", "质检追问延迟", "◆ 等你拍板"],
+          activeRole: "engineering",
+          roles: [
+            {
+              id: "product", name: "产品", glyph: "✓", tone: "ok", state: "done",
+              model: "claude sonnet", ctx: "14%", rate: "", spark: [0, 12, 24, 10, 0, 0, 0, 0],
+              goal: "要求接口在 50 万行订单下稳定翻页", touches: "docs/prd-list.md", diff: "PRD v1 已采纳", verify: "待工程与质检核对"
+            },
+            {
+              id: "engineering", name: "工程", glyph: "◆", tone: "warn", state: "waits",
+              model: "codex gpt-6.1-sol · high", ctx: "29%", rate: "待决", spark: [18, 42, 36, 10, 0, 0, 0, 0],
+              goal: "回答质检对万行计数的延迟疑虑，需确认产品规则取舍",
+              touches: "src/orders/list.py, src/api/orders.py",
+              diff: "暂未写入新代码 · 停在你的决定",
+              verify: "拍板后立即恢复第 2 轮"
+            },
+            {
+              id: "qa", name: "质检·核", glyph: "○", tone: "muted", state: "idle",
+              model: "claude opus · high", ctx: "21%", rate: "", spark: [30, 44, 18, 0, 0, 0, 0, 0],
+              goal: "已提出 COUNT(*) 索引扫描风险，等工程新回执后复测", touches: "tests/qa/", diff: "第 2 轮核验暂停中", verify: "等工程提交"
+            },
+          ],
+          subRoles: null,
+          stages: [
+            { text: "轮 1  PRD v1", state: "done" },
+            { text: "轮 2  交付 v2", state: "done" },
+            { text: "轮 2  质检追问延迟", state: "done" },
+            { text: "◆ 等你拍板", state: "waits" },
+            { text: "放行 ?", state: "pending" },
+          ],
+          activity: [
+            ["13:56", "◆ 工程停下，请你确认翻页计数字段"],
+            ["13:54", "质检 问工程：>1万行 COUNT(*) 耗时多少？"],
+            ["13:52", "工程 提交联合索引优化版 v2"],
+          ],
+          liveSteps: [
+            ["Read", "src/orders/list.py  （50万行测试表 COUNT(*) 耗时 680ms）", "muted"],
+            ["Note", "与原规则「每页均显示精确总页数」存在冲突，未擅自改接口", "warn"],
+            ["Wait", "◆ 停下等待你拍板选择后继续执行", "warn"],
+          ],
+          diffFiles: [
+            { file: "src/orders/list.py", stat: "待决定", ok: true, line: "若采纳「有下一页」可去掉 COUNT(*) 扫表" },
+          ],
+          rounds: [
+            { r: 1, intent: "分页接口提速", product: { t: "PRD v1 ✓", cls: "is-done" }, eng: { t: "交付 v1", cls: "is-done" }, qa: { t: "✕ 性能未达标", cls: "is-reject" }, exit: { t: "—", cls: "" } },
+            { r: 2, intent: "（接第 1 轮）", product: { t: "待确认规则", cls: "" }, eng: { t: "◆ 等你拍板", cls: "is-waits" }, qa: { t: "○ 追问延迟中", cls: "" }, exit: { t: "✓ 放行（待达）", cls: "" } },
+          ],
+          gate: {
+            ask: "订单表超过 1 万行时，是否允许省略精确总页数，改用「有下一页」？",
+            options: ["采纳：>1万行改「有下一页」", "保留精确总页数（补汇总表）"],
+            resolvedText: "已采纳「>1万行改有下一页」，工程已恢复运行并继续",
+          },
+        },
+
+        suborg: {
+          id: "suborg",
+          project: "固件升级服务",
+          item: "断点续传分片校验",
+          form: "产品 · 工程(小组) · 质检",
+          roundLabel: "第 2 / 6 轮",
+          elapsed: "6m 32s",
+          hasVerifier: true,
+          exitText: "✓ 质检放行",
+          exitSub: "等工程小组交回外层",
+          factChips: ["PRD v1 ✓", "工程小组内部 第 2 轮", "整件等外层质检"],
+          activeRole: "engineering",
+          roles: [
+            {
+              id: "product", name: "产品", glyph: "✓", tone: "ok", state: "done",
+              model: "claude sonnet", ctx: "15%", rate: "", spark: [0, 14, 30, 12, 0, 0, 0, 0],
+              goal: "定义断电 A/B 槽位切换与 CRC32 校验规范", touches: "docs/ota.md", diff: "PRD v1 已定稿", verify: "已交工程小组"
+            },
+            {
+              id: "engineering", name: "工程（小组 3 人）", glyph: "●", tone: "ok", state: "working",
+              model: "中心型小组 · 架构 / 主程 / 审查", ctx: "41%", rate: "76 tok/s", spark: [38, 49, 62, 70, 82, 71, 79, 76],
+              goal: "主程按内部审查意见修正尾包 < 4KB 缓冲越界；完工后作为工程提案交回外层",
+              touches: "firmware/ota/chunk.c, tests/ota/", diff: "1 个文件改动 · 范围内 ✓", verify: "小组内部第 2 轮运行中"
+            },
+            {
+              id: "qa", name: "质检·核", glyph: "○", tone: "muted", state: "idle",
+              model: "claude opus · high", ctx: "0%", rate: "", spark: [0, 0, 0, 0, 0, 0, 0, 0],
+              goal: "等工程小组交回完整提案后，在硬件模拟器副本做独立放行检查", touches: "tests/qa/", diff: "尚未进入外层复测", verify: "待工程交回"
+            },
+          ],
+          subRoles: [
+            { id: "architect", name: "架构", glyph: "✓", tone: "ok", state: "done", model: "claude opus", ctx: "22%", rate: "", note: "A/B 槽位方案 v1" },
+            { id: "coder", name: "主程", glyph: "●", tone: "ok", state: "working", model: "codex gpt-6.1-sol", ctx: "33%", rate: "76 tok/s", note: "修尾包越界" },
+            { id: "reviewer", name: "内审", glyph: "○", tone: "muted", state: "idle", model: "claude sonnet", ctx: "19%", rate: "", note: "上轮打回尾包" },
+          ],
+          stages: [
+            { text: "外层  PRD v1", state: "done" },
+            { text: "组内  架构定方案", state: "done" },
+            { text: "组内  内审打回 v1", state: "reject" },
+            { text: "组内  主程返工中", state: "working" },
+            { text: "外层  质检放行?", state: "pending" },
+          ],
+          activity: [
+            ["14:22", "工程·主程 修改 chunk.c（范围内 ✓）"],
+            ["14:16", "工程·内审 组内打回改动 v1"],
+            ["13:58", "工程·架构 完成 A/B 槽位拆解"],
+            ["13:50", "产品 提交 PRD v1"],
+          ],
+          liveSteps: [
+            ["Plan", "工程架构师：拆分 A/B 槽位与 4KB 对段边界（已完成）", "muted"],
+            ["Edit", "firmware/ota/chunk.c  (+14 -5)  范围内 ✓", "ok"],
+            ["Run",  "make test-ota  -> running (主程第 2 轮 · 76 tok/s)", "ok"],
+          ],
+          diffFiles: [
+            { file: "firmware/ota/chunk.c", stat: "+14 -5", ok: true, line: "+ size_t pad = PAGE_SIZE - (tail_len & (PAGE_SIZE - 1));" },
+          ],
+          rounds: [
+            { r: 1, intent: "防砖分片校验", product: { t: "PRD v1 ✓", cls: "is-done" }, eng: { t: "架构 ✓ → 主程 v1 → 内审打回", cls: "is-reject" }, qa: { t: "—", cls: "" }, exit: { t: "—", cls: "" } },
+            { r: 2, intent: "（工程组内）", product: { t: "沿用 PRD v1", cls: "" }, eng: { t: "● 主程返工 76 tok/s · 待内审", cls: "is-working" }, qa: { t: "○ 等工程交回", cls: "" }, exit: { t: "✓ 放行（待达）", cls: "" } },
+          ],
+          gate: null,
+        },
+
+        openloop: {
+          id: "openloop",
+          project: "日志清理脚本",
+          item: "清理 30 天前归档",
+          form: "工程（直做 · 外包）",
+          roundLabel: "第 1 / 3 轮",
+          elapsed: "1m 12s",
+          hasVerifier: false,
+          exitText: "◌ 开环完成",
+          exitSub: "无独立核验 · 外包直出",
+          factChips: ["单职能直做", "OpenCode 运行中", "无核验角色 → ◌ 开环"],
+          activeRole: "engineering",
+          roles: [
+            {
+              id: "engineering", name: "工程 (OpenCode)", glyph: "●", tone: "ok", state: "working",
+              model: "OpenCode · 档位自定", ctx: "14%", rate: "64 tok/s", spark: [12, 35, 54, 68, 61, 64, 70, 64],
+              goal: "删除超过 30 天归档日志并重建索引；未设质检，干完直接记为开环完成",
+              touches: "scripts/clean_logs.py", diff: "1 个文件改动 · 范围内 ✓", verify: "只跑脚本自检（无独立核验）"
+            },
+          ],
+          subRoles: null,
+          stages: [
+            { text: "输入  开始事项", state: "done" },
+            { text: "● OpenCode 执行中", state: "working" },
+            { text: "◌ 开环完成", state: "pending" },
+          ],
+          activity: [
+            ["10:14", "OpenCode 跑 --dry-run 通过"],
+            ["10:13", "OpenCode 改 clean_logs.py（范围内 ✓）"],
+            ["10:12", "派发外包 OpenCode（档位由它定）"],
+          ],
+          liveSteps: [
+            ["Out",  "外包会话 OpenCode 启动（档位由它自定）", "muted"],
+            ["Edit", "scripts/clean_logs.py  (+28 -9)  范围内 ✓", "ok"],
+            ["Run",  "python scripts/clean_logs.py --dry-run  -> exit 0", "ok"],
+          ],
+          diffFiles: [
+            { file: "scripts/clean_logs.py", stat: "+28 -9", ok: true, line: "+ if mtime < cutoff_30d: move_to_trash(path)" },
+          ],
+          rounds: [
+            { r: 1, intent: "清理 30 天前归档", eng: { t: "● OpenCode 执行 64 tok/s", cls: "is-working" }, exit: { t: "◌ 开环完成（虚线）", cls: "is-open" } },
+          ],
+          gate: null,
+        },
+      };
+
+      const state = {
+        variant: "A",
+        scene: "rework",
+        theme: "dark",
+        aTab: 1,
+        selectedRole: null,
+        resolvedGates: {},
+        foldOpen: false,
+        liveOpen: false,
+        userNotes: [],
+      };
+
+      function readUrlParams() {
+        try {
+          const sp = new URLSearchParams(window.location.search);
+          const v = sp.get("variant");
+          const s = sp.get("scene");
+          if (v && VARIANT_INFO[v.toUpperCase()]) state.variant = v.toUpperCase();
+          if (s && SCENES[s]) state.scene = s;
+        } catch (_) {}
+      }
+
+      function syncUrl() {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set("variant", state.variant);
+          url.searchParams.set("scene", state.scene);
+          window.history.replaceState(null, "", url.toString());
+        } catch (_) {}
+      }
+
+      function esc(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function sparkStr(vals) {
+        const glyphs = "⠀⡀⡄⡆⡇⣇⣧⣷⣿";
+        return (vals || [0]).map((v) => glyphs[Math.max(0, Math.min(8, Math.round((v / 100) * 8)))]).join("");
+      }
+
+      function currentScene() {
+        return SCENES[state.scene] || SCENES.rework;
+      }
+
+      function activeRoleObj(sc) {
+        if (sc.subRoles && state.selectedRole) {
+          const sub = sc.subRoles.find((x) => x.id === state.selectedRole);
+          if (sub) return {
+            id: sub.id,
+            name: "工程·" + sub.name,
+            model: sub.model,
+            ctx: sub.ctx,
+            rate: sub.rate,
+            spark: sub.state === "working" ? sc.roles[1].spark : [0, 0, 0, 0],
+            goal: sc.roles[1].goal,
+            touches: sc.roles[1].touches,
+            diff: sc.roles[1].diff,
+            verify: sub.note,
+          };
+        }
+        return sc.roles.find((r) => r.id === state.selectedRole) || sc.roles.find((r) => r.id === sc.activeRole) || sc.roles[0];
+      }
+
+      function isGateOpen(sc) {
+        return Boolean(sc.gate && !state.resolvedGates[sc.id]);
+      }
+
+      /* ------------------------------------------------------------
+         Variant A: Troupe 极简原味
+         ------------------------------------------------------------ */
+      function renderVariantA(sc) {
+        const role = activeRoleObj(sc);
+        const gateOpen = isGateOpen(sc);
+        const sub = state.aTab;
+
+        // 干净静默画布坐标（无连线文字牌）
+        let flowHtml = "";
+        const nodes = [];
+        const wires = [];
+
+        if (sc.id === "openloop") {
+          nodes.push({ id: "src", x: 18, y: 74, w: 94, title: "意图", sub: "输入", cls: "" });
+          const r = sc.roles[0];
+          nodes.push({ id: r.id, x: 204, y: 66, w: 220, title: r.glyph + " " + r.name, sub: r.model, meta: (r.rate || "待命") + "  " + r.ctx, cls: "is-" + r.state });
+          wires.push({ d: "M 112 96 L 200 96", color: "var(--ok)", solid: true });
+          wires.push({ d: "M 424 96 L 520 96", color: "var(--warn)", solid: false });
+          flowHtml = renderVaCanvas(nodes, wires, { x: 524, y: 68, w: 170, label: sc.exitText, sub: sc.exitSub, isOpen: true }, role.id);
+        } else if (sc.subRoles) {
+          // 工程区内纵向展开架构/主程/内审（模仿 troupe api/web/store 纵向展开）
+          const p = sc.roles[0], q = sc.roles[2];
+          nodes.push({ id: p.id, x: 14, y: 72, w: 146, title: p.glyph + " " + p.name, sub: p.model, meta: p.ctx, cls: "is-" + p.state });
+          sc.subRoles.forEach((sr, idx) => {
+            nodes.push({ id: sr.id, x: 224, y: 12 + idx * 70, w: 204, title: sr.glyph + " 工程·" + sr.name, sub: sr.model, meta: (sr.rate || sr.note) + "  " + sr.ctx, cls: "is-" + sr.state });
+            wires.push({ d: "M 160 96 L 192 96 L 192 " + (36 + idx * 70) + " L 220 " + (36 + idx * 70), color: sr.state === "working" ? "var(--ok)" : "var(--line-hi)", solid: true });
+            wires.push({ d: "M 428 " + (36 + idx * 70) + " L 460 " + (36 + idx * 70) + " L 460 96 L 490 96", color: sr.state === "working" ? "var(--ok)" : "var(--line-hi)", solid: true });
+          });
+          nodes.push({ id: q.id, x: 494, y: 72, w: 146, title: q.glyph + " " + q.name, sub: q.model, meta: q.ctx, cls: "is-" + q.state });
+          wires.push({ d: "M 640 96 L 672 96", color: "var(--line-hi)", solid: true });
+          flowHtml = renderVaCanvas(nodes, wires, { x: 676, y: 74, w: 96, label: sc.exitText, sub: "待复测", isOpen: false }, role.id);
+        } else {
+          const p = sc.roles[0], e = sc.roles[1], q = sc.roles[2];
+          nodes.push({ id: p.id, x: 18, y: 58, w: 156, title: p.glyph + " " + p.name, sub: p.model, meta: p.ctx, cls: "is-" + p.state });
+          nodes.push({ id: e.id, x: 226, y: 58, w: 190, title: e.glyph + " " + e.name, sub: e.model, meta: (e.rate || "待命") + "  " + e.ctx, cls: gateOpen ? "is-waits" : "is-" + e.state });
+          nodes.push({ id: q.id, x: 468, y: 58, w: 156, title: q.glyph + " " + q.name, sub: q.model, meta: q.ctx, cls: "is-" + q.state });
+          wires.push({ d: "M 174 88 L 222 88", color: "var(--ok)", solid: true });
+          wires.push({ d: "M 416 88 L 464 88", color: gateOpen ? "var(--warn)" : "var(--ok)", solid: true });
+          wires.push({ d: "M 624 88 L 664 88", color: "var(--line-hi)", solid: true });
+          // 下方回流线（有返工时显现，不写长串文字）
+          wires.push({ d: "M 546 126 L 546 176 L 321 176 L 321 130", color: "var(--err)", solid: sc.id === "rework", label: "↺ 返工回流" });
+          flowHtml = renderVaCanvas(nodes, wires, { x: 668, y: 60, w: 100, label: sc.exitText, sub: sc.exitSub, isOpen: false }, role.id);
+        }
+
+        let mainContent = "";
+        if (sub === 1) {
+          mainContent =
+            '<div class="va-flow-zone dot-bg">' +
+            '  <div class="va-sec-label" style="margin:0">FLOW · 角色流转（无连线文字牌 · 点卡片切下部详情）</div>' +
+            flowHtml +
+            "</div>" +
+            '<div class="va-live-zone">' +
+            (gateOpen
+              ? '<div class="va-gate-inline"><div><b class="warn">◆ 等你拍板</b> · ' + esc(sc.gate.ask) + '</div><div style="display:flex;gap:8px">' +
+                sc.gate.options.map((o, i) => '<button type="button" class="' + (i === 0 ? "btn-primary" : "btn-ghost") + '" data-act="resolve-gate">' + esc(o) + "</button>").join("") +
+                "</div></div>"
+              : (sc.gate ? '<div class="ok mono" style="font-size:12px">✓ ' + esc(sc.gate.resolvedText) + "</div>" : "")) +
+            '  <div style="display:flex;justify-content:space-between;align-items:baseline">' +
+            '    <b>' + esc(role.name) + ' <span class="muted">· ' + esc(role.model) + "</span></b>" +
+            '    <span class="mono ' + (role.rate ? "ok" : "muted") + '">' + esc(sparkStr(role.spark)) + " " + esc(role.rate || "空闲") + "</span>" +
+            "  </div>" +
+            '  <div class="va-kv">' +
+            '    <span class="va-kv-k">目标</span><span>' + esc(role.goal) + "</span>" +
+            '    <span class="va-kv-k">上下文</span><span class="mono">' + esc(role.ctx) + "</span>" +
+            '    <span class="va-kv-k">允许范围</span><span class="mono accent">' + esc(role.touches) + "</span>" +
+            '    <span class="va-kv-k">改动与核验</span><span>' + esc(role.diff) + ' <span class="muted">· ' + esc(role.verify) + "</span></span>" +
+            "  </div>" +
+            '  <div class="va-tree mono">' +
+            '    <div class="va-sec-label" style="margin:0 0 2px">live · 最近动作</div>' +
+            sc.liveSteps.map((st) => '<div class="' + esc(st[2]) + '"><span class="dim">▸ ' + esc(st[0]).padEnd(5, " ") + "</span> " + esc(st[1]) + "</div>").join("") +
+            state.userNotes.map((n) => '<div class="accent">▸ 你的指导  ' + esc(n) + "</div>").join("") +
+            "  </div>" +
+            "</div>";
+        } else if (sub === 2) {
+          mainContent =
+            '<div class="va-live-zone">' +
+            '  <div class="va-sec-label">2 对话 · 你的话、拍板与关键交接</div>' +
+            '  <div><span class="dim mono">14:01</span> <b>你</b>：' + esc(sc.item) + "</div>" +
+            '  <div class="muted"><span class="dim mono">14:04</span> 产品定稿 PRD v1 · 工程与质检折叠往来 3 条</div>' +
+            (sc.gate ? '<div class="warn"><span class="dim mono">13:56</span> ◆ ' + esc(sc.gate.ask) + "</div>" : "") +
+            state.userNotes.map((n) => '<div class="accent"><span class="dim mono">刚刚</span> <b>你</b>：' + esc(n) + "</div>").join("") +
+            "</div>";
+        } else if (sub === 3) {
+          mainContent =
+            '<div class="va-live-zone">' +
+            '  <div class="va-sec-label">3 改动与独立核验</div>' +
+            sc.diffFiles.map((f) =>
+              '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' +
+              '  <div style="display:flex;justify-content:space-between"><span class="mono">' + esc(f.file) + '</span><span class="ok">' + esc(f.stat) + " · 范围内 ✓</span></div>" +
+              '  <div class="mono muted" style="font-size:12px;margin-top:4px">' + esc(f.line) + "</div>" +
+              "</div>"
+            ).join("") +
+            '  <div style="margin-top:6px">结论方式：<b>' + esc(sc.exitText) + '</b> <span class="muted">(' + esc(sc.exitSub) + ")</span></div>" +
+            "</div>";
+        } else {
+          mainContent =
+            '<div class="va-live-zone">' +
+            '  <div class="va-sec-label">4 组织设置</div>' +
+            "  <div>当前形态：<b>" + esc(sc.form) + '</b> · 结束：<b>' + esc(sc.exitText) + "</b></div>" +
+            '  <div class="muted">这里仅放置换形态（三角色 / 单角色 / 协作直做）、加减独立核验与模型分配；运行中的事项按启动时形态完成。</div>' +
+            "</div>";
+        }
+
+        return (
+          '<div class="va-shell">' +
+          '  <header class="va-head">' +
+          '    <div class="va-head-row1">' +
+          '      <div><span class="va-brand mono">yudao</span>  <b>' + esc(sc.project) + '</b> <span class="muted">· ' + esc(sc.item) + " · " + esc(sc.roundLabel) + "</span></div>" +
+          '      <div class="mono muted" style="font-size:11.5px">' + esc(sc.form) + " · " + esc(sc.elapsed) + "</div>" +
+          "    </div>" +
+          '    <nav class="va-head-row2">' +
+          [["1 循环", 1], ["2 对话", 2], ["3 改动与核验", 3], ["4 设置", 4]].map((t) =>
+            '<button type="button" class="va-tab' + (sub === t[1] ? " is-on" : "") + '" data-act="a-tab" data-t="' + t[1] + '">' + t[0] + "</button>"
+          ).join("") +
+          "    </nav>" +
+          "  </header>" +
+          '  <div class="va-body">' +
+          '    <aside class="va-left">' +
+          '      <div><div class="va-sec-label">ROLES</div>' +
+          (sc.subRoles ? [sc.roles[0], ...sc.subRoles.map((sr) => ({ id: sr.id, name: "工程·" + sr.name, glyph: sr.glyph, tone: sr.tone, ctx: sr.ctx })), sc.roles[2]] : sc.roles).map((r) =>
+            '<button type="button" class="va-row' + (r.id === role.id ? " is-sel" : "") + '" data-act="sel-role" data-r="' + esc(r.id) + '">' +
+            '  <span><span class="' + esc(r.tone) + '">' + esc(r.glyph) + "</span> " + esc(r.name) + "</span>" +
+            '  <span class="mono muted">' + esc(r.ctx) + "</span>" +
+            "</button>"
+          ).join("") +
+          "      </div>" +
+          '      <div><div class="va-sec-label">ROUNDS</div>' +
+          sc.stages.map((st) => {
+            const g = st.state === "done" ? "✓" : st.state === "reject" ? "✕" : st.state === "working" ? "●" : st.state === "waits" ? "◆" : "○";
+            const c = st.state === "done" ? "ok" : st.state === "reject" ? "err" : st.state === "working" ? "ok" : st.state === "waits" ? "warn" : "dim";
+            return '<div class="va-row" style="cursor:default"><span><span class="' + c + '">' + g + "</span> " + esc(st.text) + "</span></div>";
+          }).join("") +
+          "      </div>" +
+          '      <div><div class="va-sec-label">ACTIVITY</div>' +
+          sc.activity.map((a) => '<div class="va-act-line"><span class="mono dim">' + esc(a[0]) + "</span><span>" + esc(a[1]) + "</span></div>").join("") +
+          "      </div>" +
+          "    </aside>" +
+          '    <section class="va-right">' +
+          mainContent +
+          '      <form class="va-prompt" data-act="send-note">' +
+          '        <span class="mono accent">›</span>' +
+          '        <input type="text" placeholder="给 ' + esc(role.name) + ' 发一句指导（回车追加到现场）…">' +
+          "      </form>" +
+          "    </section>" +
+          "  </div>" +
+          "</div>"
+        );
+      }
+
+      function renderVaCanvas(nodes, wires, exit, selId) {
+        return (
+          '<div class="va-flow-canvas">' +
+          '  <svg class="va-flow-svg" viewBox="0 0 780 222">' +
+          wires.map((w) =>
+            '<path d="' + esc(w.d) + '" fill="none" stroke="' + w.color + '" stroke-width="1.6"' + (w.solid ? "" : ' stroke-dasharray="5 4"') + "></path>" +
+            (w.label ? '<text x="434" y="192" text-anchor="middle" fill="var(--err)" font-size="11">' + esc(w.label) + "</text>" : "")
+          ).join("") +
+          "  </svg>" +
+          nodes.map((n) =>
+            '<button type="button" class="va-node ' + esc(n.cls) + (n.id === selId ? " is-selected" : "") + (n.id === "src" ? " is-dashed" : "") + '" ' +
+            'style="left:' + n.x + "px;top:" + n.y + "px;width:" + n.w + 'px" data-act="sel-role" data-r="' + esc(n.id) + '">' +
+            '  <div style="font-size:12px;font-weight:600">' + esc(n.title) + "</div>" +
+            '  <div class="mono muted" style="font-size:10.5px;margin-top:2px">' + esc(n.sub) + "</div>" +
+            (n.meta ? '<div class="mono" style="font-size:10.5px;margin-top:2px">' + esc(n.meta) + "</div>" : "") +
+            "</button>"
+          ).join("") +
+          '  <div class="va-exit ' + (exit.isOpen ? "is-open" : "is-ver") + '" style="left:' + exit.x + "px;top:" + exit.y + "px;width:" + exit.w + 'px">' +
+          '    <div style="font-weight:600">' + esc(exit.label) + "</div>" +
+          '    <div class="muted" style="font-size:10.5px">' + esc(exit.sub) + "</div>" +
+          "  </div>" +
+          "</div>"
+        );
+      }
+
+      /* ------------------------------------------------------------
+         Variant B: 环形回环台（围着「一份事实」顺时针转圈 · 单屏零页签）
+         ------------------------------------------------------------ */
+      function renderVariantB(sc) {
+        const role = activeRoleObj(sc);
+        const gateOpen = isGateOpen(sc);
+
+        let ringHtml = "";
+        if (sc.id === "openloop") {
+          const r = sc.roles[0];
+          ringHtml =
+            '<svg class="vb-svg" viewBox="0 0 690 410">' +
+            '  <rect x="135" y="102" width="320" height="206" rx="96" fill="none" stroke="var(--line-hi)" stroke-width="1.8" stroke-dasharray="6 5"></rect>' +
+            '  <path d="M 455 205 L 542 205" fill="none" stroke="var(--warn)" stroke-width="1.8" stroke-dasharray="5 4"></path>' +
+            '  <polygon points="542,205 533,200 533,210" fill="var(--warn)"></polygon>' +
+            '  <text x="295" y="90" text-anchor="middle" fill="var(--muted)" font-size="11">单职能围绕事实直做 · 完成后直接从虚线出口交付</text>' +
+            "</svg>" +
+            '<div class="vb-node" style="left:16px;top:174px;width:98px"><b>意图入口</b><div class="muted" style="font-size:11px">' + esc(sc.item) + "</div></div>" +
+            '<div class="vb-core" style="left:192px;top:155px;width:206px">' +
+            '  <div class="accent mono" style="font-size:11px">一份事实 · ' + esc(sc.roundLabel) + "</div>" +
+            '  <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px;font-size:11.5px">' +
+            sc.factChips.map((c) => "<div>· " + esc(c) + "</div>").join("") +
+            "  </div>" +
+            "</div>" +
+            '<button type="button" class="vb-node is-working is-selected" style="left:392px;top:64px;width:196px" data-act="sel-role" data-r="engineering">' +
+            '  <div style="font-weight:600">● ' + esc(r.name) + "</div>" +
+            '  <div class="mono ok" style="font-size:11px;margin-top:2px">' + esc(sparkStr(r.spark)) + " " + esc(r.rate) + "</div>" +
+            "</button>" +
+            '<div class="vb-node is-dashed" style="left:546px;top:172px;width:132px;border-color:var(--warn);color:var(--warn)">' +
+            '  <b>' + esc(sc.exitText) + '</b><div class="muted" style="font-size:10.5px">' + esc(sc.exitSub) + "</div>" +
+            "</div>";
+        } else {
+          const p = sc.roles[0], e = sc.roles[1], q = sc.roles[2];
+          ringHtml =
+            '<svg class="vb-svg" viewBox="0 0 690 410">' +
+            // 顺时针主环跑道 + 回流轨道
+            '  <rect x="115" y="72" width="386" height="270" rx="92" fill="none" stroke="var(--line-hi)" stroke-width="1.8"></rect>' +
+            // 顺时针方向箭头：上边 产品->工程，右边 工程->质检，底边 质检->打回
+            '  <polygon points="304,72 294,67 294,77" fill="var(--ok)"></polygon>' +
+            '  <polygon points="501,210 496,200 506,200" fill="' + (gateOpen ? "var(--warn)" : "var(--ok)") + '"></polygon>' +
+            '  <path d="M 380 342 L 225 342" fill="none" stroke="' + (sc.id === "rework" ? "var(--err)" : "var(--line-hi)") + '" stroke-width="2"></path>' +
+            '  <polygon points="225,342 235,337 235,347" fill="' + (sc.id === "rework" ? "var(--err)" : "var(--line-hi)") + '"></polygon>' +
+            '  <text x="302" y="362" text-anchor="middle" fill="' + (sc.id === "rework" ? "var(--err)" : "var(--muted)") + '" font-size="11">' +
+            (sc.id === "rework" ? "↺ 打回进入第 2 轮（围着同一份事实继续）" : "↺ 顺时针回流轨道") +
+            "</text>" +
+            // 入口与放行切线出口
+            '  <path d="M 88 122 L 130 122" fill="none" stroke="var(--ok)" stroke-width="1.6"></path>' +
+            '  <path d="M 480 286 L 560 286" fill="none" stroke="var(--line-hi)" stroke-width="1.6"></path>' +
+            '  <polygon points="560,286 551,281 551,291" fill="var(--line-hi)"></polygon>' +
+            "</svg>" +
+            '<div class="vb-node" style="left:8px;top:94px;width:82px;font-size:11.5px"><b>意图</b><div class="muted">' + esc(sc.item).slice(0, 6) + "…</div></div>" +
+            '<div class="vb-core">' +
+            '  <div class="accent mono" style="font-size:11px">◎ 一份事实 · ' + esc(sc.roundLabel) + "</div>" +
+            '  <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px;font-size:11.5px">' +
+            sc.factChips.map((c) => "<div>· " + esc(c) + "</div>").join("") +
+            "  </div>" +
+            "</div>" +
+            '<button type="button" class="vb-node ' + (p.id === role.id ? "is-selected" : "") + '" style="left:110px;top:24px;width:154px" data-act="sel-role" data-r="product">' +
+            '  <div style="font-weight:600">' + esc(p.glyph + " " + p.name) + "</div>" +
+            '  <div class="mono muted" style="font-size:11px">' + esc(p.model + " · " + p.ctx) + "</div>" +
+            "</button>" +
+            (sc.subRoles
+              ? '<div class="vb-node is-working" style="left:336px;top:16px;width:248px">' +
+                '  <div style="font-weight:600;margin-bottom:4px">● 工程（小组 3 人）</div>' +
+                '  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">' +
+                sc.subRoles.map((sr) =>
+                  '<button type="button" data-act="sel-role" data-r="' + esc(sr.id) + '" style="padding:3px 5px;border:1px solid ' + (sr.state === "working" ? "var(--ok)" : "var(--line-hi)") + ';border-radius:4px;font-size:11px;text-align:left;background:var(--bg)">' +
+                  '  <div>' + esc(sr.glyph + " " + sr.name) + "</div>" +
+                  '  <div class="mono muted" style="font-size:10px">' + esc(sr.rate || sr.ctx) + "</div>" +
+                  "</button>"
+                ).join("") +
+                "  </div>" +
+                "</div>"
+              : '<button type="button" class="vb-node is-' + (gateOpen ? "waits" : e.state) + (e.id === role.id ? " is-selected" : "") + '" style="left:368px;top:24px;width:196px" data-act="sel-role" data-r="engineering">' +
+                '  <div style="font-weight:600">' + esc((gateOpen ? "◆" : e.glyph) + " " + e.name) + "</div>" +
+                '  <div class="mono ' + (e.rate && !gateOpen ? "ok" : "warn") + '" style="font-size:11px">' + esc(sparkStr(e.spark)) + " " + esc(gateOpen ? "等你拍板" : e.rate) + "</div>" +
+                "</button>") +
+            '<button type="button" class="vb-node ' + (q.id === role.id ? "is-selected" : "") + '" style="left:344px;top:262px;width:176px" data-act="sel-role" data-r="qa">' +
+            '  <div style="font-weight:600">' + esc(q.glyph + " " + q.name) + "</div>" +
+            '  <div class="mono muted" style="font-size:11px">' + esc(q.diff) + "</div>" +
+            "</button>" +
+            '<div class="vb-node" style="left:564px;top:262px;width:116px;border-color:var(--ok);color:var(--ok)">' +
+            '  <b>' + esc(sc.exitText) + '</b><div class="muted" style="font-size:10.5px">' + esc(sc.exitSub) + "</div>" +
+            "</div>";
+        }
+
+        return (
+          '<div class="vb-shell">' +
+          '  <header class="vb-top">' +
+          '    <div><b class="mono">yudao</b>  <span>' + esc(sc.project) + '</span> <span class="muted">· ' + esc(sc.item) + " · " + esc(sc.form) + "</span></div>" +
+          '    <div class="muted" style="font-size:12px">单屏工作台 · 耗时 ' + esc(sc.elapsed) + " · 无多余页签</div>" +
+          "  </header>" +
+          '  <div class="vb-grid">' +
+          '    <div class="vb-orbit-pane dot-bg"><div class="vb-stage">' + ringHtml + "</div></div>" +
+          '    <div class="vb-feed">' +
+          '      <div class="vb-feed-scroll">' +
+          (gateOpen
+            ? '<div class="vb-card" style="border-color:var(--warn);background:var(--warn-wash)">' +
+              '  <div class="warn" style="font-weight:600">◆ 等你拍板</div>' +
+              '  <div style="margin:4px 0 8px">' + esc(sc.gate.ask) + "</div>" +
+              '  <div style="display:flex;gap:8px;flex-wrap:wrap">' +
+              sc.gate.options.map((o, i) => '<button type="button" class="' + (i === 0 ? "btn-primary" : "btn-ghost") + '" data-act="resolve-gate">' + esc(o) + "</button>").join("") +
+              "  </div>" +
+              "</div>"
+            : (sc.gate ? '<div class="vb-card ok">✓ ' + esc(sc.gate.resolvedText) + "</div>" : "")) +
+          '        <div class="vb-card">' +
+          '          <div style="display:flex;justify-content:space-between"><b>' + esc(role.name) + '</b><span class="mono ok">' + esc(sparkStr(role.spark)) + " " + esc(role.rate || role.ctx) + "</span></div>" +
+          '          <div class="muted" style="margin:4px 0 6px">' + esc(role.goal) + "</div>" +
+          '          <div class="mono accent" style="font-size:11.5px">允许范围：' + esc(role.touches) + "</div>" +
+          '          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px" class="mono">' +
+          sc.liveSteps.map((st) => '<div class="' + esc(st[2]) + '" style="font-size:11.5px"><span class="dim">' + esc(st[0]) + "</span>  " + esc(st[1]) + "</div>").join("") +
+          state.userNotes.map((n) => '<div class="accent" style="font-size:11.5px">你：' + esc(n) + "</div>").join("") +
+          "          </div>" +
+          "        </div>" +
+          '        <div class="vb-card">' +
+          '          <div class="muted" style="font-size:11.5px;margin-bottom:6px">刚发生的事</div>' +
+          sc.activity.map((a) => '<div style="font-size:12px;display:flex;gap:8px"><span class="mono dim">' + esc(a[0]) + "</span><span>" + esc(a[1]) + "</span></div>").join("") +
+          "        </div>" +
+          "      </div>" +
+          '      <form class="va-prompt" data-act="send-note"><span class="mono accent">›</span><input type="text" placeholder="直接给 ' + esc(role.name) + ' 发一句话…"></form>' +
+          "    </div>" +
+          "  </div>" +
+          "</div>"
+        );
+      }
+
+      /* ------------------------------------------------------------
+         Variant C: 按轮展开泳道（第1轮 -> 第2轮 纵向展开 · 零交叉）
+         ------------------------------------------------------------ */
+      function renderVariantC(sc) {
+        const role = activeRoleObj(sc);
+        const gateOpen = isGateOpen(sc);
+        const isOpen = sc.id === "openloop";
+        const cols = isOpen
+          ? ["轮次", "意图", "工程 (OpenCode)", "出口"]
+          : ["轮次", "意图", "产品", "工程", "质检·核", "出口"];
+        const gridCols = isOpen ? "66px 140px 1fr 170px" : "66px 115px 1fr 1.25fr 1fr 118px";
+
+        const rowsHtml = sc.rounds.map((rw, idx) => {
+          const cells = isOpen
+            ? [
+                '<div class="vc-cell mono"><b>第 ' + rw.r + " 轮</b></div>",
+                '<div class="vc-cell muted">' + esc(rw.intent) + "</div>",
+                '<div class="vc-cell"><button type="button" class="vc-pill ' + esc(rw.eng.cls) + ' is-sel" data-act="sel-role" data-r="engineering">' + esc(rw.eng.t) + "</button></div>",
+                '<div class="vc-cell"><div class="vc-pill ' + esc(rw.exit.cls) + '">' + esc(rw.exit.t) + "</div></div>",
+              ]
+            : [
+                '<div class="vc-cell mono"><b>第 ' + rw.r + " 轮</b></div>",
+                '<div class="vc-cell muted">' + esc(rw.intent) + "</div>",
+                '<div class="vc-cell"><button type="button" class="vc-pill ' + esc(rw.product.cls) + (role.id === "product" ? " is-sel" : "") + '" data-act="sel-role" data-r="product">' + esc(rw.product.t) + "</button></div>",
+                '<div class="vc-cell"><button type="button" class="vc-pill ' + esc(gateOpen && rw.r === 2 ? "is-waits" : rw.eng.cls) + (role.id === "engineering" ? " is-sel" : "") + '" data-act="sel-role" data-r="engineering">' + esc(gateOpen && rw.r === 2 ? "◆ 等你拍板" : rw.eng.t) + "</button></div>",
+                '<div class="vc-cell"><button type="button" class="vc-pill ' + esc(rw.qa.cls) + (role.id === "qa" ? " is-sel" : "") + '" data-act="sel-role" data-r="qa">' + esc(rw.qa.t) + "</button></div>",
+                '<div class="vc-cell"><div class="vc-pill ' + esc(rw.exit.cls) + '">' + esc(rw.exit.t) + "</div></div>",
+              ];
+
+          const stepArrow = (idx === 0 && sc.rounds.length > 1)
+            ? '<div class="vc-rework-band">↳ 第 1 轮核验打回后直接落到第 2 轮工程返工（按轮垂直展开，连线永不重叠）</div>'
+            : "";
+
+          return '<div class="vc-row" style="grid-template-columns:' + gridCols + '">' + cells.join("") + "</div>" + stepArrow;
+        }).join("");
+
+        return (
+          '<div class="vc-shell">' +
+          '  <header class="vb-top">' +
+          '    <div><b class="mono">yudao</b>  <span>' + esc(sc.project) + '</span> <span class="muted">· ' + esc(sc.item) + " · 按轮展开泳道</span></div>" +
+          '    <div class="mono muted" style="font-size:12px">' + esc(sc.form) + " · 结束：" + esc(sc.exitText) + "</div>" +
+          "  </header>" +
+          '  <div class="vc-body">' +
+          '    <div class="vc-lanes dot-bg">' +
+          '      <div style="font-size:12px" class="muted">每一轮占一行，横跨各职能；打回从上轮质检直接落到下轮工程。</div>' +
+          '      <div class="vc-matrix">' +
+          '        <div class="vc-row vc-hdr" style="grid-template-columns:' + gridCols + '">' +
+          cols.map((c) => '<div class="vc-cell">' + esc(c) + "</div>").join("") +
+          "        </div>" +
+          rowsHtml +
+          "      </div>" +
+          "    </div>" +
+          '    <div class="vb-feed">' +
+          '      <div class="vb-feed-scroll">' +
+          (gateOpen
+            ? '<div class="vb-card" style="border-color:var(--warn);background:var(--warn-wash)">' +
+              '  <div class="warn" style="font-weight:600">◆ 当前格等你拍板</div>' +
+              '  <div style="margin:4px 0 8px">' + esc(sc.gate.ask) + "</div>" +
+              '  <div style="display:flex;gap:8px;flex-wrap:wrap">' +
+              sc.gate.options.map((o, i) => '<button type="button" class="' + (i === 0 ? "btn-primary" : "btn-ghost") + '" data-act="resolve-gate">' + esc(o) + "</button>").join("") +
+              "  </div>" +
+              "</div>"
+            : "") +
+          '        <div class="vb-card">' +
+          '          <div style="display:flex;justify-content:space-between"><b>选中单元 · ' + esc(role.name) + '</b><span class="mono ok">' + esc(role.rate || role.ctx) + "</span></div>" +
+          '          <div class="muted" style="margin:4px 0">' + esc(role.goal) + "</div>" +
+          '          <div class="mono accent" style="font-size:11.5px">范围：' + esc(role.touches) + "</div>" +
+          '          <div class="mono" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px;display:flex;flex-direction:column;gap:4px">' +
+          sc.liveSteps.map((st) => '<div class="' + esc(st[2]) + '">' + esc(st[0]) + "  " + esc(st[1]) + "</div>").join("") +
+          state.userNotes.map((n) => '<div class="accent">你：' + esc(n) + "</div>").join("") +
+          "          </div>" +
+          "        </div>" +
+          '        <div class="vb-card">' +
+          '          <div class="muted" style="font-size:11.5px;margin-bottom:6px">本轮文件改动</div>' +
+          sc.diffFiles.map((f) => '<div class="mono" style="font-size:11.5px"><span class="ok">' + esc(f.stat) + "</span> " + esc(f.file) + '<div class="muted">' + esc(f.line) + "</div></div>").join("") +
+          "        </div>" +
+          "      </div>" +
+          '      <form class="va-prompt" data-act="send-note"><span class="mono accent">›</span><input type="text" placeholder="针对当前格补充指导…"></form>' +
+          "    </div>" +
+          "  </div>" +
+          "</div>"
+        );
+      }
+
+      /* ------------------------------------------------------------
+         Variant D: 对话主轴 + 顶部紧凑 72px 循环脉冲条
+         ------------------------------------------------------------ */
+      function renderVariantD(sc) {
+        const role = sc.roles.find((r) => r.id === sc.activeRole) || sc.roles[0];
+        const gateOpen = isGateOpen(sc);
+
+        const steps = sc.id === "openloop"
+          ? [
+              { t: "意图", cls: "" },
+              { t: "● 工程 (OpenCode · 64 tok/s)", cls: "is-working" },
+              { t: "◌ 开环完成", cls: "is-open" },
+            ]
+          : [
+              { t: "意图", cls: "" },
+              { t: "✓ 产品", cls: "" },
+              { t: (gateOpen ? "◆ 工程等你拍板" : sc.subRoles ? "● 工程小组 3人 · 76 tok/s" : "● 工程 · 轮2 · 87 tok/s"), cls: gateOpen ? "is-waits" : "is-working" },
+              { t: "○ 质检·核", cls: "" },
+              { t: "✓ 放行", cls: "" },
+            ];
+
+        return (
+          '<div class="vd-shell">' +
+          '  <aside class="vd-rail">' +
+          '    <div class="va-sec-label">' + esc(sc.project) + "</div>" +
+          Object.values(SCENES).map((s) =>
+            '<button type="button" class="vd-item' + (s.id === sc.id ? " is-on" : "") + '" data-act="set-scene" data-s="' + esc(s.id) + '">' +
+            '  <div style="font-weight:600">' + esc(s.item) + "</div>" +
+            '  <div class="muted" style="font-size:11px">' + esc(s.roundLabel) + " · " + (s.gate && !state.resolvedGates[s.id] ? "等你拍板" : s.exitText) + "</div>" +
+            "</button>"
+          ).join("") +
+          "  </aside>" +
+          '  <section class="vd-main">' +
+          '    <div class="vd-pulse-bar">' +
+          '      <div class="vd-track">' +
+          steps.map((st, i) => (i > 0 ? '<span class="dim">──▶</span>' : "") + '<span class="vd-step ' + esc(st.cls) + '">' + esc(st.t) + "</span>").join("") +
+          (sc.id === "rework" ? '<span class="err mono" style="font-size:11.5px;margin-left:6px">↺ 轮1打回返工</span>' : "") +
+          "      </div>" +
+          '      <div class="mono muted" style="font-size:11.5px">' + esc(sc.form) + " · " + esc(sc.elapsed) + "</div>" +
+          "    </div>" +
+          '    <div class="vd-stream">' +
+          '      <div class="vd-stream-inner">' +
+          '        <div class="vd-msg"><b>你</b> · 发起事项<div style="margin-top:4px">' + esc(sc.item) + "（" + esc(role.goal) + "）</div></div>" +
+          (sc.rounds.length > 1
+            ? '<div class="vd-msg is-fold">' +
+              '  <button type="button" class="muted" data-act="toggle-fold" style="font-size:12px">' + (state.foldOpen ? "▾ 收起第 1 轮经过" : "▸ 第 1 轮已折叠：产品交 PRD v1 → 工程交交付 v1 → 质检打回 2 项（点开）") + "</button>" +
+              (state.foldOpen ? '<div style="margin-top:6px;font-size:12px" class="muted">· ' + esc(sc.activity[sc.activity.length - 1][1]) + "<br>· " + esc(sc.activity[1][1]) + "</div>" : "") +
+              "</div>"
+            : "") +
+          (gateOpen
+            ? '<div class="vd-msg" style="border-color:var(--warn);background:var(--warn-wash)">' +
+              '  <div class="warn" style="font-weight:600">◆ 需要你拍板</div>' +
+              '  <div style="margin:6px 0 10px">' + esc(sc.gate.ask) + "</div>" +
+              '  <div style="display:flex;gap:8px">' +
+              sc.gate.options.map((o, i) => '<button type="button" class="' + (i === 0 ? "btn-primary" : "btn-ghost") + '" data-act="resolve-gate">' + esc(o) + "</button>").join("") +
+              "  </div>" +
+              "</div>"
+            : (sc.gate ? '<div class="vd-msg ok">✓ ' + esc(sc.gate.resolvedText) + "</div>" : "")) +
+          '        <div class="vd-msg">' +
+          '          <div style="display:flex;justify-content:space-between;align-items:baseline">' +
+          '            <b>' + esc(role.name) + ' · 当前进展</b>' +
+          '            <span class="mono ok" style="font-size:12px">' + esc(sparkStr(role.spark)) + " " + esc(role.rate || role.ctx) + "</span>" +
+          "          </div>" +
+          '          <div style="margin:6px 0">' + esc(role.diff) + ' <span class="muted">· ' + esc(role.verify) + "</span></div>" +
+          '          <div class="mono accent" style="font-size:11.5px;margin-bottom:6px">允许改动范围：' + esc(role.touches) + "</div>" +
+          '          <button type="button" class="btn-ghost" data-act="toggle-live">' + (state.liveOpen ? "▾ 收起现场步骤" : "▸ 看最近 3 行现场步骤与改动") + "</button>" +
+          (state.liveOpen
+            ? '<div class="mono" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px">' +
+              sc.liveSteps.map((st) => '<div class="' + esc(st[2]) + '">' + esc(st[0]) + "  " + esc(st[1]) + "</div>").join("") +
+              "</div>"
+            : "") +
+          "        </div>" +
+          state.userNotes.map((n) => '<div class="vd-msg" style="border-color:var(--accent)"><b>你</b> · 刚刚<div style="margin-top:4px">' + esc(n) + "</div></div>").join("") +
+          "      </div>" +
+          "    </div>" +
+          '    <form class="va-prompt" data-act="send-note"><span class="mono accent">›</span><input type="text" placeholder="发一句话给当前正在做的角色（回车发出）…"></form>' +
+          "  </section>" +
+          "</div>"
+        );
+      }
+
+      function render() {
+        document.documentElement.setAttribute("data-theme", state.theme);
+        const sc = currentScene();
+        const root = document.getElementById("app");
+        if (state.variant === "A") root.innerHTML = renderVariantA(sc);
+        else if (state.variant === "B") root.innerHTML = renderVariantB(sc);
+        else if (state.variant === "C") root.innerHTML = renderVariantC(sc);
+        else root.innerHTML = renderVariantD(sc);
+
+        document.querySelectorAll("[data-act='set-variant']").forEach((el) => {
+          el.classList.toggle("is-on", el.getAttribute("data-v") === state.variant);
+        });
+        document.querySelectorAll("[data-act='set-scene']").forEach((el) => {
+          el.classList.toggle("is-on", el.getAttribute("data-s") === state.scene);
+        });
+        syncUrl();
+      }
+
+      document.addEventListener("click", (ev) => {
+        const el = ev.target.closest("[data-act]");
+        if (!el) return;
+        const act = el.getAttribute("data-act");
+        if (act === "set-variant") {
+          state.variant = el.getAttribute("data-v");
+          render();
+        } else if (act === "prev-variant" || act === "next-variant") {
+          const i = VARIANT_ORDER.indexOf(state.variant);
+          const next = (i + (act === "next-variant" ? 1 : VARIANT_ORDER.length - 1)) % VARIANT_ORDER.length;
+          state.variant = VARIANT_ORDER[next];
+          render();
+        } else if (act === "set-scene") {
+          state.scene = el.getAttribute("data-s");
+          state.selectedRole = null;
+          state.foldOpen = false;
+          state.liveOpen = false;
+          state.userNotes = [];
+          render();
+        } else if (act === "toggle-theme") {
+          state.theme = state.theme === "dark" ? "light" : "dark";
+          render();
+        } else if (act === "a-tab") {
+          state.aTab = Number(el.getAttribute("data-t"));
+          render();
+        } else if (act === "sel-role") {
+          const rid = el.getAttribute("data-r");
+          if (rid && rid !== "src") {
+            state.selectedRole = rid;
+            render();
+          }
+        } else if (act === "resolve-gate") {
+          state.resolvedGates[state.scene] = true;
+          render();
+        } else if (act === "toggle-fold") {
+          state.foldOpen = !state.foldOpen;
+          render();
+        } else if (act === "toggle-live") {
+          state.liveOpen = !state.liveOpen;
+          render();
+        }
+      });
+
+      document.addEventListener("submit", (ev) => {
+        const form = ev.target.closest("[data-act='send-note']");
+        if (!form) return;
+        ev.preventDefault();
+        const input = form.querySelector("input");
+        const val = input && input.value.trim();
+        if (!val) return;
+        state.userNotes.push(val);
+        input.value = "";
+        render();
+      });
+
+      document.addEventListener("keydown", (ev) => {
+        if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA")) return;
+        if (ev.key === "ArrowLeft") {
+          const i = VARIANT_ORDER.indexOf(state.variant);
+          state.variant = VARIANT_ORDER[(i + VARIANT_ORDER.length - 1) % VARIANT_ORDER.length];
+          render();
+        } else if (ev.key === "ArrowRight") {
+          const i = VARIANT_ORDER.indexOf(state.variant);
+          state.variant = VARIANT_ORDER[(i + 1) % VARIANT_ORDER.length];
+          render();
+        } else if (ev.key === "t" || ev.key === "T") {
+          state.theme = state.theme === "dark" ? "light" : "dark";
+          render();
+        } else if (ev.key >= "1" && ev.key <= "4") {
+          const keys = ["rework", "gate", "suborg", "openloop"];
+          state.scene = keys[Number(ev.key) - 1];
+          state.selectedRole = null;
+          render();
+        }
+      });
+
+      readUrlParams();
+      render();
+    })();
+  </script>
+</body>
+</html>

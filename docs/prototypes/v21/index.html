@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yudao 页面原型 V21</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/page.css">
+  <link rel="stylesheet" href="styles/more.css">
+  <link rel="stylesheet" href="styles/models.css">
+  <link rel="stylesheet" href="styles/org.css">
+  <link rel="stylesheet" href="styles/lean.css">
+  <link rel="stylesheet" href="styles/workspace.css">
+  <link rel="stylesheet" href="styles/loop.css">
+  <link rel="stylesheet" href="styles/troupe-console.css">
+</head>
+<body>
+  <div class="y21-banner" role="note">
+    <strong>原型 V21</strong>
+    <span class="y21-banner-text">循环蓝图控制台 · 保留完整项目/组织/成果/事项与用量信息 · 融合 troupe 实时蓝图与现场窗口（右下角切换场景与主题）</span>
+  </div>
+
+  <div id="y21-window-note" class="y21-window-note" hidden></div>
+
+  <div class="y21-app">
+    <aside id="y21-sidebar" class="y21-sidebar" aria-label="首页与项目"></aside>
+    <div class="y21-scrim" data-act="drawer" aria-hidden="true"></div>
+    <div class="y21-main">
+      <header id="y21-topbar" class="y21-topbar"></header>
+      <nav id="y21-tabs" class="y21-tabbar" aria-label="项目页面" hidden></nav>
+      <main id="y21-content" class="y21-content"></main>
+    </div>
+  </div>
+
+  <div id="y21-toolbar" class="y21-toolbar" aria-label="原型工具条"></div>
+  <div id="y21-modal-root"></div>
+  <div id="y21-toast-root" class="y21-toast-root" aria-live="polite"></div>
+
+  <script src="js/y21.js"></script>
+  <script src="js/kit.js"></script>
+  <script src="js/org.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/pages.js"></script>
+  
+  <script src="js/data-more.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/system.js"></script>
+  <script src="js/more.js"></script>
+  <script src="js/orgpage.js"></script>
+  <script src="js/newflow.js"></script>
+  <script src="js/design-data.js"></script>
+  <script src="js/sequence.js"></script>
+  <script src="js/lean.js"></script>
+  <script src="js/work-units.js"></script>
+  <script src="js/organization-ui.js"></script>
+  <script src="js/preview-flows.js"></script>
+  <script src="js/troupe-console.js"></script>
+  <script>Y21.app.start();</script>
+</body>
+</html>

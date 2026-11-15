@@ -614,3 +614,22 @@
 {"down":"ac338ae4d34a752c","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 4. 项目设置中的 MCP 服务器 > 4.2 读取工具清单（探测）","up":"5cd9cf4c86622830"}
 {"down":"d0866898f9277871","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系","up":"5cd9cf4c86622830"}
 {"down":"d86d0bae87c86a60","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.14 项目页是循环图加对话","src":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用 > 14.1 先补页面","up":"f529141013c4f583"}
+{"down":"cc73c8fbc9b1af5e","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/app-and-interface.md#应用层与接口层设计说明","up":"247a9c904dfb0b10"}
+{"down":"3cc3640c0cabd0cf","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"0cded63fdd88077c"}
+{"down":"7284d605a5ee3141","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","src":"docs/design/department-guidance.md#职能指导的处理设计","up":"88c4da9cda6bdde6"}
+{"down":"db1ffe5381078445","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.7 模型与 Prompt 设置","up":"247a9c904dfb0b10"}
+{"down":"f978dc748b3eea6f","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.8 与已有结构的对应","up":"247a9c904dfb0b10"}
+{"down":"011ea6d41a931f22","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/execution-environment.md#执行环境服务设计说明","up":"0cded63fdd88077c"}
+{"down":"74133bc1017b1124","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件","up":"0cded63fdd88077c"}
+{"down":"56e88176e3ff547a","dst":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.1 角色清单","src":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","up":"3cff8976a1886355"}
+{"down":"9dfb9e3d80ed69a3","dst":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.1 角色清单","src":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择","up":"3cff8976a1886355"}
+{"down":"67756cae4b963ad5","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.10 加职能","src":"docs/design/model-management.md#模型管理设计说明 > 5. 职能与角色的模型选择 > 5.2 项目职能设置与项目角色设置","up":"9624e1971511956e"}
+{"down":"e53a39b042dd8132","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 职能详情","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 职能详情里的模型与 Prompt","up":"247a9c904dfb0b10"}
+{"down":"023e653719b5bbb9","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明","up":"0cded63fdd88077c"}
+{"down":"ac338ae4d34a752c","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 4. 项目设置中的 MCP 服务器 > 4.2 读取工具清单（探测）","up":"0cded63fdd88077c"}
+{"down":"b7a235c674b2e553","dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 5. 确认以后：当前有效要求与第一次采纳","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件","up":"f6fc16c4bde2121a"}
+{"down":"d0866898f9277871","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系","up":"0cded63fdd88077c"}
+{"down":"1a72105165302a1c","dst":"docs/design/department-roles.md#职能内多角色设计说明 > 4. 方案 > 4.1 角色清单","src":"docs/design/project-organization.md#项目的组织设计说明","up":"3cff8976a1886355"}
+{"down":"fd522b8028de3a8a","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.5 采用与历史","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 2. 规则登记","up":"b5a66c2162041bb4"}
+{"down":"fd1e494c0f15aded","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.5 采用与历史","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 5. 采用与撤回","up":"b5a66c2162041bb4"}
+{"down":"817f20a84ee37de4","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.5 采用与历史","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 9. 命令与事件","up":"b5a66c2162041bb4"}

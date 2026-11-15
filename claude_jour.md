@@ -777,5 +777,21 @@ claude（总架构师） / 2026-11-15 22:55 / 完成多题前沿用户追问（`
 ② 设计定稿与契约修正：主线设计提交 `a4843ee0` 写入 `domain-completion.md`（D12）、`expert-ask-react.md`（D07）、`department-loop.md`、`independent-verification.md`、`app-and-interface.md`、`rules-and-parameters.md`、`evaluation-scenarios.md`、`name-map.md`、`decision.md` 与 `CHANGELOG.md`；核对 `harness/tests/test_slot_contracts.py` 与 `harness/tests/test_thin_driver_names.py` 锁定规矩后，在提交 `ffbd95e1` 修正 `docs/design/architecture/name-map.md` 保持 `execution_contract.py` 的 `SafeNode` 五方法协议不变（经 `RoundDependencies` 传入 `ask_user` 回调）并同步 `docs/decision.md` 切片数量表述，全量文档一致性（`doc-consistency check` 0 死引用 / 0 待核对）与规则比对（`rules check` 0 矛盾）通过。
 ③ 父子工单拆解与放行：在阶段工单 `#1683`（里程碑 `1.1 职能之间：转实` 薄片 ①）下建立父工单 `#1797` 与 6 张切片子工单并按依赖串联入队——`#1798`（`role_choice` 决定模型、`answers` 折叠与 `decision.answer` 接口合同，`touches-core`）并行解挡 `#1799`（`ask_user` 工具定义、冻结参数及 `ask` 分支收紧，`touches-core`）与 `#1802`（客户端多题决定卡片与线程气泡）；`#1799` 解挡 `#1800`（薄驱动与执行层本轮阻塞、计时暂停顺延、重启按 `(session_id, call_id)` 幂等恢复与 `waiting_user` 状态，`touches-core`）；`#1800` 并行解挡 `#1801`（全角色装配 `ask_user`、先探索后提问与自由互审指引、全员只读共享 `[user_decisions]` 上下文段与提示快照，`touches-core`）与 `#1803`（评测运行器自动采用推荐作答与提问次数统计）。6 张子工单均已完成父子关联与原生依赖绑定并切换为 `ready-for-agent`，阶段工单 `#1683` 与 `discussions/1796` 已同步进展评论。
 
+gemini-3.1-pro（总架构师） / 2026-11-15 00:25 / 完成面向 `client/` 的 V21 循环蓝图控制台交互原型（`docs/prototypes/v21/`）并更新原型变更记录
+① 判断与分流：调研 `C:\code\troupe`（`c844a45`）并与用户确认「循环蓝图控制台归 `client/` 工程工作台、`view/` 另做游戏化世界」。V21 不迁就 V20 双页裁剪与已有实现现状，直接以 `docs/architecture.html` 第 1、3、4 节为骨干（实线固定结构 vs 虚线定义内容、外环交接/打回/旁路询问/圈外观察者、内环 6 步、五种 `source`、`✓ 独立核验放行` vs `◌ 开环完成`），叠加 `troupe` 的点阵蓝图、单调吞吐 Braille 波形与 `现场窗口 · live`，并支持浅色总图纸面一键对比。
+② 范围控制：严格限定在 `docs/prototypes/v21/`、`docs/prototypes/CHANGELOG.md`、`docs/CHANGELOG.md` 与架构师日记内完成并提交本地验证，未触碰 `docs/design/`、`docs/architecture.html`、`harness/`、`client/` 或 `view/`；后续待用户试用反馈后再决定是否把结论写入客户端设计说明与新阶段工单。
 
+gemini-3.1-pro（总架构师） / 2026-11-15 20:24 / 回应用户对 V21 像 V20 且偏复杂的讨论意见，产出四套减法结构对比草图（`docs/prototypes/v21-sketches.html`）
+① 根因诊断：V21 仍沿用 V20 的单排横向流水线拓扑且往连线上贴版本牌，同时把内环 6 步、`事实 #pos`、5 种 `source` 等引擎内部机制直接做成界面控件，叠出多层框体与双层顶栏。
+② 草图方案：全部隐藏内核术语，提供可按 `?variant=A|B|C|D` 切换的四套减法骨架：`A`（`troupe` 无框纯排版 + 静默折线 + 纵向展开）、`B`（单屏围着「一份事实」顺时针回环跑道）、`C`（按第 1 轮 → 第 2 轮纵向平铺泳道，零交叉）、`D`（对话主轴 + 72px 顶部脉冲条），均带 4 个典型场景与深/浅蓝图切换。待用户试挑方向后再重写正式原型。
+
+gemini-3.1-pro（总架构师） / 2026-11-15 22:15 / 基于 `v20` 完整信息骨架重写 `docs/prototypes/v21/` 并纳入 `troupe` 实时蓝图与五标签页结构
+① 方向确认：用户评估草图后明确偏好 V18-V20 的完整信息密度，决定不走过度简化的删减路线，改为保留 `v20` 全量项目与组织规则（`Y21` 命名空间），恢复「对话 · 成果库 · 组织 · 事项与用量 · 设置」五个一级标签页，让成果差异、组织定义、事项收敛、模型请求与运行设置直接可达。
+② 核心实现：在 `docs/prototypes/v21/` 新增 `js/troupe-console.js` 与 `styles/troupe-console.css`，升级 `js/lean.js`、`js/more.js`、`js/orgpage.js`、`js/organization-ui.js` 与 `js/app.js`，为主循环图接入深色/浅色图纸切换、节点内模型/5 格推理档位/上下文百分比/就地更新 Braille `tok/s` 波形、实线放行 vs 虚线开环终点胶囊以及内联 `现场窗口 · live`。同步重写 `v21/walkthrough.md`，更新 `docs/prototypes/CHANGELOG.md` 与 `docs/CHANGELOG.md`。
+
+
+
+gemini-3.1-pro（总架构师） / 2026-11-15 23:35 / 完成客户端 V21 循环蓝图控制台与主线设计（`a4843ee0`、`1e266483`、D42）的跨会话收口并更新正本
+① 同步与原型补齐：核对 `origin/main`（`73d5245c`），在 `docs/prototypes/v21/` 补齐 `#/projects/new` 与 `#/projects/onboard` 独立全宽页、取消前端「和某项目一样」、候选「测试」按钮瘦身与 `ag/gemini-3.8-flash-thinking`、对话主轴与首页/通知多题前沿 `role_choice` 追问卡片、结构化 PRD 全文卡片与头部进展条、详情面板置顶、`?w=`/`?dept=` 查询同步以及「组织」页只读总览和确认后直接「改回这一份」；所有 JS 通过 `node --check` 并在本地无头浏览器完成交互走查。
+② 正本更新与工单边界：更新 `project-organization.md`、`app-and-interface.md`、`visualization.md`、`network-and-mcp.md`、`department-roles.md`、`existing-project-onboarding.md`、`design/README.md` 及三份需求文档，并将三个标题更名登记进 `docs/CHANGELOG.md`；在 `docs/decision.md` 写明「服务端/运行器切片按原合同推进，客户端界面切片统一采用 V21 五标签页控制台」，避免并行会话重复分叉；通过 `tools/doc-consistency`（`check` 与 `rules check` 均为 0）核验后提交推送 `main`。
 
