@@ -67,6 +67,8 @@ def collect(export, outcome, replay=None, parameters_version=None):
         "empty_model_responses": _empty_responses(export),
         "open_loop": open_loop,
         "open_loop_readings": open_loop_readings(events) if open_loop else None,
+        "outer_loop_states": _outer_loop_states(events),
+        "activation_rounds": _activation_rounds(export),
         "checkpoints": checkpoints,
     }
 
@@ -570,14 +572,516 @@ def _check_release_coverage(events, released):
                        + ("；" + "；".join(reasons) if reasons else ""))}
 
 
+# --- 外环状态与按轮按角色读数 -----------------------------------------
+
+REVIEW_SUBMISSION_TYPES = frozenset({"qa_submitted", "baseline_review_accepted"})
+REWORK_VERDICTS = frozenset({"rework", "rework_engineering", "rework_product"})
+ACCEPT_EVENT_TYPES = frozenset({
+    "spec_accepted",
+    "contract_accepted",
+    "product_decision_accepted",
+    "delivery_accepted",
+    "structure_accepted",
+})
+TERMINAL_EVENT_TYPES = frozenset({"run_done", "run_paused", "run_failed"})
+DEFAULT_VERIFIER_DEPARTMENTS = frozenset({"quality", "verifier"})
+ATTEMPT_EVENT_TYPES = frozenset({"model_requested", "model_attempt_finished", "model_attempt_failed"})
+ROUND_TOKEN_FIELDS = ("input_tokens", "output_tokens", "total_tokens")
+USAGE_PRESENCE_FIELDS = ("input_tokens", "output_tokens", "total_tokens",
+                         "cache_read_tokens", "cache_write_tokens", "cost")
+
+
+def _positive_int(value):
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
+
+
+def _non_negative_number(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+        return value
+    return None
+
+
+def _is_review_submission(event_type, payload):
+    if event_type in REVIEW_SUBMISSION_TYPES:
+        return True
+    return event_type == "artifact_accepted" and payload.get("artifact_kind") == "completion_review"
+
+
+def _discover_outer_loop_roles(events):
+    """识别询问子分支会话与承担核验职能的部门。"""
+    branch_sessions = set()
+    verifier_departments = set(DEFAULT_VERIFIER_DEPARTMENTS)
+    for event in events:
+        event_type = event.get("type")
+        payload = event.get("payload") or {}
+        if event_type == "ask_started":
+            branch_sid = payload.get("branch_session_id")
+            if isinstance(branch_sid, str) and branch_sid:
+                branch_sessions.add(branch_sid)
+        elif _is_review_submission(event_type, payload):
+            department = event.get("department") or payload.get("department")
+            if isinstance(department, str) and department:
+                verifier_departments.add(department)
+    return branch_sessions, verifier_departments
+
+
+def _outer_loop_states(events):
+    """从原始事件流统计外环各状态走到次数及每次停止的原因。"""
+    branch_sessions, verifier_departments = _discover_outer_loop_roles(events)
+    ask_started = 0
+    ask_answered = 0
+    decision_requested = 0
+    decision_answered = 0
+    decision_withdrawn = 0
+    verifier_activations = 0
+    verifier_activation_ids = set()
+    verifier_sessions = set()
+    review_submissions = 0
+    unmatched_reviews = 0
+    rework = 0
+    accepted = 0
+    accept_events = {}
+    stop_reasons = []
+    stop_events = {}
+
+    for event in events:
+        event_type = event.get("type")
+        payload = event.get("payload") or {}
+        if event_type == "ask_started":
+            ask_started += 1
+        elif event_type == "ask_answered":
+            ask_answered += 1
+        elif event_type == "decision_requested":
+            blocks = payload.get("blocks")
+            if blocks is None or blocks in BLOCKING_DECISION_SCOPES:
+                decision_requested += 1
+        elif event_type == "decision_answered":
+            decision_answered += 1
+        elif event_type == "decision_withdrawn":
+            decision_withdrawn += 1
+        elif event_type == "department_activated":
+            department = event.get("department") or payload.get("department")
+            session_id = event.get("session_id")
+            if department in verifier_departments and session_id not in branch_sessions:
+                verifier_activations += 1
+                aid = payload.get("activation_id")
+                if isinstance(aid, str) and aid:
+                    verifier_activation_ids.add(aid)
+                if isinstance(session_id, str) and session_id:
+                    verifier_sessions.add(session_id)
+        elif _is_review_submission(event_type, payload):
+            review_submissions += 1
+            aid = payload.get("activation_id")
+            sid = event.get("session_id")
+            in_activation = (
+                (isinstance(aid, str) and aid in verifier_activation_ids)
+                or (isinstance(sid, str) and sid in verifier_sessions)
+                or (aid is None and sid is None and verifier_activations > 0)
+            )
+            if not in_activation:
+                unmatched_reviews += 1
+            verdict = payload.get("verdict")
+            if verdict in REWORK_VERDICTS:
+                rework += 1
+            elif event_type == "baseline_review_accepted":
+                accepted += 1
+                accept_events[event_type] = accept_events.get(event_type, 0) + 1
+        elif event_type in ACCEPT_EVENT_TYPES or event_type == "artifact_accepted":
+            accepted += 1
+            accept_events[event_type] = accept_events.get(event_type, 0) + 1
+        elif event_type in TERMINAL_EVENT_TYPES:
+            reason = (
+                event.get("stop_reason")
+                or payload.get("stop_reason")
+                or payload.get("status")
+                or event.get("state_after")
+                or event_type
+            )
+            stop_reasons.append(str(reason))
+            stop_events[event_type] = stop_events.get(event_type, 0) + 1
+
+    return {
+        "asking": ask_started,
+        "waiting_user": decision_requested,
+        "verifying": verifier_activations + unmatched_reviews,
+        "rework": rework,
+        "accepted": accepted,
+        "stopped": len(stop_reasons),
+        "stop_reasons": stop_reasons,
+        "breakdown": {
+            "ask_started": ask_started,
+            "ask_answered": ask_answered,
+            "decision_requested": decision_requested,
+            "decision_answered": decision_answered,
+            "decision_withdrawn": decision_withdrawn,
+            "verifier_activations": verifier_activations,
+            "review_submissions": review_submissions,
+            "accept_events": accept_events,
+            "stop_events": stop_events,
+        },
+    }
+
+
+def _usage_is_reported(usage):
+    if not isinstance(usage, dict) or not usage:
+        return False
+    if "reported" in usage:
+        return bool(usage["reported"])
+    return any(_non_negative_number(usage.get(field)) is not None for field in USAGE_PRESENCE_FIELDS)
+
+
+def _merge_usage(existing, incoming):
+    if _usage_is_reported(incoming):
+        return incoming
+    if _usage_is_reported(existing):
+        return existing
+    if isinstance(incoming, dict) and incoming:
+        return incoming
+    return existing
+
+
+def _parse_iso_timestamp(value):
+    if not isinstance(value, str) or not value:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+
+def _attempt_duration_ms(attempt):
+    direct = _non_negative_number(attempt.get("duration_ms"))
+    if direct is not None:
+        return int(round(direct))
+    started = _parse_iso_timestamp(attempt.get("started_at"))
+    finished = _parse_iso_timestamp(attempt.get("finished_at"))
+    if started is not None and finished is not None:
+        try:
+            delta_ms = (finished - started).total_seconds() * 1000.0
+        except TypeError:
+            delta_ms = None
+        if delta_ms is not None and delta_ms >= 0:
+            return int(round(delta_ms))
+    usage = attempt.get("usage")
+    if isinstance(usage, dict):
+        latency = _non_negative_number(usage.get("latency_ms"))
+        if latency is not None:
+            return int(round(latency))
+    return None
+
+
+def _merge_attempt_fields(target, incoming):
+    for key in ("activation_id", "session_id", "department", "logical_call_id",
+                "root_step_id", "step_id", "purpose", "started_at", "finished_at"):
+        value = incoming.get(key)
+        if value is not None and target.get(key) is None:
+            target[key] = value
+    if incoming.get("purpose") and incoming["purpose"] != "work":
+        target["purpose"] = incoming["purpose"]
+    if incoming.get("finished_at") is not None:
+        target["finished_at"] = incoming["finished_at"]
+    if incoming.get("duration_ms") is not None:
+        target["duration_ms"] = incoming["duration_ms"]
+    if incoming.get("work_round") is not None:
+        target["work_round"] = incoming["work_round"]
+    target["usage"] = _merge_usage(target.get("usage"), incoming.get("usage"))
+
+
+def _resolve_activation_for_event(state, activation_id, session_id, department):
+    if isinstance(activation_id, str) and activation_id in state["by_id"]:
+        return state["by_id"][activation_id]
+    if isinstance(session_id, str) and session_id in state["open_by_session"]:
+        return state["open_by_session"][session_id]
+    if isinstance(department, str) and department in state["open_by_dept"]:
+        return state["open_by_dept"][department]
+    return None
+
+
+def _scan_events_for_rounds(events):
+    """按时间顺序解析激活轮次、询问分支归属以及事件侧的模型调用尝试。"""
+    state = {
+        "activations": [],
+        "by_id": {},
+        "open_by_session": {},
+        "open_by_dept": {},
+        "branch_round_by_session": {},
+        "current_round": 0,
+        "attempts": [],
+        "by_attempt_id": {},
+        "pending_no_id": {},
+    }
+
+    for event in events:
+        event_type = event.get("type")
+        payload = event.get("payload") or {}
+        sid = event.get("session_id")
+        dept = event.get("department") or payload.get("department")
+        aid = payload.get("activation_id")
+
+        if event_type == "ask_started":
+            branch_sid = payload.get("branch_session_id")
+            if isinstance(branch_sid, str) and branch_sid:
+                caller = _resolve_activation_for_event(state, aid, sid, dept)
+                caller_round = caller["round"] if caller is not None else max(state["current_round"], 1)
+                state["branch_round_by_session"][branch_sid] = caller_round
+            continue
+
+        if event_type == "department_activated":
+            seq = len(state["activations"]) + 1
+            act_id = aid if isinstance(aid, str) and aid else f"act#{seq}"
+            ask_branch = isinstance(sid, str) and sid in state["branch_round_by_session"]
+            cycle = _positive_int(payload.get("cycle"))
+            if ask_branch:
+                round_no = (cycle if cycle is not None
+                            else state["branch_round_by_session"].get(sid, max(state["current_round"], 1)))
+            elif cycle is not None:
+                state["current_round"] = max(state["current_round"], cycle)
+                round_no = cycle
+            else:
+                state["current_round"] += 1
+                round_no = state["current_round"]
+            act = {
+                "sequence": seq,
+                "round": round_no,
+                "ask_branch": ask_branch,
+                "activation_id": act_id,
+                "session_id": sid,
+                "department": dept,
+                "fallback_compaction_recorded": 0,
+            }
+            state["activations"].append(act)
+            state["by_id"][act_id] = act
+            if isinstance(sid, str) and sid:
+                state["open_by_session"][sid] = act
+            if isinstance(dept, str) and dept:
+                state["open_by_dept"][dept] = act
+            continue
+
+        if event_type == "activation_finished":
+            if isinstance(sid, str) and sid in state["open_by_session"]:
+                if not aid or state["open_by_session"][sid]["activation_id"] == aid:
+                    state["open_by_session"].pop(sid, None)
+            if isinstance(dept, str) and dept in state["open_by_dept"]:
+                if not aid or state["open_by_dept"][dept]["activation_id"] == aid:
+                    state["open_by_dept"].pop(dept, None)
+            continue
+
+        if event_type == "compaction_recorded":
+            target = _resolve_activation_for_event(state, aid, sid, dept)
+            if target is not None:
+                target["fallback_compaction_recorded"] += 1
+            continue
+
+        if event_type in ATTEMPT_EVENT_TYPES:
+            resolved = _resolve_activation_for_event(state, aid, sid, dept)
+            resolved_aid = resolved["activation_id"] if resolved is not None else aid
+            step_id = payload.get("step_id") if payload.get("step_id") is not None else payload.get("step")
+            purpose = payload.get("purpose") or "work"
+            started_at = payload.get("started_at")
+            finished_at = payload.get("finished_at")
+            if event_type == "model_requested" and started_at is None:
+                started_at = event.get("created_at")
+            if event_type != "model_requested" and finished_at is None:
+                finished_at = event.get("created_at")
+
+            record = {
+                "activation_id": resolved_aid,
+                "session_id": sid,
+                "department": dept or (resolved["department"] if resolved is not None else None),
+                "logical_call_id": payload.get("logical_call_id"),
+                "root_step_id": payload.get("root_step_id"),
+                "step_id": step_id,
+                "purpose": purpose,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "duration_ms": payload.get("duration_ms"),
+                "usage": payload.get("usage"),
+                "work_round": _positive_int(payload.get("cycle")),
+            }
+            attempt_id = payload.get("attempt_id")
+            if isinstance(attempt_id, str) and attempt_id:
+                existing = state["by_attempt_id"].get(attempt_id)
+                if existing is None:
+                    state["by_attempt_id"][attempt_id] = record
+                    state["attempts"].append(record)
+                else:
+                    _merge_attempt_fields(existing, record)
+            else:
+                pending_key = (resolved_aid, sid, dept, step_id, purpose)
+                queue = state["pending_no_id"].setdefault(pending_key, [])
+                if event_type == "model_requested":
+                    state["attempts"].append(record)
+                    queue.append(record)
+                elif queue:
+                    _merge_attempt_fields(queue.pop(0), record)
+                else:
+                    state["attempts"].append(record)
+
+    return state
+
+
+def _merge_export_attempts(state, export_attempts):
+    """把 export['attempts'] 中的详细记录合并进来，已按 attempt_id 采集的不重复计。"""
+    for item in export_attempts or ():
+        if not isinstance(item, dict):
+            continue
+        attempt_id = item.get("id") or item.get("attempt_id")
+        step_id = item.get("step_id") if item.get("step_id") is not None else item.get("step")
+        record = {
+            "activation_id": item.get("activation_id"),
+            "session_id": item.get("session_id"),
+            "department": item.get("department"),
+            "logical_call_id": item.get("logical_call_id"),
+            "root_step_id": item.get("root_step_id"),
+            "step_id": step_id,
+            "purpose": item.get("purpose") or "work",
+            "started_at": item.get("started_at"),
+            "finished_at": item.get("finished_at"),
+            "duration_ms": item.get("duration_ms"),
+            "usage": item.get("usage"),
+            "work_round": _positive_int(item.get("work_round")),
+        }
+        if isinstance(attempt_id, str) and attempt_id:
+            existing = state["by_attempt_id"].get(attempt_id)
+            if existing is None:
+                state["by_attempt_id"][attempt_id] = record
+                state["attempts"].append(record)
+            else:
+                _merge_attempt_fields(existing, record)
+        else:
+            state["attempts"].append(record)
+
+
+def _logical_call_key(attempt, index, purpose):
+    logical_call_id = attempt.get("logical_call_id")
+    if isinstance(logical_call_id, str) and logical_call_id:
+        return logical_call_id
+    if attempt.get("root_step_id") is not None:
+        return f"root:{purpose}:{attempt['root_step_id']}"
+    if attempt.get("step_id") is not None:
+        return f"step:{purpose}:{attempt['step_id']}"
+    return f"idx:{purpose}:{index}"
+
+
+def _summarize_activation(act, act_attempts):
+    work_calls = set()
+    compaction_calls = set()
+    compaction_attempts = 0
+    compaction_durations_ms = []
+    reported_requests = 0
+    token_sums = {field: 0 for field in ROUND_TOKEN_FIELDS}
+    has_token = {field: False for field in ROUND_TOKEN_FIELDS}
+
+    for index, attempt in enumerate(act_attempts):
+        purpose = attempt.get("purpose") or "work"
+        logical_key = _logical_call_key(attempt, index, purpose)
+        if purpose == "compaction":
+            compaction_calls.add(logical_key)
+            compaction_attempts += 1
+            duration = _attempt_duration_ms(attempt)
+            if duration is not None:
+                compaction_durations_ms.append(duration)
+        else:
+            work_calls.add(logical_key)
+
+        usage = attempt.get("usage")
+        if _usage_is_reported(usage):
+            reported_requests += 1
+            for field in ROUND_TOKEN_FIELDS:
+                value = usage.get(field)
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    token_sums[field] += int(value)
+                    has_token[field] = True
+
+    compaction_requests = (len(compaction_calls) if compaction_attempts > 0
+                           else act["fallback_compaction_recorded"])
+    if compaction_durations_ms:
+        compaction_duration_ms = sum(compaction_durations_ms)
+        compaction_duration_seconds = round(compaction_duration_ms / 1000.0, 1)
+        compaction_max_duration_ms = max(compaction_durations_ms)
+    elif compaction_attempts == 0 and compaction_requests == 0:
+        compaction_duration_ms = 0
+        compaction_duration_seconds = 0.0
+        compaction_max_duration_ms = 0
+    else:
+        compaction_duration_ms = None
+        compaction_duration_seconds = None
+        compaction_max_duration_ms = None
+
+    model_requests = len(act_attempts)
+    return {
+        "sequence": act["sequence"],
+        "round": act["round"],
+        "ask_branch": act["ask_branch"],
+        "activation_id": act["activation_id"],
+        "department": act["department"],
+        "work_steps": len(work_calls),
+        "model_requests": model_requests,
+        "usage_reported_requests": reported_requests,
+        "usage_reported_ratio": (round(reported_requests / model_requests, 4)
+                                 if model_requests > 0 else None),
+        "input_tokens": token_sums["input_tokens"] if has_token["input_tokens"] else None,
+        "output_tokens": token_sums["output_tokens"] if has_token["output_tokens"] else None,
+        "total_tokens": token_sums["total_tokens"] if has_token["total_tokens"] else None,
+        "compaction_requests": compaction_requests,
+        "compaction_attempts": compaction_attempts,
+        "compaction_duration_ms": compaction_duration_ms,
+        "compaction_duration_seconds": compaction_duration_seconds,
+        "compaction_max_duration_ms": compaction_max_duration_ms,
+    }
+
+
+def _activation_rounds(export):
+    """按每次 `model_attempt_*` 真实归属的激活轮次统计各部门工作步数、用量与压缩耗时。"""
+    events = export.get("events") or []
+    state = _scan_events_for_rounds(events)
+    _merge_export_attempts(state, export.get("attempts"))
+
+    attempts_by_act = {}
+    for attempt in state["attempts"]:
+        aid = attempt.get("activation_id")
+        if isinstance(aid, str) and aid in state["by_id"]:
+            key = aid
+        else:
+            fallback_id = aid if isinstance(aid, str) and aid else f"unscoped:{attempt.get('work_round') or 1}:{attempt.get('department') or ''}"
+            if fallback_id not in state["by_id"]:
+                seq = len(state["activations"]) + 1
+                round_no = attempt.get("work_round") or max(state["current_round"], 1)
+                act = {
+                    "sequence": seq,
+                    "round": round_no,
+                    "ask_branch": False,
+                    "activation_id": fallback_id,
+                    "session_id": attempt.get("session_id"),
+                    "department": attempt.get("department"),
+                    "fallback_compaction_recorded": 0,
+                }
+                state["activations"].append(act)
+                state["by_id"][fallback_id] = act
+            key = fallback_id
+        attempts_by_act.setdefault(key, []).append(attempt)
+
+    return [_summarize_activation(act, attempts_by_act.get(act["activation_id"], ()))
+            for act in state["activations"]]
+
+
 # --- 模型服务故障 --------------------------------------------------
 
 def _is_model_service_failure(events):
     """模型服务故障：凭据被拒、连接失败、限流与服务端错误（provider 侧故障）。"""
     for event in events:
-        if event["type"] not in ("model_attempt_failed", "run_paused", "run_failed"):
+        event_type = event.get("type")
+        if event_type not in ("model_attempt_failed", "run_paused", "run_failed"):
             continue
-        text = json.dumps(event["payload"], ensure_ascii=False).lower()
+        payload = event.get("payload") or {}
+        if event_type == "run_failed":
+            stop_reason = event.get("stop_reason") or payload.get("stop_reason")
+            if stop_reason == "provider_error":
+                return True
+        text = json.dumps(payload, ensure_ascii=False).lower()
         if any(marker in text for marker in FAILURE_MARKERS):
             return True
     return False
