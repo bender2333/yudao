@@ -338,13 +338,20 @@ def bare_title(title: str) -> str:
 
 
 @lru_cache(maxsize=None)
-def changelog_titles() -> frozenset[str]:
-    """docs/CHANGELOG.md 里作为「旧标题」出现过的标题。"""
-    try:
-        text = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
-    except OSError:
-        return frozenset()
-    return frozenset(m.strip() for m in re.findall(r"「([^」\n]{1,60})」\s*→\s*「[^」\n]{1,60}」", text))
+def changelog_titles(text: str | None = None) -> frozenset[str]:
+    """docs/CHANGELOG.md（或给定正文）里作为「旧标题」出现过的标题。"""
+    if text is None:
+        try:
+            text = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
+        except OSError:
+            return frozenset()
+    return frozenset(
+        m.strip()
+        for m in re.findall(
+            r"「((?:[^「」\n]|「[^「」\n]*」){1,60})」\s*→\s*「(?:[^「」\n]|「[^「」\n]*」){1,60}」",
+            text,
+        )
+    )
 
 
 def squeeze(text: str) -> str:
@@ -402,3 +409,19 @@ def test_a_changelog_old_title_passes_but_an_unknown_title_fails():
 
     assert allowed(olds[0]), "CHANGELOG 记过的旧标题应当放过"
     assert not allowed("这一节从来没有过"), "没记过的标题仍然要失败"
+
+
+def test_changelog_titles_matches_old_titles_with_nested_brackets():
+    """旧标题内部包含一层「...」时仍能从变更记录中匹配出来（守 R2：标题内含「」的旧标题在更名后仍可按合同识别）。"""
+    sample = (
+        "示例记录（`docs/design/network-and-mcp.md`："
+        "「设置页「高级」的「MCP 服务器」」 → 「设置页的「MCP 服务器」」，"
+        "「单个「内嵌」标题」 → 「普通「新」标题」，"
+        "「普通旧标题」 → 「另一「新」标题」）\n"
+    )
+    matched = changelog_titles(sample)
+    assert "设置页「高级」的「MCP 服务器」" in matched
+    assert "单个「内嵌」标题" in matched
+    assert "普通旧标题" in matched
+    assert "普通「新」标题" not in matched
+    assert "另一「新」标题" not in matched
