@@ -21,12 +21,15 @@ import {
   NOT_REPORTED_TEXT,
   entryLinks,
   guidanceFacts,
+  guidanceItems,
+  lastRequestDetail,
   lastRequestFacts,
   liveOutputShown,
   nodePanelView,
   stateText,
   waitedTextFor,
   workshopFacts,
+  workshopRecoveryNeeded,
 } from "../../src/renderer/src/views/project/node-panel-model.ts";
 
 function node(overrides: Partial<LoopNode> = {}): LoopNode {
@@ -263,4 +266,36 @@ test("面板里不写死职能清单：这份组织以外的职能名一个都�
     assert.doesNotMatch(written, new RegExp(other));
   }
   assert.match(view.links.requests, /dept=ops/);
+});
+
+test("结构化指导记录、最近请求详情与结果未知恢复判断与原面板事实同源", () => {
+  // R1/R2：LiveWindow 与节点面板复用同一套 lastRequestDetail、guidanceItems 与 workshopRecoveryNeeded
+  assert.equal(workshopRecoveryNeeded(null), false);
+  assert.equal(workshopRecoveryNeeded(workspace({ room: { remote_unknown: true } })), true);
+
+  const callData = workspace({
+    last_call: { requested_model: "gpt-5", requested_protocol: "responses", requested_tier: "high", sent_tier: "high" },
+    guidance: [
+      {
+        guidance_id: "g1",
+        version: 2,
+        text: "先补测试再改实现",
+        status: "received",
+        created_event_id: "ev-g1",
+        applied_activation_id: null,
+        answered_activation_id: null,
+        outcome: null,
+      },
+    ],
+  });
+  const detail = lastRequestDetail(callData);
+  assert.equal(detail?.hasCall, true);
+  assert.equal(detail?.model, "gpt-5");
+  assert.equal(detail?.summary, lastRequestFacts(callData)[0].value);
+
+  const gItems = guidanceItems(callData);
+  assert.equal(gItems.length, 1);
+  assert.equal(gItems[0].version, 2);
+  assert.equal(gItems[0].text, "先补测试再改实现");
+  assert.equal(gItems[0].statusLabel, guidanceFacts(callData)[0].value);
 });
