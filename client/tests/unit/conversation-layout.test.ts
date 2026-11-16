@@ -46,7 +46,7 @@ function collectComponentMarkers(source: string): Array<{ tag: string; pos: numb
 }
 
 test("对话页主区布局顺序为：循环图 -> 详情面板 -> 时序图 -> 线程与输入框", () => {
-  // R3：设计说明 docs/design/project-organization.md「对话」页：详情面板展在循环图正下方、时序图上方
+  // R3：设计说明 docs/design/project-organization.md「节点面板与箭头面板接住的内容」：详情面板展在循环图正下方、时序图上方
   const source = fs.readFileSync(CONVERSATION_PATH, "utf8");
   const markers = collectComponentMarkers(source);
   const picker = markers.find((m) => m.tag === "ItemPicker");

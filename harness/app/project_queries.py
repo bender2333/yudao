@@ -2714,7 +2714,7 @@ class PrdChangeRecordView(Contract):
 
 
 class ProductSpecView(Contract):
-    # 一版有效合同对应的结构化 PRD 正文（docs/design/app-and-interface.md「work_item.materials」）
+    # 一版有效合同对应的结构化 PRD 正文（docs/design/project-organization.md「节点面板与箭头面板接住的内容」）
     spec_id: str
     spec_revision: int
     spec_status: str
