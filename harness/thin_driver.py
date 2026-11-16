@@ -205,6 +205,7 @@ class RoundDependencies:
     work_ref: Any
     refresh_workspace: Any
     mcp_sessions: Any = None
+    ask_user: Any = None
 
 
 @dataclass
@@ -275,8 +276,12 @@ class ThinDriver:
         self.segment_ms: dict[str, int] = {}
         self._segment_start: dict[str, float] = {}
         # 每个会话这一段的起点（run 的已用毫秒）：会话自己的累计已用时间读最小投影的会话一级用量，
-        # 这一段用掉多少由这个起点算
+        # 这一段用掉多少由这个起点算；同一轮中因等待用户暂停过的部分累记到 _session_paused_ms
         self._session_base_ms: dict[tuple[str, str], int] = {}
+        self._session_paused_ms: dict[tuple[str, str], int] = {}
+        # 正在等待本轮决定（不计入活跃执行）的 (run_id, 职能) 与等待登记表
+        self._waiting_rounds: set[tuple[str, str]] = set()
+        self._waiters: dict[str, dict[int, RoundWork]] = {}
         # 运行到停止的循环在等会话时同时等新工作：run 编号 → (循环, 事件)。
         # 没有会话在跑而新输入、指导或取消提交时，由 wake 打开它，循环醒来重新找可以开始的部门
         self._run_wakeups: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -307,29 +312,40 @@ class ThinDriver:
         # 会话这一段工作的起点：记下 run 此刻的累计已用时间
         self._session_base_ms[(run_id, session_id)] = self.elapsed_ms(run_id)
 
+    def pause_session_segment(self, run_id: str, session_id: str) -> None:
+        # 闭合当前已消耗的会话计时段，等待用户回答期间不再继续计入该会话耗时
+        key = (run_id, session_id)
+        base = self._session_base_ms.pop(key, None)
+        if base is not None:
+            self._session_paused_ms[key] = self._session_paused_ms.get(key, 0) + max(
+                0, self.elapsed_ms(run_id) - base)
+
     def settle_session_segment(self, run_id: str, session_id: str, run_elapsed_ms: int) -> int:
-        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点，加上投影里已结算的那一部分。
+        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点，加上本轮暂停前已闭合与投影已结算部分。
         # 一个部门会话包含它等待的分支会话的时间（用量计入提问方），因此各会话的用时之和可以大于事项的用时
         key = (run_id, session_id)
         settled = self.session_used(run_id, session_id).settled_ms
+        paused = self._session_paused_ms.pop(key, 0)
         base = self._session_base_ms.pop(key, None)
-        if base is None:
-            return settled
-        return settled + max(0, run_elapsed_ms - base)
+        total = settled + paused
+        if base is not None:
+            total += max(0, run_elapsed_ms - base)
+        return total
 
     def session_elapsed_sec(self, run_id: str, session_id: str) -> float:
-        # 这个会话已经用的运行时间（秒）：投影里已结算的那一部分加上当前这一段
-        total = self.session_used(run_id, session_id).settled_ms
-        base = self._session_base_ms.get((run_id, session_id))
+        # 这个会话已经用的运行时间（秒）：投影里已结算的那一部分加上当前这一轮累计的各段
+        key = (run_id, session_id)
+        total = self.session_used(run_id, session_id).settled_ms + self._session_paused_ms.get(key, 0)
+        base = self._session_base_ms.get(key)
         if base is not None:
             total += max(0, self.elapsed_ms(run_id) - base)
         return total / 1000.0
 
     def pause_run_clock(self, run_id: str, exclude: str | None = None) -> None:
         # 暂停这个 run 的段计时：进入等待时调用，等待的时间不计入运行时间。
-        # 同时运行：还有别的会话在工作时计时继续
+        # 同时运行：还有别的非等待中会话在工作时计时继续
         active = self.activations(run_id)
-        if any(key != exclude for key in active):
+        if any(key != exclude and (run_id, key) not in self._waiting_rounds for key in active):
             return
         started = self._segment_start.pop(run_id, None)
         if started is not None:
@@ -445,6 +461,7 @@ class ThinDriver:
             dispatch_number=parent.dispatch_number or 0,
         )
         # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
+        self._session_paused_ms.pop((run_id, session_id), None)
         self.start_session_segment(run_id, session_id)
         # 开始时的流版本读最小投影（工单 #1678）：停止判断核对流版本时用这一个
         version = transaction.minimal().stream_versions.get(transaction.stream, 0)
@@ -465,6 +482,7 @@ class ThinDriver:
             cancelled=round_work.stop_flag, deltas=dependencies.deltas,
             tightening=dependencies.tightening, refresh_workspace=dependencies.refresh_workspace,
             definitions=dependencies.definitions, mcp_sessions=dependencies.mcp_sessions,
+            ask_user=dependencies.ask_user,
         )
         return round_work.driver
 
@@ -658,10 +676,13 @@ class ThinDriver:
 
     def withdraw_decisions(self, transaction: Transaction, reason: str) -> None:
         # 运行结束：撤销未回答的决定请求，reason 是结束运行的停止原因
-        status = transaction.minimal().status
+        minimal = transaction.minimal()
+        status = minimal.status
+        withdrawn = False
         for decision in list(transaction.decisions.values()):
             if decision.status != "open":
                 continue
+            withdrawn = True
             transaction.append(NewEvent(
                 SkeletonEventType.DECISION_WITHDRAWN, actor="system",
                 department=decision.request["department"],
@@ -669,6 +690,9 @@ class ThinDriver:
                 state_after=status,
                 payload={"decision_id": decision.decision_id, "reason": reason},
             ))
+        if withdrawn:
+            run_id = minimal.run_id
+            transaction.on_commit(lambda: self.wake(run_id, restart=True))
 
     # 安全节点 ---------------------------------------------------------------------------
 
@@ -734,6 +758,52 @@ class ThinDriver:
                     pass
         finally:
             round_work.wakeup = None
+
+    async def wait_for_decision(self, round_work: RoundWork, decision_id: str) -> tuple[Any | None, bool]:
+        # 仅暂停当前职能这一轮等待本轮范围决定：闭合本会话计时段，无其他活跃执行职能时暂停运行计时；
+        # 回答后按实际等待时长顺延单职能限时并重开计时段；运行结束或决定撤销时干净收束等待
+        run_id = round_work.run_id
+        department = round_work.department
+        session_id = round_work.scope.session_id
+        key = (run_id, department)
+        loop = asyncio.get_running_loop()
+        self.pause_session_segment(run_id, session_id)
+        self._waiting_rounds.add(key)
+        self.pause_run_clock(run_id, exclude=department)
+        wait_started = time.monotonic()
+        answered_decision: Any | None = None
+        try:
+            while True:
+                changed = asyncio.Event()
+                round_work.wakeup = (loop, changed)
+                self._waiters.setdefault(run_id, {})[id(round_work)] = round_work
+                snapshot = self._writes.read(run_stream(run_id))
+                minimal = snapshot.minimal()
+                decision = snapshot.decisions.get(decision_id)
+                if decision is not None and decision.status == "answered":
+                    answered_decision = decision
+                    break
+                if (decision is None
+                        or decision.status == "withdrawn"
+                        or round_work.stop_flag.is_set()
+                        or self._hooks.aborted(run_id)
+                        or minimal.status in TERMINAL_STATUSES
+                        or self._hooks.blocks_run(snapshot.decisions.values())):
+                    return None, True
+                await changed.wait()
+        finally:
+            round_work.wakeup = None
+            waiters = self._waiters.get(run_id, {})
+            waiters.pop(id(round_work), None)
+            if not waiters:
+                self._waiters.pop(run_id, None)
+            self._waiting_rounds.discard(key)
+        wait_elapsed = max(0.0, time.monotonic() - wait_started)
+        if round_work.deadline is not None:
+            round_work.deadline += wait_elapsed
+        self.resume_run_clock(run_id)
+        self.start_session_segment(run_id, session_id)
+        return answered_decision, False
 
     # 循环与调度 -------------------------------------------------------------------------
 
@@ -832,9 +902,14 @@ class ThinDriver:
         return await asyncio.to_thread(self._hooks.settled, run_id)
 
     def wake(self, run_id: str, *, restart: bool = False) -> None:
-        # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用。
-        # 同时运行：这个 run 的每一个会话都醒过来
-        for round_work in list(self.activations(run_id).values()):
+        # 在安全节点或本轮决定处等待的激活立即醒来判断；在改变提交以后调用。
+        # 同时运行：这个 run 的每一个会话与等待中的轮次都醒过来
+        seen: set[int] = set()
+        for round_work in (*self.activations(run_id).values(), *self._waiters.get(run_id, {}).values()):
+            marker = id(round_work)
+            if marker in seen:
+                continue
+            seen.add(marker)
             wakeup = round_work.wakeup
             if wakeup is not None:
                 loop, changed = wakeup

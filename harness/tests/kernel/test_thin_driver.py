@@ -339,3 +339,193 @@ def test_a_stop_judgment_the_application_calls_expired_does_not_end_the_run(tmp_
         assert rig.hooks.superseded_asks == 1
         assert rig.events(SkeletonEventType.RUN_FAILED) == []
         assert rig.system.project(rig.run_id).status == "running"
+
+
+def test_round_dependencies_forwards_ask_user_and_wait_for_decision_pauses_timers_and_extends_deadline(tmp_path):
+    # 守 R1（只由你批准的一环）：RoundDependencies 把 ask_user 回调经执行契约交进执行实现；
+    # wait_for_decision 等待期间暂停本会话计时与运行计时，回答后顺延单职能限时并重开计时段
+    import threading
+    from harness.models import EventType, json_dumps
+
+    now = [0.0]
+    with _Rig(tmp_path, run_time_limit_sec=10, run_clock=lambda: now[0]) as rig:
+        seen_callbacks: list[object] = []
+
+        class _WaitExecution:
+            CONTRACT_VERSION = execution_contract.CURRENT_VERSION
+
+            @classmethod
+            def start(cls, request, *, nodes, cancelled, ask_user=None, **dependencies):
+                seen_callbacks.append(ask_user)
+                return cls(ask_user)
+
+            def __init__(self, ask_user) -> None:
+                self._ask_user = ask_user
+
+            def cancel(self) -> None:
+                pass
+
+            async def result(self):
+                assert self._ask_user is not None
+                answered, stopped = await self._ask_user()
+                assert stopped is False
+                assert answered.status == "answered"
+                return execution_contract.RoundResult(version=0)
+
+        round_work = rig.begin()
+        now[0] = 0.125
+        # 直接在 round_work 上设置剩余 0.125 秒限时；等待 0.35 秒后顺延，verify deadline 顺延仍不得超时
+        limits = execution_contract.StepLimits()
+        decision_box: list[str] = []
+
+        def emit_role_choice(tx):
+            ev = tx.append(
+                __import__("harness.write_path", fromlist=["NewEvent"]).NewEvent(
+                    EventType.DECISION_REQUESTED,
+                    actor="system",
+                    department=DEPARTMENT,
+                    state_before=tx.minimal().status,
+                    state_after=tx.minimal().status,
+                    payload={
+                        "kind": "role_choice",
+                        "blocks": "round",
+                        "options": [{"id": "submit", "label": "提交回答"}],
+                        "description": "待选择",
+                        "facts": [],
+                        "department": DEPARTMENT,
+                        "questions": [],
+                    },
+                )
+            )[0]
+            decision_box.append(ev.event_id)
+
+        rig.hooks.transact_run(rig.run_id, emit_role_choice)
+        decision_id = decision_box[0]
+
+        async def ask_cb():
+            # 模拟外层已激活轮次登记，验证 wake() 去重与 wait_for_decision 的计时暂停/恢复
+            rig.driver._active[rig.run_id] = {DEPARTMENT: round_work}
+            rig.driver.pause_session_segment(rig.run_id, SESSION)
+            # 幂等再次闭合，覆盖 base is None 分支
+            rig.driver.pause_session_segment(rig.run_id, SESSION)
+            assert round(rig.driver.session_elapsed_sec(rig.run_id, SESSION), 3) == 0.125
+
+            def answer_soon():
+                time.sleep(0.35)
+                # 等待期间即使外部单调时钟推进，暂停中的 run 计时不得增长
+                now[0] = 10.0
+
+                def write_answer(tx):
+                    tx.append(
+                        __import__("harness.write_path", fromlist=["NewEvent"]).NewEvent(
+                            EventType.DECISION_ANSWERED,
+                            actor="user:local",
+                            department=DEPARTMENT,
+                            parent_event_id=decision_id,
+                            state_before=tx.minimal().status,
+                            state_after=tx.minimal().status,
+                            payload={"decision_id": decision_id, "option": "submit",
+                                     "note": None, "base_version": 1},
+                        )
+                    )
+                    tx.on_commit(lambda: rig.driver.wake(rig.run_id))
+
+                rig.hooks.transact_run(rig.run_id, write_answer)
+
+            round_work.deadline = time.monotonic() + 0.125
+            threading.Thread(target=answer_soon, daemon=True).start()
+            res = await rig.driver.wait_for_decision(round_work, decision_id)
+            assert round(rig.driver.session_elapsed_sec(rig.run_id, SESSION), 3) == 0.125
+            assert rig.driver.at_safe_node(round_work).proceed is True
+            now[0] = 10.25
+            rig.driver._active.pop(rig.run_id, None)
+            return res
+
+        rig.hooks.dependencies = RoundDependencies(
+            execution=_WaitExecution,
+            assembly=_Assembly,
+            artifacts=None,
+            facade=None,
+            deltas=None,
+            tightening=None,
+            definitions=None,
+            environment=None,
+            limits=limits,
+            work_ref=None,
+            refresh_workspace=None,
+            ask_user=ask_cb,
+        )
+        asyncio.run(rig.driver.invoke_round(round_work))
+        assert seen_callbacks == [ask_cb]
+        rig.driver.finish_round(round_work, started=time.monotonic())
+        [finished] = rig.events(SkeletonEventType.ACTIVATION_FINISHED)
+        # 9.875 秒等待被剔除，总耗时仅 0.125 + 0.25 = 375ms
+        assert finished.payload["elapsed_ms"] == 375
+        assert finished.payload["session_elapsed_ms"] == 375
+        # 覆盖 _session_base_ms 为空且有 settled 的 session_elapsed_sec 分支
+        assert round(rig.driver.session_elapsed_sec(rig.run_id, SESSION), 3) == 0.375
+        assert json_dumps(finished.payload)
+
+
+def test_wait_for_decision_tracks_concurrent_active_dept_and_exits_on_withdraw(tmp_path):
+    # 守 R1（只由你批准的一环）：同一 run 有另一非等待职能活跃时不暂停总计时，待另一职能结束后
+    # 总计时随即暂停；若等待期间决定被撤回则干净退出并正确结算停表前用量
+    from dataclasses import replace
+    from harness.models import EventType
+    from harness.write_path import NewEvent
+
+    now = [0.0]
+    with _Rig(tmp_path, run_time_limit_sec=10, run_clock=lambda: now[0]) as rig:
+        round_work = rig.begin()
+        other_scope = replace(
+            round_work.scope,
+            department="other_dept",
+            session_id="ses_other_1",
+            activation_id="act_other",
+        )
+        other_work = __import__("harness.thin_driver", fromlist=["RoundWork"]).RoundWork(
+            other_scope, _Prompt(), __import__("threading").Event(), object(), 1)
+        rig.driver._active[rig.run_id] = {DEPARTMENT: round_work, "other_dept": other_work}
+
+        decision_ids: list[str] = []
+
+        def emit_decisions(tx):
+            ev1 = tx.append(NewEvent(
+                EventType.DECISION_REQUESTED, actor="system", department=DEPARTMENT,
+                state_before=tx.minimal().status, state_after=tx.minimal().status,
+                payload={"kind": "role_choice", "blocks": "round",
+                         "options": [{"id": "submit", "label": "提交"}],
+                         "description": "等待1", "facts": [], "department": DEPARTMENT, "questions": []},
+            ))[0]
+            decision_ids.append(ev1.event_id)
+
+        rig.hooks.transact_run(rig.run_id, emit_decisions)
+
+        async def scenario():
+            waiter1 = asyncio.create_task(rig.driver.wait_for_decision(round_work, decision_ids[0]))
+            waiter2 = asyncio.create_task(rig.driver.wait_for_decision(other_work, decision_ids[0]))
+            await asyncio.sleep(0)
+            # 让 other_work 临时从等待集合移出并恢复跑表，模拟另一活跃职能继续跑表 0.4s，随后结束该职能停表
+            rig.driver._waiting_rounds.discard((rig.run_id, "other_dept"))
+            rig.driver.resume_run_clock(rig.run_id)
+            now[0] = 0.4
+            rig.driver.pause_run_clock(rig.run_id, exclude=None)
+            assert rig.driver.elapsed_ms(rig.run_id) == 400
+            # settle_run_segment 结算 other_dept 时只剩 DEPARTMENT 在等待中，此时应暂停总计时
+            settled_at = rig.driver.settle_run_segment(rig.run_id, "other_dept")
+            assert settled_at == 400
+            now[0] = 5.0
+            assert rig.driver.elapsed_ms(rig.run_id) == 400
+            rig.driver._waiting_rounds.add((rig.run_id, "other_dept"))
+            # 撤回决定后由 on_commit 触发 wake(restart=True) 唤醒等待中的两个任务并干净返回 stopped=True
+            rig.hooks.transact_run(rig.run_id, lambda tx: rig.driver.withdraw_decisions(tx, "cancelled"))
+            res1, res2 = await asyncio.gather(waiter1, waiter2)
+            assert res1 == (None, True)
+            assert res2 == (None, True)
+
+        asyncio.run(scenario())
+        rig.driver._active.pop(rig.run_id, None)
+        rig.driver.finish_round(round_work, started=time.monotonic())
+        [finished] = rig.events(SkeletonEventType.ACTIVATION_FINISHED)
+        assert finished.payload["elapsed_ms"] == 400
+        assert finished.payload["session_elapsed_ms"] == 0

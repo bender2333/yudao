@@ -136,6 +136,9 @@ NOT_WIRED_REASONS: dict[str, str] = {
     # 已接入（工单 #1582）：建 run 时冻结，浏览器会话按本 run 的冻结值起 ServerLaunch（harness/environment.py
     # 的 _open_browser），是 Playwright MCP 自己的动作时限与导航时限之外的上限；改参数只作用于之后创建的 run
     "browser.call_timeout_sec": "",
+    # 已接入（工单 #1800）：建 run 时冻结，向用户提问执行时按冻结值校验单轮最多提问数与同次输入最多提问轮数
+    "ask_user.max_questions_per_round": "",
+    "ask_user.max_rounds_per_input": "",
 
     # 还没有读取方：取值不影响任何行为
     "adjudication.plan_before_write": "没有代码读取这条登记的取值：写入前的计划检查还没有实现",
@@ -189,8 +192,6 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "wait.desktop.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "wait.desktop_unlock.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
-    "ask_user.max_questions_per_round": "还没有代码读取它：向用户提问工具调用时按每轮最多提问数校验题数上限的逻辑待后续工单（#1800）接入",
-    "ask_user.max_rounds_per_input": "还没有代码读取它：同次用户输入下统计并限制向用户提问轮数上限的逻辑待后续工单（#1800）接入",
 }
 # 已接入（工单 #1189、#1401）：每个角色的可见范围在建 run 时冻结，上下文装配只读冻结的那份。
 # 每个角色一条，名字跟着角色编号走，所以按定义里的角色补进同一份清单

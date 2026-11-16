@@ -87,6 +87,12 @@ WIRED_READERS: dict[str, tuple[Reader, ...]] = {
     "browser.call_timeout_sec": (
         Reader("frozen", "harness/environment.py 的 _open_browser 读这个 run 的冻结值，交给 "
                          "harness/browser.py 的 BrowserSessions.start 起 ServerLaunch"),),
+    "ask_user.max_questions_per_round": (
+        Reader("frozen", "harness/orchestrator.py 的 _execute_ask_user 读这个 run 的冻结值，"
+                         "校验单轮向用户提问的题数上限"),),
+    "ask_user.max_rounds_per_input": (
+        Reader("frozen", "harness/orchestrator.py 的 _execute_ask_user 读这个 run 的冻结值，"
+                         "校验同次用户输入下的向用户提问轮数上限（含设为 0 时拒绝）"),),
     "roles.product.visibility": (
         Reader("frozen", "harness/context.py 的 frozen_visibility 按角色读冻结值，装配只放这个角色看得见的材料"),),
     "roles.engineering.visibility": (

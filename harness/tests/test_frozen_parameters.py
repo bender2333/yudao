@@ -485,29 +485,27 @@ def test_ask_user_tool_and_rules_load_and_validate_bounds_across_all_forms(tmp_p
 
 
 def test_new_runs_freeze_ask_user_parameters_and_old_snapshots_preserve_values_with_defaults(tmp_path):
-    # R2（测试按三环留）：新建 run 冻结 ask_user 参数、未接入前拒绝参数改写，旧快照缺这两项时保留既有冻结值并从定义初值补齐
+    # R2（测试按三环留）：新建 run 冻结 ask_user 参数、已接入参数可按界限改写且不改变已建 run 的冻结值，
+    # 旧快照缺这两项时保留既有冻结值并从定义初值补齐
     for name in ("ask_user.max_questions_per_round", "ask_user.max_rounds_per_input"):
         assert name in FROZEN_PARAMETERS
-        assert NOT_WIRED_REASONS.get(name, "").strip()
-        assert not parameters.wired(name)
+        assert NOT_WIRED_REASONS.get(name) == ""
+        assert parameters.wired(name)
 
     system = _system(tmp_path)
-    with pytest.raises(ParameterNotWiredError, match="1800"):
-        _set(system, "ask_user.max_questions_per_round", 6)
-    with pytest.raises(ParameterNotWiredError, match="1800"):
-        _set(system, "ask_user.max_rounds_per_input", 4)
-
     _set(system, "max_model_steps", 7)
     first_run = system.create_run("冻结提问参数")
 
+    _set(system, "ask_user.max_questions_per_round", 6)
+    _set(system, "ask_user.max_rounds_per_input", 4)
     _set(system, "max_model_steps", 11)
-    second_run = system.create_run("再次更改步数参数后的 run")
+    second_run = system.create_run("再次更改步数与提问参数后的 run")
 
     reopened = _system(tmp_path)
     first = frozen_run_parameters(project_run(reopened.store, first_run))
     second = frozen_run_parameters(project_run(reopened.store, second_run))
     assert (first["max_model_steps"], first["ask_user.max_questions_per_round"], first["ask_user.max_rounds_per_input"]) == (7, 4, 2)
-    assert (second["max_model_steps"], second["ask_user.max_questions_per_round"], second["ask_user.max_rounds_per_input"]) == (11, 4, 2)
+    assert (second["max_model_steps"], second["ask_user.max_questions_per_round"], second["ask_user.max_rounds_per_input"]) == (11, 6, 4)
 
     created_payload = _created(reopened, first_run)
     assert created_payload["parameters"]["values"]["ask_user.max_questions_per_round"] == 4
