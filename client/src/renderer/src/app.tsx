@@ -14,6 +14,8 @@ import { SystemNotifier, noticeForEvent, pageTitle, type NoticeNames } from "./s
 import { Sidebar } from "./shell/sidebar";
 import { Tabbar, Topbar, type Tab } from "./shell/topbar";
 import { attemptBackPath, parseRoute, pathLabel, paths, projectTabs, type Route } from "./shell/routing";
+import { cancelNewProjectHash, isNewProjectEntryRoute } from "./shell/new-project-text";
+import { NewProjectPage } from "./views/home/new-project-page";
 import { HomePage } from "./views/home/page";
 import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
@@ -295,10 +297,15 @@ export function App() {
   // 第 108 行、工单 #296）。只有从别的页面进入模型管理时才记录；直接输入地址进来没有记录，
   // 回落首页
   const beforeModelsRef = useRef<string | null>(null);
+  const beforeCreateRef = useRef<string | null>(null);
   const prevRouteRef = useRef<string>(window.location.hash);
   useEffect(() => {
-    if (route.name === "sys-models" && parseRoute(prevRouteRef.current).name !== "sys-models") {
+    const prevName = parseRoute(prevRouteRef.current).name;
+    if (route.name === "sys-models" && prevName !== "sys-models") {
       beforeModelsRef.current = prevRouteRef.current;
+    }
+    if (isNewProjectEntryRoute(route.name) && !isNewProjectEntryRoute(prevName)) {
+      beforeCreateRef.current = prevRouteRef.current;
     }
     prevRouteRef.current = window.location.hash;
   }, [route]);
@@ -307,6 +314,8 @@ export function App() {
     const back = beforeModelsRef.current;
     return back === null || back === "" ? paths.home() : back;
   }, []);
+
+  const cancelCreateHash = useCallback(() => cancelNewProjectHash(beforeCreateRef.current), []);
   if (state.kind === "connecting") {
     return <div className="y10-gate gate"><div className="y10-gate-card card"><h1>连接中…</h1></div></div>;
   }
@@ -397,6 +406,26 @@ export function App() {
         <main className="y10-content content">
           {route.name === "home" ? (
             <HomePage app={app} onNavigate={navigate} at={route.at} targetDecision={targetDecision} />
+          ) : route.name === "new-project" ? (
+            <NewProjectPage
+              key="new-project"
+              app={app}
+              mode="idea"
+              capabilities={capabilities}
+              projects={projects}
+              onCancel={() => navigate(cancelCreateHash())}
+              onNavigate={navigate}
+            />
+          ) : route.name === "onboard-project" ? (
+            <NewProjectPage
+              key="onboard-project"
+              app={app}
+              mode="existing"
+              capabilities={capabilities}
+              projects={projects}
+              onCancel={() => navigate(cancelCreateHash())}
+              onNavigate={navigate}
+            />
           ) : route.name === "sys-models" ? (
             <ModelManagementPage
               views={app.viewSync}

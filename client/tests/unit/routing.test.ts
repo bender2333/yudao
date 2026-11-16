@@ -211,3 +211,27 @@ test("对话页路径支持可选位置参数，概览与对话回链均解析�
   assert.equal(projectOnly.at, 2);
 });
 
+// 工单 #1806（保护 R2）：独立新建与接入已有项目页使用规范路径 #/projects/new 与 #/projects/onboard，
+// 同时兼容解析 #/new 与 #/onboard；顶栏路径直接写页名，不拼项目前缀。
+test("独立新建与接入已有项目页的路径生成、兼容解析与顶栏路径名", () => {
+  assert.equal(paths.newProject(), "#/projects/new");
+  assert.equal(paths.onboardProject(), "#/projects/onboard");
+
+  for (const hash of ["#/projects/new", "#/projects/new/", "#/new", "#/new?from=home"]) {
+    const route = parseRoute(hash);
+    assert.equal(route.name, "new-project");
+    assert.equal(route.projectId, null);
+    assert.equal(pathLabel(route, [{ project_id: "demo", name: "演示项目" }]), "从想法新建项目");
+  }
+
+  for (const hash of ["#/projects/onboard", "#/projects/onboard/", "#/onboard"]) {
+    const route = parseRoute(hash);
+    assert.equal(route.name, "onboard-project");
+    assert.equal(route.projectId, null);
+    assert.equal(pathLabel(route, [{ project_id: "demo", name: "演示项目" }]), "接入已有项目");
+  }
+
+  assert.equal(parseRoute("#/projects/other").name, "not-found");
+  assert.equal(parseRoute("#/projects/new/extra").name, "not-found");
+});
+
