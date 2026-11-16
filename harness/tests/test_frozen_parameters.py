@@ -436,8 +436,10 @@ def test_ask_user_tool_and_rules_load_and_validate_bounds_across_all_forms(tmp_p
         assert set(option_schema["required"]) == {"id", "label"}
         assert "description" in option_schema["properties"]
 
+        # R1：三份形态全部角色（change 与 onboarding）均已配备 ask_user 工具（工单 #1801）
         for role in defs.departments:
-            assert "ask_user" not in defs.tools_for(role, "change")
+            assert "ask_user" in defs.tools_for(role, "change")
+            assert "ask_user" in defs.tools_for(role, "onboarding")
 
         questions_rule = defs.rules["ask_user.max_questions_per_round"]
         rounds_rule = defs.rules["ask_user.max_rounds_per_input"]

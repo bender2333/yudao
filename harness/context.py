@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import base64
 import json
-from dataclasses import asdict, dataclass
+from collections.abc import Sequence
 from copy import deepcopy
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .adjudication import offered_tools
 from .compaction import request_input_tokens
 from .contracts import artifact_hash
+from .decisions import ROLE_CHOICE, resolve_role_choice_answers
+from .kernel_events import accepted, replay_decisions
 from .providers.invoke import ToolImage, tool_image_part, tool_text_part
 from .watched_outputs import has_new_baseline_review
 from .artifacts import ArtifactStore
@@ -543,6 +546,17 @@ class ContextAssembler:
         feedback = _validation_feedback(projection, department)
         if feedback:
             parts.append(ContextPart("validation_feedback", feedback.get("event_id"), json_dumps(feedback)))
+        # 已回答的 role_choice 用户决定属全员只读共享的需求事实（docs/design/department-loop.md、independent-verification.md），
+        # 主线与 ask 询问分支、核验角色独立判断前后均可读取，保持 [intend] 原文独立不变。
+        user_decisions = _answered_user_decisions(events)
+        if user_decisions:
+            parts.append(
+                ContextPart(
+                    "user_decisions",
+                    f"{len(user_decisions)}:{canonical_hash(user_decisions)[:12]}",
+                    json_dumps(user_decisions),
+                )
+            )
         if projection.effective_contract is not None:
             parts.append(ContextPart("current_contract", projection.effective_contract.content_hash,
                                      json_dumps(projection.effective_contract)))
@@ -673,6 +687,11 @@ class ContextAssembler:
             ContextExclusion("expired_product_decisions", "earlier decisions enter the current contract only when the current ProductSpec explicitly retains them"),
             ContextExclusion("invalid_delivery_as_current", "superseded deliveries are not injected as current_delivery_spec"),
         ]
+        if not user_decisions:
+            excluded.append(ContextExclusion(
+                "user_decisions",
+                "no answered role_choice user decisions in the current run",
+            ))
         input_token_estimate = request_input_tokens(input_items, tools)
         if max_output_tokens is not None:
             # The request may spend whatever the window leaves after its input, up to the
@@ -891,6 +910,68 @@ def _causal_chain(projection: RunProjection) -> list[dict[str, str]]:
     for review in projection.reviews[-3:]:
         chain.append({"kind": "qa_review", "verdict": review.verdict, "hash": review.content_hash, "id": review.id})
     return chain
+
+
+def _answered_user_decisions(events: Sequence[Event] | None) -> list[dict[str, Any]]:
+    if not events:
+        return []
+    accepted_events = accepted(events)
+    decisions = replay_decisions(accepted_events)
+    answer_order: dict[str, int] = {}
+    for index, event in enumerate(accepted_events):
+        if event.type == EventType.DECISION_ANSWERED:
+            decision_id = str(event.payload.get("decision_id") or "")
+            if decision_id:
+                answer_order[decision_id] = index
+    answered = [
+        decision
+        for decision in decisions.values()
+        if decision.status == "answered"
+        and decision.request.get("kind") == ROLE_CHOICE.name
+        and isinstance(decision.answer, dict)
+    ]
+    answered.sort(
+        key=lambda item: (
+            str((item.answer or {}).get("answered_at") or ""),
+            answer_order.get(item.decision_id, 0),
+        )
+    )
+    rendered: list[dict[str, Any]] = []
+    for decision in answered:
+        request = decision.request
+        answer = decision.answer or {}
+        questions = list(request.get("questions") or ())
+        resolved = resolve_role_choice_answers(
+            questions,
+            str(answer.get("option") or ""),
+            answer.get("answers"),
+            decision=decision,
+        )
+        items: list[dict[str, Any]] = []
+        for question in questions:
+            q_id = str(question["id"])
+            selected_id = resolved[q_id]
+            option_labels = {
+                str(opt["id"]): str(opt.get("label") or opt["id"])
+                for opt in question.get("options") or ()
+                if isinstance(opt, dict) and "id" in opt
+            }
+            items.append({
+                "id": q_id,
+                "question": question["question"],
+                "selected_option_id": selected_id,
+                "selected_option_label": option_labels.get(selected_id, selected_id),
+            })
+        rendered.append({
+            "decision_id": decision.decision_id,
+            "department": request.get("department"),
+            "input_version": request.get("input_version"),
+            "round": request.get("round"),
+            "answered_at": answer.get("answered_at"),
+            "answers": items,
+            "note": answer.get("note"),
+        })
+    return rendered
 
 
 def _decision_payload(item: ProductDecision) -> dict[str, Any]:

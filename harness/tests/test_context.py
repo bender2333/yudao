@@ -1,11 +1,17 @@
 import json
+import uuid
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
 from harness.context import Rules
-from harness.models import EventType
-from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
-from harness.runtime import LoopSystem
+from harness.decisions import ROLE_CHOICE
+from harness.definitions import DEFAULT_FORM
+from harness.event_store import Command, project_stream, run_stream
+from harness.models import EventType, ProjectEventType
+from harness.projection import saved_decisions
+from harness.proposals import answer_turn, ask_turn, completion_turn, delivery_turn, judgement_turn, product_spec, review_turn
+from harness.runtime import FORM_REGISTRY, LoopSystem, SEVERAL_ROLES_DIRECT
 from harness.tests.helpers import developer_text, explore_turn, quality_turns, recorded_context
+from harness.write_path import NewEvent, NewProjectEvent
 
 def _part(call, source: str):
     text = prompt_part(call, source)
@@ -164,5 +170,222 @@ def test_each_assembled_request_records_the_rule_version_and_the_folded_rounds(d
         assert set(request) <= {"input", "tools", "max_output_tokens"}
         # 部门材料那一条在请求的首位（docs/design/context-assembly.md「确定性（通过）」「材料恒在首位」）
         assert request["input"][0]["role"] == "developer"
+
+
+def _sample_role_choice_questions(prefix: str) -> list[dict[str, object]]:
+    return [
+        {
+            "id": f"{prefix}_fmt",
+            "question": f"{prefix}: 优先支持哪种输出格式？",
+            "options": [
+                {"id": "json", "label": "JSON 结构输出"},
+                {"id": "text", "label": "纯文本行输出"},
+            ],
+            "recommended": "json",
+            "rationale": "便于脚本稳定解析",
+        },
+        {
+            "id": f"{prefix}_dest",
+            "question": f"{prefix}: 默认写往哪里？",
+            "options": [
+                {"id": "stdout", "label": "标准输出"},
+                {"id": "file", "label": "独立文件"},
+            ],
+            "recommended": "stdout",
+            "rationale": "默认符合命令行习惯",
+        },
+    ]
+
+
+def _append_role_choice(system: LoopSystem, run_id: str, *, department: str, prefix: str,
+                        input_version: int = 1, round_number: int = 1) -> str:
+    before_ids = {item.decision_id for item in saved_decisions(system.store, statuses=("open",))[1]}
+    questions = _sample_role_choice_questions(prefix)
+    system.writes.transact(
+        run_stream(run_id),
+        lambda tx: tx.append(
+            NewEvent(
+                EventType.DECISION_REQUESTED,
+                actor="system",
+                department=department,
+                state_before=tx.projection.status,
+                state_after=tx.projection.status,
+                payload={
+                    "kind": ROLE_CHOICE.name,
+                    "blocks": "round",
+                    "options": [{"id": opt.id, "label": opt.label} for opt in ROLE_CHOICE.options],
+                    "description": f"{department} 前沿分叉问题",
+                    "facts": [],
+                    "department": department,
+                    "questions": questions,
+                    "input_version": input_version,
+                    "round": round_number,
+                },
+            )
+        ),
+    )
+    created = [
+        item for item in saved_decisions(system.store, statuses=("open",))[1]
+        if item.run_id == run_id and item.decision_id not in before_ids
+    ]
+    assert len(created) == 1
+    return created[0].decision_id
+
+
+def test_user_decisions_shared_across_roles_ask_branches_and_judgement_ordered_by_answer_time(data_dir):
+    # 守 R1（共享需求事实）与 R2（上下文段落契约）：已回答的 role_choice 决定按回答时间顺序进入
+    # 全部职能主线、ask 询问分支与核验角色独立判断前后的只读 user_decisions 段落，同时保持 intend 原文不变；
+    # 尚无已回答决定（或仅存在未答请求）时不注入空壳段落，并在 manifest.excluded 中记录原因。
+    empty_adapter = FakeAdapter({"product": [product_spec()]})
+    empty_system = LoopSystem.for_testing(data_dir / "empty", empty_adapter)
+    empty_task = "保持原始意图的 echo 任务"
+    empty_run = empty_system.create_run(empty_task)
+    _append_role_choice(empty_system, empty_run, department="product", prefix="pending")
+    empty_system.activate_once(empty_run)
+    empty_call = empty_adapter.invocations[0]
+    assert prompt_part(empty_call, "intend") == empty_task
+    assert "user_decisions" not in _sources(empty_call)
+    empty_manifest = recorded_context(empty_system, empty_call).manifest
+    assert "user_decisions" in {item.source for item in empty_manifest.excluded}
+
+    canary = "DELIVERY_EXPLANATION_CANARY_SHOULD_NOT_LEAK"
+    original_task = "build echo CLI   with exact spacing\nand line breaks"
+    adapter = FakeAdapter(
+        {
+            "product": [product_spec()],
+            "engineering": [ask_turn(recipient="product", question="确认命令行输出边界。"), delivery_turn(summary=canary)],
+            "product:ask": [answer_turn("按照已回答用户决定实现。")],
+            "quality": [explore_turn(), judgement_turn(), review_turn("release", "ok")],
+        }
+    )
+    system = LoopSystem.for_testing(data_dir / "answered", adapter)
+    run_id = system.create_run(original_task)
+    d1_id = _append_role_choice(system, run_id, department="product", prefix="p1", input_version=1, round_number=1)
+    d2_id = _append_role_choice(system, run_id, department="engineering", prefix="e1", input_version=1, round_number=1)
+    d3_open_id = _append_role_choice(system, run_id, department="product", prefix="p_open", input_version=1, round_number=2)
+
+    # 先回答较后创建的 d2（全采用推荐），再回答较早创建的 d1（部分题号提交，未答题目按推荐补齐），d3 保持未答
+    d2 = next(item for item in saved_decisions(system.store, statuses=("open",))[1] if item.decision_id == d2_id)
+    system.orchestrator.answer_decision(
+        d2.decision_id,
+        "recommended",
+        "先采用工程确认的推荐项",
+        base_version=d2.version,
+        command=Command(str(uuid.uuid4()), "decision.answer", f"sha256:recommended:{d2.version}", "user:local"),
+    )
+    d1 = next(item for item in saved_decisions(system.store, statuses=("open",))[1] if item.decision_id == d1_id)
+    system.orchestrator.answer_decision(
+        d1.decision_id,
+        "submit",
+        "输出需兼容纯文本管道",
+        base_version=d1.version,
+        answers={"p1_fmt": "text"},
+        command=Command(str(uuid.uuid4()), "decision.answer", f"sha256:submit:{d1.version}", "user:local"),
+    )
+
+    system.run_until_stop(run_id)
+    assert system.project(run_id).status == "done"
+
+    product_call = next(c for c in adapter.invocations if c.department == "product" and not c.session_id.startswith("ses_ask_"))
+    eng_call = next(c for c in adapter.invocations if c.department == "engineering" and not c.session_id.startswith("ses_ask_"))
+    ask_call = next(c for c in adapter.invocations if c.department == "product" and c.session_id.startswith("ses_ask_"))
+    quality_calls = [c for c in adapter.invocations if c.department == "quality"]
+    assert len(quality_calls) >= 3
+    qa_before_judgement = quality_calls[1]
+    qa_after_judgement = quality_calls[-1]
+
+    assert canary not in developer_text(qa_before_judgement)
+    assert canary in developer_text(qa_after_judgement)
+
+    for call in (product_call, eng_call, ask_call, qa_before_judgement, qa_after_judgement):
+        assert prompt_part(call, "intend") == original_task
+        manifest = recorded_context(system, call).manifest
+        assert "user_decisions" in {item.source for item in manifest.injected}
+        assert "user_decisions" not in {item.source for item in manifest.excluded}
+        ud = _part(call, "user_decisions")
+        assert isinstance(ud, list) and [item["decision_id"] for item in ud] == [d2_id, d1_id]
+        assert all(item["decision_id"] != d3_open_id for item in ud)
+
+        first, second = ud
+        assert first["department"] == "engineering"
+        assert first["input_version"] == 1
+        assert first["note"] == "先采用工程确认的推荐项"
+        assert first["answers"] == [
+            {
+                "id": "e1_fmt",
+                "question": "e1: 优先支持哪种输出格式？",
+                "selected_option_id": "json",
+                "selected_option_label": "JSON 结构输出",
+            },
+            {
+                "id": "e1_dest",
+                "question": "e1: 默认写往哪里？",
+                "selected_option_id": "stdout",
+                "selected_option_label": "标准输出",
+            },
+        ]
+        assert second["department"] == "product"
+        assert second["input_version"] == 1
+        assert second["note"] == "输出需兼容纯文本管道"
+        assert second["answers"] == [
+            {
+                "id": "p1_fmt",
+                "question": "p1: 优先支持哪种输出格式？",
+                "selected_option_id": "text",
+                "selected_option_label": "纯文本行输出",
+            },
+            {
+                "id": "p1_dest",
+                "question": "p1: 默认写往哪里？",
+                "selected_option_id": "stdout",
+                "selected_option_label": "标准输出",
+            },
+        ]
+
+
+def test_user_decisions_shared_in_direct_form_and_preserves_intend(data_dir):
+    # 守 R1 与 R2（直做形态装配边界）：直做形态主线入口角色与 ask 询问分支同样接收只读 user_decisions 且保持 intend 原文不变
+    original_task = "直接实现 echo 工具"
+    adapter = FakeAdapter(
+        {
+            "engineering": [ask_turn(recipient="product", question="边界由谁承担？"), completion_turn("done")],
+            "product:ask": [answer_turn("由调用方传参，按已回答决定。")],
+        }
+    )
+    system = LoopSystem.for_testing(data_dir / "direct", adapter, forms=FORM_REGISTRY, resume_on_startup=False)
+    project_id = system.projects.register("直做共享用户决定", "goal")
+    system.writes.append(
+        project_stream(project_id),
+        NewProjectEvent(
+            ProjectEventType.PROJECT_FORM_SET,
+            {"previous_form": DEFAULT_FORM, "form": SEVERAL_ROLES_DIRECT, "reason": ""},
+            actor="user:local",
+        ),
+    )
+    _work_item_id, run_id = system.projects.start_work_item(project_id, original_task)
+    dec_id = _append_role_choice(system, run_id, department="engineering", prefix="d")
+    dec = next(item for item in saved_decisions(system.store, statuses=("open",))[1] if item.decision_id == dec_id)
+    system.orchestrator.answer_decision(
+        dec.decision_id,
+        "submit",
+        "直做备注",
+        base_version=dec.version,
+        answers={"d_fmt": "text", "d_dest": "file"},
+        command=Command(str(uuid.uuid4()), "decision.answer", f"sha256:submit:{dec.version}", "user:local"),
+    )
+
+    system.run_until_stop(run_id)
+    eng_call = next(c for c in adapter.invocations if c.department == "engineering" and not c.session_id.startswith("ses_ask_"))
+    ask_call = next(c for c in adapter.invocations if c.department == "product" and c.session_id.startswith("ses_ask_"))
+    for call in (eng_call, ask_call):
+        assert prompt_part(call, "intend") == original_task
+        ud = _part(call, "user_decisions")
+        assert len(ud) == 1
+        assert ud[0]["decision_id"] == dec_id
+        assert ud[0]["department"] == "engineering"
+        assert ud[0]["note"] == "直做备注"
+        assert ud[0]["answers"][0]["selected_option_label"] == "纯文本行输出"
+        assert ud[0]["answers"][1]["selected_option_label"] == "独立文件"
+
 
 
