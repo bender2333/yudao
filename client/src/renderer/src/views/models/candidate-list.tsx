@@ -11,6 +11,7 @@ import {
   SOURCE_LABELS,
   candidateApplicable,
   candidateTestView,
+  modelSupportsImage,
   type CandidateFilterId,
   type CandidateRow,
 } from "./model-logic";
@@ -147,7 +148,7 @@ export function CandidateList(props: CandidateListProps) {
                   <span className="mm-candidate-info">
                     <span className="mm-candidate-name">
                       {candidate.id}
-                      {candidate.input_modalities.includes("image") ? <span className="y10-tag">图像输入</span> : null}
+                      {modelSupportsImage(candidate.input_modalities) ? <span className="y10-tag">图像输入</span> : null}
                       {candidate.reasoning === true ? <span className="y10-tag">推理</span> : null}
                     </span>
                     <span className="y10-small y10-muted">

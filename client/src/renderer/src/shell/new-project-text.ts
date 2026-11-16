@@ -5,6 +5,8 @@
 // 需求材料不在新建这一步提交，建好项目以后在对话里写要求、发长材料（项目的组织设计说明「新建的入口」）。
 // 原型 v13（js/ui/shell.js）的两个入口没有说明、表单写的是旧的一句，按工单正文取代原型的说法。
 
+import { parseRoute, paths } from "./routing.ts";
+
 export type NewProjectMode = "idea" | "existing";
 
 // 入口旁的场景说明：答「什么时候用这个入口」，不写实现细节
@@ -29,4 +31,107 @@ export function projectEntryNote(mode: NewProjectMode): string {
 export function projectFormNote(mode: NewProjectMode): string | null {
   const note = PROJECT_FORM_NOTES[mode];
   return note === "" ? null : note;
+}
+
+export type NewProjectRouteName = "new-project" | "onboard-project";
+
+export function newProjectRouteName(mode: NewProjectMode): NewProjectRouteName {
+  return mode === "idea" ? "new-project" : "onboard-project";
+}
+
+export function isNewProjectEntryRoute(routeName: string): boolean {
+  return routeName === "new-project" || routeName === "onboard-project";
+}
+
+export type SidebarEntryItem = {
+  mode: NewProjectMode;
+  label: string;
+  note: string;
+  hash: string;
+  active: boolean;
+};
+
+/** 左侧栏的新建/接入导航项（工单 #1806）：只跳转独立页面并标出当前活动页，不再展开内联表单。 */
+export function sidebarEntryItems(options: {
+  activeName: string;
+  canCreate: boolean;
+  canOnboard: boolean;
+}): SidebarEntryItem[] {
+  const items: SidebarEntryItem[] = [];
+  if (options.canCreate) {
+    items.push({
+      mode: "idea",
+      label: "从想法新建",
+      note: projectEntryNote("idea"),
+      hash: paths.newProject(),
+      active: options.activeName === "new-project",
+    });
+  }
+  if (options.canOnboard) {
+    items.push({
+      mode: "existing",
+      label: "接入已有项目",
+      note: projectEntryNote("existing"),
+      hash: paths.onboardProject(),
+      active: options.activeName === "onboard-project",
+    });
+  }
+  return items;
+}
+
+export type NewProjectPageMeta = {
+  mode: NewProjectMode;
+  title: string;
+  subtitle: string;
+  commandName: "project.create" | "project.onboard";
+  requiredCapability: "project.create" | "project.onboard";
+  cardsHeading: string;
+  cardsHint: string;
+  formNote: string | null;
+  missingCapabilityText: string;
+  showInitialDirectory: boolean;
+  showSourceDirectory: boolean;
+};
+
+export function newProjectPageMeta(mode: NewProjectMode): NewProjectPageMeta {
+  if (mode === "idea") {
+    return {
+      mode,
+      title: "从想法新建项目",
+      subtitle: projectEntryNote("idea"),
+      commandName: "project.create",
+      requiredCapability: "project.create",
+      cardsHeading: "选择起步组织形态",
+      cardsHint: "选好名称后点一张形态卡即可建好项目；建好以后还能在设置里调。",
+      formNote: projectFormNote("idea"),
+      missingCapabilityText: "当前服务不支持在这里新建项目。",
+      showInitialDirectory: true,
+      showSourceDirectory: false,
+    };
+  }
+  return {
+    mode,
+    title: "接入已有项目",
+    subtitle: projectEntryNote("existing"),
+    commandName: "project.onboard",
+    requiredCapability: "project.onboard",
+    cardsHeading: "选择起步组织形态",
+    cardsHint: "选好名称与源目录后点一张形态卡即可接入项目。",
+    formNote: projectFormNote("existing"),
+    missingCapabilityText: "当前服务不支持在这里接入已有项目。",
+    showInitialDirectory: false,
+    showSourceDirectory: true,
+  };
+}
+
+/** 点「取消」返回进入新建/接入前的那一页；直接输入地址进来或前一页仍是入口页时回到首页。 */
+export function cancelNewProjectHash(previousHash: string | null | undefined): string {
+  if (!previousHash) {
+    return paths.home();
+  }
+  const prior = parseRoute(previousHash);
+  if (isNewProjectEntryRoute(prior.name) || prior.name === "not-found") {
+    return paths.home();
+  }
+  return previousHash;
 }
