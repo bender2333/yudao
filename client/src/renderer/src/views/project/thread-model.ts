@@ -25,7 +25,8 @@ import {
   type RoleChoiceAnsweredView,
   type RoleChoiceQuestionView,
 } from "../decisions/card-logic.ts";
-import { workItemStatusText } from "./labels.ts";
+import { prdOf, type PrdView, type ProductSpecLike } from "./arrow-panel-model.ts";
+import { versionStatusName, workItemStatusText } from "./labels.ts";
 
 /** 一个职能（事项冻结的组织里的一项）。 */
 export interface ThreadRole {
@@ -68,6 +69,7 @@ export interface ThreadItemView {
 /** project.flow 的一条。 */
 export interface ThreadFlowRecord {
   flow_id: string;
+  event_id?: string | null;
   kind: string;
   content: string;
   direction_from: string | null;
@@ -76,6 +78,7 @@ export interface ThreadFlowRecord {
   round?: number | null;
   work_item_id?: string | null;
   created_at?: string | null;
+  prd?: ProductSpecLike | null;
 }
 
 /** run.asks 的一项（只列线程用到的字段）。 */
@@ -162,6 +165,22 @@ export interface ThreadMessage {
 export type ThreadEntry =
   | { kind: "sep"; key: string; item: string; title: string; result: string; ended: boolean; expandable: boolean }
   | { kind: "you"; key: string; item: string; at: string; text: string; tag: string; long: boolean }
+  | {
+    kind: "prd";
+    key: string;
+    item: string;
+    at: string;
+    who: string;
+    whoLabel: string;
+    revision: number | null;
+    title: string;
+    goalSummary: string;
+    criteriaCount: number | null;
+    statusName: string | null;
+    prd: PrdView | null;
+    fallbackText: string;
+    flowId: string;
+  }
   | { kind: "fold"; key: string; item: string; at: string; label: string; roles: string[]; messages: ThreadMessage[] }
   | {
     kind: "done"; key: string; item: string; at: string; who: string; whoLabel: string;
@@ -195,9 +214,10 @@ export function roleLabel(
 const DONE_STATUS = new Set(["adopted", "released_unsettled", "stopped"]);
 const INPUT_KIND = "你的输入";
 const GUIDANCE_KIND = "指导";
+const PRD_KIND = "PRD 新版本";
 const RELEASE_KIND = "放行";
 const DELIVERY_KIND = "版本交付";
-const ROLE_KINDS = new Set(["PRD 新版本", "版本交付", "问题反馈"]);
+const ROLE_KINDS = new Set(["版本交付", "问题反馈"]);
 
 /** 事项结束了没有（结束的事项默认收起）。 */
 export function isEnded(item: ThreadItemView): boolean {
@@ -412,8 +432,38 @@ export function explanationNoteOf(input: {
   return before === 0 ? `${name}对交付下结论以后才看到` : `${name}对交付第 ${before} 版下结论以后才看到`;
 }
 
+function parseSpecRevision(text: string): number | null {
+  const matched = /第\s*(\d+)\s*版/.exec(text);
+  if (matched === null) {
+    return null;
+  }
+  const value = Number.parseInt(matched[1] ?? "", 10);
+  return Number.isFinite(value) ? value : null;
+}
+
+interface PrdGroup {
+  key: string;
+  order: number;
+  time: number;
+  at: string;
+  position: number;
+  who: string;
+  content: string;
+  spec: ProductSpecLike | null;
+  records: ThreadFlowRecord[];
+}
+
+function pickPrdFlowId(records: readonly ThreadFlowRecord[], organization: ThreadOrganization | null): string {
+  const verifiers = new Set((organization?.verifiers ?? []).map((entry) => entry.role));
+  const preferred = records.find((record) => record.direction_to !== null && !verifiers.has(record.direction_to));
+  if (preferred !== undefined) {
+    return preferred.flow_id;
+  }
+  return records[0]?.flow_id ?? "";
+}
+
 /**
- * 一件事项在线程里的那些行：细线、你写的、要你决定的、折叠行、交完成或放行。
+ * 一件事项在线程里的那些行：细线、你写的、PRD 版本卡片、要你决定的、折叠行、交完成或放行。
  *
  * 已结束的事项收起时只有细线与交完成或放行那一条；展开以后才看完整的（设计说明 4.14 交互骨架第 1 条）。
  */
@@ -426,6 +476,7 @@ export function itemThread(input: ItemThreadInput): ThreadEntry[] {
   const ended = isEnded(item);
   const roleIds = new Set(organization?.roles.map((role) => role.id) ?? []);
   const atoms: Atom[] = [];
+  const prdGroups = new Map<string, PrdGroup>();
   let order = 0;
 
   // 结束那一条先从流转记录里挑出来：它不重复出现在折叠行里
@@ -462,6 +513,32 @@ export function itemThread(input: ItemThreadInput): ThreadEntry[] {
       });
       continue;
     }
+    if (record.kind === PRD_KIND) {
+      const dedupKey = record.event_id
+        ? `event:${record.event_id}`
+        : `pos:${record.position}:${record.direction_from ?? ""}:${record.prd?.spec_revision ?? ""}`;
+      const existing = prdGroups.get(dedupKey);
+      const currentOrder = order++;
+      if (existing === undefined) {
+        prdGroups.set(dedupKey, {
+          key: record.event_id || record.flow_id,
+          order: currentOrder,
+          time,
+          at,
+          position: record.position,
+          who: record.direction_from ?? "",
+          content: record.content,
+          spec: record.prd ?? null,
+          records: [record],
+        });
+      } else {
+        existing.records.push(record);
+        if (existing.spec === null && record.prd != null) {
+          existing.spec = record.prd;
+        }
+      }
+      continue;
+    }
     if (!ROLE_KINDS.has(record.kind) || endingIds.has(record.flow_id)) {
       continue;
     }
@@ -477,6 +554,44 @@ export function itemThread(input: ItemThreadInput): ThreadEntry[] {
         key: record.flow_id, who: from, whoLabel: roleLabel(from, organization, labels), toLabel: null,
         text: record.content, at, role: "message", facts: null, explanation: null, explanationNote: null,
       }],
+    });
+  }
+
+  // 每版被接纳的产品 PRD 独立成一等主卡片（同一 event_id 的多接收者合并，且按版本先后算前后差异）
+  const orderedPrds = [...prdGroups.values()].sort((left, right) => (left.position - right.position) || (left.order - right.order));
+  let previousSpec: ProductSpecLike | null = null;
+  for (const group of orderedPrds) {
+    const spec = group.spec;
+    const prdView = spec === null ? null : prdOf(spec, previousSpec);
+    if (spec !== null) {
+      previousSpec = spec;
+    }
+    const revision = spec !== null ? spec.spec_revision : parseSpecRevision(group.content);
+    const prdTitle = revision !== null ? `PRD 第 ${revision} 版` : "PRD 新版本";
+    const goalSummary = spec !== null && spec.goal.trim() !== "" ? spec.goal.trim() : group.content;
+    const who = group.who;
+    const whoLabel = who === "" ? "产品" : roleLabel(who, organization, labels);
+    atoms.push({
+      kind: "entry",
+      time: group.time,
+      at: group.at,
+      order: group.order,
+      entry: {
+        kind: "prd",
+        key: `prd:${itemId}:${group.key}`,
+        item: itemId,
+        at: group.at,
+        who,
+        whoLabel,
+        revision,
+        title: prdTitle,
+        goalSummary,
+        criteriaCount: prdView === null ? null : prdView.acceptanceCriteria.length,
+        statusName: spec === null ? null : versionStatusName(spec.spec_status),
+        prd: prdView,
+        fallbackText: group.content,
+        flowId: pickPrdFlowId(group.records, organization),
+      },
     });
   }
 

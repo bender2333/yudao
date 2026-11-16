@@ -116,6 +116,69 @@ class InputView(Contract):
     git_version: dict[str, Any] | None = None
 
 
+class PrdSourceInputView(Contract):
+    # 这一版 PRD 纳入的用户输入（接纳来源与背景输入），按输入版本号列出
+    version: int
+    kind: str
+    text: str
+    created_event_id: str
+
+
+class RequirementMappingView(Contract):
+    # 单条功能需求与验收条件的对应声明，无法写验收条件时写明缺口原因
+    requirement: int
+    criteria: list[str] = Field(default_factory=list)
+    gap: str | None = None
+
+
+class PrdDecisionView(Contract):
+    # 这一版有效合同纳入的产品决定
+    decision_id: str
+    content_hash: str
+    statement: str
+    rationale: str
+    product_spec_hash: str
+    created_event_id: str
+
+
+class PrdDecisionChangeView(Contract):
+    # 修订 PRD 时对既有产品决定的处理（沿用、并入或停止沿用）
+    decision_hash: str
+    disposition: str
+    rationale: str
+
+
+class PrdChangeRecordView(Contract):
+    # PRD 修订说明（第 2 版及以后）
+    changed: list[str] = Field(default_factory=list)
+    retained: list[str] = Field(default_factory=list)
+    retired: list[str] = Field(default_factory=list)
+    rationale: str
+
+
+class ProductSpecView(Contract):
+    # 一版有效合同对应的结构化 PRD 正文（docs/design/project-organization.md「节点面板与箭头面板接住的内容」）
+    spec_id: str
+    spec_revision: int
+    spec_status: str
+    spec_event_id: str
+    spec_hash: str
+    parent_hash: str | None = None
+    input_version: int
+    accepted_inputs: list[PrdSourceInputView] = Field(default_factory=list)
+    goal: str
+    non_goals: list[str] = Field(default_factory=list)
+    boundaries: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    requirement_mapping: list[RequirementMappingView] = Field(default_factory=list)
+    fatal_conditions: list[str] = Field(default_factory=list)
+    decisions: list[PrdDecisionView] = Field(default_factory=list)
+    decision_changes: list[PrdDecisionChangeView] = Field(default_factory=list)
+    change_record: PrdChangeRecordView | None = None
+
+
 # ---------------------------------------------------------------------------
 # projects.list
 
@@ -1081,6 +1144,8 @@ class FlowRecord(Contract):
     seq: int
     event_id: str
     created_at: str
+    # 被接纳的产品 PRD 记录随带的完整结构化正文（工单 #1808）；其余记录类型为空
+    prd: ProductSpecView | None = None
 
 
 class ProjectFlowResult(Contract):
@@ -1102,6 +1167,7 @@ def _project_flow(application: Application, request: ProjectFlow) -> Snapshot[Pr
                 run_id=row["run_id"],
                 work_item_id=row["work_item_id"], position=row["position"], seq=row["seq"],
                 event_id=row["event_id"], created_at=row["created_at"],
+                prd=None if not row["prd"] else ProductSpecView.model_validate_json(row["prd"]),
             )
             for row in rows
         ]),
@@ -2673,69 +2739,6 @@ class LaunchMethodView(Contract):
     ready_timeout_sec: int | None = None
 
 
-class PrdSourceInputView(Contract):
-    # 这一版 PRD 纳入的用户输入（接纳来源与背景输入），按输入版本号列出
-    version: int
-    kind: str
-    text: str
-    created_event_id: str
-
-
-class RequirementMappingView(Contract):
-    # 单条功能需求与验收条件的对应声明，无法写验收条件时写明缺口原因
-    requirement: int
-    criteria: list[str] = Field(default_factory=list)
-    gap: str | None = None
-
-
-class PrdDecisionView(Contract):
-    # 这一版有效合同纳入的产品决定
-    decision_id: str
-    content_hash: str
-    statement: str
-    rationale: str
-    product_spec_hash: str
-    created_event_id: str
-
-
-class PrdDecisionChangeView(Contract):
-    # 修订 PRD 时对既有产品决定的处理（沿用、并入或停止沿用）
-    decision_hash: str
-    disposition: str
-    rationale: str
-
-
-class PrdChangeRecordView(Contract):
-    # PRD 修订说明（第 2 版及以后）
-    changed: list[str] = Field(default_factory=list)
-    retained: list[str] = Field(default_factory=list)
-    retired: list[str] = Field(default_factory=list)
-    rationale: str
-
-
-class ProductSpecView(Contract):
-    # 一版有效合同对应的结构化 PRD 正文（docs/design/project-organization.md「节点面板与箭头面板接住的内容」）
-    spec_id: str
-    spec_revision: int
-    spec_status: str
-    spec_event_id: str
-    spec_hash: str
-    parent_hash: str | None = None
-    input_version: int
-    accepted_inputs: list[PrdSourceInputView] = Field(default_factory=list)
-    goal: str
-    non_goals: list[str] = Field(default_factory=list)
-    boundaries: list[str] = Field(default_factory=list)
-    constraints: list[str] = Field(default_factory=list)
-    requirements: list[str] = Field(default_factory=list)
-    acceptance_criteria: list[str] = Field(default_factory=list)
-    requirement_mapping: list[RequirementMappingView] = Field(default_factory=list)
-    fatal_conditions: list[str] = Field(default_factory=list)
-    decisions: list[PrdDecisionView] = Field(default_factory=list)
-    decision_changes: list[PrdDecisionChangeView] = Field(default_factory=list)
-    change_record: PrdChangeRecordView | None = None
-
-
 class VersionEntry(Contract):
     event_id: str
     kind: str
@@ -4064,10 +4067,10 @@ PROJECT_LOOP = QueryDefinition(
 
 PROJECT_FLOW = QueryDefinition(
     name="project.flow", request=ProjectFlow, result=ProjectFlowResult, handle=_project_flow,
-    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、交付到达、质检的退回和放行、
-    # 直做交完成的那一版都进流转记录；你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636、#1699）
+    # 流转记录吸收的事件种类（读取模型的 FLOW_TYPES）：规格被接纳、旧版规格被取代、交付到达、质检的退回和放行、
+    # 直做交完成的那一版都进流转记录；你的输入与指导各是一条记录，事项的创建是你给它的第一句输入（工单 #1636、#1699、#1808）
     changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED,
-                EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED,
+                EventType.SPEC_ACCEPTED, EventType.SPEC_SUPERSEDED, EventType.DELIVERY_ACCEPTED,
                 # 直做交完成的那一版在流转记录里是一条版本交付（工单 #1699）
                 EventType.ARTIFACT_ACCEPTED,
                 EventType.QA_SUBMITTED,

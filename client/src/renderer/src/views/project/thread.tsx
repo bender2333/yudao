@@ -12,6 +12,7 @@ import type { ClientApp } from "../../contract/client-app";
 import type { DecisionView, RunAsksResult } from "../../api/generated/types.gen";
 import { RoleChoiceAnsweredBox, RoleChoiceForm, useRoleChoiceSelection } from "../decisions/card";
 import { decisionLinks, missingNoteText, prepareRoleChoiceSubmit } from "../decisions/card-logic";
+import { PrdSection } from "./arrow-panel";
 import { CommandFeedback, Tag, hasCommand } from "./common";
 import { DECISION_BLOCKS, DECISION_KIND, formatTime, label } from "./labels";
 import {
@@ -203,6 +204,8 @@ function ThreadRow(props: {
       );
     case "you":
       return <YouLine entry={entry} />;
+    case "prd":
+      return <PrdCard entry={entry} onLook={props.onLook} />;
     case "fold":
       return <FoldRow entry={entry} onSequence={props.onSequence} />;
     case "done":
@@ -231,6 +234,63 @@ function YouLine(props: { entry: Extract<ThreadEntry, { kind: "you" }> }) {
       {folded ? (
         <button type="button" className="y10-link" onClick={() => setOpen(!open)}>{open ? "收起" : "展开全文"}</button>
       ) : null}
+    </div>
+  );
+}
+
+/** 被接纳的产品 PRD 主卡片：默认展示版本号、目标概要与验收条数，支持就地展开全文与定位循环图箭头。 */
+export function PrdCard(props: {
+  entry: Extract<ThreadEntry, { kind: "prd" }>;
+  onLook: (flowId: string) => void;
+  defaultOpen?: boolean;
+}) {
+  const { entry } = props;
+  const [open, setOpen] = useState(props.defaultOpen ?? false);
+  const hasDetail = entry.prd !== null || entry.fallbackText.trim() !== "";
+  const goalText = entry.goalSummary.trim() === "" ? "未写明核心目标" : entry.goalSummary;
+  return (
+    <div className="y10-th-msg y10-th-prd" data-testid={`thread-prd-${entry.key}`}>
+      <div className="y10-th-meta">
+        {entry.whoLabel} · {entry.title} · {formatTime(entry.at)}
+        {entry.statusName === null ? null : (
+          <Tag tone={entry.statusName === "当前版本" ? "ok" : "warn"}>{entry.statusName}</Tag>
+        )}
+      </div>
+      <div className="y10-th-bubble y10-th-prd-card">
+        <div className="y10-th-prd-head">
+          <strong className="y10-th-prd-title">{entry.title}</strong>
+          {entry.criteriaCount === null ? null : (
+            <span className="y10-th-tag">验收条件 {entry.criteriaCount} 条</span>
+          )}
+        </div>
+        <p className="y10-th-prd-goal">{goalText}</p>
+        <div className="y10-th-prd-actions">
+          {!hasDetail ? null : (
+            <button
+              type="button"
+              className="y10-link"
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+            >
+              {open ? "收起 PRD" : "展开完整 PRD"}
+            </button>
+          )}
+          {entry.flowId === "" ? null : (
+            <button type="button" className="y10-link" onClick={() => props.onLook(entry.flowId)}>
+              看这一版
+            </button>
+          )}
+        </div>
+        {!open ? null : (
+          <div className="y10-th-prd-body" data-testid={`thread-prd-body-${entry.key}`}>
+            {entry.prd !== null ? (
+              <PrdSection prd={entry.prd} />
+            ) : (
+              <p className="y10-cv-panel-text">{entry.fallbackText}</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
