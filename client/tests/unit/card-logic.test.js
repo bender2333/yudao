@@ -5,17 +5,27 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import fs from "node:fs";
 import {
+  answeredRoleChoiceSummary,
   blockedText,
+  buildRoleChoiceAnswerArgs,
   decisionLinks,
+  defaultRoleChoiceAnswers,
   face,
   materialRows,
   missingNoteText,
+  prepareRoleChoiceSubmit,
+  reconcileRoleChoiceAnswers,
+  roleChoiceActions,
+  roleChoiceQuestions,
   sortByRequested,
   viewHref,
   waitedSeconds,
 } from "../../src/renderer/src/views/decisions/card-logic.ts";
-import { DECISION_KIND, RECOVERY_STATE } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS, DECISION_KIND, RECOVERY_STATE } from "../../src/renderer/src/views/project/labels.ts";
+import { itemThread, threadDecisionView } from "../../src/renderer/src/views/project/thread-model.ts";
 
 function decision(overrides) {
   return {
@@ -292,4 +302,415 @@ test("初始 PRD 的材料逐条列出要求与验收标准的对应声明", () 
 test("旧事件的初始 PRD 没有对应声明时不出要求行", () => {
   const rows = materialRows(initialPrd());
   assert.equal(rows.some((row) => row.term.startsWith("要求 ")), false);
+});
+
+// ---------------------------------------------------------------------------
+// role_choice 多题前沿决定请求（工单 #1802）
+
+function roleChoiceDecision(overrides = {}) {
+  const baseRequest = {
+    kind: "role_choice",
+    blocks: "round",
+    options: [
+      { id: "submit", label: "提交回答" },
+      { id: "recommended", label: "全部采用推荐" },
+    ],
+    description: "请确认两项前置配置选择",
+    facts: [],
+    department: "product",
+    input_version: 1,
+    round: 1,
+    note: "默认采用推荐项即可直接运行",
+    questions: [
+      {
+        id: "q1",
+        question: "配置格式采用哪一种？",
+        options: [
+          { id: "json", label: "JSON 文件", description: "零额外依赖" },
+          { id: "toml", label: "TOML 文件", description: null },
+        ],
+        recommended: "json",
+        rationale: "标准库可直接读写",
+      },
+      {
+        id: "q2",
+        question: "默认端口选哪个？",
+        options: [
+          { id: "8080", label: "8080 端口" },
+          { id: "9000", label: "9000 端口" },
+        ],
+        recommended: "8080",
+        rationale: "本地调试常用端口",
+      },
+    ],
+  };
+  const { request: requestOverrides, ...restOverrides } = overrides;
+  return decision({
+    decision_id: "dec_rc_1",
+    kind: "role_choice",
+    blocks: "round",
+    request: { ...baseRequest, ...(requestOverrides ?? {}) },
+    ...restOverrides,
+  });
+}
+
+test("role_choice 阻塞范围为 round 时提示仅暂停当前职能本轮工作，不变更原有 run 提示", () => {
+  assert.deepEqual(blockedText(roleChoiceDecision(), "导出报表"), {
+    text: "仅暂停「导出报表」中产品的本轮工作，其余职能与事项照常推进",
+    muted: false,
+  });
+  assert.deepEqual(blockedText(roleChoiceDecision({ blocked: null }), ""), {
+    text: "仅暂停产品的本轮工作，其余职能与事项照常推进",
+    muted: false,
+  });
+  assert.equal(DECISION_BLOCKS.round, "本轮工作");
+  assert.equal(DECISION_KIND.role_choice, "角色向你提问，等待选择");
+  // 原有 run 阻塞文案保持不变
+  assert.deepEqual(blockedText(decision(), "实现逐行处理"), {
+    text: "挡住「实现逐行处理」，同一项目中排在它后面的事项 2 个",
+    muted: false,
+  });
+});
+
+test("role_choice 解析题目、推荐预选、改选合并与两类提交载荷", () => {
+  const dec = roleChoiceDecision();
+  const questions = roleChoiceQuestions(dec);
+  assert.equal(questions.length, 2);
+  assert.equal(questions[0].question, "配置格式采用哪一种？");
+  assert.equal(questions[0].rationale, "标准库可直接读写");
+  assert.deepEqual(questions[0].options, [
+    { id: "json", label: "JSON 文件", description: "零额外依赖", recommended: true },
+    { id: "toml", label: "TOML 文件", description: null, recommended: false },
+  ]);
+
+  // 默认按每题 recommended 预选
+  const defaults = defaultRoleChoiceAnswers(questions);
+  assert.deepEqual(defaults, { q1: "json", q2: "8080" });
+
+  // 改选第一题后，刷新题目仍保留第一题有效改选并补全未选题目
+  const merged = reconcileRoleChoiceAnswers(questions, { q1: "toml", q_old: "x" });
+  assert.deepEqual(merged, { q1: "toml", q2: "8080" });
+
+  // 「提交回答」携带逐题 answers 与可选 note
+  assert.deepEqual(buildRoleChoiceAnswerArgs(dec, "submit", merged, "  按项目需求选择  "), {
+    decision_id: "dec_rc_1",
+    option: "submit",
+    answers: { q1: "toml", q2: "8080" },
+    note: "按项目需求选择",
+    base_version: 3,
+  });
+
+  // 「全部采用推荐」发送 option="recommended"，省略空 note 与 answers
+  assert.deepEqual(buildRoleChoiceAnswerArgs(dec, "recommended", merged, "   "), {
+    decision_id: "dec_rc_1",
+    option: "recommended",
+    base_version: 3,
+  });
+
+  const actions = roleChoiceActions(dec);
+  assert.equal(actions.submitLabel, "提交回答");
+  assert.equal(actions.recommendedLabel, "全部采用推荐");
+  assert.deepEqual(prepareRoleChoiceSubmit(dec, actions, "submit", merged, "  说明  "), {
+    missing: "",
+    payload: {
+      decision_id: "dec_rc_1",
+      option: "submit",
+      answers: { q1: "toml", q2: "8080" },
+      note: "说明",
+      base_version: 3,
+    },
+  });
+  assert.deepEqual(
+    prepareRoleChoiceSubmit(dec, { ...actions, submitNoteRequired: true }, "submit", merged, " "),
+    { missing: "「提交回答」需要在说明里写明修改意见", payload: null },
+  );
+
+  // questions 为空或非 role_choice 种类不进入多题模式
+  assert.deepEqual(roleChoiceQuestions(roleChoiceDecision({ request: { questions: [] } })), []);
+  assert.deepEqual(roleChoiceQuestions(decision()), []);
+});
+
+test("role_choice 已回答时对照 answers 与 questions 解析逐题选定文字与补充说明", () => {
+  const answered = roleChoiceDecision({
+    status: "answered",
+    answer: {
+      event_id: "evt_ans_1",
+      option: "submit",
+      answers: { q1: "toml", q2: "8080" },
+      note: "配置用 TOML，端口保留默认",
+      base_version: 3,
+      actor: "user:local",
+      command_id: "cmd_1",
+      answered_at: "2026-10-02T10:02:00Z",
+    },
+  });
+  const summary = answeredRoleChoiceSummary(answered);
+  assert.ok(summary !== null);
+  assert.equal(summary.actionLabel, "逐题回答");
+  assert.equal(summary.note, "配置用 TOML，端口保留默认");
+  assert.deepEqual(summary.items, [
+    {
+      questionId: "q1",
+      question: "配置格式采用哪一种？",
+      optionId: "toml",
+      optionLabel: "TOML 文件",
+      optionDescription: null,
+      recommended: false,
+    },
+    {
+      questionId: "q2",
+      question: "默认端口选哪个？",
+      optionId: "8080",
+      optionLabel: "8080 端口",
+      optionDescription: null,
+      recommended: true,
+    },
+  ]);
+  assert.ok(summary.summaryText.includes("TOML 文件"));
+  assert.ok(summary.summaryText.includes("8080 端口"));
+  assert.equal(summary.summaryText.includes("提交回答"), false);
+
+  // option="recommended" 且旧记录缺少 answers 时按每题 recommended 解析
+  const recAnswered = roleChoiceDecision({
+    status: "answered",
+    answer: {
+      event_id: "evt_ans_2",
+      option: "recommended",
+      answers: null,
+      note: null,
+      base_version: 3,
+      actor: "user:local",
+      command_id: "cmd_2",
+      answered_at: "2026-10-02T10:03:00Z",
+    },
+  });
+  const recSummary = answeredRoleChoiceSummary(recAnswered);
+  assert.ok(recSummary !== null);
+  assert.equal(recSummary.actionLabel, "全部采用推荐");
+  assert.deepEqual(recSummary.items.map((item) => item.optionLabel), ["JSON 文件", "8080 端口"]);
+
+  // role_choice 材料行与跳转落到对话页
+  const rows = materialRows(answered);
+  const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
+  assert.equal(map["职能"], "产品");
+  assert.equal(map["轮次"], "第 1 轮");
+  assert.equal(map["补充提示"], "默认采用推荐项即可直接运行");
+  assert.equal(map["说明"], "请确认两项前置配置选择");
+  assert.equal(viewHref(answered), "#/p/p1/conversation?w=w1");
+  assert.equal(face(answered, new Date("2026-10-02T10:01:00Z").getTime()).title, "角色向你提问，等待选择");
+});
+
+test("对话线程模型保留 role_choice 气泡的多题题目、本轮阻塞提示与逐题已回答结果", () => {
+  const openDecision = roleChoiceDecision();
+  const answeredDecision = roleChoiceDecision({
+    decision_id: "dec_rc_2",
+    status: "answered",
+    answer: {
+      option: "submit",
+      answers: { q1: "toml", q2: "9000" },
+      note: "已确认改选两项",
+      answered_at: "2026-10-02T10:05:00Z",
+    },
+  });
+  const openView = threadDecisionView(openDecision);
+  assert.equal(openView.questions.length, 2);
+  assert.equal(openView.roundLabel, "第 1 轮");
+  assert.equal(openView.blocksText, "仅暂停产品的本轮工作，其余职能与事项照常推进");
+  assert.equal(openView.answeredSummary, null);
+
+  const answeredView = threadDecisionView(answeredDecision);
+  assert.ok(answeredView.answeredSummary !== null);
+  assert.deepEqual(answeredView.answeredSummary.items.map((item) => item.optionLabel), ["TOML 文件", "9000 端口"]);
+  assert.equal(answeredView.answeredSummary.note, "已确认改选两项");
+
+  const entries = itemThread({
+    item: { work_item_id: "w1", kind: "change", status: "in_progress" },
+    flow: [],
+    asks: [],
+    decisions: [openDecision, answeredDecision],
+    titles: { w1: "配置系统" },
+    expanded: true,
+  });
+  const decisionEntries = entries.filter((entry) => entry.kind === "decision");
+  assert.equal(decisionEntries.length, 2);
+  assert.equal(decisionEntries[1].decision.answer?.answers?.q1, "toml");
+});
+
+function loadTsxModule(relativePath) {
+  const require = createRequire(import.meta.url);
+  const ts = require("typescript");
+  const React = require("react");
+  globalThis.React = React;
+  const loader = (module, filename) => {
+    const code = fs.readFileSync(filename, "utf8");
+    const js = ts.transpileModule(code, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    module._compile(js, filename);
+  };
+  require.extensions[".tsx"] = loader;
+  require.extensions[".ts"] = loader;
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const mod = require(relativePath);
+  return { React, renderToStaticMarkup, mod };
+}
+
+test("决定卡片与对话线程决定气泡渲染 role_choice 多题交互、已回答逐题展示及原有单选决定", () => {
+  const { React, renderToStaticMarkup, mod: cardMod } = loadTsxModule("../../src/renderer/src/views/decisions/card.tsx");
+  const { mod: threadMod } = loadTsxModule("../../src/renderer/src/views/project/thread.tsx");
+  const now = new Date("2026-10-02T10:01:00Z").getTime();
+
+  const appWithAnswer = { currentCapabilities: { commands: [{ name: "decision.answer" }] } };
+
+  // 1. 待回答 role_choice：卡片与气泡均展示题干、选项、说明、推荐标记、推荐理由、补充说明框与两个提交按钮
+  const openRc = roleChoiceDecision();
+  const cardOpenHtml = renderToStaticMarkup(React.createElement(cardMod.DecisionCard, {
+    app: appWithAnswer,
+    decision: openRc,
+    now,
+    projectName: "配置工具",
+    workItemTitle: "初始化配置",
+    onNavigate: () => {},
+  }));
+  for (const snippet of [
+    "角色向你提问，等待选择",
+    "阻塞范围：本轮工作",
+    "仅暂停「初始化配置」中产品的本轮工作，其余职能与事项照常推进",
+    "1. 配置格式采用哪一种？",
+    "JSON 文件",
+    "零额外依赖",
+    "TOML 文件",
+    "推荐",
+    "推荐理由：标准库可直接读写",
+    "2. 默认端口选哪个？",
+    "8080 端口",
+    "9000 端口",
+    "推荐理由：本地调试常用端口",
+    "补充说明（可选）",
+    ">提交回答</button>",
+    ">全部采用推荐</button>",
+  ]) {
+    assert.ok(cardOpenHtml.includes(snippet), `决定卡片缺少：${snippet}`);
+  }
+  // 默认按 recommended 预选（json 与 8080 处于 checked 状态，toml 与 9000 未选中）
+  assert.match(cardOpenHtml, /<input[^>]*checked=""[^>]*value="json"/);
+  assert.match(cardOpenHtml, /<input[^>]*checked=""[^>]*value="8080"/);
+  assert.equal(/<input[^>]*checked=""[^>]*value="toml"/.test(cardOpenHtml), false);
+  assert.equal(/<input[^>]*checked=""[^>]*value="9000"/.test(cardOpenHtml), false);
+
+  const threadOpenHtml = renderToStaticMarkup(React.createElement(threadMod.ThreadView, {
+    app: appWithAnswer,
+    items: [{ work_item_id: "w1", kind: "change", status: "in_progress" }],
+    titles: { w1: "初始化配置" },
+    flow: [],
+    decisions: [openRc],
+    labels: {},
+    selected: "w1",
+    opened: {},
+    onToggleItem: () => {},
+    onSelectItem: () => {},
+    onLook: () => {},
+    onSequence: () => {},
+    onNavigate: () => {},
+    scrollSignal: 0,
+  }));
+  for (const snippet of [
+    "角色向你提问，等待选择",
+    "阻塞范围：本轮工作",
+    "1. 配置格式采用哪一种？",
+    "TOML 文件",
+    "推荐理由：标准库可直接读写",
+    "补充说明（可选）",
+    ">提交回答</button>",
+    ">全部采用推荐</button>",
+  ]) {
+    assert.ok(threadOpenHtml.includes(snippet), `线程气泡缺少：${snippet}`);
+  }
+  assert.match(threadOpenHtml, /<input[^>]*checked=""[^>]*value="json"/);
+  assert.match(threadOpenHtml, /<input[^>]*checked=""[^>]*value="8080"/);
+
+  // 2. 已回答 role_choice：显示逐题选定文字与补充说明，不退化为仅显示顶层「提交回答」
+  const answeredRc = roleChoiceDecision({
+    status: "answered",
+    answer: {
+      event_id: "evt_a1",
+      option: "submit",
+      answers: { q1: "toml", q2: "8080" },
+      note: "优先兼容现有 TOML",
+      base_version: 3,
+      actor: "user:local",
+      command_id: "cmd_a1",
+      answered_at: "2026-10-02T10:02:00Z",
+    },
+  });
+  const cardAnsweredHtml = renderToStaticMarkup(React.createElement(cardMod.DecisionCard, {
+    app: null,
+    decision: answeredRc,
+    now,
+    projectName: "配置工具",
+    workItemTitle: "初始化配置",
+    onNavigate: () => {},
+  }));
+  for (const snippet of ["配置格式采用哪一种？", "TOML 文件", "默认端口选哪个？", "8080 端口", "补充说明：优先兼容现有 TOML"]) {
+    assert.ok(cardAnsweredHtml.includes(snippet), `已回答决定卡片缺少：${snippet}`);
+  }
+  assert.equal(cardAnsweredHtml.includes("已提交：提交回答"), false);
+
+  const threadAnsweredHtml = renderToStaticMarkup(React.createElement(threadMod.ThreadView, {
+    app: null,
+    items: [{ work_item_id: "w1", kind: "change", status: "in_progress" }],
+    titles: { w1: "初始化配置" },
+    flow: [],
+    decisions: [answeredRc],
+    labels: {},
+    selected: "w1",
+    opened: {},
+    onToggleItem: () => {},
+    onSelectItem: () => {},
+    onLook: () => {},
+    onSequence: () => {},
+    onNavigate: () => {},
+    scrollSignal: 0,
+  }));
+  for (const snippet of ["配置格式采用哪一种？", "TOML 文件", "默认端口选哪个？", "8080 端口", "补充说明：优先兼容现有 TOML"]) {
+    assert.ok(threadAnsweredHtml.includes(snippet), `已回答线程气泡缺少：${snippet}`);
+  }
+  assert.equal(threadAnsweredHtml.includes("已回答：提交回答"), false);
+
+  // 3. 原有单选决定种类行为与显示保持不变
+  const singleOpen = decision();
+  const singleCardOpen = renderToStaticMarkup(React.createElement(cardMod.DecisionCard, {
+    app: null,
+    decision: singleOpen,
+    now,
+    projectName: "文本工具",
+    workItemTitle: "实现逐行处理",
+    onNavigate: () => {},
+  }));
+  assert.ok(singleCardOpen.includes("阻塞范围：整次运行"));
+  assert.ok(singleCardOpen.includes("继续执行"));
+  assert.ok(singleCardOpen.includes("停止事项"));
+  assert.equal(singleCardOpen.includes("全部采用推荐"), false);
+
+  const singleAnswered = decision({
+    status: "answered",
+    answer: {
+      event_id: "evt_s1",
+      option: "continue",
+      note: null,
+      base_version: 3,
+      actor: "user:local",
+      command_id: "cmd_s1",
+      answered_at: "2026-10-02T10:02:00Z",
+    },
+  });
+  const singleCardAnswered = renderToStaticMarkup(React.createElement(cardMod.DecisionCard, {
+    app: null,
+    decision: singleAnswered,
+    now,
+    projectName: "文本工具",
+    workItemTitle: "实现逐行处理",
+    onNavigate: () => {},
+  }));
+  assert.ok(singleCardAnswered.includes("已提交：继续执行"));
 });
