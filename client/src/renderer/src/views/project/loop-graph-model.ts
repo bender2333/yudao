@@ -22,7 +22,16 @@
 // 服务端还没有「第几轮」的字段时（app-and-interface 4.4 第 1 条由接口工单补上），箭头上不写轮次，
 // 其余照画：这里读的是可选的 round，加上以后不用改页面。
 
+import type {
+  AttemptView,
+  Catalog,
+  DecisionView,
+  DepartmentWorkspaceResult,
+  ProjectSettingsResult,
+} from "../../api/generated/types.gen";
+import { mergedModelId, modelById } from "../models/model-logic.ts";
 import { DEPARTMENT_STATE } from "./labels.ts";
+import { usageView, type UsageView } from "./usage-text.ts";
 
 /** 循环图的箭头两端：图外的来源、结束，或一个职能的标识。 */
 export const SOURCE = "src";
@@ -49,6 +58,7 @@ export interface FrozenOrganization {
   watched: readonly { source: string; recipient: string; outcome: string }[];
   asks?: readonly { requester: string; recipient: string }[];
   rejections?: readonly { verifier: string; role: string; outcome: string }[];
+  same_as_project?: boolean | null;
 }
 
 /**
@@ -836,4 +846,509 @@ export function otherCounts(items: readonly LoopItemView[], selected: string | n
     }
   }
   return counts;
+}
+
+// ---------------------------------------------------------------------------
+// troupe 循环蓝图控制台纯计算（工单 #1811）
+// ---------------------------------------------------------------------------
+
+/** 蓝图图纸主题：深色点阵蓝图或浅色纸面图纸。 */
+export type BlueprintTheme = "dark" | "paper";
+
+/** 本地存储键：记住用户在对话页选的蓝图图纸明暗。 */
+export const BLUEPRINT_THEME_STORAGE_KEY = "yudao.conversation.blueprint_theme";
+export const DEFAULT_BLUEPRINT_THEME: BlueprintTheme = "dark";
+
+/** 解析存储的图纸主题；缺省或未知值回到深色。 */
+export function blueprintThemeParse(raw: string | null | undefined): BlueprintTheme {
+  return raw === "paper" ? "paper" : DEFAULT_BLUEPRINT_THEME;
+}
+
+/** 切换图纸主题。 */
+export function nextBlueprintTheme(current: BlueprintTheme): BlueprintTheme {
+  return current === "dark" ? "paper" : "dark";
+}
+
+/** 工作中的 Unicode Braille 脉冲波形帧（纯视觉状态脉冲，不含任何估算数值）。 */
+export const BRAILLE_FRAMES: readonly string[] = Object.freeze([
+  "⠋⠙⠚⠞⠖⠦⠴⠲",
+  "⠙⠚⠞⠖⠦⠴⠲⠋",
+  "⠚⠞⠖⠦⠴⠲⠋⠙",
+  "⠞⠖⠦⠴⠲⠋⠙⠚",
+  "⠖⠦⠴⠲⠋⠙⠚⠞",
+  "⠦⠴⠲⠋⠙⠚⠞⠖",
+  "⠴⠲⠋⠙⠚⠞⠖⠦",
+  "⠲⠋⠙⠚⠞⠖⠦⠴",
+]);
+
+/** 按节拍返回当前 Braille 波形帧。 */
+export function brailleFrameOf(tick: number): string {
+  const safe = Number.isFinite(tick) ? Math.abs(Math.floor(tick)) : 0;
+  return BRAILLE_FRAMES[safe % BRAILLE_FRAMES.length];
+}
+
+/** 五格推理档位指示。 */
+export interface ReasoningEffortView {
+  tier: string | null;
+  filled: number;
+  squares: string;
+  label: string;
+  text: string;
+}
+
+const EFFORT_LEVELS: Readonly<Record<string, { filled: number; label: string }>> = Object.freeze({
+  minimal: { filled: 1, label: "极低" },
+  low: { filled: 2, label: "低" },
+  medium: { filled: 3, label: "中" },
+  high: { filled: 4, label: "高" },
+  xhigh: { filled: 5, label: "超高" },
+  max: { filled: 5, label: "最高" },
+});
+
+/** 把推理档位映成五格方块与中文等级；未指定或无推理能力时如实写出。 */
+export function reasoningEffortOf(
+  tier: string | null | undefined,
+  noReasoningDeclared = false,
+): ReasoningEffortView {
+  const clean = typeof tier === "string" ? tier.trim() : "";
+  if (clean === "") {
+    const label = noReasoningDeclared ? "无推理" : "未指定";
+    const squares = "□□□□□";
+    return { tier: null, filled: 0, squares, label, text: `${squares} ${label}` };
+  }
+  const hit = EFFORT_LEVELS[clean.toLowerCase()];
+  if (hit !== undefined) {
+    const squares = "■".repeat(hit.filled) + "□".repeat(5 - hit.filled);
+    return { tier: clean, filled: hit.filled, squares, label: hit.label, text: `${squares} ${hit.label}` };
+  }
+  const squares = "■■■□□";
+  return { tier: clean, filled: 3, squares, label: clean, text: `${squares} ${clean}` };
+}
+
+/** 终点胶囊视图：严格区分实线核验放行与虚线开环完成。 */
+export interface BlueprintEndView {
+  kind: "verifier" | "open";
+  text: string;
+  released: boolean;
+  stopped: boolean;
+}
+
+/** 根据事项冻结组织与结果生成终点胶囊：有核验职能用实线 `✓ {核验职能}放行`，无核验用虚线 `◌ 开环完成`。 */
+export function blueprintEndOf(
+  item: LoopItemView | null,
+  organization: FrozenOrganization | null,
+  labels: Record<string, string> = {},
+): BlueprintEndView {
+  const names = organization === null
+    ? ""
+    : verifierIds(organization).map((id) => labelOf(id, organization, labels)).join("、");
+  const conclusion = item?.progress?.conclusion ?? null;
+  const stopped = item !== null && item.status === "stopped";
+  const ended = item !== null && (item.status === "released_unsettled" || item.status === "adopted");
+  const openLoop = names === "" || (item !== null && item.stop_reason === "open_loop");
+  if (!openLoop && names !== "") {
+    const released = conclusion === "release" || ended;
+    const text = released
+      ? `✓ ${names}放行`
+      : stopped
+        ? `✓ ${names}放行（已停止）`
+        : `✓ ${names}放行才结束`;
+    return { kind: "verifier", text, released, stopped };
+  }
+  const text = stopped
+    ? "◌ 开环完成（已停止）"
+    : ended && item?.stop_reason === "open_loop"
+      ? "◌ 开环完成：没有人核验"
+      : "◌ 开环完成";
+  return { kind: "open", text, released: ended && !stopped, stopped };
+}
+
+export type NodeStatusTone = "work" | "warn" | "ask" | "ready" | "done";
+
+/** 单个职能节点的实时遥测视图：只用真实上报字段，不做随机或估算数值。 */
+export interface NodeTelemetry {
+  id: string;
+  statusLabel: string;
+  statusTone: NodeStatusTone;
+  workingPulse: boolean;
+  modelId: string;
+  modelName: string;
+  modelUnset: boolean;
+  modelUnusable: boolean;
+  protocol: string | null;
+  effort: ReasoningEffortView;
+  contextPercent: number | null;
+  contextText: string;
+  railContextText: string;
+  contextWindow: number | null;
+  inputTokens: number | null;
+  latestAttempt: AttemptView | null;
+  latestUsage: UsageView | null;
+  hasRequests: boolean;
+  waitingProvider: boolean;
+  remoteUnknown: boolean;
+  openDecisionCount: number;
+}
+
+export type TelemetryCatalog = Pick<Catalog, "models" | "bindings">;
+export type TelemetrySettings = Pick<ProjectSettingsResult, "departments">;
+
+export interface NodeTelemetryInput {
+  node: LoopNode;
+  item: LoopItemView | null;
+  workspace?: DepartmentWorkspaceResult | null;
+  settings?: TelemetrySettings | null;
+  catalog?: TelemetryCatalog | null;
+  attempts?: readonly AttemptView[];
+  decisions?: readonly DecisionView[];
+}
+
+function nonEmptyText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+/** 判断一条决定是否明确归属某个职能。 */
+export function decisionMatchesDepartment(
+  decision: Pick<DecisionView, "kind" | "work_item_id" | "request">,
+  department: string,
+  item?: Pick<LoopItemView, "work_item_id" | "department"> | null,
+): boolean {
+  const req = (decision.request ?? {}) as Record<string, unknown>;
+  const reqDept = nonEmptyText(req["department"]);
+  if (reqDept !== null) {
+    return reqDept === department;
+  }
+  if (decision.kind === "initial_prd" && item && item.department === department) {
+    return true;
+  }
+  return false;
+}
+
+/** 计算单个职能节点的真实遥测数据（有效模型、五格档位、状态徽标、真实上下文占比）。 */
+export function nodeTelemetryOf(input: NodeTelemetryInput): NodeTelemetry {
+  const { node, item } = input;
+  const workItemId = item?.work_item_id ?? "";
+  const workspace = input.workspace ?? null;
+  const settings = input.settings ?? null;
+  const catalog = input.catalog ?? null;
+  const attempts = (input.attempts ?? [])
+    .filter((a) => a.department === node.id && (workItemId === "" || a.work_item_id === workItemId || a.work_item_id === null))
+    .sort((left, right) => left.position - right.position);
+  const latestAttempt = attempts.at(-1) ?? null;
+  const lastCall = (workspace?.last_call ?? null) as Record<string, unknown> | null;
+  const hasRequests = latestAttempt !== null || lastCall !== null;
+
+  const setting = settings?.departments?.[node.id] ?? null;
+  const binding = catalog?.bindings?.[node.id] ?? null;
+  const mergedId = mergedModelId(setting?.model_id, node.id, catalog?.bindings);
+  const effective = workspace?.effective ?? null;
+  const catalogModels = [...(catalog?.models ?? [])];
+  const effectiveId = nonEmptyText(effective?.model_id) ?? mergedId;
+  const configuredModel = effectiveId !== "" ? modelById(catalogModels, effectiveId) : null;
+
+  const lastCallModel = nonEmptyText(lastCall?.["requested_model"]) ?? nonEmptyText(lastCall?.["actual_model"]);
+  const attemptModelName = nonEmptyText(latestAttempt?.actual_model) ?? nonEmptyText(latestAttempt?.requested_model);
+
+  let modelName = "未设置模型";
+  let modelUnset = true;
+  if (effective !== null && effective.state !== "unset") {
+    modelName = nonEmptyText(effective.model) ?? configuredModel?.model ?? effectiveId;
+    modelUnset = modelName === "" || modelName === "未设置模型";
+    if (modelName === "") {
+      modelName = "未设置模型";
+    }
+  } else if (configuredModel !== null) {
+    modelName = configuredModel.model;
+    modelUnset = false;
+  } else if (mergedId !== "") {
+    modelName = mergedId;
+    modelUnset = false;
+  } else if (effective === null && (lastCallModel !== null || attemptModelName !== null)) {
+    modelName = lastCallModel ?? attemptModelName ?? "未设置模型";
+    modelUnset = false;
+  }
+
+  const modelUnusable = effective?.state === "unusable";
+  const protocol = nonEmptyText(effective?.protocol)
+    ?? configuredModel?.protocol
+    ?? nonEmptyText(lastCall?.["requested_protocol"])
+    ?? null;
+
+  const rawTier = nonEmptyText(effective?.sent_tier)
+    ?? nonEmptyText(effective?.requested_tier)
+    ?? nonEmptyText(setting?.requested_tier)
+    ?? nonEmptyText(binding?.requested_tier)
+    ?? nonEmptyText(configuredModel?.default_reasoning_level)
+    ?? nonEmptyText(lastCall?.["sent_tier"])
+    ?? nonEmptyText(lastCall?.["requested_tier"])
+    ?? null;
+  const noReasoningDeclared = configuredModel !== null && configuredModel.reasoning_levels.length === 0;
+  const effort = reasoningEffortOf(rawTier, noReasoningDeclared);
+
+  const attemptProvider = nonEmptyText(latestAttempt?.actual_provider) ?? nonEmptyText(latestAttempt?.requested_provider);
+  const attemptCatalogModel = attemptModelName === null
+    ? null
+    : catalogModels.find((m) => m.model === attemptModelName && (attemptProvider === null || m.provider_id === attemptProvider))
+      ?? catalogModels.find((m) => m.model === attemptModelName)
+      ?? null;
+  const contextWindow = (() => {
+    if (attemptCatalogModel?.context_window && attemptCatalogModel.context_window > 0) {
+      return attemptCatalogModel.context_window;
+    }
+    if (configuredModel?.context_window && configuredModel.context_window > 0) {
+      if (attemptModelName === null || attemptModelName === configuredModel.model) {
+        return configuredModel.context_window;
+      }
+    }
+    return null;
+  })();
+
+  const latestUsage = latestAttempt === null ? null : usageView(latestAttempt.usage);
+  const inputTokens = latestUsage !== null && latestUsage.reported ? latestUsage.input : null;
+
+  let contextPercent: number | null = null;
+  let contextText = "待命";
+  let railContextText = "—";
+  if (!hasRequests) {
+    contextPercent = null;
+    contextText = "待命";
+    railContextText = "—";
+  } else if (inputTokens !== null && contextWindow !== null && contextWindow > 0) {
+    contextPercent = Math.max(0, Math.round((inputTokens / contextWindow) * 100));
+    contextText = `${contextPercent}%`;
+    railContextText = contextText;
+  } else {
+    contextPercent = null;
+    contextText = "未上报";
+    railContextText = "—";
+  }
+
+  const openDecisionCount = (input.decisions ?? []).filter(
+    (d) => d.status === "open" && (workItemId === "" || d.work_item_id === workItemId)
+      && decisionMatchesDepartment(d, node.id, item),
+  ).length;
+  const deptState = item?.departments?.[node.id]?.state ?? "";
+  const waitingProvider = Boolean(workspace?.room?.waiting_provider);
+  const remoteUnknown = Boolean(workspace?.room?.remote_unknown);
+
+  let statusLabel = "空闲";
+  let statusTone: NodeStatusTone = "done";
+  let workingPulse = false;
+
+  if (item !== null && item.status === "stopped") {
+    statusLabel = "已停止";
+    statusTone = "warn";
+  } else if (item !== null && DONE_STATUS.has(item.status)) {
+    statusLabel = "已结束";
+    statusTone = "done";
+  } else if (openDecisionCount > 0 || deptState === "waiting_user") {
+    statusLabel = "等你决定";
+    statusTone = "warn";
+  } else if (waitingProvider) {
+    statusLabel = "限流重试";
+    statusTone = "warn";
+  } else if (deptState === "asking" || node.waiting.length > 0) {
+    statusLabel = "等回复";
+    statusTone = "ask";
+  } else if (deptState === "verifying") {
+    statusLabel = "核验中";
+    statusTone = "work";
+    workingPulse = true;
+  } else if (node.working || deptState === "working") {
+    statusLabel = "进行中";
+    statusTone = "work";
+    workingPulse = true;
+  } else if (workspace?.room?.mailbox && workspace.room.mailbox > 0) {
+    statusLabel = "待处理";
+    statusTone = "ready";
+  }
+
+  return {
+    id: node.id,
+    statusLabel,
+    statusTone,
+    workingPulse,
+    modelId: effectiveId,
+    modelName,
+    modelUnset,
+    modelUnusable,
+    protocol,
+    effort,
+    contextPercent,
+    contextText,
+    railContextText,
+    contextWindow,
+    inputTokens,
+    latestAttempt,
+    latestUsage,
+    hasRequests,
+    waitingProvider,
+    remoteUnknown,
+    openDecisionCount,
+  };
+}
+
+/** 左侧栏的一个职能状态行。 */
+export interface BlueprintRailDepartment {
+  id: string;
+  label: string;
+  statusLabel: string;
+  statusTone: NodeStatusTone;
+  contextText: string;
+  contextPercent: number | null;
+}
+
+/** 左侧栏的一个阶段进度项（按组织动态推导，不写死三职能名）。 */
+export interface BlueprintRailStage {
+  key: string;
+  label: string;
+  state: "done" | "active" | "pending" | "stopped";
+}
+
+export interface BlueprintRailView {
+  departments: BlueprintRailDepartment[];
+  stages: BlueprintRailStage[];
+}
+
+function outcomeWord(outcomeId: string): string {
+  if (outcomeId === "prd" || outcomeId === "product_spec") {
+    return "PRD";
+  }
+  if (outcomeId === "delivery" || outcomeId === "delivery_spec") {
+    return "交付";
+  }
+  if (outcomeId === "defect_record") {
+    return "缺陷记录";
+  }
+  return outcomeId;
+}
+
+/**
+ * 动态推出左侧状态栏的「职能」与「阶段」列表：
+ * 不硬编码固定三职能或固定阶段名，完全跟随 `item.organization.routing`、`watched`、`verifiers` 与运行事实。
+ */
+export function blueprintRailOf(input: {
+  item: LoopItemView | null;
+  graph: LoopGraph;
+  flow: readonly FlowRecordLike[];
+  materials: MaterialsView | null;
+  telemetryById: Readonly<Record<string, NodeTelemetry>>;
+  labels?: Record<string, string>;
+}): BlueprintRailView {
+  const { item, graph, flow, materials, telemetryById } = input;
+  const labels = input.labels ?? {};
+  const organization = item?.organization ?? null;
+
+  const departments: BlueprintRailDepartment[] = graph.nodes.map((node) => {
+    const tel = telemetryById[node.id];
+    return {
+      id: node.id,
+      label: node.label,
+      statusLabel: tel?.statusLabel ?? (node.working ? "进行中" : "空闲"),
+      statusTone: tel?.statusTone ?? (node.working ? "work" : "done"),
+      contextText: tel?.railContextText ?? "—",
+      contextPercent: tel?.contextPercent ?? null,
+    };
+  });
+
+  if (organization === null) {
+    return { departments, stages: [] };
+  }
+
+  const verifiers = new Set(verifierIds(organization));
+  const vIds = verifierIds(organization);
+  const vNames = vIds.map((id) => labelOf(id, organization, labels)).join("、");
+  const stopped = item !== null && item.status === "stopped";
+  const ended = item !== null && (item.status === "released_unsettled" || item.status === "adopted");
+  const conclusion = item?.progress?.conclusion ?? null;
+  const lastReview = (materials?.reviews ?? []).at(-1)?.verdict ?? null;
+  const released = conclusion === "release" || (ended && vIds.length > 0 && item?.stop_reason !== "open_loop")
+    || (conclusion === null && lastReview === "release");
+
+  const isRoleActive = (roleId: string): boolean => {
+    const st = item?.departments?.[roleId]?.state ?? "";
+    return st === "working" || st === "asking" || st === "verifying" || st === "waiting_user" || item?.department === roleId;
+  };
+
+  const stages: BlueprintRailStage[] = [];
+  // 1. 输入阶段
+  const hasStarted = item !== null && (
+    (materials?.inputs?.length ?? 0) > 0 || flow.length > 0 || ended || item.status === "in_progress"
+  );
+  stages.push({
+    key: "stage:input",
+    label: item?.kind === "onboarding" ? "建档输入" : "收到输入",
+    state: hasStarted ? "done" : stopped ? "stopped" : "pending",
+  });
+
+  // 2. 执行阶段：区分成果流转组织与直做组织
+  const nonVerifierNodes = [
+    ...graph.chain.filter((n) => !verifiers.has(n.id)),
+    ...graph.side.map((s) => s.node).filter((n) => !verifiers.has(n.id)),
+  ];
+
+  if (organization.routing !== "direct" && organization.watched.length > 0) {
+    // 沿主线依次列出非核验职能对应的成果阶段
+    for (let index = 0; index < nonVerifierNodes.length; index += 1) {
+      const role = nonVerifierNodes[index];
+      const watchedOut = organization.watched.filter((w) => w.source === role.id);
+      const outcomeWords = [...new Set(watchedOut.map((w) => outcomeWord(w.outcome)))];
+      const label = outcomeWords.length > 0
+        ? `${role.label} · ${outcomeWords.join(" / ")}`
+        : `${role.label}工作`;
+      const active = !ended && !stopped && isRoleActive(role.id);
+      const producedOutcome = flow.some((r) => r.direction_from === role.id && outcomeOf(r.kind) !== null);
+      const downstreamStarted = nonVerifierNodes.slice(index + 1).some((next) => isRoleActive(next.id))
+        || vIds.some((vid) => isRoleActive(vid));
+      const state: BlueprintRailStage["state"] = active
+        ? "active"
+        : (ended || released || producedOutcome || downstreamStarted)
+          ? "done"
+          : stopped
+            ? "stopped"
+            : "pending";
+      stages.push({ key: `stage:role:${role.id}`, label, state });
+    }
+  } else if (nonVerifierNodes.length > 0) {
+    // 直做组织：不拆分固定三职能，合并展示真实执行职能
+    const workerLabels = nonVerifierNodes.map((n) => n.label).join("、");
+    const label = nonVerifierNodes.length === 1 ? `${workerLabels}执行` : `执行（${workerLabels}）`;
+    const active = !ended && !stopped && nonVerifierNodes.some((n) => isRoleActive(n.id));
+    const delivered = flow.some((r) => outcomeOf(r.kind) !== null) || (materials?.deliveries?.length ?? 0) > 0;
+    const verifierRunning = vIds.some((vid) => isRoleActive(vid));
+    const state: BlueprintRailStage["state"] = active
+      ? "active"
+      : (ended || released || delivered || verifierRunning)
+        ? "done"
+        : stopped
+          ? "stopped"
+          : "pending";
+    stages.push({ key: "stage:work", label, state });
+  }
+
+  // 3. 核验阶段与终点阶段
+  if (vIds.length > 0) {
+    const verifierActive = !ended && !stopped && vIds.some((vid) => isRoleActive(vid));
+    const verifierState: BlueprintRailStage["state"] = verifierActive
+      ? "active"
+      : released
+        ? "done"
+        : stopped
+          ? "stopped"
+          : "pending";
+    stages.push({ key: "stage:verify", label: `${vNames}核验`, state: verifierState });
+    stages.push({
+      key: "stage:end",
+      label: `✓ ${vNames}放行`,
+      state: released ? "done" : stopped ? "stopped" : "pending",
+    });
+  } else {
+    stages.push({
+      key: "stage:end",
+      label: "◌ 开环完成",
+      state: ended ? "done" : stopped ? "stopped" : "pending",
+    });
+  }
+
+  return { departments, stages };
 }

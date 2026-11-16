@@ -110,23 +110,86 @@ export function workshopFacts(data: DepartmentWorkspaceResult | null): PanelFact
   return facts;
 }
 
+/** 工作间是否存在结果未知的远程动作（需要动作核实与恢复）。 */
+export function workshopRecoveryNeeded(data: DepartmentWorkspaceResult | null): boolean {
+  return Boolean(data?.room?.remote_unknown);
+}
+
+/** 最近一次请求的结构化事实（由 LiveWindow 与 lastRequestFacts 共用）。 */
+export interface LastRequestDetail {
+  hasCall: boolean;
+  model: string;
+  protocol: string;
+  requestedTier: string;
+  sentTier: string;
+  summary: string;
+}
+
+export function lastRequestDetail(data: DepartmentWorkspaceResult | null): LastRequestDetail | null {
+  if (data === null) {
+    return null;
+  }
+  if (data.last_call === null) {
+    return {
+      hasCall: false,
+      model: "",
+      protocol: NOT_REPORTED_TEXT,
+      requestedTier: NOT_REPORTED_TEXT,
+      sentTier: NOT_REPORTED_TEXT,
+      summary: NO_LAST_CALL_TEXT,
+    };
+  }
+  const lastCall = data.last_call as Record<string, unknown>;
+  const model = stringOf(lastCall["requested_model"]) ?? stringOf(lastCall["actual_model"]) ?? NOT_REPORTED_TEXT;
+  const protocol = stringOf(lastCall["requested_protocol"]) ?? NOT_REPORTED_TEXT;
+  const requestedTier = stringOf(lastCall["requested_tier"]) ?? NOT_REPORTED_TEXT;
+  const sentTier = stringOf(lastCall["sent_tier"]) ?? NOT_REPORTED_TEXT;
+  return {
+    hasCall: true,
+    model,
+    protocol,
+    requestedTier,
+    sentTier,
+    summary: `${model}（协议 ${protocol}，请求 ${requestedTier}，实际发送 ${sentTier}）`,
+  };
+}
+
 /**
  * 最近一次请求实际使用的模型、协议与发送的档位（取自工作间的 last_call）：
  * 模型先看请求的模型、没有就写实际使用的；协议照请求时给的那一份；档位写请求的与真正发送的。
  */
 export function lastRequestFacts(data: DepartmentWorkspaceResult | null): PanelFact[] {
+  const detail = lastRequestDetail(data);
+  if (detail === null) {
+    return [];
+  }
+  return [{ label: "最近一次请求", value: detail.summary }];
+}
+
+/** 指导记录的结构化视图（含版本、处理状态、正文与事件引用）。 */
+export interface GuidanceItemView {
+  id: string;
+  version: number;
+  status: string;
+  statusLabel: string;
+  text: string;
+  appliedActivationId: string | null;
+  createdEventId: string;
+}
+
+export function guidanceItems(data: DepartmentWorkspaceResult | null): GuidanceItemView[] {
   if (data === null) {
     return [];
   }
-  if (data.last_call === null) {
-    return [{ label: "最近一次请求", value: NO_LAST_CALL_TEXT }];
-  }
-  const lastCall = data.last_call as Record<string, unknown>;
-  const model = stringOf(lastCall["requested_model"]) ?? stringOf(lastCall["actual_model"]) ?? NOT_REPORTED_TEXT;
-  const protocol = stringOf(lastCall["requested_protocol"]) ?? NOT_REPORTED_TEXT;
-  const requested = stringOf(lastCall["requested_tier"]) ?? NOT_REPORTED_TEXT;
-  const sent = stringOf(lastCall["sent_tier"]) ?? NOT_REPORTED_TEXT;
-  return [{ label: "最近一次请求", value: `${model}（协议 ${protocol}，请求 ${requested}，实际发送 ${sent}）` }];
+  return (data.guidance ?? []).map((record) => ({
+    id: record.guidance_id,
+    version: record.version,
+    status: record.status,
+    statusLabel: GUIDANCE_STATUS[record.status] ?? record.status,
+    text: record.text,
+    appliedActivationId: record.applied_activation_id ?? null,
+    createdEventId: record.created_event_id,
+  }));
 }
 
 /**
@@ -141,13 +204,13 @@ export function guidanceFacts(data: DepartmentWorkspaceResult | null): PanelFact
   if (data === null) {
     return [];
   }
-  const guidance = data.guidance ?? [];
-  if (guidance.length === 0) {
+  const items = guidanceItems(data);
+  if (items.length === 0) {
     return [{ label: "指导", value: NO_GUIDANCE_TEXT }];
   }
-  return guidance.map((record) => ({
+  return items.map((record) => ({
     label: `指导（第 ${record.version} 版）`,
-    value: GUIDANCE_STATUS[record.status] ?? record.status,
+    value: record.statusLabel,
   }));
 }
 
