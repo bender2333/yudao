@@ -1253,15 +1253,16 @@ def test_a_run_without_a_score_is_reported_as_void(tmp_path):
 
 
 def test_process_exit_failure_is_not_a_release():
-    """构造：harness 没有现成的进程退出事件序列。事件序列仍用 retry_exhausted.json
-    （fake 适配器，事件里没有 `process_exit_failed` 标志），通过 outcome 标志触发
+    """构造：harness 没有现成的进程退出事件序列。事件序列用 stop_command.json
+    （fake 适配器，非模型服务故障，事件里没有 `process_exit_failed` 标志），通过 outcome 标志触发
     运行器进程退出码非零分支：放行记未通过，停止原因取原始值。"""
-    export = _load_fixture("retry_exhausted.json")
+    export = _load_fixture("stop_command.json")
     outcome = {"timed_out": False, "elapsed_seconds": 60.0,
                "hidden_failures": [], "process_exit_failed": True}
     collected = yudao_metrics.collect(export, outcome, None, None)
     assert collected["checkpoints"]["ended_within_limit"]["passed"] is False
     assert "进程退出码非零" in collected["checkpoints"]["ended_within_limit"]["detail"]
+    assert collected["end_reason"] == "cancelled"
     assert collected["end_reason"] != yudao_metrics.MODEL_SERVICE_FAILURE
 
 # ---------------------------------------------------------------------------
@@ -2702,4 +2703,292 @@ def test_metrics_collect_records_open_blocking_decision_reason():
     non_blocking_collected = yudao_metrics.collect(non_blocking_export, outcome)
     assert non_blocking_collected["end_status"] == "ended"
     assert non_blocking_collected["end_reason"] == "running"
+
+
+def test_outer_loop_states_count_transitions_and_stop_reasons():
+    """守 R2/R3：指标 JSON 直接从事件流统计外环各状态走到次数与全部停止原因。"""
+    outcome = {"timed_out": False, "elapsed_seconds": 10.0, "hidden_failures": []}
+
+    rework_collected = yudao_metrics.collect(_load_fixture("quality_rework.json"), outcome)
+    assert rework_collected["outer_loop_states"] == {
+        "asking": 0,
+        "waiting_user": 0,
+        "verifying": 5,
+        "rework": 1,
+        "accepted": 4,
+        "stopped": 1,
+        "stop_reasons": ["released"],
+        "breakdown": {
+            "ask_started": 0,
+            "ask_answered": 0,
+            "decision_requested": 0,
+            "decision_answered": 0,
+            "decision_withdrawn": 0,
+            "verifier_activations": 5,
+            "review_submissions": 2,
+            "accept_events": {
+                "spec_accepted": 1,
+                "contract_accepted": 1,
+                "delivery_accepted": 2,
+            },
+            "stop_events": {"run_done": 1},
+        },
+    }
+
+    ask_collected = yudao_metrics.collect(
+        _load_fixture("ask_answer_with_spec_revision.json"), outcome)
+    ask_states = ask_collected["outer_loop_states"]
+    assert ask_states["asking"] == 1
+    assert ask_states["verifying"] == 2
+    assert ask_states["rework"] == 0
+    assert ask_states["accepted"] == 5
+    assert ask_states["stopped"] == 1
+    assert ask_states["stop_reasons"] == ["released"]
+
+    compaction_fail = yudao_metrics.collect(_load_fixture("compaction_failed.json"), outcome)
+    assert compaction_fail["outer_loop_states"]["waiting_user"] == 1
+    assert compaction_fail["outer_loop_states"]["stopped"] == 1
+    assert compaction_fail["outer_loop_states"]["stop_reasons"] == ["compaction_failed"]
+
+    mixed_export = _export(
+        outcome="released",
+        events=[
+            {"type": "department_activated", "department": "product",
+             "session_id": "s-prod", "payload": {"activation_id": "a1"}},
+            {"type": "spec_accepted", "department": "product"},
+            {"type": "department_activated", "department": "verifier",
+             "session_id": "s-ver", "payload": {"activation_id": "a2"}},
+            {"type": "baseline_review_accepted", "department": "verifier",
+             "session_id": "s-ver", "payload": {"verdict": "rework_product"}},
+            {"type": "baseline_review_accepted", "department": "verifier",
+             "session_id": "s-ver", "payload": {"verdict": "consistent"}},
+            {"type": "decision_requested", "payload": {"blocks": "instance", "kind": "upgrade"}},
+            {"type": "decision_requested", "payload": {"blocks": "run", "kind": "no_tool_call"}},
+            {"type": "run_paused", "stop_reason": "no_tool_call",
+             "payload": {"stop_reason": "no_tool_call"}},
+            {"type": "artifact_accepted", "department": "engineering",
+             "payload": {"artifact_kind": "completion"}},
+            {"type": "artifact_accepted", "department": "verifier",
+             "session_id": "s-ver",
+             "payload": {"artifact_kind": "completion_review", "verdict": "rework"}},
+            {"type": "run_done", "stop_reason": "released", "payload": {"stop_reason": "released"}},
+        ],
+    )
+    mixed_states = yudao_metrics.collect(mixed_export, outcome)["outer_loop_states"]
+    assert mixed_states["waiting_user"] == 1
+    assert mixed_states["verifying"] == 1
+    assert mixed_states["rework"] == 2
+    assert mixed_states["accepted"] == 3
+    assert mixed_states["stopped"] == 2
+    assert mixed_states["stop_reasons"] == ["no_tool_call", "released"]
+
+
+def test_activation_rounds_separate_departments_usage_and_ignore_cumulative_model_steps():
+    """守 R2/R3：各激活轮次按 model_attempt_* 真实归属统计步数、用量与占比，避免按整场累计数相加。"""
+    outcome = {"timed_out": False, "elapsed_seconds": 8.0, "hidden_failures": []}
+    export = _export(
+        outcome="released",
+        events=[
+            {"type": "department_activated", "department": "product",
+             "session_id": "s-prod", "payload": {"activation_id": "act-1", "cycle": 1}},
+            {"type": "model_requested", "department": "product", "session_id": "s-prod",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-1",
+                         "logical_call_id": "call-1", "step_id": 1, "purpose": "work"}},
+            {"type": "model_attempt_finished", "department": "product", "session_id": "s-prod",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-1",
+                         "logical_call_id": "call-1", "step_id": 1, "purpose": "work",
+                         "usage": {"input_tokens": 100, "output_tokens": 20,
+                                   "total_tokens": 120, "reported": True}}},
+            {"type": "model_requested", "department": "product", "session_id": "s-prod",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-2",
+                         "logical_call_id": "call-2", "step_id": 2, "purpose": "work"}},
+            {"type": "model_attempt_finished", "department": "product", "session_id": "s-prod",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-2",
+                         "logical_call_id": "call-2", "step_id": 2, "purpose": "work",
+                         "usage": {"input_tokens": 150, "output_tokens": 30,
+                                   "total_tokens": 180, "reported": True}}},
+            {"type": "activation_finished", "department": "product", "session_id": "s-prod",
+             "payload": {"activation_id": "act-1", "model_steps": 2, "session_model_steps": 2}},
+
+            {"type": "department_activated", "department": "engineering",
+             "session_id": "s-eng", "payload": {"activation_id": "act-2", "cycle": 2}},
+            {"type": "model_requested", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-2", "attempt_id": "att-3",
+                         "logical_call_id": "call-3", "step_id": 1, "purpose": "work"}},
+            {"type": "model_attempt_failed", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-2", "attempt_id": "att-3",
+                         "logical_call_id": "call-3", "step_id": 1, "purpose": "work",
+                         "reason": "timeout"}},
+            {"type": "model_requested", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-2", "attempt_id": "att-4",
+                         "logical_call_id": "call-3", "step_id": 2, "purpose": "work"}},
+            {"type": "model_attempt_finished", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-2", "attempt_id": "att-4",
+                         "logical_call_id": "call-3", "step_id": 2, "purpose": "work",
+                         "usage": {"input_tokens": 300, "output_tokens": 50,
+                                   "total_tokens": 350, "reported": True}}},
+            {"type": "ask_started", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-2", "branch_session_id": "s-ask-1"}},
+            {"type": "department_activated", "department": "product",
+             "session_id": "s-ask-1", "payload": {"activation_id": "act-ask-1", "cycle": 2}},
+            {"type": "model_requested", "department": "product", "session_id": "s-ask-1",
+             "payload": {"activation_id": "act-ask-1", "attempt_id": "att-5",
+                         "logical_call_id": "call-ask-1", "step_id": 1, "purpose": "work"}},
+            {"type": "model_attempt_finished", "department": "product", "session_id": "s-ask-1",
+             "payload": {"activation_id": "act-ask-1", "attempt_id": "att-5",
+                         "logical_call_id": "call-ask-1", "step_id": 1, "purpose": "work",
+                         "usage": {"reported": False}}},
+            {"type": "activation_finished", "department": "product", "session_id": "s-ask-1",
+             "payload": {"activation_id": "act-ask-1", "model_steps": 4, "session_model_steps": 1}},
+            {"type": "ask_answered", "department": "product", "session_id": "s-ask-1"},
+            {"type": "activation_finished", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-2", "model_steps": 5, "session_model_steps": 2}},
+
+            {"type": "department_activated", "department": "quality",
+             "session_id": "s-qa", "payload": {"activation_id": "act-3", "cycle": 3}},
+            {"type": "model_requested", "department": "quality", "session_id": "s-qa",
+             "payload": {"activation_id": "act-3", "attempt_id": "att-6",
+                         "logical_call_id": "call-4", "step_id": 1, "purpose": "work"}},
+            {"type": "model_attempt_finished", "department": "quality", "session_id": "s-qa",
+             "payload": {"activation_id": "act-3", "attempt_id": "att-6",
+                         "logical_call_id": "call-4", "step_id": 1, "purpose": "work",
+                         "usage": {"input_tokens": 200, "output_tokens": 40,
+                                   "total_tokens": 240, "reported": True}}},
+            {"type": "activation_finished", "department": "quality", "session_id": "s-qa",
+             "payload": {"activation_id": "act-3", "model_steps": 6, "session_model_steps": 1}},
+        ],
+    )
+    rounds = yudao_metrics.collect(export, outcome)["activation_rounds"]
+    assert [(r["round"], r["department"], r["ask_branch"], r["work_steps"]) for r in rounds] == [
+        (1, "product", False, 2),
+        (2, "engineering", False, 1),
+        (2, "product", True, 1),
+        (3, "quality", False, 1),
+    ]
+    assert sum(r["work_steps"] for r in rounds) == 5
+
+    prod_r1, eng_r2, ask_r2, qa_r3 = rounds
+    assert prod_r1["model_requests"] == 2
+    assert prod_r1["usage_reported_requests"] == 2
+    assert prod_r1["usage_reported_ratio"] == 1.0
+    assert (prod_r1["input_tokens"], prod_r1["output_tokens"], prod_r1["total_tokens"]) == (250, 50, 300)
+
+    assert eng_r2["model_requests"] == 2
+    assert eng_r2["usage_reported_requests"] == 1
+    assert eng_r2["usage_reported_ratio"] == 0.5
+    assert (eng_r2["input_tokens"], eng_r2["output_tokens"], eng_r2["total_tokens"]) == (300, 50, 350)
+
+    assert ask_r2["model_requests"] == 1
+    assert ask_r2["usage_reported_requests"] == 0
+    assert ask_r2["usage_reported_ratio"] == 0.0
+    assert ask_r2["input_tokens"] is None and ask_r2["total_tokens"] is None
+
+    assert (qa_r3["input_tokens"], qa_r3["output_tokens"], qa_r3["total_tokens"]) == (200, 40, 240)
+
+
+def test_activation_rounds_count_compaction_requests_attempts_and_duration():
+    """守 R2/R3：压缩请求次数、尝试次数与墙钟耗时从压缩尝试统计，兼容重试失败与 attempts 导出。"""
+    outcome = {"timed_out": False, "elapsed_seconds": 12.0, "hidden_failures": []}
+
+    fixture_rounds = yudao_metrics.collect(_load_fixture("compaction_success.json"), outcome)["activation_rounds"]
+    assert len(fixture_rounds) == 1
+    assert fixture_rounds[0]["work_steps"] == 2
+    assert fixture_rounds[0]["compaction_requests"] == 4
+    assert fixture_rounds[0]["compaction_attempts"] == 4
+    assert fixture_rounds[0]["compaction_duration_ms"] is None
+
+    export = _export(
+        outcome="released",
+        events=[
+            {"type": "department_activated", "department": "engineering",
+             "session_id": "s-eng", "payload": {"activation_id": "act-1"}},
+            {"type": "model_requested", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-w1",
+                         "logical_call_id": "call-w1", "step_id": 1, "purpose": "work"}},
+            {"type": "model_attempt_finished", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-w1",
+                         "logical_call_id": "call-w1", "step_id": 1, "purpose": "work",
+                         "usage": {"input_tokens": 100, "output_tokens": 10,
+                                   "total_tokens": 110, "reported": True}}},
+            {"type": "model_requested", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-c1-1",
+                         "logical_call_id": "call-c1", "step_id": 2, "purpose": "compaction"}},
+            {"type": "model_attempt_failed", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-c1-1",
+                         "logical_call_id": "call-c1", "step_id": 2, "purpose": "compaction",
+                         "duration_ms": 1250}},
+            {"type": "model_requested", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-c1-2",
+                         "logical_call_id": "call-c1", "step_id": 3, "purpose": "compaction"}},
+            {"type": "model_attempt_finished", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-c1-2",
+                         "logical_call_id": "call-c1", "step_id": 3, "purpose": "compaction",
+                         "duration_ms": 750,
+                         "usage": {"input_tokens": 400, "output_tokens": 40,
+                                   "total_tokens": 440, "reported": True}}},
+            {"type": "compaction_recorded", "department": "engineering", "session_id": "s-eng",
+             "payload": {"activation_id": "act-1", "step_id": 3, "purpose": "compaction"}},
+            {"type": "model_requested", "department": "engineering", "session_id": "s-eng",
+             "created_at": "2026-01-01T00:00:10+00:00",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-c2-1",
+                         "logical_call_id": "call-c2", "step_id": 4, "purpose": "compaction"}},
+            {"type": "model_attempt_finished", "department": "engineering", "session_id": "s-eng",
+             "created_at": "2026-01-01T00:00:13.500000+00:00",
+             "payload": {"activation_id": "act-1", "attempt_id": "att-c2-1",
+                         "logical_call_id": "call-c2", "step_id": 4, "purpose": "compaction",
+                         "usage": {"input_tokens": 300, "output_tokens": 30,
+                                   "total_tokens": 330, "reported": True}}},
+        ],
+    )
+    export["attempts"] = [
+        {"id": "att-c1-2", "activation_id": "act-1", "logical_call_id": "call-c1",
+         "step": 3, "department": "engineering", "purpose": "compaction",
+         "duration_ms": 750,
+         "usage": {"input_tokens": 400, "output_tokens": 40,
+                   "total_tokens": 440, "reported": True}},
+    ]
+    row = yudao_metrics.collect(export, outcome)["activation_rounds"][0]
+    assert row["work_steps"] == 1
+    assert row["compaction_requests"] == 2
+    assert row["compaction_attempts"] == 3
+    assert row["compaction_duration_ms"] == 5500
+    assert row["compaction_duration_seconds"] == 5.5
+    assert row["compaction_max_duration_ms"] == 3500
+    assert row["model_requests"] == 4
+    assert row["usage_reported_requests"] == 3
+    assert row["usage_reported_ratio"] == 0.75
+    assert (row["input_tokens"], row["output_tokens"], row["total_tokens"]) == (800, 80, 880)
+
+
+def test_model_service_failure_recognises_provider_error_stop_reason_on_run_failed():
+    """守 R2/R3：`run_failed` 携带 `stop_reason == 'provider_error'` 时识别为模型服务故障。"""
+    outcome = {"timed_out": False, "elapsed_seconds": 1.0, "hidden_failures": []}
+
+    exhausted = yudao_metrics.collect(_load_fixture("retry_exhausted.json"), outcome)
+    assert exhausted["model_service_failure"] is True
+    assert exhausted["end_reason"] == yudao_metrics.MODEL_SERVICE_FAILURE
+
+    payload_only = yudao_metrics.collect(
+        _export("failed", [{"type": "run_failed", "payload": {"stop_reason": "provider_error"}}]),
+        outcome,
+    )
+    assert payload_only["model_service_failure"] is True
+
+    envelope_only = yudao_metrics.collect(
+        _export("failed", [{"type": "run_failed", "stop_reason": "provider_error"}]),
+        outcome,
+    )
+    assert envelope_only["model_service_failure"] is True
+
+    recovered = yudao_metrics.collect(_load_fixture("retry_then_success.json"), outcome)
+    assert recovered["model_service_failure"] is False
+    assert recovered["end_reason"] != yudao_metrics.MODEL_SERVICE_FAILURE
+
+    non_provider = yudao_metrics.collect(
+        _export("failed", [{"type": "run_failed", "stop_reason": "time_limit",
+                            "payload": {"stop_reason": "time_limit"}}]),
+        outcome,
+    )
+    assert non_provider["model_service_failure"] is False
+
 
