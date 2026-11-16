@@ -10,7 +10,7 @@ import uuid
 from harness.app.application import Application
 from harness.models import CatalogEventType
 from harness.tests.api_helpers import running_api
-from harness.tests.protocol_helpers import ScriptedProvider, model_test_responder, send_reply
+from harness.tests.protocol_helpers import ScriptedProvider, model_test_responder, send_reply, sse
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 SECRET = "candidate-test-key-do-not-publish"
@@ -122,16 +122,19 @@ def test_a_passing_candidate_test_saves_no_definition_admission_or_selection(tmp
             provider_id = connect(client, upstream)
             before = catalog(client)
             assert before["models"] == [] and before["admissions"] == [] and before["bindings"] == {}
+            position = opened.application.system.store.end_position()
             started = command(client, "catalog.candidate.test", base_version=before["revision"],
                               provider_id=provider_id, model="maker/ready")
             assert started.status_code == 200, started.text
-            position = opened.application.system.store.end_position()
             data = wait_candidate_test(client, provider_id, "maker/ready",
                                        lambda test: test is not None and test["status"] == "passed")
             test = candidate_test(data, provider_id, "maker/ready")
-            assert test["elapsed_ms"] >= 0 and test["actual_model"] == "maker/ready"
-            assert test["accepts_required_tool_call"] is True
+            assert test["elapsed_ms"] is None and test["actual_model"] is None
+            assert test["accepts_required_tool_call"] is None
             assert test["failure_group"] is None and test["failure_step"] is None and test["error"] is None
+            assert len(upstream.requests) == 2  # 一次列表 GET 与一次无工具极简文本 POST
+            assert not upstream.requests[1].get("tools")
+            assert "tool_choice" not in upstream.requests[1]
             after = catalog(client)
             assert after["models"] == [] and after["admissions"] == [] and after["bindings"] == {}
             assert after["selections"] == []
@@ -140,7 +143,7 @@ def test_a_passing_candidate_test_saves_no_definition_admission_or_selection(tmp
             assert finished.payload["ok"] is True and finished.payload["admitted"] is None
             assert finished.payload["provider_id"] == provider_id
             assert finished.payload["model_id"] == "maker/ready"
-            assert finished.payload["actual_model"] == "maker/ready"
+            assert finished.payload["actual_model"] is None
             assert SECRET not in json.dumps([event.payload for event in
                                              opened.application.system.store.read(0, limit=10000)])
     finally:
@@ -148,14 +151,16 @@ def test_a_passing_candidate_test_saves_no_definition_admission_or_selection(tmp
 
 
 def test_a_failed_candidate_test_names_the_group_step_and_hides_401_and_403_bodies(tmp_path):
-    # 验收 2：未通过时写明哪一组、哪一步与原因；401 与 403 只写状态码与含义，响应里查不到 Key。
+    # 验收 2：候选测试失败只保留简洁原因并留空遥测字段；401 与 403 只写状态码与含义，响应里查不到 Key。
     exposed = "untrusted-credential-echo " + SECRET
 
-    def text_instead_of_tool(_provider, handler):
-        body = {**handler.body, "tools": []}
-        status, content_type, chunks = model_test_responder(
-            body, protocol="chat_completions", actual_model=handler.body["model"])
-        send_reply(handler, status, content_type, b"".join(chunks))
+    def empty_text_reply(_provider, handler):
+        chunk = json.dumps({
+            "id": "chat-empty", "object": "chat.completion.chunk", "created": 1,
+            "model": handler.body["model"],
+            "choices": [{"index": 0, "delta": {"role": "assistant", "content": "   "}, "finish_reason": "stop"}],
+        }, ensure_ascii=False)
+        send_reply(handler, 200, "text/event-stream", sse(f"data: {chunk}\n\n", "data: [DONE]\n\n"))
 
     def rejected(status):
         def respond(_provider, handler):
@@ -164,8 +169,7 @@ def test_a_failed_candidate_test_names_the_group_step_and_hides_401_and_403_bodi
         return respond
 
     models = [{"id": "maker/ready", "limit": {"context": 128000, "output": 8192}}]
-    upstream = ScriptedProvider([responder(models), responder(models), text_instead_of_tool,
-                                 rejected(401), rejected(403)])
+    upstream = ScriptedProvider([responder(models), empty_text_reply, rejected(401), rejected(403)])
     opened = Opened(tmp_path)
     try:
         with running_api(opened) as client:
@@ -179,16 +183,17 @@ def test_a_failed_candidate_test_names_the_group_step_and_hides_401_and_403_bodi
             start()
             data = wait_candidate_test(client, provider_id, "maker/ready",
                                        lambda test: test is not None and test["status"] == "failed")
-            tool = candidate_test(data, provider_id, "maker/ready")
-            assert tool["failure_group"] == "tool_round_trip" and tool["failure_step"] == "tool_call"
-            assert "工具往返" in tool["error"] and "模型没有调用测试工具" in tool["error"]
+            empty_outcome = candidate_test(data, provider_id, "maker/ready")
+            assert empty_outcome["failure_group"] is None and empty_outcome["failure_step"] is None
+            assert empty_outcome["elapsed_ms"] is None and empty_outcome["actual_model"] is None
+            assert empty_outcome["accepts_required_tool_call"] is None
+            assert "上游未返回文本回复" in empty_outcome["error"]
 
             start()
             data = wait_candidate_test(client, provider_id, "maker/ready",
                                        lambda test: test is not None and test["status"] == "failed")
             unauthorized = candidate_test(data, provider_id, "maker/ready")
-            assert unauthorized["failure_group"] == "minimal_qa"
-            assert unauthorized["failure_step"] == "request"
+            assert unauthorized["failure_group"] is None and unauthorized["failure_step"] is None
             assert "HTTP 401" in unauthorized["error"] and "凭据无效" in unauthorized["error"]
             assert exposed not in json.dumps(data, ensure_ascii=False)
             assert SECRET not in json.dumps(data, ensure_ascii=False)
@@ -197,7 +202,7 @@ def test_a_failed_candidate_test_names_the_group_step_and_hides_401_and_403_bodi
             data = wait_candidate_test(client, provider_id, "maker/ready",
                                        lambda test: test is not None and test["status"] == "failed")
             forbidden = candidate_test(data, provider_id, "maker/ready")
-            assert forbidden["failure_group"] == "minimal_qa"
+            assert forbidden["failure_group"] is None and forbidden["failure_step"] is None
             assert "HTTP 403" in forbidden["error"] and "没有访问权限" in forbidden["error"]
             dumped = json.dumps(data, ensure_ascii=False) + json.dumps(
                 [event.payload for event in opened.application.system.store.read(0, limit=10000)],
@@ -218,8 +223,8 @@ def test_candidate_tests_and_model_tests_share_one_concurrency_limit(tmp_path):
     normal = responder([{"id": name, "limit": {"context": 32000, "output": 2048}} for name in names])
 
     def gated(provider, handler):
-        # 每次测试的第一组请求停在这里：名额给了哪些测试、谁还在等待，由真实请求的到达决定
-        if handler.body is not None and not handler.body.get("tools"):
+        # 候选测试与选用测试均在此等待：名额给了哪些测试、谁还在等待，由真实请求的到达决定
+        if handler.body is not None:
             name = handler.body["model"]
             with condition:
                 entered.add(name)
@@ -338,7 +343,7 @@ def test_unknown_capacity_and_non_text_candidates_are_rejected_without_a_request
 
 
 def test_selecting_after_a_candidate_test_sends_the_two_groups_again_and_enables_with_sources(tmp_path):
-    # 验收 6：测试通过以后选用该候选，上游再次收到两组请求，最终已启用，来源详情完整。
+    # 验收 6：候选测试只发一次极简问候，选用后发起单轮工具测试并最终启用，来源详情完整。
     upstream = ScriptedProvider([responder([
         {"id": "maker/ready", "limit": {"context": 128000, "output": 8192},
          "modalities": {"input": ["text", "image"], "output": ["text"]}}
@@ -353,12 +358,12 @@ def test_selecting_after_a_candidate_test_sends_the_two_groups_again_and_enables
             wait_candidate_test(client, provider_id, "maker/ready",
                                 lambda test: test is not None and test["status"] == "passed")
             requests_after_candidate_test = len(upstream.requests)
-            assert requests_after_candidate_test == 4  # 一次列表 GET 与两组请求的三次 POST
+            assert requests_after_candidate_test == 2  # 一次列表 GET 与一次无工具极简文本 POST
             selected = command(client, "catalog.model.select", base_version=catalog(client)["revision"],
                                provider_id=provider_id, model="maker/ready")
             assert selected.status_code == 200, selected.text
             data = wait_catalog(client, lambda data: any(row["admitted"] for row in data["admissions"]))
-            assert len(upstream.requests) == requests_after_candidate_test + 3
+            assert len(upstream.requests) == requests_after_candidate_test + 1
             [model] = data["models"]
             assert model["model"] == "maker/ready"
             assert model["context_window"] == 128000 and model["max_output_tokens"] == 8192

@@ -204,16 +204,17 @@ class SelectionFlow:
 
     def finish_candidate(self, test: CandidateTest, result: dict[str, Any]) -> bool:
         # 结果到达时这次测试仍在（没有被重新获取模型列表或服务重启清掉）才写进状态。
+        # 候选测试只验证极简文本连通性，遥测与工具调用结论字段固定留空并保持向后兼容。
         with self._condition:
             if not self._is_live_candidate(test):
                 return False
             passed = bool(result.get("ok"))
             test.status = "passed" if passed else "failed"
-            test.elapsed_ms = result.get("elapsed_ms")
-            test.actual_model = result.get("model") if passed else None
-            test.accepts_required_tool_call = result.get("accepts_required_tool_call") if passed else None
-            test.failure_group = result.get("failure_group")
-            test.failure_step = result.get("failure_step")
+            test.elapsed_ms = None
+            test.actual_model = None
+            test.accepts_required_tool_call = None
+            test.failure_group = None
+            test.failure_step = None
             test.error = result.get("error")
             self._condition.notify_all()
             return True

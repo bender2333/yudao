@@ -17,6 +17,7 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
+from .capabilities import CAPABILITY_INDEX
 from .credentials import CredentialChain, CredentialMaterial, connection_credential_ref, dotenv_key_problem
 from .discovery import _parse_candidates, effective_models_url, probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
@@ -432,28 +433,43 @@ class ProviderFacade:
             providers.append(entry)
             if models_raw is None:
                 models = document["models"]
+                prepared_models: list[Any] = []
             else:
                 if not isinstance(models_raw, list):
                     raise CatalogValidationError((ValidationIssue("models", "应为数组"),))
                 _require_capacity(models_raw, provider_id, set(self._store.models))
                 models = [item for item in document["models"] if item.get("provider_id") != provider_id]
-                for item in models_raw:
-                    nested = dict(item)
-                    nested["provider_id"] = provider_id
-                    models.append(nested)
+                prepared_models = [self._prepared_model_item(provider_id, item) for item in models_raw]
+                models.extend(prepared_models)
             merged = {"providers": providers, "models": models, "bindings": document["bindings"]}
             _parse_document(merged, self._startup_mode)
             self._store.save_provider(entry)
             if models_raw is not None:
                 submitted: set[str] = set()
-                for item in models_raw:
-                    nested = dict(item)
-                    nested["provider_id"] = provider_id
+                for nested in prepared_models:
                     self._store.save_model(nested)
                     submitted.add(str(nested.get("id")))
                 self._prune_admissions(str(provider_id), submitted)
             self._publish()
             return self._revision
+
+    def _prepared_model_item(self, provider_id: Any, item: Any) -> Any:
+        if not isinstance(item, Mapping):
+            return item
+        nested = dict(item)
+        nested["provider_id"] = provider_id
+        model_id = str(nested.get("id") or "")
+        existing = self._store.models.get(model_id)
+        if existing is not None and existing.provider_id == provider_id and nested.get("source_details") is None:
+            details = copy.deepcopy(existing.source_details)
+            submitted_modalities = tuple(nested.get("input_modalities") or ())
+            if submitted_modalities != existing.input_modalities:
+                details["input_modalities"] = {"source": "manual"}
+                nested["capability_source"] = _format_capability_source(details)
+            elif details and not nested.get("capability_source"):
+                nested["capability_source"] = _format_capability_source(details)
+            nested["source_details"] = details
+        return nested
 
     def connect(self, base_url: str, api_key: str | None = None) -> dict[str, Any]:
         # 先校验完整连接，再写入 Key；凭据文件写入失败时目录、凭据内存与版本都不改变。
@@ -941,7 +957,8 @@ class ProviderFacade:
             candidate = next((item for item in latest.get("candidates", ()) if item["id"] == upstream_model), None)
             from_list = candidate is not None
             if candidate is None:
-                candidate = _parse_candidates([{"id": upstream_model}], provider.preset_id)[0]
+                candidate = _parse_candidates([{"id": upstream_model}], provider.preset_id,
+                                              base_url=provider.base_url)[0]
             if not candidate.get("applicable", True):
                 raise CatalogValidationError((ValidationIssue("model", "不适用于部门任务：模型不输出文本"),))
             values = dict(candidate)
@@ -953,6 +970,9 @@ class ProviderFacade:
                                 and (name == "protocol" or values.get(name) is None))):
                         values[name] = getattr(existing, name)
                         details[name] = dict(existing.source_details.get(name, {"source": "manual"}))
+                if existing.source_details.get("input_modalities", {}).get("source") == "manual":
+                    values["input_modalities"] = list(existing.input_modalities)
+                    details["input_modalities"] = dict(existing.source_details["input_modalities"])
             for name, value in (("context_window", context_window), ("max_output_tokens", max_output_tokens),
                                 ("protocol", protocol)):
                 if value is not None and (name == "protocol" or values.get(name) is None
@@ -972,8 +992,7 @@ class ProviderFacade:
                              "default_reasoning_level": None if existing is None else existing.default_reasoning_level,
                              "reasoning_mode": "" if existing is None else existing.reasoning_mode,
                              "accepts_required_tool_call": True if existing is None else existing.accepts_required_tool_call,
-                             "capability_source": " · ".join(f"{name}：{detail['source']}"
-                                                             for name, detail in details.items())})
+                             "capability_source": _format_capability_source(details)})
             problem = self.persist_catalog(previous)
             if problem is not None:
                 raise CatalogValidationError((ValidationIssue("catalog", problem),))
@@ -1128,7 +1147,7 @@ class ProviderFacade:
         return result
 
     def _candidate_model_test(self, test: CandidateTest) -> dict[str, Any]:
-        # 与模型测试相同的两组真实请求；定义与准入都不写，部门默认与已有选择都不变（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）
+        # 候选测试只发一次无工具极简文本问候请求；定义与准入都不写，部门默认与已有选择都不变（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）
         model = ModelDefinition(id=f"candidate:{test.provider_id}:{test.model}", provider_id=test.provider_id,
                                 model=test.model, protocol=test.protocol,
                                 context_window=test.context_window,
@@ -1142,11 +1161,11 @@ class ProviderFacade:
             target = self._candidate_target(provider, model)
         target = replace(target, timeout_sec=min(
             target.timeout_sec, float(DEFINITIONS.rule_value("provider.model_test_timeout_sec"))))
-        outcome = self._model_requests(target, model, test)
-        return {"ok": outcome["ok"], "error": outcome["error"], "model": outcome["model"],
-                "elapsed_ms": outcome["elapsed_ms"],
-                "accepts_required_tool_call": outcome["accepts_required_tool_call"],
-                "failure_group": outcome["failure_group"], "failure_step": outcome["failure_step"],
+        outcome = self._candidate_requests(target, model, test)
+        return {"ok": outcome["ok"], "error": outcome["error"], "model": None,
+                "elapsed_ms": None,
+                "accepts_required_tool_call": None,
+                "failure_group": None, "failure_step": None,
                 "protocol": model.protocol, "admitted": None,
                 "request_timeout_sec": target.timeout_sec}
 
@@ -1301,37 +1320,50 @@ class ProviderFacade:
         capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
         defaults_before = defaults_after = self.catalog_revision()
         with self._lock:
+            current = self._store.models.get(model.id)
+            current_provider = self._store.providers.get(provider.id)
+            if (current is None or current_provider is None
+                    or (selection is not None and not self.selections.is_current(selection))
+                    or (provider.base_url, provider.credential_ref, model.protocol, model.model, model.reasoning_mode)
+                    != (current_provider.base_url, current_provider.credential_ref,
+                        current.protocol, current.model, current.reasoning_mode)):
+                return {"ok": False, "admitted": False, "error": "选用已取消或测试目标已经改变"}
+            updated = current
+            if capacity_confirmed and current.accepts_required_tool_call != accepts_required:
+                updated = replace(updated, accepts_required_tool_call=accepts_required)
+            backfilled = _backfilled_input_modalities(current_provider.base_url, updated, actual)
+            if backfilled is not None:
+                new_modalities, new_detail = backfilled
+                new_details = copy.deepcopy(updated.source_details)
+                new_details["input_modalities"] = new_detail
+                updated = replace(
+                    updated,
+                    input_modalities=new_modalities,
+                    source_details=new_details,
+                    capability_source=_format_capability_source(new_details),
+                )
+            if updated is not current:
+                previous = self.to_document()
+                self.save_model(updated.public_dict())
+                persist_error = self.persist_catalog(previous)
+                if persist_error is not None:
+                    return {"ok": False, "error": f"工具往返 / 保存测试能力：{persist_error}",
+                            "model": actual, "admitted": False, "protocol": model.protocol,
+                            "revision": self.revision, "elapsed_ms": elapsed_ms, "usage_reported": False,
+                            "accepts_required_tool_call": accepts_required, "failure_group": "tool_round_trip",
+                            "failure_step": "save_capability", "request_timeout_sec": target.timeout_sec}
             if capacity_confirmed:
-                with self._lock:
-                    current = self._store.models.get(model.id)
-                    current_provider = self._store.providers.get(provider.id)
-                    if (current is None or current_provider is None
-                            or (selection is not None and not self.selections.is_current(selection))
-                            or (provider.base_url, provider.credential_ref, model.protocol, model.model, model.reasoning_mode)
-                            != (current_provider.base_url, current_provider.credential_ref,
-                                current.protocol, current.model, current.reasoning_mode)):
-                        return {"ok": False, "admitted": False, "error": "选用已取消或测试目标已经改变"}
-                    if current.accepts_required_tool_call != accepts_required:
-                        previous = self.to_document()
-                        self.save_model(replace(current, accepts_required_tool_call=accepts_required).public_dict())
-                        persist_error = self.persist_catalog(previous)
-                        if persist_error is not None:
-                            return {"ok": False, "error": f"工具往返 / 保存测试能力：{persist_error}",
-                                    "model": actual, "admitted": False, "protocol": model.protocol,
-                                    "revision": self.revision, "elapsed_ms": elapsed_ms, "usage_reported": False,
-                                    "accepts_required_tool_call": accepts_required, "failure_group": "tool_round_trip",
-                                    "failure_step": "save_capability", "request_timeout_sec": target.timeout_sec}
-                    previous_admission = self._admissions.get(model.id)
-                    self.record_admission(provider_id, model.id, admitted_model=actual)
-                    if selection is not None:
-                        try:
-                            defaults_before, defaults_after = self._fill_missing_defaults(model.id, default_keys)
-                        except CatalogValidationError:
-                            if previous_admission is None:
-                                self._admissions.pop(model.id, None)
-                            else:
-                                self._admissions[model.id] = previous_admission
-                            raise
+                previous_admission = self._admissions.get(model.id)
+                self.record_admission(provider_id, model.id, admitted_model=actual)
+                if selection is not None:
+                    try:
+                        defaults_before, defaults_after = self._fill_missing_defaults(model.id, default_keys)
+                    except CatalogValidationError:
+                        if previous_admission is None:
+                            self._admissions.pop(model.id, None)
+                        else:
+                            self._admissions[model.id] = previous_admission
+                        raise
             persisted, persist_error = self._persist_admissions()
             payload = {
                 "ok": True,
@@ -1355,26 +1387,44 @@ class ProviderFacade:
                 self.selections.finish(selection, payload)
             return payload
 
-    def _model_requests(self, target: FrozenTarget, model: ModelDefinition,
-                        selection: SelectionAttempt | CandidateTest | None) -> dict[str, Any]:
-        # 模型测试与候选测试共用的两组真实请求：最小问答与工具往返。只发请求，
-        # 不写定义、准入或部门默认；失败时写明哪一组、哪一步与上游给出的原因
+    def _candidate_requests(self, target: FrozenTarget, model: ModelDefinition,
+                            test: CandidateTest) -> dict[str, Any]:
+        # 候选连通性测试：只发一次无工具极简文本问候请求，确认地址、凭据与非空文本回复。
         provider_input = to_provider_input(
             [{"role": "user", "content": "ping"}],
             max_output_tokens=model.max_output_tokens,
         )
+        try:
+            result = self._invoke_for_test(target, provider_input, model, test)
+        except ProviderError as exc:
+            reason = (f"请求超时（等待上限 {target.timeout_sec:g} 秒）" if exc.reason == "provider_timeout"
+                      else _model_test_failure_reason(exc))
+            return {"ok": False, "error": reason}
+        if not result.text.strip():
+            return {"ok": False, "error": "上游未返回文本回复"}
+        return {"ok": True, "error": None}
+
+    def _model_requests(self, target: FrozenTarget, model: ModelDefinition,
+                        selection: SelectionAttempt | CandidateTest | None) -> dict[str, Any]:
+        # 模型准入测试：单轮带测试工具与 required 参数的请求（fake 协议仅做极简请求）；
+        # 仅上游明确拒绝 required 时不带该参数重试一次，并校验工具调用输出。
         started = time.monotonic()
-        group, step = "minimal_qa", "request"
+        group = "minimal_qa" if model.protocol == "fake" else "tool_round_trip"
+        step = "request" if model.protocol == "fake" else "tool_call"
         accepts_required = True
         result: InvokeResult | None = None
         try:
-            result = self._invoke_for_test(target, provider_input, model, selection)
-            if model.protocol != "fake":
-                group, step = "tool_round_trip", "tool_call"
+            if model.protocol == "fake":
+                provider_input = to_provider_input(
+                    [{"role": "user", "content": "ping"}],
+                    max_output_tokens=model.max_output_tokens,
+                )
+                result = self._invoke_for_test(target, provider_input, model, selection)
+            else:
                 tool = {"type": "function", "name": "yudao_model_test",
                         "description": "无副作用的模型接入测试工具，返回 pong。请调用一次。",
                         "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}
-                prompt = {"role": "user", "content": "请调用 yudao_model_test，不需要参数。收到工具结果后回复。"}
+                prompt = {"role": "user", "content": "请调用 yudao_model_test，不需要参数。"}
                 tool_input = replace(to_provider_input([prompt], [tool],
                                                        max_output_tokens=model.max_output_tokens),
                                      tool_choice="required")
@@ -1386,17 +1436,11 @@ class ProviderFacade:
                     accepts_required = False
                     step = "tool_call_retry"
                     result = self._invoke_for_test(target, replace(tool_input, tool_choice="auto"), model, selection)
-                outputs = _model_test_tool_outputs(result)
-                step = "tool_result"
-                reasoning = [] if result.reasoning is None else result.reasoning.items
-                follow_up = replace(tool_input, tool_choice="auto", raw_request={
-                    "input": [prompt, *reasoning, *result.output, *outputs], "tools": [tool]})
-                result = self._invoke_for_test(target, follow_up, model, selection)
+                _model_test_tool_outputs(result)
         except ProviderError as exc:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             group_text = "最小问答" if group == "minimal_qa" else "工具往返"
-            step_text = {"request": "请求", "tool_call": "调用测试工具", "tool_call_retry": "不要求调用工具重试",
-                         "tool_result": "回传工具结果"}[step]
+            step_text = {"request": "请求", "tool_call": "调用测试工具", "tool_call_retry": "不要求调用工具重试"}[step]
             reason = (f"请求超时（等待上限 {target.timeout_sec:g} 秒）" if exc.reason == "provider_timeout"
                       else _model_test_failure_reason(exc))
             return {
@@ -2209,6 +2253,31 @@ def _model_test_tool_outputs(result: InvokeResult) -> list[dict[str, Any]]:
             raise ProviderError(f"测试工具的参数应当是对象，收到的是 {received}", reason="provider_protocol")
         outputs.append({"type": "function_call_output", "call_id": call["call_id"], "output": "pong"})
     return outputs
+
+
+def _format_capability_source(details: Mapping[str, Mapping[str, Any]]) -> str:
+    return " · ".join(f"{name}：{detail['source']}" for name, detail in details.items())
+
+
+def _backfilled_input_modalities(base_url: str, current: ModelDefinition,
+                                  actual: str | None) -> tuple[tuple[str, ...], dict[str, str]] | None:
+    actual_name = (actual or "").strip()
+    if not actual_name:
+        return None
+    current_source = current.source_details.get("input_modalities", {}).get("source", "default")
+    if current_source != "default" or current.input_modalities != ("text",):
+        return None
+    recognized = CAPABILITY_INDEX.recognize_provider(base_url)
+    if recognized is not None:
+        entry = CAPABILITY_INDEX.capability(recognized, actual_name)
+        if entry is not None and entry.input_modalities:
+            modalities = ("text", "image") if "image" in entry.input_modalities else ("text",)
+            return modalities, CAPABILITY_INDEX.source_details("capability_table", recognized)
+    matched = CAPABILITY_INDEX.normalized_input_modalities(actual_name)
+    if matched is None:
+        return None
+    modalities, normalized = matched
+    return modalities, CAPABILITY_INDEX.source_details("capability_table", normalized)
 
 
 def _provider_dependents(store: ProviderStore, bindings: Mapping[str, Mapping[str, str]],

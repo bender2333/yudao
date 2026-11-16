@@ -194,7 +194,7 @@ def test_five_selections_share_three_test_slots_reuse_inflight_and_first_pass_wi
     normal = responder([{"id": name, "limit": {"context": 32000, "output": 2048}} for name in names])
 
     def gated(provider, handler):
-        if handler.body is not None and not handler.body.get("tools"):
+        if handler.body is not None:
             name = handler.body["model"]
             with condition:
                 entered.add(name)
@@ -318,7 +318,7 @@ def test_cancel_and_reselect_ignores_the_old_final_response(tmp_path):
         assert new_release.wait(30), "等待重新选用的模型请求放行"
         normal(provider, handler)
 
-    upstream = ScriptedProvider([normal, normal, normal, old_final, new_first, normal, normal])
+    upstream = ScriptedProvider([normal, old_final, new_first])
     opened = Opened(tmp_path)
     try:
         with running_api(opened) as client:
@@ -403,7 +403,7 @@ def test_key_change_keeps_admissions_and_tests_connection_then_address_change_re
     new_normal = responder([{"id": "remain", "limit": {"context": 256000, "output": 16384}}])
 
     def new_held(provider, handler):
-        if handler.body is not None and not handler.body.get("tools"):
+        if handler.body is not None:
             provider.held.set()
             assert provider.release.wait(30), "等待地址修改的重新测试放行"
         new_normal(provider, handler)
@@ -463,7 +463,7 @@ def test_concurrency_rule_consumes_current_values_and_rejects_values_outside_one
                         for index in range(3)])
 
     def gated(provider, handler):
-        if handler.body is not None and not handler.body.get("tools"):
+        if handler.body is not None:
             with condition:
                 entered.add(handler.body["model"])
                 condition.notify_all()
@@ -511,7 +511,7 @@ def test_removed_admission_cannot_reappear_when_the_same_model_is_selected_after
         assert provider.release.wait(30), "等待重建的定义完成新测试"
         normal(provider, handler)
 
-    upstream = ScriptedProvider([normal, normal, normal, normal, held, normal, normal])
+    upstream = ScriptedProvider([normal, normal, held])
     opened = Opened(tmp_path)
     try:
         with running_api(opened) as client:
@@ -538,7 +538,7 @@ def test_removed_admission_cannot_reappear_when_the_same_model_is_selected_after
 
 @pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
 def test_failed_tool_test_can_retry_through_the_same_bounded_selection_flow(protocol, tmp_path):
-    # R3：手动声明三种协议均使用真实两组测试；不调用工具时失败，重新测试生成新的选用序号。
+    # R3：手动声明三种协议均使用单轮真实工具测试；不调用工具时失败，重新测试生成新的选用序号。
     listing = responder([{"id": "retry", "limit": {"context": 32000, "output": 2048}}])
 
     def reply(without_tools=False):
@@ -548,7 +548,7 @@ def test_failed_tool_test_can_retry_through_the_same_bounded_selection_flow(prot
             send_reply(handler, status, content_type, b"".join(chunks))
         return respond
 
-    upstream = ScriptedProvider([listing, reply(), reply(True), reply(), reply(), reply()])
+    upstream = ScriptedProvider([listing, reply(True), reply()])
     opened = Opened(tmp_path)
     try:
         with running_api(opened) as client:
@@ -633,7 +633,7 @@ def test_address_change_retests_each_existing_definition_of_the_same_upstream_mo
                     {"id": "shared", "limit": {"context": window, "output": 2048}}]}).encode())
                 return
             protocol = "responses" if handler.path.endswith("/responses") else "chat_completions"
-            if gated and not handler.body.get("tools"):
+            if gated:
                 with condition:
                     entered.add(protocol)
                     condition.notify_all()
@@ -689,7 +689,7 @@ def test_address_changes_through_document_reload_and_file_watch_share_one_retest
     new_normal = responder([{"id": "stable", "limit": {"context": 128000, "output": 8192}}])
 
     def held(provider, handler):
-        if handler.body is not None and not handler.body.get("tools"):
+        if handler.body is not None:
             provider.held.set()
             assert provider.release.wait(30), "等待高级修改入口的重测放行"
         new_normal(provider, handler)
@@ -722,7 +722,7 @@ def test_address_changes_through_document_reload_and_file_watch_share_one_retest
             assert enabled["bindings"] == before["bindings"]
             same = command(client, "catalog.reload", base_version=enabled["revision"])
             assert same.status_code == 200, same.text
-        assert len(new.requests) == 4  # 一次列表请求与同一轮模型测试的三次真实请求。
+        assert len(new.requests) == 2  # 一次列表请求与同一轮模型测试的单轮真实请求。
     finally:
         old.close()
         new.close()
@@ -818,7 +818,7 @@ def test_late_list_from_an_older_address_does_not_replace_the_current_candidates
         candidate = opened.application.system.facade.latest_candidates(provider_id)
         assert candidate["source_url"] == latest.base + "/v1/models"
         assert candidate["candidates"][0]["context_window"] == 256000
-        assert middle.requests == [None] and len(latest.requests) == 4
+        assert middle.requests == [None] and len(latest.requests) == 2
     finally:
         old.close()
         middle.close()
@@ -967,5 +967,60 @@ def test_unrecognized_address_does_not_borrow_the_same_models_capability_table_v
             assert pending["admissions"] == [] and pending["bindings"] == {}
             # 两次获取模型列表的请求，没有发出任何模型测试请求
             assert upstream.requests == [None, None]
+    finally:
+        upstream.close()
+
+
+def test_normalized_model_prefills_image_without_borrowing_capacity_and_actual_model_backfills_default(tmp_path):
+    # R2、R3：未识别连接按归一化模型名预填一致的图像输入；冲突模型保留 default，准入测试返回 actual_model 时自动回填并保存。
+    def reply_with_actual(actual_by_model):
+        def handle(_provider, handler):
+            if handler.body is None:
+                send_reply(handler, 200, "application/json", json.dumps({"data": [
+                    {"id": "ag/gemini-3.8-flash-high", "limit": {"context": 128000, "output": 8192}},
+                    {"id": "wb/cn:deepseek-v4.1-flash", "limit": {"context": 128000, "output": 8192}},
+                    {"id": "custom-vision-alias", "limit": {"context": 128000, "output": 8192}},
+                ]}).encode())
+                return
+            actual = actual_by_model.get(handler.body["model"], handler.body["model"])
+            status, content_type, chunks = model_test_responder(
+                handler.body, protocol="chat_completions", actual_model=actual)
+            send_reply(handler, status, content_type, b"".join(chunks))
+        return handle
+
+    upstream = ScriptedProvider([reply_with_actual({"custom-vision-alias": "ag/gemini-3.8-flash-high"})] * 12)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id = connect_at(client, upstream.base + "/v1")
+            data = catalog(client)
+            revision = data["capability_table"]["revision"]
+            candidates = {item["id"]: item for item in data["providers"][0]["latest_candidates"]["candidates"]}
+
+            normalized_hit = candidates["ag/gemini-3.8-flash-high"]
+            assert normalized_hit["input_modalities"] == ["text", "image"]
+            assert normalized_hit["source_details"]["input_modalities"] == {
+                "source": "capability_table", "provider": "gemini-3.8-flash", "revision": revision}
+            assert normalized_hit["protocol"] == "chat_completions"
+            assert normalized_hit["protocol_source"] == "default"
+
+            conflicted = candidates["wb/cn:deepseek-v4.1-flash"]
+            assert conflicted["input_modalities"] == ["text"]
+            assert conflicted["source_details"]["input_modalities"] == {
+                "source": "default", "provider": None, "revision": None}
+
+            default_alias = candidates["custom-vision-alias"]
+            assert default_alias["input_modalities"] == ["text"]
+            assert default_alias["source_details"]["input_modalities"] == {
+                "source": "default", "provider": None, "revision": None}
+
+            select(client, provider_id, "custom-vision-alias")
+            admitted = wait_catalog(client, lambda res: bool(res["admissions"]) and not res["selections"])
+            assert admitted["admissions"][0]["admitted"] is True
+            [model] = admitted["models"]
+            assert model["model"] == "custom-vision-alias"
+            assert model["input_modalities"] == ["text", "image"]
+            assert model["source_details"]["input_modalities"] == {
+                "source": "capability_table", "provider": "gemini-3.8-flash", "revision": revision}
     finally:
         upstream.close()
