@@ -7,9 +7,33 @@
 //
 // 这一层只画，不做判断：节点、箭头、询问与两端写什么全部由模型给出。
 
-import { Fragment } from "react";
-import type { LoopArrow, LoopAskLine, LoopGraph, LoopNode } from "./loop-graph-model";
-import { END, SOURCE, nameOf } from "./loop-graph-model";
+import { Fragment, useEffect, useLayoutEffect, useState } from "react";
+import blueprintCss from "../../styles/v21-blueprint.css?raw";
+import type {
+  BlueprintEndView,
+  BlueprintRailView,
+  BlueprintTheme,
+  LoopArrow,
+  LoopAskLine,
+  LoopGraph,
+  LoopNode,
+  NodeTelemetry,
+} from "./loop-graph-model";
+import { END, SOURCE, brailleFrameOf, nameOf } from "./loop-graph-model";
+
+/** 在组件挂载前向文档头注入一次蓝图样式，避免 Vite SSR 测试在未执行 buildStart 时解析裸 .css 失败，也不改动 styles.css。 */
+export function ensureBlueprintStyles(): void {
+  if (typeof document === "undefined") {
+    return;
+  }
+  if (document.getElementById("y21-blueprint-styles") !== null) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = "y21-blueprint-styles";
+  style.textContent = blueprintCss;
+  document.head.appendChild(style);
+}
 
 /** 面板现在打开的是哪一个：一个节点，或一条箭头。 */
 export type LoopPanelPick = { kind: "node"; id: string } | { kind: "arrow"; arrow: LoopArrow } | null;
@@ -64,17 +88,63 @@ function AskChip(props: { line: LoopAskLine; direction: string; title: string; o
   );
 }
 
-function NodeCard(props: { node: LoopNode; on: boolean; onPick: (id: string) => void }) {
-  const { node } = props;
+function NodeCard(props: {
+  node: LoopNode;
+  on: boolean;
+  telemetry?: NodeTelemetry | null;
+  brailleFrame?: string;
+  onPick: (id: string) => void;
+}) {
+  const { node, telemetry } = props;
   return (
     <button type="button" className={`y10-cv-node${node.verifier ? " is-ver" : ""}${node.working ? " is-working" : ""}${props.on ? " is-on" : ""}`}
             data-testid={`node-${node.id}`} aria-label={`${node.label}：看这个职能的状态`} onClick={() => props.onPick(node.id)}>
-      <b>{node.label}</b>
+      {telemetry ? (
+        <div className="y21-node-top">
+          <span className={`y21-dot is-${telemetry.statusTone}`} aria-hidden="true" />
+          <b>{node.label}</b>
+          <span className={`y21-node-status is-${telemetry.statusTone}`} data-testid={`node-status-${node.id}`}>
+            {telemetry.statusLabel}
+          </span>
+        </div>
+      ) : (
+        <b>{node.label}</b>
+      )}
       <span className="y10-cv-marks">
         {node.verifier ? <span className="y10-cv-badge is-ver">核验</span> : null}
         {node.oldOnly ? <span className="y10-cv-badge">只在旧组织里</span> : null}
         {node.others > 0 ? <span className="y10-cv-badge">另 {node.others} 件</span> : null}
       </span>
+      {telemetry ? (
+        <>
+          <small
+            className={`y21-node-model${telemetry.modelUnset ? " is-unset" : ""}${telemetry.modelUnusable ? " is-unusable" : ""}`}
+            title={telemetry.modelName}
+            data-testid={`node-model-${node.id}`}
+          >
+            {telemetry.modelName}
+          </small>
+          <div className="y21-node-tele">
+            <span className="y21-effort" title="推理档位">
+              <span className="y21-squares" aria-hidden="true">{telemetry.effort.squares}</span>
+              <span>{telemetry.effort.label}</span>
+            </span>
+            <span className="y21-tele-right">
+              {telemetry.workingPulse && props.brailleFrame ? (
+                <span className="y21-braille" aria-hidden="true" data-testid={`node-braille-${node.id}`}>
+                  {props.brailleFrame}
+                </span>
+              ) : null}
+              {telemetry.contextPercent === null ? null : (
+                <span className="y21-ctx-bar" aria-hidden="true">
+                  <i style={{ width: `${Math.min(100, telemetry.contextPercent)}%` }} />
+                </span>
+              )}
+              <span className="y21-ctx-pct" data-testid={`node-ctx-${node.id}`}>{telemetry.contextText}</span>
+            </span>
+          </div>
+        </>
+      ) : null}
       {node.state === "" ? null : <small className="y10-cv-state">{node.state}</small>}
     </button>
   );
@@ -90,8 +160,34 @@ export function LoopGraphView(props: {
   onPickNode: (id: string) => void;
   onPickArrow: (arrow: LoopArrow) => void;
   onPickAsk: (from: string, to: string) => void;
+  troupe?: boolean;
+  blueprintTheme?: BlueprintTheme;
+  rail?: BlueprintRailView | null;
+  telemetry?: Readonly<Record<string, NodeTelemetry>>;
+  endView?: BlueprintEndView | null;
+  frozenOrganization?: { form: string; sameAsProject?: boolean | null } | null;
+  selectedDepartmentId?: string | null;
 }): React.JSX.Element {
   const { graph } = props;
+  useLayoutEffect(() => {
+    if (props.troupe) {
+      ensureBlueprintStyles();
+    }
+  }, [props.troupe]);
+  const anyWorking = Boolean(
+    props.troupe && graph.nodes.some((n) => props.telemetry?.[n.id]?.workingPulse ?? n.working),
+  );
+  const [pulseTick, setPulseTick] = useState(0);
+  useEffect(() => {
+    if (!anyWorking) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setPulseTick((value) => (value + 1) % 8);
+    }, 150);
+    return () => window.clearInterval(timer);
+  }, [anyWorking]);
+  const brailleFrame = brailleFrameOf(pulseTick);
   const count = graph.chain.length;
   // 有旁边的职能时多两行：一行放它们，一行放它们与主线之间的竖线
   const hasSide = graph.side.length > 0;
@@ -112,7 +208,7 @@ export function LoopGraphView(props: {
   template.push("minmax(56px, 1fr)", "auto");
   const nodeColumn = (index: number): number => 3 + 2 * index;
   const gapColumn = (index: number): number => 2 + 2 * index;
-  const selectedNode = props.pick?.kind === "node" ? props.pick.id : null;
+  const selectedNode = props.pick?.kind === "node" ? props.pick.id : (props.selectedDepartmentId ?? null);
   const selectedArrow = props.pick?.kind === "arrow" ? props.pick.arrow.key : null;
   // 虚线：方向只给开着的询问（累计往来的字里已经写了谁问谁），按放置分组画
   const directions = (line: LoopAskLine): string => {
@@ -162,13 +258,28 @@ export function LoopGraphView(props: {
       return;
     }
     chain.push(cell(
-      <NodeCard node={node} on={node.id === selectedNode} onPick={props.onPickNode} />,
+      <NodeCard
+        node={node}
+        on={node.id === selectedNode}
+        telemetry={props.troupe ? (props.telemetry?.[node.id] ?? null) : null}
+        brailleFrame={brailleFrame}
+        onPick={props.onPickNode}
+      />,
       nodeColumn(index),
     ));
   });
   chain.unshift(cell(<span className="y10-cv-pill is-src">{graph.sourceText}</span>, 1));
   chain.push(cell(
-    <span className={`y10-cv-pill is-end is-${graph.endTone}`}>{graph.endText}</span>,
+    props.troupe && props.endView ? (
+      <span
+        className={`y10-cv-pill is-end ${props.endView.kind === "verifier" ? "is-ver" : "is-open"}`}
+        data-testid="blueprint-end"
+      >
+        {props.endView.text}
+      </span>
+    ) : (
+      <span className={`y10-cv-pill is-end is-${graph.endTone}`}>{graph.endText}</span>
+    ),
     nodeColumn(count),
   ));
   const side: React.ReactNode[] = [];
@@ -176,7 +287,14 @@ export function LoopGraphView(props: {
     sideAt.forEach((parts, index) => {
       side.push(cell(
         <span className="y10-cv-side">{parts.map((part) => (
-          <NodeCard key={part.node.id} node={part.node} on={part.node.id === selectedNode} onPick={props.onPickNode} />
+          <NodeCard
+            key={part.node.id}
+            node={part.node}
+            on={part.node.id === selectedNode}
+            telemetry={props.troupe ? (props.telemetry?.[part.node.id] ?? null) : null}
+            brailleFrame={brailleFrame}
+            onPick={props.onPickNode}
+          />
         ))}</span>,
         nodeColumn(index), 1,
       ));
@@ -219,16 +337,86 @@ export function LoopGraphView(props: {
     );
   });
   const current = currentArrow(graph);
-  return (
-    <div className="y10-cv-graph" data-testid="loop-graph">
-      <div className="y10-cv-wrap">
-        <div className="y10-cv-grid" style={{ gridTemplateColumns: template.join(" ") }}>
-          {side}
-          {chain}
-          {skips}
-          {skipAsks}
+  const theme: BlueprintTheme = props.blueprintTheme ?? "dark";
+  const stageMark = (state: "done" | "active" | "pending" | "stopped"): string => {
+    if (state === "done") {
+      return "✓";
+    }
+    if (state === "active") {
+      return "▸";
+    }
+    if (state === "stopped") {
+      return "■";
+    }
+    return "○";
+  };
+  const canvas = (
+    <div className="y10-cv-wrap">
+      {props.troupe ? (
+        <div className="y21-bp-head">
+          <div className="y21-bp-title">
+            <span className="y21-bp-kicker">LOOP BLUEPRINT</span>
+            {graph.rounds > 0 ? <span>第 {graph.rounds} 轮</span> : null}
+            {props.frozenOrganization?.sameAsProject === false ? (
+              <span className="y21-bp-frozen">按旧组织快照运行</span>
+            ) : null}
+          </div>
+          <div className="y21-bp-legend" aria-label="终点图例">
+            <span><i className="is-solid" aria-hidden="true" /> ✓ 核验放行</span>
+            <span><i className="is-dashed" aria-hidden="true" /> ◌ 开环完成</span>
+          </div>
         </div>
+      ) : null}
+      <div className="y10-cv-grid" style={{ gridTemplateColumns: template.join(" ") }}>
+        {side}
+        {chain}
+        {skips}
+        {skipAsks}
       </div>
+    </div>
+  );
+  return (
+    <div
+      className={`y10-cv-graph${props.troupe ? " is-troupe" : ""}`}
+      data-bp={props.troupe ? theme : undefined}
+      data-testid="loop-graph"
+    >
+      {props.troupe && props.rail ? (
+        <div className="y21-bp-shell">
+          <aside className="y21-bp-rail" aria-label="蓝图状态栏" data-testid="blueprint-rail">
+            <section className="y21-rail-sec">
+              <h3 className="y21-rail-title">职能</h3>
+              <ul className="y21-rail-depts">
+                {props.rail.departments.map((dept) => (
+                  <li key={dept.id}>
+                    <button
+                      type="button"
+                      className={`y21-rail-dept-btn${dept.id === selectedNode ? " is-on" : ""}`}
+                      onClick={() => props.onPickNode(dept.id)}
+                    >
+                      <span className={`y21-dot is-${dept.statusTone}`} aria-hidden="true" />
+                      <span className="y21-rail-dept-name">{dept.label}</span>
+                      <span className="y21-rail-ctx">{dept.contextText}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section className="y21-rail-sec">
+              <h3 className="y21-rail-title">阶段</h3>
+              <ul className="y21-rail-stages">
+                {props.rail.stages.map((stage) => (
+                  <li key={stage.key} className={`y21-rail-stage is-${stage.state}`}>
+                    <span className="y21-rail-mark" aria-hidden="true">{stageMark(stage.state)}</span>
+                    <span>{stage.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </aside>
+          {canvas}
+        </div>
+      ) : canvas}
       {/* 窄屏：图收成一行，节点名与当前箭头（样式里在 800px 以下显示这一行、收起上面那张图） */}
       <div className="y10-cv-oneline" data-testid="loop-oneline">
         {graph.chain.map((node, index) => (

@@ -10,9 +10,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  END, SOURCE, arrowsOf, askStateText, graphOf, layoutOf, nameOf, outcomeOf, otherCounts, pickItem, versionsOf,
-  type AskViewLike, type FlowRecordLike, type FrozenOrganization, type LoopAskLine, type LoopItemView, type MaterialsView,
+  BLUEPRINT_THEME_STORAGE_KEY, DEFAULT_BLUEPRINT_THEME, END, SOURCE,
+  arrowsOf, askStateText, blueprintEndOf, blueprintRailOf, blueprintThemeParse, brailleFrameOf,
+  decisionMatchesDepartment, graphOf, layoutOf, nameOf, nextBlueprintTheme, nodeTelemetryOf,
+  outcomeOf, otherCounts, pickItem, reasoningEffortOf, versionsOf,
+  type AskViewLike, type FlowRecordLike, type FrozenOrganization, type LoopAskLine, type LoopItemView,
+  type MaterialsView, type TelemetryCatalog, type TelemetrySettings,
 } from "../../src/renderer/src/views/project/loop-graph-model.ts";
+import type {
+  AttemptView,
+  DecisionView,
+  DepartmentWorkspaceResult,
+} from "../../src/renderer/src/api/generated/types.gen.ts";
 
 /** 产品 · 工程 · 质检（harness/definitions/organization.json 的那一份，结构一样）。 */
 function threeDepartments(): FrozenOrganization {
@@ -734,6 +743,330 @@ test("PRD 新版本箭头带 SPEC_ACCEPTED 事件编号时也能凭 spec_event_i
   assert.deepEqual(prdArrows.map((arrow) => [arrow.eventId, arrow.version]), [
     ["ev-spec-1", 1],
     ["ev-spec-2", 2],
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// troupe 蓝图控制台与真实遥测测试（工单 #1811）
+// ---------------------------------------------------------------------------
+
+test("蓝图图纸主题默认深色，支持深浅互切并按固定存储键读写", () => {
+  // R3：蓝图主题默认深色点阵，可切至纸面并记住合法偏好
+  assert.equal(DEFAULT_BLUEPRINT_THEME, "dark");
+  assert.equal(BLUEPRINT_THEME_STORAGE_KEY, "yudao.conversation.blueprint_theme");
+  assert.equal(blueprintThemeParse(null), "dark");
+  assert.equal(blueprintThemeParse("unknown"), "dark");
+  assert.equal(blueprintThemeParse("paper"), "paper");
+  assert.equal(nextBlueprintTheme("dark"), "paper");
+  assert.equal(nextBlueprintTheme("paper"), "dark");
+});
+
+test("五格推理档位按真实档位映射，未指定时不伪造等级", () => {
+  // R1：推理档位从配置或最近调用取出，按五格直观展示
+  assert.equal(reasoningEffortOf("minimal").text, "■□□□□ 极低");
+  assert.equal(reasoningEffortOf("low").text, "■■□□□ 低");
+  assert.equal(reasoningEffortOf("medium").text, "■■■□□ 中");
+  assert.equal(reasoningEffortOf("high").text, "■■■■□ 高");
+  assert.equal(reasoningEffortOf("xhigh").text, "■■■■■ 超高");
+  assert.equal(reasoningEffortOf("max").text, "■■■■■ 最高");
+  assert.equal(reasoningEffortOf(null, false).text, "□□□□□ 未指定");
+  assert.equal(reasoningEffortOf(null, true).text, "□□□□□ 无推理");
+});
+
+test("终点胶囊严格区分实线核验放行与虚线开环完成", () => {
+  // R1：有核验角色显示实线「✓ 核验职能放行」，无核验角色显示虚线「◌ 开环完成」
+  const withVerifier = threeDepartments();
+  const runningVerifier = blueprintEndOf(
+    item({ work_item_id: "w-end-1", organization: withVerifier, status: "in_progress" }),
+    withVerifier,
+  );
+  assert.equal(runningVerifier.kind, "verifier");
+  assert.equal(runningVerifier.text, "✓ 质检放行才结束");
+
+  const releasedVerifier = blueprintEndOf(
+    item({
+      work_item_id: "w-end-2",
+      organization: withVerifier,
+      status: "adopted",
+      progress: { conclusion: "release" },
+    }),
+    withVerifier,
+  );
+  assert.equal(releasedVerifier.kind, "verifier");
+  assert.equal(releasedVerifier.released, true);
+  assert.equal(releasedVerifier.text, "✓ 质检放行");
+
+  const noVerifier: FrozenOrganization = {
+    form: "solo",
+    routing: "direct",
+    roles: [{ id: "ops", label: "运维" }],
+    verifiers: [],
+    watched: [],
+  };
+  const openLoop = blueprintEndOf(
+    item({
+      work_item_id: "w-end-3",
+      organization: noVerifier,
+      status: "released_unsettled",
+      stop_reason: "open_loop",
+    }),
+    noVerifier,
+  );
+  assert.equal(openLoop.kind, "open");
+  assert.equal(openLoop.text, "◌ 开环完成：没有人核验");
+});
+
+test("节点遥测只用真实上报用量与模型窗口；未上报或尚无请求时显示待命或未上报，不伪造百分比", () => {
+  // R1：严禁伪造随机或估算数字，缺用量或缺窗口时如实写出
+  const org = threeDepartments();
+  const workItem = item({
+    work_item_id: "w-tel",
+    organization: org,
+    status: "in_progress",
+    departments: {
+      product: { state: "waiting" },
+      engineering: { state: "working", note: "实现蓝图" },
+      quality: { state: "waiting" },
+    },
+  });
+  const graph = graphOf({ item: workItem, flow: [], materials: null });
+  const engNode = graph.nodes.find((n) => n.id === "engineering")!;
+  const prodNode = graph.nodes.find((n) => n.id === "product")!;
+
+  const catalog: TelemetryCatalog = {
+    models: [
+      {
+        id: "m-sonnet",
+        provider_id: "p-ant",
+        model: "claude-sonnet-4-6",
+        protocol: "messages",
+        context_window: 200000,
+        max_output_tokens: 8192,
+        capability_source: "declared",
+        accepts_required_tool_call: true,
+        input_modalities: ["text"],
+        reasoning_levels: ["low", "medium", "high"],
+        default_reasoning_level: "medium",
+        reasoning_mode: "adaptive",
+      },
+      {
+        id: "m-nowin",
+        provider_id: "p-custom",
+        model: "custom-model",
+        protocol: "chat_completions",
+        context_window: null,
+        max_output_tokens: null,
+        capability_source: "manual",
+        accepts_required_tool_call: true,
+        input_modalities: ["text"],
+        reasoning_levels: [],
+        default_reasoning_level: null,
+        reasoning_mode: "effort",
+      },
+    ],
+    bindings: {
+      engineering: { provider_id: "p-ant", model_id: "m-sonnet", requested_tier: "high" },
+    },
+  };
+  const settings: TelemetrySettings = {
+    departments: {},
+  };
+
+  // 1) 无模型配置且尚无请求：显示「未设置模型」与「待命」
+  const unsetProd = nodeTelemetryOf({ node: prodNode, item: workItem, settings, catalog, attempts: [] });
+  assert.equal(unsetProd.modelName, "未设置模型");
+  assert.equal(unsetProd.modelUnset, true);
+  assert.equal(unsetProd.contextPercent, null);
+  assert.equal(unsetProd.contextText, "待命");
+  assert.equal(unsetProd.railContextText, "—");
+
+  // 2) 有真实 input_tokens 与模型 context_window：按真实除法算百分比，工作时带 Braille 脉冲标志
+  const attempts: AttemptView[] = [
+    {
+      attempt_id: "att-1",
+      run_id: "r1",
+      work_item_id: "w-tel",
+      department: "engineering",
+      status: "success",
+      stage: "work",
+      purpose: "work",
+      prompt_version: 1,
+      requested_provider: "p-ant",
+      requested_model: "claude-sonnet-4-6",
+      actual_provider: "p-ant",
+      actual_model: "claude-sonnet-4-6",
+      started_at: "2026-01-01T00:00:00Z",
+      finished_at: "2026-01-01T00:00:05Z",
+      duration_ms: 5000,
+      usage: { reported: true, input_tokens: 50000, output_tokens: 2000, total_tokens: 52000 },
+      position: 10,
+    },
+  ];
+  const reportedEng = nodeTelemetryOf({ node: engNode, item: workItem, settings, catalog, attempts });
+  assert.equal(reportedEng.modelName, "claude-sonnet-4-6");
+  assert.equal(reportedEng.modelUnset, false);
+  assert.equal(reportedEng.effort.squares, "■■■■□");
+  assert.equal(reportedEng.effort.label, "高");
+  assert.equal(reportedEng.contextPercent, 25);
+  assert.equal(reportedEng.contextText, "25%");
+  assert.equal(reportedEng.railContextText, "25%");
+  assert.equal(reportedEng.workingPulse, true);
+  assert.equal(reportedEng.statusLabel, "进行中");
+  assert.ok(brailleFrameOf(0).length > 0);
+
+  // 3) 有请求但 usage 缺 input_tokens（或 reported=false）或模型未声明 context_window：如实显示「未上报」
+  const missingUsageAttempt: AttemptView = {
+    ...attempts[0],
+    attempt_id: "att-2",
+    usage: { reported: false },
+  };
+  const missingUsage = nodeTelemetryOf({
+    node: engNode,
+    item: workItem,
+    settings,
+    catalog,
+    attempts: [missingUsageAttempt],
+  });
+  assert.equal(missingUsage.contextPercent, null);
+  assert.equal(missingUsage.contextText, "未上报");
+  assert.equal(missingUsage.railContextText, "—");
+
+  const noWindowCatalog: TelemetryCatalog = {
+    ...catalog,
+    bindings: { engineering: { provider_id: "p-custom", model_id: "m-nowin", requested_tier: null } },
+  };
+  const noWindowAttempt: AttemptView = {
+    ...attempts[0],
+    attempt_id: "att-3",
+    requested_provider: "p-custom",
+    requested_model: "custom-model",
+    actual_provider: "p-custom",
+    actual_model: "custom-model",
+  };
+  const missingWindow = nodeTelemetryOf({
+    node: engNode,
+    item: workItem,
+    settings,
+    catalog: noWindowCatalog,
+    attempts: [noWindowAttempt],
+  });
+  assert.equal(missingWindow.contextPercent, null);
+  assert.equal(missingWindow.contextText, "未上报");
+
+  // 4) 限流重试与等你决定状态由真实查询事实推出
+  const waitingWs = {
+    room: { waiting_provider: true, remote_unknown: false },
+    effective: { state: "effective", model: "claude-sonnet-4-6", model_id: "m-sonnet" },
+    last_call: null,
+  } as unknown as DepartmentWorkspaceResult;
+  const rateLimited = nodeTelemetryOf({
+    node: engNode,
+    item: workItem,
+    workspace: waitingWs,
+    settings,
+    catalog,
+    attempts: [],
+  });
+  assert.equal(rateLimited.statusLabel, "限流重试");
+  assert.equal(rateLimited.statusTone, "warn");
+
+  const openDecisions: DecisionView[] = [
+    {
+      decision_id: "dec-1",
+      project_id: "p1",
+      work_item_id: "w-tel",
+      run_id: "r1",
+      kind: "role_choice",
+      blocks: "round",
+      version: 1,
+      status: "open",
+      requested_at: "2026-01-01T00:00:00Z",
+      blocked: null,
+      request: { kind: "role_choice", blocks: "round", options: [], questions: [], department: "engineering" } as unknown as DecisionView["request"],
+      answer: null,
+    },
+  ];
+  assert.equal(decisionMatchesDepartment(openDecisions[0], "engineering", workItem), true);
+  assert.equal(decisionMatchesDepartment(openDecisions[0], "product", workItem), false);
+  const deciding = nodeTelemetryOf({
+    node: engNode,
+    item: workItem,
+    workspace: waitingWs,
+    decisions: openDecisions,
+  });
+  assert.equal(deciding.statusLabel, "等你决定");
+});
+
+test("左侧状态栏的阶段进度随组织与核验角色动态推出，不写死固定三职能阶段名", () => {
+  // R1/R2：单职能直做、自定义双职能无核验与成果流转三职能各自生成对应阶段
+  const soloOrg: FrozenOrganization = {
+    form: "custom_solo",
+    routing: "direct",
+    roles: [{ id: "ops", label: "值守" }],
+    verifiers: [],
+    watched: [],
+  };
+  const soloItem = item({
+    work_item_id: "w-solo",
+    organization: soloOrg,
+    status: "in_progress",
+    departments: { ops: { state: "working" } },
+  });
+  const soloGraph = graphOf({ item: soloItem, flow: [], materials: null });
+  const soloRail = blueprintRailOf({
+    item: soloItem,
+    graph: soloGraph,
+    flow: [],
+    materials: null,
+    telemetryById: {},
+  });
+  assert.deepEqual(soloRail.departments.map((d) => d.label), ["值守"]);
+  assert.deepEqual(soloRail.stages.map((s) => [s.label, s.state]), [
+    ["收到输入", "done"],
+    ["值守执行", "active"],
+    ["◌ 开环完成", "pending"],
+  ]);
+  for (const text of soloRail.stages.map((s) => s.label)) {
+    assert.doesNotMatch(text, /产品|工程|质检/);
+  }
+
+  // 三职能成果流转：按 watched 与 verifiers 推出阶段，不出现重复的产出字样
+  const threeOrg = threeDepartments();
+  const threeItem = item({
+    work_item_id: "w-three",
+    organization: threeOrg,
+    status: "in_progress",
+    departments: {
+      product: { state: "waiting" },
+      engineering: { state: "working" },
+      quality: { state: "waiting" },
+    },
+  });
+  const threeFlow = [
+    record({
+      flow_id: "f1",
+      event_id: "e1",
+      kind: "PRD 新版本",
+      position: 2,
+      direction_from: "product",
+      direction_to: "engineering",
+      content: "spec",
+    }),
+  ];
+  const threeGraph = graphOf({ item: threeItem, flow: threeFlow, materials: null });
+  const threeRail = blueprintRailOf({
+    item: threeItem,
+    graph: threeGraph,
+    flow: threeFlow,
+    materials: null,
+    telemetryById: {},
+  });
+  assert.deepEqual(threeRail.stages.map((s) => [s.label, s.state]), [
+    ["收到输入", "done"],
+    ["产品 · PRD", "done"],
+    ["工程 · 交付", "active"],
+    ["质检核验", "pending"],
+    ["✓ 质检放行", "pending"],
   ]);
 });
 

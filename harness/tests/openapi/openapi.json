@@ -10351,6 +10351,16 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "prd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductSpecView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

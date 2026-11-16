@@ -39,8 +39,9 @@ ATTEMPT_TYPES = frozenset({
 # （工单 #1636、#1699）
 FLOW_TYPES = frozenset({
     EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
-    EventType.SPEC_ACCEPTED, EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
-    EventType.DEPARTMENT_ACTIVATED, EventType.ARTIFACT_ACCEPTED, EventType.RUN_CREATED,
+    EventType.SPEC_ACCEPTED, EventType.SPEC_SUPERSEDED, EventType.USER_INPUT_RECEIVED,
+    EventType.DEPARTMENT_GUIDANCE_RECEIVED, EventType.DEPARTMENT_ACTIVATED,
+    EventType.ARTIFACT_ACCEPTED, EventType.RUN_CREATED,
 })
 # 项目流里进流转记录的事件种类：事项的创建就是你给它的第一句输入（工单 #1636）
 PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
@@ -51,7 +52,8 @@ PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
 # 第 3 版：流转记录带第几轮，并增加你的输入、指导与放行（工单 #1636）。
 # 第 4 版：直做交完成的那一版进流转记录（工单 #1699）。
 # 第 5 版：流转记录按事项冻结的定义取部门与去向（工单 #1703）。
-DERIVATION_VERSION = 5
+# 第 6 版：流转记录的 PRD 新版本随带完整结构化 PRD（工单 #1808）。
+DERIVATION_VERSION = 6
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
 # 没有事项可依的读取用的定义（工单 #1703）：这个文件里唯一一处读这一版加载的定义，守卫用例按这一行登记
@@ -122,7 +124,8 @@ CREATE TABLE IF NOT EXISTS app_flows (
     content TEXT NOT NULL,
     round INTEGER NOT NULL DEFAULT 0,
     event_id TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    prd TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_app_flows_scope ON app_flows(project_id, work_item_id, position);
 CREATE TABLE IF NOT EXISTS app_flow_state (
@@ -158,10 +161,12 @@ class ReadModels:
             self._rebuild_if_derivation_changed()
 
     def _add_missing_columns(self) -> None:
-        # 旧文件里的表没有后加的列（工单 #1636 加了流转记录的 round）：补上，旧行的内容由推导版本的重建填好
+        # 旧文件里的表没有后加的列（工单 #1636 加了流转记录的 round、工单 #1808 加了 prd）：补上，旧行的内容由推导版本的重建填好
         columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(app_flows)")}
         if "round" not in columns:
             self._connection.execute("ALTER TABLE app_flows ADD COLUMN round INTEGER NOT NULL DEFAULT 0")
+        if "prd" not in columns:
+            self._connection.execute("ALTER TABLE app_flows ADD COLUMN prd TEXT")
 
     def _rebuild_if_derivation_changed(self) -> None:
         # 推导方式变了就重建一次：读模型是增量投影，算法修好以后已有的行仍然是旧的（工单 #684）。
@@ -292,9 +297,15 @@ class ReadModels:
                     states[run_id] = _empty_flow_state() if saved is None else json.loads(saved["state"])
                 state = states[run_id]
                 _advance_flow_state(state, event)
+            if isinstance(event, Event) and event.type == EventType.SPEC_SUPERSEDED:
+                _supersede_flow_specs(connection, event.run_id, (event.payload or {}).get("content_hash"))
+                continue
+            if isinstance(event, Event) and event.type == EventType.SPEC_ACCEPTED:
+                _supersede_flow_specs(connection, event.run_id, None, exclude_event_id=event.event_id)
             for row in flow_rows(event, work_round=_flow_round(state, event),
                                  deliveries=None if state is None else state["deliveries"],
-                                 definitions=_flow_definitions(state, event, self.artifacts, definitions)):
+                                 definitions=_flow_definitions(state, event, self.artifacts, definitions),
+                                 inputs=None if state is None else state.get("inputs")):
                 _upsert_flow(connection, row)
         for run_id, state in states.items():
             connection.execute(
@@ -424,25 +435,47 @@ def public_status(record: dict[str, Any]) -> str:
     return "failed"
 
 
+def _supersede_flow_specs(connection: sqlite3.Connection, run_id: str | None,
+                          content_hash: Any, *, exclude_event_id: str | None = None) -> None:
+    # 旧版 PRD 被新版替代时更新流转记录中的结构化状态，使主轴卡片与工作材料口径一致（工单 #1808）
+    if not run_id:
+        return
+    rows = connection.execute(
+        "SELECT flow_id, event_id, prd FROM app_flows WHERE run_id = ? AND kind = 'PRD 新版本' AND prd IS NOT NULL",
+        (run_id,),
+    ).fetchall()
+    for row in rows:
+        if exclude_event_id is not None and row["event_id"] == exclude_event_id:
+            continue
+        prd = json.loads(row["prd"])
+        if content_hash is not None and prd.get("spec_hash") != content_hash:
+            continue
+        if prd.get("spec_status") == "superseded":
+            continue
+        prd["spec_status"] = "superseded"
+        connection.execute("UPDATE app_flows SET prd = ? WHERE flow_id = ?", (json_dumps(prd), row["flow_id"]))
+
+
 def _upsert_flow(connection: sqlite3.Connection, row: dict[str, Any]) -> None:
     # 第几轮只在第一次写入时定下：询问的回答更新同一条记录，不改它所在的轮次（工单 #1636）
     connection.execute(
         "INSERT INTO app_flows (flow_id, project_id, work_item_id, run_id, position, seq, kind, direction_from, "
-        "direction_to, status, content, round, event_id, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "direction_to, status, content, round, event_id, created_at, prd) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(flow_id) DO UPDATE SET status = excluded.status, content = excluded.content, "
+        "prd = COALESCE(excluded.prd, app_flows.prd), "
         "direction_from = COALESCE(app_flows.direction_from, excluded.direction_from), "
         "direction_to = COALESCE(app_flows.direction_to, excluded.direction_to)",
         (row["flow_id"], row["project_id"], row["work_item_id"], row["run_id"], row["position"], row["seq"],
          row["kind"], row["direction_from"], row["direction_to"], row["status"], row["content"], row["round"],
-         row["event_id"], row["created_at"]),
+         row["event_id"], row["created_at"], row.get("prd")),
     )
 
 
 def _empty_flow_state() -> dict[str, Any]:
-    # 一个 run 的流转记录推导状态：当前轮次、每个会话在它那次激活里的轮次、询问分支的会话、已接纳的交付版本，
-    # 以及这个事项冻结的定义的引用（工单 #1703：部门与去向按它取）
-    return {"round": 0, "sessions": {}, "branches": [], "deliveries": {}, "definitions_ref": None}
+    # 一个 run 的流转记录推导状态：当前轮次、每个会话在它那次激活里的轮次、询问分支的会话、已接纳的交付版本、
+    # 已收到的用户输入（PRD 结构化来源用，工单 #1808），以及这个事项冻结的定义的引用（工单 #1703：部门与去向按它取）
+    return {"round": 0, "sessions": {}, "branches": [], "deliveries": {}, "inputs": [], "definitions_ref": None}
 
 
 def _flow_definitions(state: dict[str, Any] | None, event: Event | ProjectEvent,
@@ -483,6 +516,12 @@ def _advance_flow_state(state: dict[str, Any], event: Event | ProjectEvent) -> N
         return
     if event.type == EventType.RUN_CREATED:
         state["definitions_ref"] = payload.get("definitions_ref")
+        initial = payload.get("initial_input")
+        if isinstance(initial, dict):
+            _record_flow_input(state, initial, event.event_id)
+        return
+    if event.type == EventType.USER_INPUT_RECEIVED:
+        _record_flow_input(state, payload, event.event_id)
         return
     if event.type == EventType.DEPARTMENT_ACTIVATED:
         session = event.session_id
@@ -507,6 +546,22 @@ def _advance_flow_state(state: dict[str, Any], event: Event | ProjectEvent) -> N
             state["deliveries"][content_hash] = revision
 
 
+def _record_flow_input(state: dict[str, Any], raw: dict[str, Any], event_id: str) -> None:
+    # 记录已收到的用户输入版本，供随后被接纳的 PRD 随带 accepted_inputs
+    version = raw.get("version")
+    if not isinstance(version, int):
+        return
+    inputs = state.setdefault("inputs", [])
+    if any(int(item.get("version") or 0) == version for item in inputs):
+        return
+    inputs.append({
+        "version": version,
+        "kind": str(raw.get("kind") or "text"),
+        "text": str(raw.get("text") or ""),
+        "created_event_id": str(raw.get("created_event_id") or event_id),
+    })
+
+
 def _flow_round(state: dict[str, Any] | None, event: Event | ProjectEvent) -> int:
     # 这条记录的第几轮：产生它的那次会话的激活的轮次；没有会话（你的输入、指导）时是当时正在进行的那一轮，
     # 还没有任何激活（事项创建）时是第 0 轮
@@ -520,7 +575,8 @@ def _flow_round(state: dict[str, Any] | None, event: Event | ProjectEvent) -> in
 
 def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
               deliveries: dict[str, int] | None = None,
-              definitions: Any = None) -> list[dict[str, Any]]:
+              definitions: Any = None,
+              inputs: Sequence[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     # 一条事件产生的流转记录：迁移与退回产生新记录，部门之间的回答与关闭更新同一条咨询记录。
     # 记录的去向按定义推出（工单 #1391）：PRD 的新版本送到关注它的部门，「交付送到谁」「返工回到谁」
     # 由核验声明给出，来源是写这条事件的部门；代码里不写部门名。
@@ -554,12 +610,13 @@ def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
         return [{**base, "flow_id": event.event_id, "kind": "指导", "direction_from": None,
                  "direction_to": event.department, "status": "已收到", "content": payload.get("text", "")}]
     if event.type == EventType.SPEC_ACCEPTED:
-        # PRD 被接纳（工单 #882）：关注 PRD 新版本的每个部门一条，来源是写这份 PRD 的部门。
+        # PRD 被接纳（工单 #882、#1808）：关注 PRD 新版本的每个部门一条，来源是写这份 PRD 的部门，并随带完整结构化 PRD。
         # 几条的编号不同（事件编号加接收部门），否则后一条会盖掉前一条
         content = _spec_version_content(payload)
+        prd = json_dumps(_spec_prd_data(event, payload, inputs or ()))
         return [{**base, "flow_id": f"{event.event_id}:{department}", "kind": "PRD 新版本",
                  "direction_from": source, "direction_to": department,
-                 "status": "已完成", "content": content}
+                 "status": "已完成", "content": content, "prd": prd}
                 for department in _watchers(organization, "product_spec")]
     if event.type == EventType.DELIVERY_ACCEPTED:
         # 交付到达（工单 #556：不再有阶段迁移事件，版本交付的记录由交付到达给出）：送去核验这个部门交付的
@@ -616,6 +673,62 @@ def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
                  "status": "已放行", "content": content}
                 for target in targets]
     return []
+
+
+def _spec_prd_data(event: Event, payload: dict[str, Any],
+                   inputs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    # 被接纳的 PRD 完整结构化数据，结构与 ProductSpecView 同形，供流转记录直出给对话线程主卡片（工单 #1808）
+    input_version = int(payload.get("input_version") or 0)
+    accepted_inputs = sorted(
+        (dict(item) for item in inputs if int(item.get("version") or 0) <= input_version),
+        key=lambda item: int(item.get("version") or 0),
+    )
+    requirement_mapping = [
+        {
+            "requirement": int(entry["requirement"]),
+            "criteria": [str(item) for item in entry.get("criteria") or []],
+            "gap": None if entry.get("gap") is None else str(entry["gap"]),
+        }
+        for entry in payload.get("requirement_mapping") or []
+        if isinstance(entry, dict) and entry.get("requirement") is not None
+    ]
+    decision_changes = [
+        {
+            "decision_hash": str(item.get("decision_hash") or ""),
+            "disposition": str(item.get("disposition") or ""),
+            "rationale": str(item.get("rationale") or ""),
+        }
+        for item in payload.get("decision_changes") or []
+        if isinstance(item, dict)
+    ]
+    raw_change = payload.get("change_record")
+    change_record = None if not isinstance(raw_change, dict) else {
+        "changed": [str(item) for item in raw_change.get("changed") or []],
+        "retained": [str(item) for item in raw_change.get("retained") or []],
+        "retired": [str(item) for item in raw_change.get("retired") or []],
+        "rationale": str(raw_change.get("rationale") or ""),
+    }
+    return {
+        "spec_id": str(payload.get("id") or ""),
+        "spec_revision": int(payload.get("revision") or 0),
+        "spec_status": str(payload.get("status") or "active"),
+        "spec_event_id": event.event_id,
+        "spec_hash": str(payload.get("content_hash") or ""),
+        "parent_hash": payload.get("parent_hash"),
+        "input_version": input_version,
+        "accepted_inputs": accepted_inputs,
+        "goal": str(payload.get("goal") or ""),
+        "non_goals": [str(item) for item in payload.get("non_goals") or []],
+        "boundaries": [str(item) for item in payload.get("boundaries") or []],
+        "constraints": [str(item) for item in payload.get("constraints") or []],
+        "requirements": [str(item) for item in payload.get("requirements") or []],
+        "acceptance_criteria": [str(item) for item in payload.get("acceptance_criteria") or []],
+        "requirement_mapping": requirement_mapping,
+        "fatal_conditions": [str(item) for item in payload.get("fatal_conditions") or []],
+        "decisions": [],
+        "decision_changes": decision_changes,
+        "change_record": change_record,
+    }
 
 
 def _spec_version_content(payload: dict[str, Any]) -> str:
