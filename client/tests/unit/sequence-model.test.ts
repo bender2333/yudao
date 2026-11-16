@@ -443,3 +443,23 @@ test("只有一个职能时没有时序图（「看经过」也不出现）", ()
   assert.equal(hasSequence([{ id: "product" }, { id: "engineering" }]), true);
   assert.equal(hasSequence(ROLES), true);
 });
+
+test("流转记录里的 PRD 新版本带 SPEC_ACCEPTED 事件编号时，时序图标题仍写 PRD v1", () => {
+  // R2：contracts 带 spec_event_id 时能对上流转记录的 PRD 新版本事件
+  const view = sequenceOf({
+    roles: ROLES,
+    flow: [
+      flow({
+        flow_id: "f-prd-spec", event_id: "ev-spec-1", kind: "PRD 新版本",
+        position: 2, direction_from: "product", direction_to: "engineering",
+        content: "第一版目标", round: 1, created_at: "2026-11-01T09:05:00Z",
+      }),
+    ],
+    materials: {
+      contracts: [
+        { event_id: "ev-contract-1", spec_event_id: "ev-spec-1", status: "active", revision: 1, prd: { spec_revision: 1 } },
+      ],
+    },
+  });
+  assert.equal(rowOf(view, "flow:ev-spec-1").title, "PRD v1");
+});

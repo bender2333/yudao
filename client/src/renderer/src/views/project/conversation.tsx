@@ -241,7 +241,7 @@ export function ConversationPage(props: {
   const [pair, setPair] = useState<{ item: string; roles: readonly string[] } | null>(null);
   // 点的折叠行在别的事项上：切过去以后（数据到了才）展开只看这两个职能的时序图
   const [pendingSequence, setPendingSequence] = useState<{ item: string; roles: readonly string[] } | null>(null);
-  // 时序图展开在循环图下面：从线程里点过来时把它带到眼前；面板在时序图下面，点一行时也把它带到眼前
+  // 详情面板紧贴循环图下方、排在时序图上方；点节点、箭头、事项标题或时序图行后滚到眼前
   const sequenceRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   // 列是这个事项冻结的组织里的职能和你（显示名用项目现在组织的名字，旧组织里的用冻结的那一份）
@@ -465,22 +465,9 @@ export function ConversationPage(props: {
                   )}
                   {/* 询问读不出来时在图上说一句：不静默少画线（图上的虚线、节点的往来都与时序图读同一份查询） */}
                   {asks.error === null ? null : <Empty text={readFailureText(asks.error)} />}
-                  {/* 时序图展开在循环图下面，不是单独的页，也不盖住线程 */}
-                  {sequenceOpen && hasSequence(roles) ? (
-                    <div ref={sequenceRef}>
-                      <SequenceView
-                        view={sequence}
-                        pickedKey={pickedKey}
-                        onPickRow={openRow}
-                        onShowAll={() => setPair(null)}
-                        onClose={() => setSequenceOpen(false)}
-                        onToggleRound={toggleRound}
-                      />
-                    </div>
-                  ) : null}
                 </>
               )}
-              {/* 面板在图的下面（时序图展开时在它下面）：点节点、点箭头与点时序图的一行都是这一个，
+              {/* 详情面板紧贴循环图正下方（在时序图上方，工单 #1807）：点节点、点箭头与点时序图的一行都是这一个，
                   点选事项一行里选中那件的标题换成事项面板（工单 #1708），末尾的「全部事项」换成
                   分组列表（工单 #1709）。这个位置在图上有没有画节点之外：事项冻结的组织不在这一版
                   发布里时，事项面板与全部事项照样能开 */}
@@ -522,6 +509,19 @@ export function ConversationPage(props: {
                   )}
                 </div>
               )}
+              {/* 时序图排在展开的详情面板下方、对话线程上方 */}
+              {item !== null && item.organization != null && sequenceOpen && hasSequence(roles) ? (
+                <div ref={sequenceRef}>
+                  <SequenceView
+                    view={sequence}
+                    pickedKey={pickedKey}
+                    onPickRow={openRow}
+                    onShowAll={() => setPair(null)}
+                    onClose={() => setSequenceOpen(false)}
+                    onToggleRound={toggleRound}
+                  />
+                </div>
+              ) : null}
               {flow.error === null ? null : <Empty text={readFailureText(flow.error)} />}
               {materials.error === null ? null : <Empty text={readFailureText(materials.error)} />}
             </>

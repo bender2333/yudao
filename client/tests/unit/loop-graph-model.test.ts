@@ -708,3 +708,32 @@ test("来回的询问合成一条：两个方向各写几次，还开着的写�
   assert.equal(pairLabel(graph.lines[0]), "工程问产品 2 次，产品问工程 1 次 · 开着");
 });
 
+test("PRD 新版本箭头带 SPEC_ACCEPTED 事件编号时也能凭 spec_event_id 对出版本号", () => {
+  // R2：project.flow 的 PRD 新版本带 SPEC_ACCEPTED 事件编号，materials.contracts 带合同与 spec_event_id 两个编号
+  const organization = threeDepartments();
+  const graph = graphOf({
+    item: item({ work_item_id: "w36", organization }),
+    flow: [
+      record({
+        flow_id: "f-prd-1", event_id: "ev-spec-1", kind: "PRD 新版本",
+        position: 1, direction_from: "product", direction_to: "engineering", content: "第一版目标",
+      }),
+      record({
+        flow_id: "f-prd-2", event_id: "ev-spec-2", kind: "PRD 新版本",
+        position: 3, direction_from: "product", direction_to: "engineering", content: "第二版目标",
+      }),
+    ],
+    materials: {
+      contracts: [
+        { event_id: "ev-contract-1", spec_event_id: "ev-spec-1", status: "superseded", revision: 1, prd: { spec_revision: 1 } },
+        { event_id: "ev-contract-2", spec_event_id: "ev-spec-2", status: "active", revision: 2, prd: { spec_revision: 2 } },
+      ],
+    },
+  });
+  const prdArrows = graph.gaps[1].filter((arrow) => arrow.outcome === "PRD");
+  assert.deepEqual(prdArrows.map((arrow) => [arrow.eventId, arrow.version]), [
+    ["ev-spec-1", 1],
+    ["ev-spec-2", 2],
+  ]);
+});
+

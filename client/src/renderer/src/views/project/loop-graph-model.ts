@@ -68,7 +68,13 @@ export interface FlowRecordLike {
 
 /** work_item.materials 里循环图用到的几项。 */
 export interface MaterialsView {
-  contracts?: readonly { event_id: string; revision: number | null }[];
+  contracts?: readonly {
+    event_id: string;
+    revision: number | null;
+    spec_event_id?: string | null;
+    status?: string | null;
+    prd?: { spec_revision?: number | null } | null;
+  }[];
   deliveries?: readonly { event_id: string; revision: number | null; summary?: string | null; files?: readonly string[] }[];
   reviews?: readonly { event_id: string; verdict: string; rationale?: string }[];
   inputs?: readonly { version: number; text: string; created_event_id?: string | null }[];
@@ -561,7 +567,19 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       eventId: input.created_event_id ?? null,
     });
   }
-  const contracts = new Map((materials?.contracts ?? []).map((entry) => [entry.event_id, entry]));
+  const contractsByEvent = new Map((materials?.contracts ?? []).map((entry) => [entry.event_id, entry]));
+  const contractsBySpecEvent = new Map<string, NonNullable<MaterialsView["contracts"]>[number]>();
+  for (const entry of materials?.contracts ?? []) {
+    if (!entry.spec_event_id) {
+      continue;
+    }
+    const prev = contractsBySpecEvent.get(entry.spec_event_id);
+    if (prev === undefined || entry.status === "active" || prev.status !== "active") {
+      contractsBySpecEvent.set(entry.spec_event_id, entry);
+    }
+  }
+  const contractOf = (eventId: string) =>
+    contractsByEvent.get(eventId) ?? contractsBySpecEvent.get(eventId);
   const deliveries = new Map((materials?.deliveries ?? []).map((entry) => [entry.event_id, entry]));
   const records = [...flow].sort((left, right) => left.position - right.position);
   const defects = new Map<string, number>();
@@ -594,8 +612,9 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       }
       continue;
     }
+    const matchedContract = outcome === "PRD" ? contractOf(record.event_id) : undefined;
     const version = outcome === "PRD"
-      ? contracts.get(record.event_id)?.revision ?? null
+      ? (matchedContract?.prd?.spec_revision ?? matchedContract?.revision ?? null)
       : deliveries.get(record.event_id)?.revision ?? null;
     const delivery = outcome === "交付" ? deliveries.get(record.event_id) : undefined;
     const arrow: LoopArrow = {
