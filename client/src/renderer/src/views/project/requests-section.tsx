@@ -1,7 +1,6 @@
-// 设置页底部「模型请求与用量」这一节（工单 #1710；项目的组织设计说明「模型请求与用量」）：
-// 请求记录与用量统计两块用同一组筛选（事项、职能、状态、模型），平时收着，展开与筛选都写在地址里。
-// 观测页用的是同一个部件（RequestsPanel）：两处内容相同，改一处两处都变。
-// 这一节里没有循环的层与收敛状态：循环在对话页的循环图与事项面板里。
+// 模型请求与用量部件（工单 #1710、#1809；项目的组织设计说明「模型请求与用量」）：
+// 请求记录与用量统计两块用同一组筛选（事项、职能、状态、模型），筛选条件写在地址里。
+// 这一部件里没有循环的层与收敛状态：循环在对话页的循环图与事项面板里。
 //
 // 数据来自已登记的查询：请求记录读 project.attempts（游标分页），用量统计读 project.usage，
 // 事项的清单读 project.overview；请求详情在 attempt-detail.tsx。
@@ -11,7 +10,6 @@ import type { ClientApp } from "../../contract/client-app";
 import type {
   AttemptView, ProjectAttemptsResult, ProjectOverviewResult, UsageGroup, UsageReport,
 } from "../../api/generated/types.gen";
-import { REQUESTS_SECTION, paths, type Route } from "../../shell/routing";
 import type { DepartmentLabels, DepartmentView } from "./organization";
 import { departmentLabel, departmentLabels } from "./organization";
 import { readFailureText } from "../../contract/read-failure";
@@ -370,60 +368,5 @@ function UsageGroups(props: { title: string; groups: UsageGroup[]; name: (group:
       ])}
       caption={props.title}
     />
-  );
-}
-
-// 设置页底部这一节（工单 #1710）：平时收着，展开以后是上面那份部件；
-// 展开状态写在地址里（section=requests），从请求详情返回时按地址回到展开的样子，筛选也不变
-export function RequestsSection(props: { app: ClientApp; route: Route; departments: DepartmentView[] }) {
-  const projectId = props.route.projectId ?? "";
-  const open = props.route.settingsSection === REQUESTS_SECTION;
-  const write = (workItem: string | null, section: string | null, requests: Filters): void => {
-    const target = paths.settings(projectId, { workItem, section, requests });
-    if (window.location.hash !== target) {
-      window.location.hash = target;
-    }
-  };
-
-  return (
-    <section id={REQUESTS_SECTION} className="y10-block card y20-req">
-      <details
-        className="y20-req-details"
-        open={open}
-        onToggle={(event) => {
-          // 展开与收起写回地址：刷新与从请求详情返回以后还是这个样子
-          const next = event.currentTarget.open;
-          if (next !== open) {
-            write(props.route.workItemId, next ? REQUESTS_SECTION : null, props.route.requestFilters);
-          }
-        }}
-      >
-        <summary className="y20-req-summary section-head">
-          <span className="y10-block-title y20-req-title">模型请求与用量</span>
-          <span className="y10-block-sub note y20-req-sub">请求记录与用量统计用同一组筛选；默认是当前选中的事项，可以切到整个项目；展开状态与筛选条件写在地址里。</span>
-        </summary>
-        {open ? (
-          <div className="y10-block-body">
-            <RequestsPanel
-              app={props.app}
-              projectId={projectId}
-              workItem={props.route.workItemId}
-              departments={props.departments}
-              addressFilters={props.route.requestFilters}
-              onFiltersChange={(filters) => write(props.route.workItemId, REQUESTS_SECTION, filters)}
-              onScopeChange={(workItem, filters) => write(workItem, REQUESTS_SECTION, filters)}
-              attemptHash={(item, filters) => paths.observeDetail(projectId, item.attempt_id, {
-                workItem: props.route.workItemId,
-                runId: item.run_id,
-                department: filters.department || null,
-                from: "settings",
-                requests: filters,
-              })}
-              scopeSelect
-            />
-          </div>
-        ) : null}
-      </details>
-    </section>
   );
 }

@@ -17,7 +17,6 @@ import {
 import { FormSection } from "./form-section";
 import { McpServersSection } from "./mcp-servers";
 import type { DepartmentView } from "./organization";
-import { RequestsSection } from "./requests-section";
 import { WritebackSection } from "./writeback";
 import {
   CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsText, sourceDirectoryPayload, sourceWritebackText,
@@ -68,9 +67,6 @@ export function SettingsPage(props: { app: ClientApp; route: Route; departments:
           <ExecutionPlacement />
           <Operations />
           <RoleSettings />
-          {/* 模型请求与用量（工单 #1710）：设置页底部的一节，平时收着；
-              展开状态与筛选条件写在地址里，内容与观测页是同一份部件 */}
-          <RequestsSection app={props.app} route={props.route} departments={props.departments} />
         </>
       ) : null}
     </div>
