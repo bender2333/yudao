@@ -54,12 +54,13 @@
             "browser_take_screenshot",
             "ask",
             "submit_completion",
-            "update_plan"
+            "update_plan",
+            "ask_user"
           ],
           "current_work": "按用户的原文完成这件事，需要时问产品，然后交完成。",
           "notes": [
             "交完成不是宣布合格：这份形态没有核验角色，事项以开环完成结束，记录上不写放行。",
-            "拿不准、又不必问产品的地方列进交完成的 uncertain；检查结果以主机执行的 run_check 为准。",
+            "拿不准的地方列进交完成的 uncertain；检查结果以主机执行的 run_check 为准。",
             "产品只在收到询问时工作：用 ask 把问题、背景与希望得到的结果写清楚。"
           ]
         }
@@ -86,7 +87,8 @@
             "submit_structure",
             "ask",
             "submit_completion",
-            "update_plan"
+            "update_plan",
+            "ask_user"
           ],
           "current_work": "读取现有代码与文档，提交描述现有行为的初始 PRD 与绑定当前快照的现有结构说明，然后交完成；需要时问产品。",
           "notes": [

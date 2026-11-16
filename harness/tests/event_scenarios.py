@@ -163,11 +163,12 @@ def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse], *, ste
     # （pinned_input_tokens 读 5133 → 5277）；工单 #1659 给 bash 加上一句话那一项参数（工具定义多一项），
     # 三个部门的固定材料各实测多 104 个 token（pinned_input_tokens 读 5271 → 5375）；工单 #1660 加上更新计划
     # 这个主机工具（工具定义与工具清单各多一项），三个部门的固定材料各实测多 277 个 token
-    # （pinned_input_tokens 读 5375 → 5652）。几笔都是固定材料的增长，窗口按各笔之和上调，
-    # 让第一次请求仍然读取大文件、压缩发生在读取以后；材料变大以后压缩的轮数取决于窗口与历史的大小关系，
-    # 本单重生成的基准里少了一轮压缩（有意的改变，工单 #1660）
+    # （pinned_input_tokens 读 5375 → 5652）；此后至工单 #1801 前产品固定材料又增 390 个 token（→ 6042），
+    # 工单 #1801 配备 ask_user 工具并补充先探索后提问与互审指引后，产品固定材料再实测多 674 个 token
+    # （5652 → 6716，合计 +1064）。几笔都是固定材料的增长，窗口按各笔之和上调，让第一次请求仍然读取大文件、
+    # 压缩发生在读取以后，且与既有 compaction_success 事件序列基准保持一致
     system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits,
-                                context_window=6000 + 346 + 283 + 144 + 104 + 277)
+                                context_window=6000 + 346 + 283 + 144 + 104 + 277 + 1064)
     system.workspace(run_id).write_file("large.txt", "LARGE_TOOL_OUTPUT " * 2200)
     return system, run_id
 

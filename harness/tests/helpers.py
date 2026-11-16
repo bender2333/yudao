@@ -503,9 +503,10 @@ def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=Fals
     measure_run = system.create_run(original, context_window=1_000_000)
     window = pinned_window(system, measure_run, "product", "engineering", "quality")
     run_id = system.create_run(original, context_window=window)
-    # 这份材料读一次约一万个 token，远过阈值之上的那截余量：读完以后这一步就要压缩，未压缩的工作请求
-    # 放不下窗口（这就是 partial 压缩与「摘要被截断时以上下文超限结束」两条用例的输入）
-    system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
+    # 读入长度随窗口的 85% 阈值同步缩放（工单 #1801）：三职能配备 ask_user 与提示指引后 quality 固定材料增大，
+    # 固定 2200 份已落入单步压缩阈值以内；按阈值扣除约两千固定开销定长，保持仍触发多轮 partial 压缩与未压缩超限
+    large_tokens = max(11_000, window * 85 // 100 - 2000)
+    system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * (large_tokens * 4 // 20 + 1))
     return system, adapter, run_id, original
 
 def pinned_input_tokens(system: LoopSystem, run_id: str, department: str = "product") -> int:
