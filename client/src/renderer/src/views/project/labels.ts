@@ -200,12 +200,14 @@ export const DECISION_KIND: Record<string, string> = {
   initial_prd: "接入已有项目的初始需求文档等待确认",
   kernel_modification: "交付改动了内核路径，等待批准",
   qa_cannot_verify: "质检无法核验，等待回答",
+  role_choice: "角色向你提问，等待选择",
 };
 
 // 决定请求的阻塞范围（DecisionView 的 blocks 取值）：卡片头的标记按中文写，不出现内部词 run
 export const DECISION_BLOCKS: Record<string, string> = {
   run: "整次运行",
   action: "单个动作",
+  round: "本轮工作",
 };
 
 export const INPUT_PROGRESS: Record<string, string> = {

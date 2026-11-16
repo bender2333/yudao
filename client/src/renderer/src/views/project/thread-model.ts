@@ -16,6 +16,15 @@
 //   - 收件人按在跑事项冻结的组织给出（项目换过形态以后仍按它）；默认值按状态选，点过节点以后切到给那个职能的指导。
 //   - 名字从冻结的组织与项目现在的组织里取显示名，页面上不出现内部标识。
 
+import {
+  answeredRoleChoiceSummary,
+  blockedText,
+  roleChoiceActions,
+  roleChoiceQuestions,
+  type RoleChoiceActions,
+  type RoleChoiceAnsweredView,
+  type RoleChoiceQuestionView,
+} from "../decisions/card-logic.ts";
 import { workItemStatusText } from "./labels.ts";
 
 /** 一个职能（事项冻结的组织里的一项）。 */
@@ -91,12 +100,44 @@ export interface ThreadAsk {
 export interface ThreadDecision {
   decision_id: string;
   kind: string;
+  blocks?: string;
   status: string;
   work_item_id: string | null;
   requested_at: string;
   version: number;
+  blocked?: { work_item_id: string | null; queued_after: number } | null;
   request?: { [key: string]: unknown } | null;
-  answer?: { option?: string | null; note?: string | null; answered_at?: string } | null;
+  answer?: {
+    option?: string | null;
+    note?: string | null;
+    answers?: { [key: string]: string } | null;
+    answered_at?: string;
+  } | null;
+}
+
+/** 线程内嵌决定气泡的多题与阻塞提示视图：与决定卡片共用同一份解析逻辑。 */
+export interface ThreadDecisionView {
+  questions: RoleChoiceQuestionView[];
+  actions: RoleChoiceActions;
+  answeredSummary: RoleChoiceAnsweredView | null;
+  blocksText: string;
+  roleNote: string;
+  roundLabel: string;
+}
+
+export function threadDecisionView(decision: ThreadDecision): ThreadDecisionView {
+  const questions = roleChoiceQuestions(decision);
+  const request = (decision.request ?? {}) as Record<string, unknown>;
+  const roundLabel = typeof request.round === "number" && Number.isFinite(request.round) ? `第 ${request.round} 轮` : "";
+  const roleNote = typeof request.note === "string" ? request.note.trim() : "";
+  return {
+    questions,
+    actions: roleChoiceActions(decision),
+    answeredSummary: decision.status === "answered" ? answeredRoleChoiceSummary(decision) : null,
+    blocksText: decision.blocks === "round" ? blockedText(decision).text : "",
+    roleNote,
+    roundLabel,
+  };
 }
 
 /** 折叠行里的一条话。问答的两条分别是 question 与 answer。 */
