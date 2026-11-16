@@ -12,7 +12,7 @@ import { newCommandId } from "../../contract/command-id.ts";
 import { commandProblemText } from "../../contract/command-problem.ts";
 import { readFailureText } from "../../contract/read-failure.ts";
 import type { ViewSync } from "../../contract/view-sync";
-import type { Catalog, CatalogDocument, EventObject } from "../../api/generated/types.gen";
+import type { Catalog, CatalogDocument, CatalogProvider, EventObject } from "../../api/generated/types.gen";
 import { JsonDialog, type EditableDocument } from "./json-dialog";
 import { Advanced, type ConnectionDraft, type ModelDraft } from "./advanced";
 import { CandidateList, type CandidateStatus } from "./candidate-list";
@@ -42,6 +42,8 @@ import {
   groupAdmittedModels,
   intFromInput,
   modelInputOf,
+  providerInputOf,
+  providerModelsWithImageToggled,
   removalCommand,
   removalRejectionText,
   removeConfirmLines,
@@ -602,6 +604,32 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       : { kind: "error", message: commandProblemText(outcome.problem) });
   }, [submit]);
 
+  const saveProviderCatalog = useCallback(async (
+    provider: CatalogProvider,
+    models: Record<string, unknown>[],
+  ): Promise<CommandOutcome> => submit("catalog.connection.save", {
+    provider: providerInputOf(provider),
+    models,
+  }), [submit]);
+
+  const toggleSelectedImage = useCallback(async (row: SelectedModelRow, supportsImage: boolean) => {
+    const current = catalogRef.current;
+    const provider = current?.providers.find((item) => item.id === row.provider_id);
+    if (!current || !provider) {
+      return;
+    }
+    const outcome = await saveProviderCatalog(
+      provider,
+      providerModelsWithImageToggled(provider.models, row.model_id, supportsImage),
+    );
+    setSelectionStatus((currentStatus) => ({
+      ...currentStatus,
+      [row.key]: outcome.ok
+        ? { kind: "ok", message: supportsImage ? "已开启图像输入。" : "已关闭图像输入。" }
+        : { kind: "error", message: commandProblemText(outcome.problem) },
+    }));
+  }, [saveProviderCatalog]);
+
   const saveModel = useCallback(async (providerId: string, modelId: string, draft: ModelDraft) => {
     const current = catalogRef.current;
     const provider = current?.providers.find((item) => item.id === providerId);
@@ -621,22 +649,11 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         accepts_required_tool_call: draft.accepts_required_tool_call,
       }
       : modelInputOf(model)));
-    const outcome = await submit("catalog.connection.save", {
-      provider: {
-        id: provider.id,
-        name: provider.name,
-        base_url: provider.base_url,
-        credential_ref: provider.credential_ref,
-        timeout_sec: provider.timeout_sec,
-        preset_id: provider.preset_id,
-        models_url: provider.models_url,
-      },
-      models,
-    });
+    const outcome = await saveProviderCatalog(provider, models);
     setPageNotice(outcome.ok
       ? { kind: "ok", message: "已保存这个模型。" }
       : { kind: "error", message: commandProblemText(outcome.problem) });
-  }, [submit]);
+  }, [saveProviderCatalog]);
 
   if (catalog === null) {
     // 目录读不出来：写一句失败提示与服务端给的原文，不停在「正在读取目录…」（工单 #776）
@@ -776,6 +793,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             onContinue={(row) => void continueWithCapacity(row.provider_id, row.upstream_model, row.key)}
             onRetry={(row) => void selectModel(row.provider_id, row.upstream_model, row.key)}
             onRemove={(row) => setPendingRemoval(removalOfRow(row))}
+            onToggleImage={(row, supportsImage) => void toggleSelectedImage(row, supportsImage)}
           />
         </div>
       </Block>
