@@ -3,8 +3,17 @@
 // 失败写出原因与「重新验证」；容量未知的在这一行填写窗口与输出上限；已启用的可以展开看参数与来源。
 // 取消勾选就是取消选用（catalog.model.remove）：被引用的取消不了，这一行写明引用方。
 
-import { PROTOCOL_LABELS, SOURCE_LABELS, capacityMissingText, selectionStatusKind, selectionStatusLabel,
-  type SelectedModelRow } from "./model-logic";
+import {
+  PROTOCOL_LABELS,
+  SOURCE_LABELS,
+  canToggleSelectedImage,
+  capacityMissingText,
+  modelImageInputLabel,
+  modelSupportsImage,
+  selectionStatusKind,
+  selectionStatusLabel,
+  type SelectedModelRow,
+} from "./model-logic";
 import { StatusMark } from "../../shell/kit";
 
 export type { SelectedModelRow };
@@ -15,7 +24,7 @@ export type SelectionPanelProps = {
   rows: SelectedModelRow[];
   /** 容量未知时用户填的窗口与输出上限 */
   capacity: Record<string, { context_window: string; max_output_tokens: string }>;
-  /** 每个模型旁的结果（取消选用被拒绝时写引用方） */
+  /** 每个模型旁的结果（取消选用被拒绝或切换图像输入时写入） */
   status: Record<string, SelectionStatus>;
   /** 最近一次验证的用时与实际返回的模型 */
   tests: Record<string, { elapsed_ms: number; actual_model: string | null }>;
@@ -24,6 +33,7 @@ export type SelectionPanelProps = {
   onContinue: (row: SelectedModelRow) => void;
   onRetry: (row: SelectedModelRow) => void;
   onRemove: (row: SelectedModelRow) => void;
+  onToggleImage?: (row: SelectedModelRow, supportsImage: boolean) => void;
 };
 
 function sourceText(sources: string): string {
@@ -61,11 +71,17 @@ export function SelectionPanel(props: SelectionPanelProps) {
           const capacity = props.capacity[row.key];
           const test = props.tests[row.model_id];
           const status = props.status[row.key];
+          const hasImage = modelSupportsImage(row.input_modalities);
           return (
             <li className={`mm-selection-item${enabled ? " is-on" : ""}`} key={row.key}
                 data-testid={`selected-${row.upstream_model}`}>
               <div className="y10-row mm-selection-head">
-                <strong>{row.upstream_model}</strong>
+                <span className="mm-candidate-name">
+                  <strong>{row.upstream_model}</strong>
+                  {hasImage ? (
+                    <span className="y10-tag" data-testid={`selected-image-tag-${row.upstream_model}`}>图像输入</span>
+                  ) : null}
+                </span>
                 <button type="button" className="y10-btn small danger" data-testid={`selected-remove-${row.upstream_model}`}
                         disabled={props.busy}
                         aria-label={`取消选用 ${row.upstream_model}`}
@@ -122,6 +138,17 @@ export function SelectionPanel(props: SelectionPanelProps) {
                   重新验证
                 </button>
               ) : null}
+              {canToggleSelectedImage(row) ? (
+                <div className="y10-row">
+                  <label className="y10-check">
+                    <input type="checkbox" className="mm-check" checked={hasImage}
+                           disabled={props.busy || !props.onToggleImage}
+                           data-testid={`selected-image-toggle-${row.upstream_model}`}
+                           onChange={(event) => props.onToggleImage?.(row, event.target.checked)} />
+                    <span>图像输入</span>
+                  </label>
+                </div>
+              ) : null}
               {enabled ? (
                 <details className="y10-details mm-detail"
                          data-testid={`selected-detail-${row.upstream_model}`}>
@@ -145,7 +172,7 @@ export function SelectionPanel(props: SelectionPanelProps) {
                     </div>
                     <div>
                       <dt>图像输入</dt>
-                      <dd>{row.input_modalities.includes("image") ? "支持" : "不支持"}</dd>
+                      <dd>{modelImageInputLabel(row.input_modalities)}</dd>
                     </div>
                     <div>
                       <dt>参数来源</dt>

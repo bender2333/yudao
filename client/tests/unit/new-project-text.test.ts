@@ -6,10 +6,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-PROJECT_ENTRY_NOTES,
-PROJECT_FORM_NOTES,
-projectEntryNote,
-projectFormNote
+  PROJECT_ENTRY_NOTES,
+  PROJECT_FORM_NOTES,
+  cancelNewProjectHash,
+  isNewProjectEntryRoute,
+  newProjectPageMeta,
+  newProjectRouteName,
+  projectEntryNote,
+  projectFormNote,
+  sidebarEntryItems,
 } from "../../src/renderer/src/shell/new-project-text.ts";
 
 test("两个入口各带一行场景说明：一个从想法或需求文字开始，一个把已有的代码目录接进来", () => {
@@ -40,4 +45,56 @@ test("从想法新建的表单说明写清建好以后在对话里写要求、�
 test("接入已有项目的表单另有自己的说明，这里不加第二段", () => {
   assert.equal(projectFormNote("existing"), null);
   assert.equal(PROJECT_FORM_NOTES.existing, "");
+});
+
+// 工单 #1806（保护 R2）：侧栏新建/接入入口只生成导航目标与当前活动页标记，按权限出现。
+test("侧栏新建与接入入口按能力列出、指向独立路径并仅高亮当前页", () => {
+  const onIdea = sidebarEntryItems({ activeName: "new-project", canCreate: true, canOnboard: true });
+  assert.equal(onIdea.length, 2);
+  assert.deepEqual(
+    onIdea.map((item) => ({ mode: item.mode, hash: item.hash, active: item.active })),
+    [
+      { mode: "idea", hash: "#/projects/new", active: true },
+      { mode: "existing", hash: "#/projects/onboard", active: false },
+    ],
+  );
+
+  const onExisting = sidebarEntryItems({ activeName: "onboard-project", canCreate: true, canOnboard: true });
+  assert.equal(onExisting[0].active, false);
+  assert.equal(onExisting[1].active, true);
+
+  const onHome = sidebarEntryItems({ activeName: "home", canCreate: false, canOnboard: true });
+  assert.equal(onHome.length, 1);
+  assert.equal(onHome[0].mode, "existing");
+  assert.equal(onHome[0].active, false);
+});
+
+// 工单 #1806（保护 R2）：独立页面的模式元数据与取消返回地址规则
+test("独立页面模式元数据区分命令与字段，取消返回进入前的非入口页或回落首页", () => {
+  assert.equal(newProjectRouteName("idea"), "new-project");
+  assert.equal(newProjectRouteName("existing"), "onboard-project");
+  assert.equal(isNewProjectEntryRoute("new-project"), true);
+  assert.equal(isNewProjectEntryRoute("onboard-project"), true);
+  assert.equal(isNewProjectEntryRoute("home"), false);
+
+  const ideaMeta = newProjectPageMeta("idea");
+  assert.equal(ideaMeta.commandName, "project.create");
+  assert.equal(ideaMeta.requiredCapability, "project.create");
+  assert.equal(ideaMeta.showInitialDirectory, true);
+  assert.equal(ideaMeta.showSourceDirectory, false);
+  assert.ok(ideaMeta.formNote !== null);
+
+  const existingMeta = newProjectPageMeta("existing");
+  assert.equal(existingMeta.commandName, "project.onboard");
+  assert.equal(existingMeta.requiredCapability, "project.onboard");
+  assert.equal(existingMeta.showInitialDirectory, false);
+  assert.equal(existingMeta.showSourceDirectory, true);
+  assert.equal(existingMeta.formNote, null);
+
+  assert.equal(cancelNewProjectHash("#/p/demo/conversation?w=w1"), "#/p/demo/conversation?w=w1");
+  assert.equal(cancelNewProjectHash(null), "#/home");
+  assert.equal(cancelNewProjectHash(""), "#/home");
+  assert.equal(cancelNewProjectHash("#/projects/new"), "#/home");
+  assert.equal(cancelNewProjectHash("#/onboard"), "#/home");
+  assert.equal(cancelNewProjectHash("#/unknown-path"), "#/home");
 });

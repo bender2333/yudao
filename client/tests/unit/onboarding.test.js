@@ -5,9 +5,11 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   ONBOARDING_REJECTION_REASONS,
   lastReadExistingAction,
+  onboardingProblemText,
   projectOnboardingMark,
   readExistingAction,
   sourceInvalidLines,
@@ -93,5 +95,39 @@ test("没有建档状态的项目没有标记", () => {
 function action(overrides) {
   return { tool: "read_file", department: "product", created_at: "2026-10-07T01:00:00+00:00", ...overrides };
 }
+
+// 工单 #1806（保护 R3）：接入失败与校验错误时的中文说明及路径明细保留给独立页面显示
+test("接入命令失败时给出中文说明并拆出非法路径条目", () => {
+  const rejected = problem(rejection());
+  assert.equal(onboardingProblemText(rejected), ONBOARDING_REJECTION_REASONS.source_invalid);
+  assert.deepEqual(sourceInvalidLines(rejected), [
+    "Links and reparse points are not supported: docs/alpha",
+    "Links and reparse points are not supported: docs/beta",
+    "Add these paths to the project's ignore rules or delete them.",
+  ]);
+  const invalid = { kind: "invalid", note: "目录路径格式不对", body: {} };
+  assert.equal(onboardingProblemText(invalid), "目录路径格式不对");
+  assert.deepEqual(sourceInvalidLines(invalid), []);
+
+  const failed = { kind: "failed", status: 500 };
+  assert.match(onboardingProblemText(failed), /没有成功/);
+  assert.deepEqual(sourceInvalidLines(failed), []);
+});
+
+// 工单 #1806（保护 R2）：左侧栏不保留内联新建/接入表单，独立页面接入统一校验、失败说明与对话跳转
+test("左侧栏不再内联渲染新建表单，表单与形态卡由独立页承担", () => {
+  const sidebarCode = readFileSync(new URL("../../src/renderer/src/shell/sidebar.tsx", import.meta.url), "utf8");
+  assert.equal(sidebarCode.includes("function NewProject"), false);
+  assert.equal(sidebarCode.includes("setCreating"), false);
+  assert.equal(sidebarCode.includes("v20-new-project"), false);
+  assert.equal(sidebarCode.includes("sidebarEntryItems"), true);
+
+  const pageCode = readFileSync(new URL("../../src/renderer/src/views/home/new-project-page.tsx", import.meta.url), "utf8");
+  assert.equal(pageCode.includes("FormCards"), true);
+  assert.equal(pageCode.includes("cardPickProblem"), true);
+  assert.equal(pageCode.includes("projectEntryBody"), true);
+  assert.equal(pageCode.includes("onboardingProblemText"), true);
+  assert.equal(pageCode.includes("paths.conversation"), true);
+});
 
 
