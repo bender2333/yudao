@@ -812,5 +812,27 @@
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
     "origin": "循环与收敛 docs/design/loops-and-convergence.md「一定会停」；浏览器与 computer use docs/design/browser-and-computer-use.md「屏幕与桌面会话」"
+  },
+  "ask_user.max_questions_per_round": {
+    "value": 4,
+    "bounds": [1, 8],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "单轮向用户提出过多问题造成阅读与拍板过载",
+    "cost": "高影响独立问题被迫在单轮堆砌或合并成含糊大题",
+    "relax_when": "单轮实际发出题数经常逼近上限且用户保留推荐比例合理",
+    "tighten_when": "单轮题数过多导致用户频繁跳过或取消决定请求",
+    "origin": "产品 · 工程 · 质检的循环结构 docs/design/department-loop.md「向用户提问：多题前沿决定请求」中「边界与范围」"
+  },
+  "ask_user.max_rounds_per_input": {
+    "value": 2,
+    "bounds": [0, 5],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "同次用户输入下角色多轮连续追问占用用户注意力并拖慢推进",
+    "cost": "首轮回答后缺乏展开下层依赖问题的通道；设为 0 时关闭向用户提问能力",
+    "relax_when": "追问轮数分布显示首轮之后常因缺少额度无法确认下层依赖问题",
+    "tighten_when": "多轮追问拖慢交付且后轮问题常可通过一次探索或首轮合并解决",
+    "origin": "产品 · 工程 · 质检的循环结构 docs/design/department-loop.md「向用户提问：多题前沿决定请求」中「边界与范围」"
   }
 }
