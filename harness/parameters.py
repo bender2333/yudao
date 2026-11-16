@@ -32,6 +32,10 @@ RUN_PARAMETERS = (
     "convergence.rounds",
     "convergence.step_window",
     "convergence.step_repeat",
+    # #1799 向用户提问参数（产品 · 工程 · 质检的循环结构 docs/design/department-loop.md「向用户提问：多题前沿决定请求」）：
+    # 建 run 时冻结；重放旧快照缺这两项时按定义初值补齐
+    "ask_user.max_questions_per_round",
+    "ask_user.max_rounds_per_input",
 )
 
 
@@ -185,6 +189,8 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "wait.desktop.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "wait.desktop_unlock.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
+    "ask_user.max_questions_per_round": "还没有代码读取它：向用户提问工具调用时按每轮最多提问数校验题数上限的逻辑待后续工单（#1800）接入",
+    "ask_user.max_rounds_per_input": "还没有代码读取它：同次用户输入下统计并限制向用户提问轮数上限的逻辑待后续工单（#1800）接入",
 }
 # 已接入（工单 #1189、#1401）：每个角色的可见范围在建 run 时冻结，上下文装配只读冻结的那份。
 # 每个角色一条，名字跟着角色编号走，所以按定义里的角色补进同一份清单
@@ -375,11 +381,18 @@ def _visibility_value(name: str, values: Mapping[str, Any], definitions: Definit
 def frozen_values(frozen: Mapping[str, Any] | None) -> dict[str, Any]:
     # 冻结快照里的参数取值（工单 #1189 写进 run_created 的参数字典，工单 #397 的收敛判定参数也从这里取）：
     # 旧事件没有冻结字典时按定义初值解释；定义初值是发布时的那份，不取进程重启时的现值，也不取项目当前的覆盖。
-    # 完整性核对的是 10 个运行参数：可见范围的条目每个角色一条、名字跟着定义里的角色走（工单 #1401），
-    # 缺一项时由读它的地方按角色自己的可见范围解释（见 context.frozen_visibility）
+    # 完整性核对全部运行参数 RUN_PARAMETERS：旧快照已有冻结字典但缺此后新增的参数（例如工单 #1799 的
+    # ask_user 参数）时，保留快照里已冻结的每一项（含按形态角色生成的 visibility 键），仅把缺项按定义初值补齐
     values = (frozen or {}).get("values")
-    if isinstance(values, dict) and all(name in values for name in RUN_PARAMETERS):
-        return dict(values)
+    if isinstance(values, dict) and values:
+        if all(name in values for name in RUN_PARAMETERS):
+            return dict(values)
+        initial = initial_values()
+        resolved = dict(values)
+        for name in RUN_PARAMETERS:
+            if name not in resolved:
+                resolved[name] = initial[name]
+        return resolved
     initial = initial_values()
     return {name: initial[name] for name in FROZEN_PARAMETERS}
 
