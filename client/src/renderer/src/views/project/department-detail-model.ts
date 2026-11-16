@@ -12,7 +12,7 @@ import type {
   DepartmentSetting, DraftOrganization,
 } from "../../api/generated/types.gen";
 import { EMPTY_FILTERS } from "./observe-filter.ts";
-import { paths, REQUESTS_SECTION } from "../../shell/routing.ts";
+import { paths } from "../../shell/routing.ts";
 
 // 一行只读的文字：左边是项名，右边是值
 export interface DetailRow {
@@ -123,11 +123,11 @@ export function settingSourceRows(setting: DepartmentSetting | null): DetailRow[
   ];
 }
 
-// 「本职能的模型请求」的去处：设置页的「模型请求与用量」这一节，带着职能筛选，进来就生效
+// 「本职能的模型请求」的去处：「事项与用量」页的「模型请求与用量」子视图，带着职能筛选，进来就生效
 export function requestsPath(projectId: string, workItemId: string | null, department: string): string {
-  return paths.settings(projectId, {
+  return paths.items(projectId, {
     workItem: workItemId === "" ? null : workItemId,
-    section: REQUESTS_SECTION,
+    tab: "requests",
     requests: { ...EMPTY_FILTERS, department },
   });
 }

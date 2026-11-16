@@ -1,7 +1,7 @@
 // 职能详情（工单 #1713）：项目的组织设计说明 4.9「职能详情」里「发布带的那一版」。
 //
 // 从节点面板的「职能详情」进，自己加的职能同样能进。三组：
-// 职责只读（取自项目现在的组织 project.organization，要改走「高级」）、
+// 职责只读（取自项目现在的组织 project.organization，修改职责经进程外运维代理走采用命令）、
 // 权限里的写入范围只读、模型与 Prompt 可改（写入本项目的职能设置 project.settings，
 // 下一次模型请求生效；每项写明跟随发布还是本项目写入，能恢复）。
 // 由谁做只写「自有角色」，不给选项：外部 agent 与小组有了以后再出现。
@@ -46,6 +46,9 @@ export function DepartmentDetailPage(props: {
   const setting = settings.data?.departments[department] ?? null;
   // 刚才保存过的那一版带上它自己的提醒：建议能力的提醒照旧（设计说明 9.2）
   const command = useCommand(props.app, pageKey([setting?.version]));
+  const closeHref = props.route.departmentOrigin === "org"
+    ? paths.org(projectId, { workItem: workItemId })
+    : paths.conversation(projectId, { workItem: workItemId });
 
   return (
     <div className="page y10-dept-detail">
@@ -53,14 +56,14 @@ export function DepartmentDetailPage(props: {
         eyebrow="职能详情"
         title={name === "" ? "职能详情" : name}
         subtitle="职责与权限只读；由谁做、模型与 Prompt 在这里改，保存后从下一次模型请求起生效。"
-        actions={<a className="y10-btn is-small small" href={paths.conversation(projectId, { workItem: workItemId })}>关闭</a>}
+        actions={<a className="y10-btn is-small small" href={closeHref}>关闭</a>}
       />
       <Loading state={settings} />
       {settings.error !== null ? <p className="y10-note note" role="status">{readFailureText(settings.error)}</p> : null}
       {props.organization === null ? (
         <Empty text="项目现在的组织还没有读出来：职责与权限要等它" />
       ) : null}
-      <Block title="职责" subtitle="之后新建的事项 · 只读，要改走「高级」" dataTestId="dept-detail-duty">
+      <Block title="职责" subtitle="之后新建的事项 · 只读，修改职责经进程外运维代理走采用命令" dataTestId="dept-detail-duty">
         <KeyValue items={dutyRows(props.organization?.organization ?? null, department).map((row) => [row.label, row.value])} />
         <p className="y10-note note">{NOT_SHOWN_NOTE}</p>
       </Block>

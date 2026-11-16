@@ -358,7 +358,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     # qa_cannot_verify（质检无法核验）排在 instance_upgrade 之后、kernel_modification 之前
     assert capabilities["decisions"] == ["model_unavailable", "definitions_changed",
                                          "no_tool_call", "workspace_unrepresentable", "initial_prd",
-                                         "instance_upgrade", "qa_cannot_verify", "kernel_modification"]
+                                         "instance_upgrade", "qa_cannot_verify", "kernel_modification",
+                                         "role_choice"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
