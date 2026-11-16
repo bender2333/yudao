@@ -363,9 +363,16 @@ def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | P
                       CatalogEventType.INSTANCE_UPGRADE_ANSWERED):
         decision = decisions[payload["decision_id"]]
         decision.status = "answered"
-        decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
-                           "base_version": payload["base_version"], "actor": event.actor,
-                           "command_id": event.command_id, "answered_at": event.created_at}
+        answer: dict[str, Any] = {
+            "event_id": event.event_id, "option": payload["option"], "note": payload["note"],
+            "base_version": payload["base_version"], "actor": event.actor,
+            "command_id": event.command_id, "answered_at": event.created_at,
+        }
+        if event.type == SkeletonEventType.DECISION_ANSWERED:
+            answers = payload.get("answers")
+            if answers:
+                answer["answers"] = dict(answers)
+        decision.answer = answer
         return decision.decision_id
     if event.type in (SkeletonEventType.DECISION_WITHDRAWN, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
                       CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN):
