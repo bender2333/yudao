@@ -4819,6 +4819,177 @@ export type PlaywrightMcpView = {
 };
 
 /**
+ * PrdChangeRecordView
+ */
+export type PrdChangeRecordView = {
+    /**
+     * Changed
+     */
+    changed?: Array<string>;
+    /**
+     * Retained
+     */
+    retained?: Array<string>;
+    /**
+     * Retired
+     */
+    retired?: Array<string>;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * PrdDecisionChangeView
+ */
+export type PrdDecisionChangeView = {
+    /**
+     * Decision Hash
+     */
+    decision_hash: string;
+    /**
+     * Disposition
+     */
+    disposition: string;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * PrdDecisionView
+ */
+export type PrdDecisionView = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Statement
+     */
+    statement: string;
+    /**
+     * Rationale
+     */
+    rationale: string;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Created Event Id
+     */
+    created_event_id: string;
+};
+
+/**
+ * PrdSourceInputView
+ */
+export type PrdSourceInputView = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Created Event Id
+     */
+    created_event_id: string;
+};
+
+/**
+ * ProductSpecView
+ */
+export type ProductSpecView = {
+    /**
+     * Spec Id
+     */
+    spec_id: string;
+    /**
+     * Spec Revision
+     */
+    spec_revision: number;
+    /**
+     * Spec Status
+     */
+    spec_status: string;
+    /**
+     * Spec Event Id
+     */
+    spec_event_id: string;
+    /**
+     * Spec Hash
+     */
+    spec_hash: string;
+    /**
+     * Parent Hash
+     */
+    parent_hash?: string | null;
+    /**
+     * Input Version
+     */
+    input_version: number;
+    /**
+     * Accepted Inputs
+     */
+    accepted_inputs?: Array<PrdSourceInputView>;
+    /**
+     * Goal
+     */
+    goal: string;
+    /**
+     * Non Goals
+     */
+    non_goals?: Array<string>;
+    /**
+     * Boundaries
+     */
+    boundaries?: Array<string>;
+    /**
+     * Constraints
+     */
+    constraints?: Array<string>;
+    /**
+     * Requirements
+     */
+    requirements?: Array<string>;
+    /**
+     * Acceptance Criteria
+     */
+    acceptance_criteria?: Array<string>;
+    /**
+     * Requirement Mapping
+     */
+    requirement_mapping?: Array<RequirementMappingView>;
+    /**
+     * Fatal Conditions
+     */
+    fatal_conditions?: Array<string>;
+    /**
+     * Decisions
+     */
+    decisions?: Array<PrdDecisionView>;
+    /**
+     * Decision Changes
+     */
+    decision_changes?: Array<PrdDecisionChangeView>;
+    change_record?: PrdChangeRecordView | null;
+};
+
+/**
  * ProjectArchive
  */
 export type ProjectArchive = {
@@ -5715,6 +5886,24 @@ export type ReportItem = {
  * RequirementMapping
  */
 export type RequirementMapping = {
+    /**
+     * Requirement
+     */
+    requirement: number;
+    /**
+     * Criteria
+     */
+    criteria?: Array<string>;
+    /**
+     * Gap
+     */
+    gap?: string | null;
+};
+
+/**
+ * RequirementMappingView
+ */
+export type RequirementMappingView = {
     /**
      * Requirement
      */
@@ -7935,6 +8124,11 @@ export type VersionEntry = {
      * Launch
      */
     launch?: Array<LaunchMethodView>;
+    /**
+     * Spec Event Id
+     */
+    spec_event_id?: string | null;
+    prd?: ProductSpecView | null;
 };
 
 /**

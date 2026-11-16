@@ -467,3 +467,213 @@ test("没有对应结论的一版不给结论段", () => {
   assert.equal(MISSING_REVIEW_TEXT, "材料里没有这一份结论");
   assert.equal(NO_FILES_TEXT, "这一版没有附文件清单");
 });
+
+test("PRD 箭头用 spec_event_id 对出完整结构化 PRD 与版本差异，且不期待文件清单", () => {
+  // R2 + R3：工作流转记录的 PRD 新版本带 SPEC_ACCEPTED 事件编号，面板仍读到完整 PRD 各节与前后版差异，且 expectsFiles=false
+  const prd1Arrow = arrow({
+    key: "flow-prd-1", outcome: "PRD", version: 1, from: "product", to: "engineering",
+    position: 1, text: "目标 v1", files: [], eventId: "ev-spec-1",
+  });
+  const prd2Arrow = arrow({
+    key: "flow-prd-2", outcome: "PRD", version: 2, from: "product", to: "engineering",
+    position: 5, text: "目标 v2", files: [], eventId: "ev-spec-2",
+  });
+  const mats: MaterialsLike = {
+    contracts: [
+      {
+        event_id: "ev-c-1",
+        spec_event_id: "ev-spec-1",
+        status: "superseded",
+        revision: 1,
+        summary: "目标 v1",
+        files: [],
+        prd: {
+          spec_id: "spec-a",
+          spec_revision: 1,
+          spec_status: "superseded",
+          spec_event_id: "ev-spec-1",
+          spec_hash: "h1",
+          parent_hash: null,
+          input_version: 1,
+          accepted_inputs: [{ version: 1, kind: "text", text: "最初需求说明", created_event_id: "ev-in-1" }],
+          goal: "目标 v1",
+          non_goals: ["不做导出"],
+          boundaries: ["仅改查询"],
+          constraints: ["保持兼容"],
+          requirements: ["展示基本目标"],
+          acceptance_criteria: ["显示目标 v1"],
+          requirement_mapping: [{ requirement: 1, criteria: ["AC1"], gap: null }],
+          fatal_conditions: ["丢失既有字段"],
+          decisions: [],
+          decision_changes: [],
+          change_record: null,
+        },
+      },
+      {
+        event_id: "ev-c-2",
+        spec_event_id: "ev-spec-2",
+        status: "active",
+        revision: 2,
+        summary: "目标 v2",
+        files: [],
+        prd: {
+          spec_id: "spec-a",
+          spec_revision: 2,
+          spec_status: "active",
+          spec_event_id: "ev-spec-2",
+          spec_hash: "h2",
+          parent_hash: "h1",
+          input_version: 2,
+          accepted_inputs: [
+            { version: 1, kind: "text", text: "最初需求说明", created_event_id: "ev-in-1" },
+            { version: 2, kind: "command", text: "补充结构化章节", created_event_id: "ev-in-2" },
+          ],
+          goal: "目标 v2",
+          non_goals: ["不做导出"],
+          boundaries: ["仅改查询", "扩展箭头面板"],
+          constraints: ["保持兼容"],
+          requirements: ["展示基本目标", "展示未覆盖原因"],
+          acceptance_criteria: ["显示完整结构化 PRD"],
+          requirement_mapping: [
+            { requirement: 1, criteria: ["AC1"], gap: null },
+            { requirement: 2, criteria: [], gap: "缺少单独验收" },
+          ],
+          fatal_conditions: ["丢失既有字段"],
+          decisions: [
+            {
+              decision_id: "D1",
+              content_hash: "dh1",
+              statement: "始终保留合同原有字段",
+              rationale: "避免破坏现有视图",
+              product_spec_hash: "h2",
+              created_event_id: "ev-dec-1",
+            },
+          ],
+          decision_changes: [{ decision_hash: "dh0", disposition: "integrate", rationale: "合并入第二版" }],
+          change_record: {
+            changed: ["扩展箭头面板"],
+            retained: ["保持兼容"],
+            retired: ["显示目标 v1"],
+            rationale: "用户要求看完整 PRD",
+          },
+        },
+      },
+    ],
+  };
+
+  const view2 = versionOf(prd2Arrow, [prd1Arrow, prd2Arrow], mats);
+  assert.equal(view2.loaded, true);
+  assert.equal(view2.revision, 2);
+  assert.equal(view2.expectsFiles, false);
+  assert.deepEqual(view2.files, []);
+  assert.equal(view2.diff, null);
+  assert.ok(view2.prd !== null);
+  assert.equal(view2.prd.statusName, "当前版本");
+  assert.deepEqual(view2.prd.acceptedInputs.map((item) => item.kindName), ["文字", "命令"]);
+  assert.deepEqual(view2.prd.requirements[1], {
+    number: 2,
+    text: "展示未覆盖原因",
+    criteria: [],
+    gap: "缺少单独验收",
+  });
+  assert.deepEqual(view2.prd.decisions.map((item) => item.statement), ["始终保留合同原有字段"]);
+  assert.deepEqual(view2.prd.decisionChanges.map((item) => item.dispositionName), ["纳入"]);
+  assert.equal(view2.prd.changeRecord?.rationale, "用户要求看完整 PRD");
+  assert.equal(view2.prd.diffFromPrevious?.goalChanged?.before, "目标 v1");
+  assert.equal(view2.prd.diffFromPrevious?.goalChanged?.after, "目标 v2");
+  assert.match(view2.prd.diffFromPrevious?.summary ?? "", /目标有调整/);
+  assert.match(view2.prd.diffFromPrevious?.summary ?? "", /范围与边界 新增 1 项/);
+
+  // 仅工程交付期待文件；缺陷记录同样不期待文件清单
+  const emptyDelivery = versionOf(
+    arrow({ key: "flow-del-empty", outcome: "交付", files: [], eventId: "ev-missing" }),
+    [],
+    null,
+  );
+  assert.equal(emptyDelivery.expectsFiles, true);
+  const defectView = versionOf(arrow({ key: "flow-def", outcome: "缺陷记录", files: [] }), [], null);
+  assert.equal(defectView.expectsFiles, false);
+});
+
+test("ArrowPanel VersionSection：PRD 箭头画完整结构化 PRD 且不显示无文件清单，工程空文件交付显示无文件清单", async () => {
+  // R1 + R3：UI 只对工程交付缺失文件显示 NO_FILES_TEXT，PRD 箭头展示结构化各节且不出现该提示
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  const globalScope = globalThis as Record<string, unknown>;
+  globalScope["React"] = React;
+  const register = (module: NodeModule, filename: string) => {
+    const src = fs.readFileSync(filename, "utf8");
+    const out = ts.transpileModule(src, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(out, filename);
+  };
+  req.extensions[".tsx"] = register;
+  req.extensions[".ts"] = register;
+  const { VersionSection } = req("../../src/renderer/src/views/project/arrow-panel.tsx");
+
+  const prd1Arrow = arrow({
+    key: "flow-prd-1", outcome: "PRD", version: 1, from: "product", to: "engineering",
+    position: 1, text: "目标 v1", files: [], eventId: "ev-spec-1",
+  });
+  const prdView = versionOf(prd1Arrow, [prd1Arrow], {
+    contracts: [
+      {
+        event_id: "ev-c-1",
+        spec_event_id: "ev-spec-1",
+        status: "active",
+        revision: 1,
+        summary: "结构化目标",
+        files: [],
+        prd: {
+          spec_id: "spec-ui",
+          spec_revision: 1,
+          spec_status: "active",
+          spec_event_id: "ev-spec-1",
+          spec_hash: "h-ui",
+          parent_hash: null,
+          input_version: 1,
+          accepted_inputs: [{ version: 1, kind: "text", text: "来源正文", created_event_id: "in-1" }],
+          goal: "结构化目标",
+          non_goals: ["不做无关改动"],
+          boundaries: ["仅改展示面板"],
+          constraints: ["不改后端契约语义"],
+          requirements: ["展示需求一"],
+          acceptance_criteria: ["验收条件一"],
+          requirement_mapping: [{ requirement: 1, criteria: ["AC1"], gap: null }],
+          fatal_conditions: ["空白目标"],
+          decisions: [{
+            decision_id: "DEC-1", content_hash: "dch", statement: "按分节展示",
+            rationale: "可读性更好", product_spec_hash: "h-ui", created_event_id: "ev-d",
+          }],
+          decision_changes: [],
+          change_record: null,
+        },
+      },
+    ],
+  });
+
+  const prdHtml = renderToStaticMarkup(
+    React.createElement(VersionSection, { app: {}, version: prdView, eventId: "ev-spec-1" }),
+  );
+  for (const text of [
+    "PRD v1", "当前版本", "接纳来源", "来源正文", "结构化目标",
+    "非目标", "不做无关改动", "范围与边界", "仅改展示面板",
+    "约束与默认决定", "不改后端契约语义", "功能需求", "展示需求一",
+    "对应验收：AC1", "验收条件清单", "验收条件一", "致命条件与风险边界", "空白目标",
+    "有效产品决定", "DEC-1", "按分节展示",
+  ]) {
+    assert.ok(prdHtml.includes(text), `PRD 面板 HTML 缺少：${text}`);
+  }
+  assert.equal(prdHtml.includes(NO_FILES_TEXT), false, "PRD 面板不应该出现「这一版没有附文件清单」");
+
+  const emptyDelivery = versionOf(arrow({ outcome: "交付", files: [] }), [], null);
+  const deliveryHtml = renderToStaticMarkup(
+    React.createElement(VersionSection, { app: {}, version: emptyDelivery, eventId: null }),
+  );
+  assert.ok(deliveryHtml.includes(NO_FILES_TEXT), "空文件清单的工程交付应该显示「这一版没有附文件清单」");
+});

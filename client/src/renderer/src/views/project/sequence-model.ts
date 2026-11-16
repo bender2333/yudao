@@ -102,7 +102,13 @@ export interface DecisionLike {
 
 /** work_item.materials 里时序图用到的两栏：成果的版本号按事件对。 */
 export interface SequenceMaterials {
-  contracts?: readonly { event_id: string; revision: number | null }[];
+  contracts?: readonly {
+    event_id: string;
+    revision: number | null;
+    spec_event_id?: string | null;
+    status?: string | null;
+    prd?: { spec_revision?: number | null } | null;
+  }[];
   deliveries?: readonly { event_id: string; revision: number | null }[];
 }
 
@@ -327,8 +333,21 @@ export function sequenceOf(input: SequenceInput): SequenceView {
     }
     return round;
   };
-  const revisionOf = (eventId: string, side: "contracts" | "deliveries"): number | null =>
-    (materials?.[side] ?? []).find((entry) => entry.event_id === eventId)?.revision ?? null;
+  const revisionOf = (eventId: string, side: "contracts" | "deliveries"): number | null => {
+    const rows = materials?.[side] ?? [];
+    const direct = rows.find((entry) => entry.event_id === eventId);
+    if (direct !== undefined) {
+      return side === "contracts"
+        ? (direct as NonNullable<SequenceMaterials["contracts"]>[number]).prd?.spec_revision ?? direct.revision ?? null
+        : direct.revision ?? null;
+    }
+    if (side !== "contracts") {
+      return null;
+    }
+    const contracts = (materials?.contracts ?? []).filter((entry) => entry.spec_event_id === eventId);
+    const matched = contracts.find((entry) => entry.status === "active") ?? contracts[contracts.length - 1];
+    return matched === undefined ? null : matched.prd?.spec_revision ?? matched.revision ?? null;
+  };
 
   // 一、成果、你的输入与指导：一条事件一行；同一版同时给几个职能（PRD 给工程与质检）合成一行
   const deliveries: { row: BuiltRow; position: number; from: string; to: string[] }[] = [];

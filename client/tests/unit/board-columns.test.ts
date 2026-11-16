@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { allItemsList,boardColumns,boardGroups } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,isOpenLoopCompleted,label,progressLabel,stopNoteView,workItemStatusText,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS,DECISION_KIND,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,isOpenLoopCompleted,label,progressLabel,stopNoteView,workItemStatusText,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { DepartmentState,WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 
@@ -216,11 +216,20 @@ test("停止原因与 run 状态的中文名只覆盖控制核心与定义里的
   }
 });
 
-test("决定卡片的阻塞范围标记是中文：不出现内部词 run 与 action", () => {
-  assert.deepEqual(Object.keys(DECISION_BLOCKS).sort(), ["action", "run"]);
+test("决定卡片的阻塞范围标记是中文：不出现内部词 run、action 与 round", () => {
+  assert.deepEqual(Object.keys(DECISION_BLOCKS).sort(), ["action", "round", "run"]);
   assert.equal(label(DECISION_BLOCKS, "run"), "整次运行");
   assert.equal(label(DECISION_BLOCKS, "action"), "单个动作");
+  assert.equal(label(DECISION_BLOCKS, "round"), "本轮工作");
   for (const name of Object.values(DECISION_BLOCKS)) {
+    assert.equal(/[A-Za-z]/.test(name), false, name);
+  }
+});
+
+test("决定种类的中文标题覆盖 role_choice 且全部条目不含英文字母", () => {
+  assert.equal(DECISION_KIND.role_choice, "角色向你提问，等待选择");
+  assert.equal(label(DECISION_KIND, "role_choice"), "角色向你提问，等待选择");
+  for (const name of Object.values(DECISION_KIND)) {
     assert.equal(/[A-Za-z]/.test(name), false, name);
   }
 });

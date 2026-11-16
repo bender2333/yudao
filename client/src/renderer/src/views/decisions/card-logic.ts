@@ -9,10 +9,263 @@ import { DECISION_KIND, DECISION_REASON, STOP_REASON, label } from "../project/l
 export type MaterialRow = { term: string; value: string };
 export type MaterialLink = { label: string; href: string };
 
+export type DecisionLike = {
+  decision_id: string;
+  kind: string;
+  blocks?: string;
+  status: string;
+  version: number;
+  requested_at: string;
+  blocked?: { work_item_id: string | null; queued_after: number } | null;
+  request?: unknown;
+  answer?: {
+    option?: string | null;
+    note?: string | null;
+    answers?: Record<string, string> | null;
+    answered_at?: string | null;
+  } | null;
+};
+
+export interface RoleChoiceOptionView {
+  id: string;
+  label: string;
+  description: string | null;
+  recommended: boolean;
+}
+
+export interface RoleChoiceQuestionView {
+  id: string;
+  question: string;
+  options: RoleChoiceOptionView[];
+  recommended: string;
+  rationale: string;
+}
+
+export interface RoleChoiceActions {
+  submitLabel: string;
+  recommendedLabel: string;
+  submitNoteRequired: boolean;
+  recommendedNoteRequired: boolean;
+}
+
+export type RoleChoiceAnswerArgs = {
+  decision_id: string;
+  option: "submit" | "recommended";
+  base_version: number;
+  answers?: Record<string, string>;
+  note?: string;
+};
+
+export interface RoleChoiceAnsweredItem {
+  questionId: string;
+  question: string;
+  optionId: string;
+  optionLabel: string;
+  optionDescription: string | null;
+  recommended: boolean;
+}
+
+export interface RoleChoiceAnsweredView {
+  actionLabel: string;
+  items: RoleChoiceAnsweredItem[];
+  note: string;
+  summaryText: string;
+}
+
 // 决定请求的载荷：决定请求携带的材料与选项（类型由生成的合同给出，未知种类按原样显示）
 type Payload = Record<string, unknown>;
 
 const DEPARTMENT_NAMES: Record<string, string> = { product: "产品", engineering: "工程", quality: "质检", operations: "运维" };
+
+/** 解析多题 role_choice 决定请求中的有效题目列表；非 role_choice 或题表为空时返回空数组。 */
+export function roleChoiceQuestions(
+  decision: Pick<DecisionLike, "kind" | "request">,
+): RoleChoiceQuestionView[] {
+  if (decision.kind !== "role_choice") {
+    return [];
+  }
+  const request = (decision.request ?? {}) as Payload;
+  if (!Array.isArray(request.questions) || request.questions.length === 0) {
+    return [];
+  }
+  const questions: RoleChoiceQuestionView[] = [];
+  for (const raw of request.questions) {
+    if (raw === null || typeof raw !== "object") {
+      continue;
+    }
+    const entry = raw as Payload;
+    const id = typeof entry.id === "string" ? entry.id.trim() : "";
+    const question = typeof entry.question === "string" ? entry.question.trim() : "";
+    const recommended = typeof entry.recommended === "string" ? entry.recommended.trim() : "";
+    const rationale = typeof entry.rationale === "string" ? entry.rationale.trim() : "";
+    if (id === "" || question === "" || !Array.isArray(entry.options)) {
+      continue;
+    }
+    const options: RoleChoiceOptionView[] = [];
+    for (const rawOption of entry.options) {
+      if (rawOption === null || typeof rawOption !== "object") {
+        continue;
+      }
+      const opt = rawOption as Payload;
+      const optId = typeof opt.id === "string" ? opt.id.trim() : "";
+      const optLabel = typeof opt.label === "string" ? opt.label.trim() : "";
+      if (optId === "" || optLabel === "") {
+        continue;
+      }
+      const description = typeof opt.description === "string" && opt.description.trim() !== ""
+        ? opt.description.trim()
+        : null;
+      options.push({
+        id: optId,
+        label: optLabel,
+        description,
+        recommended: optId === recommended,
+      });
+    }
+    if (options.length === 0) {
+      continue;
+    }
+    questions.push({ id, question, options, recommended, rationale });
+  }
+  return questions;
+}
+
+/** 从 role_choice 决定请求提取提交动作按钮文案与说明必填标记。 */
+export function roleChoiceActions(decision: Pick<DecisionLike, "request">): RoleChoiceActions {
+  const request = (decision.request ?? {}) as Payload;
+  const rawOptions = Array.isArray(request.options) ? request.options : [];
+  const find = (id: string, fallback: string): { label: string; noteRequired: boolean } => {
+    for (const raw of rawOptions) {
+      if (raw !== null && typeof raw === "object") {
+        const entry = raw as Payload;
+        if (entry.id === id) {
+          const textValue = typeof entry.label === "string" && entry.label.trim() !== ""
+            ? entry.label.trim()
+            : fallback;
+          return { label: textValue, noteRequired: Boolean(entry.note_required) };
+        }
+      }
+    }
+    return { label: fallback, noteRequired: false };
+  };
+  const submit = find("submit", "提交回答");
+  const recommended = find("recommended", "全部采用推荐");
+  return {
+    submitLabel: submit.label,
+    recommendedLabel: recommended.label,
+    submitNoteRequired: submit.noteRequired,
+    recommendedNoteRequired: recommended.noteRequired,
+  };
+}
+
+/** 按每题 recommended 生成默认逐题预选映射。 */
+export function defaultRoleChoiceAnswers(questions: readonly RoleChoiceQuestionView[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const item of questions) {
+    const valid = item.options.some((opt) => opt.id === item.recommended)
+      ? item.recommended
+      : item.options[0]?.id ?? "";
+    if (valid !== "") {
+      result[item.id] = valid;
+    }
+  }
+  return result;
+}
+
+/** 题表刷新时保留仍有效的已选答案，缺省题目回落到默认推荐选项。 */
+export function reconcileRoleChoiceAnswers(
+  questions: readonly RoleChoiceQuestionView[],
+  current: Record<string, string>,
+): Record<string, string> {
+  const defaults = defaultRoleChoiceAnswers(questions);
+  const next: Record<string, string> = {};
+  for (const item of questions) {
+    const picked = current[item.id];
+    if (typeof picked === "string" && item.options.some((opt) => opt.id === picked)) {
+      next[item.id] = picked;
+    } else if (defaults[item.id] !== undefined) {
+      next[item.id] = defaults[item.id];
+    }
+  }
+  return next;
+}
+
+/** 组装 role_choice 的 decision.answer 提交参数：提交回答带逐题 answers，全部采用推荐不附带 answers。 */
+export function buildRoleChoiceAnswerArgs(
+  decision: Pick<DecisionLike, "decision_id" | "kind" | "version" | "request">,
+  action: "submit" | "recommended",
+  selected: Record<string, string>,
+  note: string,
+): RoleChoiceAnswerArgs {
+  const questions = roleChoiceQuestions(decision);
+  const trimmed = note.trim();
+  if (action === "recommended") {
+    return {
+      decision_id: decision.decision_id,
+      option: "recommended",
+      ...(trimmed === "" ? {} : { note: trimmed }),
+      base_version: decision.version,
+    };
+  }
+  return {
+    decision_id: decision.decision_id,
+    option: "submit",
+    answers: reconcileRoleChoiceAnswers(questions, selected),
+    ...(trimmed === "" ? {} : { note: trimmed }),
+    base_version: decision.version,
+  };
+}
+
+/** 校验并组装 role_choice 提交参数，供决定卡片与对话线程气泡共用。 */
+export function prepareRoleChoiceSubmit(
+  decision: Pick<DecisionLike, "decision_id" | "kind" | "version" | "request">,
+  actions: RoleChoiceActions,
+  action: "submit" | "recommended",
+  selected: Record<string, string>,
+  note: string,
+): { missing: string; payload: RoleChoiceAnswerArgs | null } {
+  const missing = missingNoteText(
+    action === "submit"
+      ? { label: actions.submitLabel, note_required: actions.submitNoteRequired }
+      : { label: actions.recommendedLabel, note_required: actions.recommendedNoteRequired },
+    note,
+  );
+  if (missing !== "") {
+    return { missing, payload: null };
+  }
+  return { missing: "", payload: buildRoleChoiceAnswerArgs(decision, action, selected, note) };
+}
+
+/** 对照 answer.answers 与 request.questions 生成已回答多题的逐题选项名称与补充说明。 */
+export function answeredRoleChoiceSummary(
+  decision: Pick<DecisionLike, "kind" | "request" | "answer">,
+): RoleChoiceAnsweredView | null {
+  const questions = roleChoiceQuestions(decision);
+  if (questions.length === 0) {
+    return null;
+  }
+  const answer = decision.answer ?? null;
+  const rawAnswers = answer?.answers ?? null;
+  const usedRecommendedAll = answer?.option === "recommended";
+  const items: RoleChoiceAnsweredItem[] = questions.map((item) => {
+    const rawChoice = rawAnswers && typeof rawAnswers[item.id] === "string" ? rawAnswers[item.id] : "";
+    const chosenId = rawChoice !== "" ? rawChoice : (usedRecommendedAll ? item.recommended : "");
+    const chosenOption = item.options.find((opt) => opt.id === chosenId) ?? null;
+    const optionLabel = chosenOption?.label ?? (chosenId !== "" ? chosenId : "未写明选择");
+    return {
+      questionId: item.id,
+      question: item.question,
+      optionId: chosenId,
+      optionLabel,
+      optionDescription: chosenOption?.description ?? null,
+      recommended: chosenId !== "" && chosenId === item.recommended,
+    };
+  });
+  const note = typeof answer?.note === "string" ? answer.note.trim() : "";
+  const actionLabel = usedRecommendedAll ? "全部采用推荐" : "逐题回答";
+  const summaryText = items.map((entry) => `${entry.question}：${entry.optionLabel}`).join("；");
+  return { actionLabel, items, note, summaryText };
+}
 
 // 等待时长：从发出时间到现在，按秒向上取整（界面不自行推进状态，取的是当前时间与发出时间的差）
 export function waitedSeconds(requestedAt: string, now: number): number {
@@ -184,6 +437,15 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
     case "initial_prd":
       initialPrdRows(request, push);
       break;
+    case "role_choice":
+      push("职能", dept(request.department));
+      if (typeof request.round === "number" && Number.isFinite(request.round)) {
+        push("轮次", `第 ${request.round} 轮`);
+      }
+      if (typeof request.note === "string" && request.note.trim() !== "") {
+        push("补充提示", request.note.trim());
+      }
+      break;
     default:
       break;
   }
@@ -250,6 +512,9 @@ export function viewHref(decision: DecisionView): string | null {
   if (decision.kind === "initial_prd") {
     return initialPrdHref(decision);
   }
+  if (decision.kind === "role_choice") {
+    return paths.conversation(decision.project_id, { workItem: decision.work_item_id });
+  }
   if (decision.work_item_id !== null) {
     return `#/p/${decision.project_id}/w/${decision.work_item_id}/recovery`;
   }
@@ -258,12 +523,29 @@ export function viewHref(decision: DecisionView): string | null {
 
 // 挡住了什么：被阻塞的事项，以及同一项目中排在它后面的事项数量（v8 第 6 节）。
 // 不挡住任何事项的请求按 muted 显示（例如不阻塞的已阅通知）。
+// 阻塞范围为 round（role_choice）时只暂停发出方的本轮工作，其余职能与事项照常推进。
 // 被挡住的事项写标题，不写事项标识（工单 #802，原型 v11 的 Y11.ui.cards.blocksText 同一写法）：
 // 标题由调用处按项目的事项列表解析；挡住的事项就是决定请求所属的事项
 // （服务端按这个事项给出挡住的对象，harness/app/decision_queries.py 的 _blocked），
 // 取不到标题时写「挡住本事项」，不拿标识凑数。
-export function blockedText(decision: DecisionView, workItemTitle = ""): { text: string; muted: boolean } {
-  if (decision.blocks === "" || decision.blocked === null) {
+export function blockedText(
+  decision: Pick<DecisionLike, "blocks" | "blocked" | "request">,
+  workItemTitle = "",
+): { text: string; muted: boolean } {
+  if (decision.blocks === "") {
+    return { text: "不挡住事项", muted: true };
+  }
+  if (decision.blocks === "round") {
+    const request = (decision.request ?? {}) as Payload;
+    const rawDept = typeof request.department === "string" ? request.department.trim() : "";
+    const deptLabel = rawDept === "" ? "" : (DEPARTMENT_NAMES[rawDept] ?? rawDept);
+    const title = workItemTitle.trim();
+    const scope = title === ""
+      ? (deptLabel === "" ? "发起方的本轮工作" : `${deptLabel}的本轮工作`)
+      : (deptLabel === "" ? `「${title}」中发起方的本轮工作` : `「${title}」中${deptLabel}的本轮工作`);
+    return { text: `仅暂停${scope}，其余职能与事项照常推进`, muted: false };
+  }
+  if (decision.blocked === null || decision.blocked === undefined) {
     return { text: "不挡住事项", muted: true };
   }
   const parts: string[] = [];

@@ -1,0 +1,350 @@
+/* 「组织」一级标签页样式（工单 #1650，沿用 v10/v20 页面变量与区块节奏） */
+
+.v21-org-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.v21-org-alert {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.v21-org-alert.is-warn {
+  border-color: var(--amber);
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.v21-org-alert.is-danger {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.v21-org-questions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.v21-org-qcard {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v21-org-qtitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #66635b);
+}
+
+.v21-org-qbody {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg, #1c1b18);
+}
+
+.v21-org-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.v21-org-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.v21-org-form-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg, #1c1b18);
+}
+
+.v21-org-hint-row {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted, #66635b);
+}
+
+.v21-org-old-items {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v21-org-old-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v21-org-old-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.v21-org-old-item a {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--teal);
+  text-decoration: none;
+}
+
+.v21-org-old-item a:hover {
+  text-decoration: underline;
+}
+
+.v21-org-prev-diff {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 13px;
+}
+
+.v21-org-prev-diff ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.v21-org-switch-panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.v21-org-switch-confirm {
+  padding: 12px 14px;
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  background: var(--amber-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v21-org-blueprint-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.v21-org-stages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.v21-org-stage {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v21-org-stage-head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted, #66635b);
+}
+
+.v21-org-stage-node {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.v21-org-stage-node.is-verifier {
+  border-color: var(--teal);
+  background: var(--teal-bg);
+}
+
+.v21-org-stage-node.is-ending {
+  border-color: var(--green);
+  background: var(--tint);
+}
+
+.v21-org-stage-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.v21-org-stage-detail {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted, #66635b);
+  line-height: 1.45;
+}
+
+.v21-org-flow {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.v21-org-flow-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.v21-org-flow-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.v21-org-dept-table .y10-table tbody tr.is-clickable {
+  cursor: pointer;
+}
+
+.v21-org-dept-table .y10-table tbody tr.is-clickable:hover td {
+  background: var(--surface-2);
+}
+
+.v21-org-dept-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.v21-org-model-main {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.v21-org-model-src {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted, #66635b);
+}
+
+.v21-org-candidates,
+.v21-org-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.v21-org-card {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v21-org-card.is-current {
+  border-color: var(--green);
+  background: var(--tint);
+}
+
+.v21-org-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.v21-org-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.v21-org-card-time {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted, #66635b);
+}
+
+.v21-org-card-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.v21-org-modal-section {
+  margin-bottom: 12px;
+}
+
+.v21-org-modal-section h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.v21-org-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .v21-org-questions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .v21-org-questions {
+    grid-template-columns: 1fr;
+  }
+}

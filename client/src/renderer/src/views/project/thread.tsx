@@ -10,11 +10,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type { DecisionView, RunAsksResult } from "../../api/generated/types.gen";
-import { decisionLinks, missingNoteText } from "../decisions/card-logic";
-import { CommandFeedback, hasCommand } from "./common";
-import { DECISION_KIND, formatTime, label } from "./labels";
+import { RoleChoiceAnsweredBox, RoleChoiceForm, useRoleChoiceSelection } from "../decisions/card";
+import { decisionLinks, missingNoteText, prepareRoleChoiceSubmit } from "../decisions/card-logic";
+import { CommandFeedback, Tag, hasCommand } from "./common";
+import { DECISION_BLOCKS, DECISION_KIND, formatTime, label } from "./labels";
 import {
-  isEnded, isLongText, itemThread, projectDecisions, shortText,
+  isEnded, isLongText, itemThread, projectDecisions, shortText, threadDecisionView,
   type ThreadDecision, type ThreadEntry, type ThreadFlowRecord, type ThreadItemView, type ThreadMessage,
   type ThreadOrganizationChange,
 } from "./thread-model";
@@ -320,6 +321,9 @@ function DecisionBubble(props: {
       item !== null && typeof item === "object" && typeof (item as { id?: unknown }).id === "string");
   const description = typeof request.description === "string" ? request.description : "";
   const answered = props.decision.status !== "open";
+  const view = useMemo(() => threadDecisionView(props.decision), [props.decision]);
+  const isMultiRoleChoice = view.questions.length > 0;
+  const [selected, selectQuestion, resetSelection] = useRoleChoiceSelection(props.decision.decision_id, view.questions);
   // 决定请求自己的跳转链接（模型不可用时去模型管理、初始 PRD 的两个工件等），与决定卡片同一份
   const links = decisionLinks(props.decision as unknown as DecisionView);
 
@@ -347,14 +351,66 @@ function DecisionBubble(props: {
     });
   };
 
+  const submitRoleChoice = (action: "submit" | "recommended"): void => {
+    const prepared = prepareRoleChoiceSubmit(props.decision, view.actions, action, selected, note);
+    if (prepared.payload === null) {
+      setNoteMissing(prepared.missing);
+      return;
+    }
+    setNoteMissing("");
+    void command.submit("decision.answer", prepared.payload).then((ok) => {
+      if (ok) {
+        setNote("");
+        if (action === "recommended") {
+          resetSelection();
+        }
+      }
+    });
+  };
+
   return (
     <div className={`y10-th-decide${answered ? " is-answered" : ""}`} data-testid={`thread-decision-${props.decision.decision_id}`}>
       <div className="y10-th-meta">
-        {label(DECISION_KIND, props.decision.kind)} · {answered ? "已回答" : "要你决定"} · {formatTime(props.decision.requested_at)}
+        {label(DECISION_KIND, props.decision.kind)}
+        {isMultiRoleChoice && view.roundLabel !== "" ? ` · ${view.roundLabel}` : null}
+        {" · "}
+        {answered ? (props.decision.status === "withdrawn" ? "已撤销" : "已回答") : "要你决定"}
+        {" · "}
+        {formatTime(props.decision.requested_at)}
+        {props.decision.blocks === "round" ? <Tag>{`阻塞范围：${label(DECISION_BLOCKS, props.decision.blocks)}`}</Tag> : null}
       </div>
       {description === "" ? null : <p className="y10-th-ask">{description}</p>}
+      {!answered && view.blocksText !== "" ? <p className="y10-th-note">{view.blocksText}</p> : null}
+      {isMultiRoleChoice && view.roleNote !== "" ? <p className="y10-th-note">{view.roleNote}</p> : null}
       {answered ? (
-        <p className="y10-th-answered" role="status">已回答：{answeredLabel(props.decision, options)}</p>
+        props.decision.status === "answered" && view.answeredSummary !== null ? (
+          <RoleChoiceAnsweredBox
+            summary={view.answeredSummary}
+            answeredAt={props.decision.answer?.answered_at ?? null}
+            resultClassName="y10-th-answered"
+            prefix="已回答"
+          />
+        ) : (
+          <p className="y10-th-answered" role="status">
+            {props.decision.status === "withdrawn"
+              ? "决定请求已经撤销，不再等待回答"
+              : `已回答：${answeredLabel(props.decision, options)}`}
+          </p>
+        )
+      ) : isMultiRoleChoice ? (
+        <RoleChoiceForm
+          questions={view.questions}
+          actions={view.actions}
+          selected={selected}
+          note={note}
+          noteMissing={noteMissing}
+          disabled={command.busy || !hasCommand(props.app, "decision.answer")}
+          inputDisabled={command.busy}
+          onSelect={selectQuestion}
+          onNote={setNote}
+          onSubmit={submitRoleChoice}
+          feedbackSlot={<CommandFeedback submitted={command.submitted} problem={command.problem} />}
+        />
       ) : (
         <>
           <textarea
