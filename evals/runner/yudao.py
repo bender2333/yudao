@@ -49,6 +49,8 @@ INITIAL_PRD_KIND = "initial_prd"
 CONFIRM_OPTION = "confirm"
 TERMINAL_STATUSES = ("done", "paused", "failed")
 BLOCKING_DECISION_SCOPES = ("run", "work_item")
+ROLE_CHOICE_KIND = "role_choice"
+ROLE_CHOICE_OPTION = "recommended"
 # 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目 docs/design/existing-project-onboarding.md「查询的变化」）
 ONBOARDING_RUNNING_STATUSES = ("in_progress", "not_started", "awaiting_initial_prd")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
@@ -566,25 +568,170 @@ def work_item_status(client, project_id, work_item_id):
     return cards[0] if cards else None
 
 
-def _has_open_blocking_decision(client, project_id, work_item_id):
-    """查询事项是否存在待回答且阻塞事项推进的决定请求。"""
+def _decision_kind(decision):
+    return decision.get("kind") or (decision.get("request") or {}).get("kind")
+
+
+def _decision_blocks(decision):
+    return decision.get("blocks") or (decision.get("request") or {}).get("blocks")
+
+
+def _rejection_reason(rejected):
+    try:
+        payload = json.loads(getattr(rejected, "body", "") or "")
+    except (TypeError, ValueError):
+        return None
+    if isinstance(payload, dict):
+        reason = payload.get("reason")
+        return reason if isinstance(reason, str) else None
+    return None
+
+
+def role_choice_answers(decision):
+    """从 `role_choice` 决定请求提取每题 `id -> recommended` 回答映射。"""
+    request = decision.get("request") or {}
+    questions = request.get("questions")
+    if questions is None:
+        questions = decision.get("questions")
+    if not isinstance(questions, list) or not questions:
+        raise ValueError("role_choice 决定请求缺少有效的 questions 列表："
+                         + str(decision.get("decision_id")))
+    answers = {}
+    for index, item in enumerate(questions, start=1):
+        if not isinstance(item, dict):
+            raise ValueError("role_choice 第 " + str(index) + " 道问题格式无效")
+        q_id = item.get("id")
+        if not isinstance(q_id, str) or not q_id.strip():
+            raise ValueError("role_choice 第 " + str(index) + " 道问题缺少有效的 id")
+        if q_id in answers:
+            raise ValueError("role_choice 题目编号重复：" + q_id)
+        recommended = item.get("recommended")
+        if not isinstance(recommended, str) or not recommended.strip():
+            raise ValueError("role_choice 题目 " + q_id + " 缺少有效的 recommended 选项")
+        raw_options = item.get("options")
+        if isinstance(raw_options, list) and raw_options:
+            option_ids = {
+                opt.get("id") for opt in raw_options
+                if isinstance(opt, dict) and isinstance(opt.get("id"), str)
+            }
+            if option_ids and recommended not in option_ids:
+                raise ValueError("role_choice 题目 " + q_id + " 的推荐选项 "
+                                 + recommended + " 不在可选选项列表中")
+        answers[q_id] = recommended
+    return answers
+
+
+def _role_choice_identity(decision):
+    decision_id = decision.get("decision_id")
+    if not isinstance(decision_id, str) or not decision_id.strip():
+        raise ValueError("role_choice 决定请求缺少有效的 decision_id")
+    version = decision.get("version")
+    if not isinstance(version, int) or isinstance(version, bool):
+        raise ValueError("role_choice 决定请求缺少整数 version：" + decision_id)
+    return decision_id, version
+
+
+def answer_role_choice(client, decision, *, command_id=None):
+    """按每题 `recommended` 向 `decision.answer` 提交 `role_choice` 回答。"""
+    answers = role_choice_answers(decision)
+    decision_id, version = _role_choice_identity(decision)
+    body = {
+        "command_id": command_id or str(uuid.uuid4()),
+        "base_version": version,
+        "decision_id": decision_id,
+        "option": ROLE_CHOICE_OPTION,
+        "answers": answers,
+    }
+    client.command("decision.answer", body)
+    return answers
+
+
+def _handle_open_role_choice(
+    client,
+    decision,
+    *,
+    answered_keys,
+    command_ids,
+    poll_namespace,
+    role_choice_stats,
+):
+    decision_id, version = _role_choice_identity(decision)
+    key = (decision_id, version)
+    if key in answered_keys:
+        return
+    command_id = command_ids.setdefault(
+        key,
+        str(uuid.uuid5(poll_namespace, decision_id + ":" + str(version))),
+    )
+    try:
+        answers = answer_role_choice(client, decision, command_id=command_id)
+    except YudaoRejected as rejected:
+        reason = _rejection_reason(rejected)
+        if reason == "decision_closed":
+            answered_keys.add(key)
+            return
+        if reason == "stale_base":
+            return
+        raise
+    answered_keys.add(key)
+    role_choice_stats["requests"] += 1
+    role_choice_stats["questions"] += len(answers)
+    request = decision.get("request") or {}
+    role_choice_stats["decisions"].append({
+        "decision_id": decision_id,
+        "version": version,
+        "question_count": len(answers),
+        "department": request.get("department"),
+        "round": request.get("round"),
+    })
+
+
+def _poll_open_decisions(
+    client,
+    project_id,
+    work_item_id,
+    *,
+    answered_keys,
+    command_ids,
+    poll_namespace,
+    role_choice_stats,
+):
+    """查询待回答决定请求：自动按推荐项回答 `role_choice`，遇到其余阻塞性决定返回 True。"""
     decisions = client.query(
         "decisions.list",
         {"project_id": project_id, "work_item_id": work_item_id, "status": ["open"]},
     )["data"]["decisions"]
+    has_blocking = False
     for item in decisions:
         if item.get("status") != "open":
             continue
         if item.get("work_item_id") not in (None, work_item_id):
             continue
-        blocks = item.get("blocks") or (item.get("request") or {}).get("blocks")
-        if blocks in BLOCKING_DECISION_SCOPES:
-            return True
-    return False
+        if _decision_kind(item) == ROLE_CHOICE_KIND:
+            _handle_open_role_choice(
+                client,
+                item,
+                answered_keys=answered_keys,
+                command_ids=command_ids,
+                poll_namespace=poll_namespace,
+                role_choice_stats=role_choice_stats,
+            )
+            continue
+        if _decision_blocks(item) in BLOCKING_DECISION_SCOPES:
+            has_blocking = True
+    return has_blocking
 
 
-def wait_for_end(client, project_id, work_item_id, limit_seconds):
-    """等待事项结束；出现阻塞事项运行的待回答决定请求时当轮返回；到达时间上限时经 `work_item.cancel` 结束并标记超时。"""
+def wait_for_end(client, project_id, work_item_id, limit_seconds, *, role_choice_stats=None):
+    """等待事项结束；自动按推荐项回答 `role_choice`；出现其余阻塞事项运行的待回答决定请求时当轮返回；到达时间上限时经 `work_item.cancel` 结束并标记超时。"""
+    stats = role_choice_stats if role_choice_stats is not None else {}
+    stats.clear()
+    stats["requests"] = 0
+    stats["questions"] = 0
+    stats["decisions"] = []
+    answered_keys = set()
+    command_ids = {}
+    poll_namespace = uuid.uuid4()
     deadline = time.monotonic() + limit_seconds
     while True:
         card = work_item_status(client, project_id, work_item_id)
@@ -592,8 +739,12 @@ def wait_for_end(client, project_id, work_item_id, limit_seconds):
             raise RuntimeError("the work item disappeared from project.overview")
         if card["status"] not in ("in_progress", "not_started", "queued"):
             return card, False
-        if card["status"] == "in_progress" and _has_open_blocking_decision(
-                client, project_id, work_item_id):
+        if card["status"] == "in_progress" and _poll_open_decisions(
+                client, project_id, work_item_id,
+                answered_keys=answered_keys,
+                command_ids=command_ids,
+                poll_namespace=poll_namespace,
+                role_choice_stats=stats):
             return card, False
         if time.monotonic() >= deadline:
             _cancel(client, work_item_id)

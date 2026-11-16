@@ -12,6 +12,7 @@ PRD（`decision.answer`，或者等人确认）、再新建事项提交需求原
 
 import argparse
 import contextlib
+import inspect
 import json
 import os
 import shutil
@@ -166,6 +167,26 @@ def _form_arguments(form):
     return {} if form is None else {"form": form}
 
 
+def _wait_for_end_with_stats(client, project_id, work_item_id, limit_seconds):
+    """调用 `yudao.wait_for_end` 并兼容未声明 `role_choice_stats` 参数的测试桩。"""
+    stats = {}
+    fn = yudao.wait_for_end
+    if "role_choice_stats" in inspect.signature(fn).parameters:
+        card, timed_out = fn(client, project_id, work_item_id, limit_seconds,
+                             role_choice_stats=stats)
+    else:
+        card, timed_out = fn(client, project_id, work_item_id, limit_seconds)
+    return card, timed_out, _role_choice_summary(stats)
+
+
+def _role_choice_summary(stats):
+    return {
+        "requests": int((stats or {}).get("requests") or 0),
+        "questions": int((stats or {}).get("questions") or 0),
+        "decisions": list((stats or {}).get("decisions") or []),
+    }
+
+
 def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, limits,
                    form=None):
     """场景 3：新建项目、带入起始文件夹、提交需求原文加接口约定、等待结束。"""
@@ -186,6 +207,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     first_delivery_files = []
     elapsed = 0.0
     timed_out = False
+    role_choice = _role_choice_summary(None)
     served_model = model_name
     try:
         client.wait_ready()
@@ -199,7 +221,8 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         work_item_id, run_id_yudao = yudao.submit_requirement(client, project_id,
                                                                yudao.requirement_text())
         started = time.monotonic()
-        card, timed_out = yudao.wait_for_end(client, project_id, work_item_id, limit_seconds)
+        card, timed_out, role_choice = _wait_for_end_with_stats(
+            client, project_id, work_item_id, limit_seconds)
         with open(os.path.join(evidence_dir, "work-item.json"), "w", encoding="utf-8") as handle:
             json.dump(card, handle, ensure_ascii=False, indent=2)
         elapsed = time.monotonic() - started
@@ -245,6 +268,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:
         json.dump({"run_id": run_id, "data_dir": data_dir, "metrics": metrics,
+                   "role_choice": role_choice,
                    "void_reasons": void_reasons, "score": scores, "first_score": first_scores,
                    "delivery": delivery},
                   handle, ensure_ascii=False, indent=2)
@@ -259,6 +283,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         "start_dir": start_dir,
         "evidence_dir": evidence_dir,
         "metrics": metrics,
+        "role_choice": role_choice,
         "delivery": delivery,
         "delivery_files": len(delivery_files),
         "first_delivery_files": len(first_delivery_files),
@@ -299,6 +324,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     first_delivery_files = []
     elapsed = 0.0
     timed_out = False
+    role_choice = _role_choice_summary(None)
     served_model = model_name
     onboarding_elapsed = None
     void_reasons = []
@@ -328,7 +354,8 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
             work_item_id, run_id_yudao = yudao.submit_requirement(client, project_id,
                                                                    yudao.requirement_text())
             started = time.monotonic()
-            card, timed_out = yudao.wait_for_end(client, project_id, work_item_id, limit_seconds)
+            card, timed_out, role_choice = _wait_for_end_with_stats(
+                client, project_id, work_item_id, limit_seconds)
             with open(os.path.join(evidence_dir, "work-item.json"), "w", encoding="utf-8") as handle:
                 json.dump(card, handle, ensure_ascii=False, indent=2)
             elapsed = time.monotonic() - started
@@ -380,6 +407,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
             "evidence_dir": evidence_dir,
             "onboarding": onboarding_metrics,
             "metrics": _empty_metrics(False),
+            "role_choice": role_choice,
             "delivery": None,
             "delivery_files": 0,
             "first_delivery_files": 0,
@@ -406,6 +434,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:
         json.dump({"run_id": run_id, "data_dir": data_dir, "metrics": metrics,
+                   "role_choice": role_choice,
                    "onboarding": onboarding_metrics, "void_reasons": void_reasons,
                    "score": scores, "first_score": first_scores, "delivery": delivery},
                   handle, ensure_ascii=False, indent=2)
@@ -421,6 +450,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         "evidence_dir": evidence_dir,
         "onboarding": onboarding_metrics,
         "metrics": metrics,
+        "role_choice": role_choice,
         "delivery": delivery,
         "delivery_files": len(delivery_files),
         "first_delivery_files": len(first_delivery_files),
@@ -439,6 +469,8 @@ def _empty_metrics(timed_out):
     return {
         "end_status": "void", "end_reason": "initial_prd_not_confirmed", "outcome": None,
         "stop_reason": None, "status": None, "cycles": 0, "rework": 0, "collaboration": 0,
+        "role_choice_requests": 0, "role_choice_questions": 0,
+        "role_choice_answered_requests": 0, "role_choice_answered_questions": 0,
         "model_requests": 0, "input_tokens": None, "output_tokens": None,
         "cache_read_tokens": None, "cache_write_tokens": None, "total_tokens": None,
         "cost": None, "model_latency_ms": None, "elapsed_seconds": 0.0,
