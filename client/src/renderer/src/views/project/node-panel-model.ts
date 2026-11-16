@@ -17,7 +17,7 @@
 
 import type { AskView, DepartmentWorkspaceResult } from "../../api/generated/types.gen.ts";
 import { EMPTY_FILTERS } from "./observe-filter.ts";
-import { REQUESTS_SECTION, paths } from "../../shell/routing.ts";
+import { paths } from "../../shell/routing.ts";
 import { GUIDANCE_STATUS, roleBarText } from "./labels.ts";
 import { waitedText } from "./floor-text.ts";
 import type { LoopNode } from "./loop-graph-model.ts";
@@ -174,11 +174,11 @@ export function waitedTextFor(
 export function entryLinks(projectId: string, workItemId: string, department: string): { detail: string; requests: string } {
   const workItem = workItemId === "" ? null : workItemId;
   return {
-    detail: paths.departmentDetail(projectId, department, { workItem }),
-    // 带着职能筛选去「模型请求与用量」：地址里写 dept，到那一节筛选立即生效（工单 #1710）
-    requests: paths.settings(projectId, {
+    detail: paths.departmentDetail(projectId, department, { workItem, from: "conversation" }),
+    // 带着职能筛选去「事项与用量」页的「模型请求与用量」子视图：地址里写 tab=requests 与 dept，进来立即生效（工单 #1710、#1809）
+    requests: paths.items(projectId, {
       workItem,
-      section: REQUESTS_SECTION,
+      tab: "requests",
       requests: { ...EMPTY_FILTERS, department },
     }),
   };

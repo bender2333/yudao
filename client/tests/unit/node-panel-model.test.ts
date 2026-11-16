@@ -201,26 +201,30 @@ test("等了多久：取它发出、还没答的询问里最早那一封，没�
   assert.equal(view.waited, "已等 20 秒");
 });
 
-test("底部两个入口：职能详情到节点所在职能的详情页，模型请求带着职能筛选", () => {
+test("底部两个入口：职能详情到节点所在职能的详情页，模型请求指向事项与用量的请求子视图", () => {
   const links = entryLinks("p1", "w1", "engineering");
   assert.match(links.detail, /^#\/p\/p1\/dept-detail\/engineering\?/);
   assert.match(links.detail, /w=w1/);
+  assert.match(links.detail, /from=conversation/);
   // 设置页不再有「职能设置」一节（工单 #1713），详情入口不再落到设置页
   assert.doesNotMatch(links.detail, /settings/);
-  assert.match(links.requests, /section=requests/);
+  assert.match(links.requests, /^#\/p\/p1\/items\?/);
+  assert.match(links.requests, /tab=requests/);
   assert.match(links.requests, /dept=engineering/);
   assert.match(links.requests, /w=w1/);
   // 没有事项时不写 w
   assert.doesNotMatch(entryLinks("p1", "", "engineering").requests, /(^|[?&])w=/);
-  // 地址回到路由以后，设置页那一节是展开的，职能筛选按这个职能生效（工单 #1710 的读法）
+  // 地址回到路由以后，「事项与用量」的请求子视图与职能筛选按这个职能生效（工单 #1710、#1809）
   const requests = parseRoute(links.requests);
-  assert.equal(requests.settingsSection, "requests");
+  assert.equal(requests.name, "items");
+  assert.equal(requests.itemsTab, "requests");
   assert.equal(requests.requestFilters.department, "engineering");
   assert.equal(requests.workItemId, "w1");
   const detail = parseRoute(links.detail);
   assert.equal(detail.name, "dept-detail");
   assert.equal(detail.department, "engineering");
   assert.equal(detail.workItemId, "w1");
+  assert.equal(detail.departmentOrigin, "conversation");
 });
 
 test("整份正文：事实按从上到下的顺序给，入口地址取自节点所在的职能", () => {

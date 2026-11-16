@@ -26,7 +26,10 @@ import { RuntimePage } from "./views/system/runtime";
 import { ToolsPage } from "./views/system/tools";
 import { ConversationPage } from "./views/project/conversation";
 import { DepartmentDetailPage } from "./views/project/department-detail";
+import { ItemsAndUsagePage } from "./views/project/items-page";
 import { AttemptDetailPage } from "./views/project/attempt-detail";
+import { OrganizationPage } from "./views/project/org-page";
+import { OutcomesPage } from "./views/project/outcomes-page";
 import { ProjectHead } from "./views/project/project-head";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
@@ -497,9 +500,7 @@ function TokenGate(props: { onSubmit: (token: string) => void }) {
   );
 }
 
-// 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
-// 项目页只有对话与设置两页（工单 #1715，设计说明「项目页只有两页」）：概览、各职能页、资料与观测
-// 已经删掉（工单 #1716），它们的地址由 parseRoute 落到对话页。
+// 项目页面（工单 #80、#1809）：按路径分派到五个一级标签页（对话、成果库、组织、事项与用量、设置）与详情页。
 function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null;
   departments: DepartmentView[]; organization: ProjectOrganizationResult | null;
   onNavigate: (hash: string) => void }) {
@@ -512,12 +513,24 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
       // 对话页（工单 #1638）：项目页先是对话，循环图在它上面
       return <ConversationPage app={props.app} route={props.route} departments={props.departments}
         organization={props.organization} onNavigate={props.onNavigate} />;
+    case "outcomes":
+      // 成果库页（工单 #1809 挂载入口，完整视图由 #1810 实现）
+      return <OutcomesPage app={props.app} route={route} organization={props.organization}
+        departments={props.departments} onNavigate={props.onNavigate} />;
+    case "org":
+      // 组织页（工单 #1809 挂载入口，完整视图由 #1650 实现）
+      return <OrganizationPage app={props.app} route={route} organization={props.organization}
+        departments={props.departments} onNavigate={props.onNavigate} />;
+    case "items":
+      // 事项与用量页（工单 #1809）：事项列表与模型请求与用量双子视图
+      return <ItemsAndUsagePage app={props.app} route={route} departments={props.departments}
+        onNavigate={props.onNavigate} />;
     case "dept-detail":
       // 职能详情（工单 #1713）：职责与权限取自项目现在的组织，模型与 Prompt 写本项目的职能设置
       return <DepartmentDetailPage app={props.app} route={route} organization={props.organization}
         departments={props.departments} />;
     case "observe-detail":
-      // 请求详情（工单 #1710）：返回的去处按进来时的地址决定（设置页那一节或对话页的工作过程）
+      // 请求详情（工单 #1710、#1809）：返回的去处按进来时的地址决定（事项与用量的请求列表或对话页工作过程）
       return <AttemptDetailPage app={props.app} route={route} back={attemptBackPath(route)} />;
     case "settings":
       return <SettingsPage app={props.app} route={route} departments={props.departments} />;
@@ -528,11 +541,9 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
   }
 }
 
-// 项目标签（原型 v8 设计说明第 3.2 节）：按能力清单显示，缺少查询的标签不出现
-// 页签只有对话与设置两项（工单 #1715，设计说明「项目页只有两页」），任何组织下都一样；
-// 页签清单由 routing.ts 的 projectTabs 给，这里只按服务端能给的查询筛。
-// 页签的地址带着当前的事项范围（工单 #746）：切页签不丢范围，
-// 范围是项目级的一份（写在 ?w= 中），设置页不按范围筛选内容，但范围同样带着
+// 项目标签（原型 v8 设计说明第 3.2 节、工单 #1809）：按能力清单显示，缺少查询的标签不出现；
+// 五个一级标签页「对话 · 成果库 · 组织 · 事项与用量 · 设置」由 routing.ts 的 projectTabs 给出。
+// 页签的地址带着当前的事项范围（工单 #746）：切页签不丢范围。
 function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
   if (!route.projectId) {
     return [];
