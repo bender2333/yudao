@@ -25,16 +25,21 @@ from harness import parameters
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import frozen_visibility
-from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
+from harness.direct import DIRECT_TIGHTENING, SINGLE_ROLE_DIRECT
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType, RunProjection
-from harness.parameters import FROZEN_PARAMETERS, ParameterOutOfBoundsError, frozen_run_parameters
+from harness.parameters import (
+    FROZEN_PARAMETERS, NOT_WIRED_REASONS, ParameterNotWiredError, ParameterOutOfBoundsError, frozen_run_parameters,
+)
 from harness.projection import project_run
 from harness.proposals import product_spec
 from harness.tightening import WATCHED_OUTPUTS
 from harness.providers.call import ModelResponse
-from harness.runtime import LoopSystem
+from harness.runtime import SEVERAL_ROLES_DIRECT, LoopSystem
 from harness.tests.helpers import pinned_input_tokens, summary_message
+from harness.validation import TightenRequest
+from harness.write_path import NewEvent
 
 GOAL = "print the argument in uppercase"
 
@@ -397,3 +402,225 @@ def test_a_missing_run_is_rebuilt_from_the_frozen_organization_after_the_release
     assert created.payload["definitions_ref"]["kind"] == "item_definitions"
     assert reopened.projects.projection(project_id).work_item(item.work_item_id) is not None
     reopened.close()
+
+
+def _copy_form_definitions(source: Path, target: Path) -> Path:
+    target.mkdir(parents=True, exist_ok=True)
+    for path in source.glob("*.json"):
+        (target / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    return target
+
+
+def test_ask_user_tool_and_rules_load_and_validate_bounds_across_all_forms(tmp_path):
+    # R1（测试按三环留）：ask_user 工具定义、规则默认值与范围边界在三份形态定义中保持有效
+    forms = (
+        (DEFAULT_FORM, DEFINITIONS_DIR),
+        (SINGLE_ROLE_DIRECT, DEFINITIONS_DIR / "forms" / SINGLE_ROLE_DIRECT),
+        (SEVERAL_ROLES_DIRECT, DEFINITIONS_DIR / "forms" / SEVERAL_ROLES_DIRECT),
+    )
+    for form_name, form_dir in forms:
+        defs = load_definitions(form_dir)
+        assert "ask_user" in defs.tools
+        tool = defs.tools["ask_user"]
+        assert tool.kind == "host"
+        assert tool.proposal is None
+        schema = tool.parameters
+        assert schema["additionalProperties"] is False
+        assert tuple(schema["required"]) == ("questions",)
+        assert "note" in schema["properties"]
+        question_schema = schema["properties"]["questions"]["items"]
+        assert question_schema["additionalProperties"] is False
+        assert set(question_schema["required"]) == {"id", "question", "options", "recommended", "rationale"}
+        option_schema = question_schema["properties"]["options"]["items"]
+        assert option_schema["additionalProperties"] is False
+        assert set(option_schema["required"]) == {"id", "label"}
+        assert "description" in option_schema["properties"]
+
+        for role in defs.departments:
+            assert "ask_user" not in defs.tools_for(role, "change")
+
+        questions_rule = defs.rules["ask_user.max_questions_per_round"]
+        rounds_rule = defs.rules["ask_user.max_rounds_per_input"]
+        assert (questions_rule.value, questions_rule.bounds, questions_rule.kind, questions_rule.form) == (
+            4, (1, 8), "parameter", "boundary")
+        assert (rounds_rule.value, rounds_rule.bounds, rounds_rule.kind, rounds_rule.form) == (
+            2, (0, 5), "parameter", "boundary")
+
+        for rule_name, invalid_value in (
+            ("ask_user.max_questions_per_round", 0),
+            ("ask_user.max_questions_per_round", 9),
+            ("ask_user.max_rounds_per_input", -1),
+            ("ask_user.max_rounds_per_input", 6),
+        ):
+            copy_dir = _copy_form_definitions(form_dir, tmp_path / f"{form_name}-{rule_name}-{invalid_value}")
+            rules_doc = json.loads((copy_dir / "rules.json").read_text(encoding="utf-8"))
+            rules_doc[rule_name]["value"] = invalid_value
+            (copy_dir / "rules.json").write_text(json.dumps(rules_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+            with pytest.raises(DefinitionError):
+                load_definitions(copy_dir)
+
+        boundary_dir = _copy_form_definitions(form_dir, tmp_path / f"{form_name}-bounds-ok")
+        rules_doc = json.loads((boundary_dir / "rules.json").read_text(encoding="utf-8"))
+        rules_doc["ask_user.max_questions_per_round"]["value"] = 8
+        rules_doc["ask_user.max_rounds_per_input"]["value"] = 0
+        (boundary_dir / "rules.json").write_text(json.dumps(rules_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+        assert load_definitions(boundary_dir).rule_value("ask_user.max_questions_per_round") == 8
+        assert load_definitions(boundary_dir).rule_value("ask_user.max_rounds_per_input") == 0
+
+    for name, valid in (
+        ("ask_user.max_questions_per_round", 1),
+        ("ask_user.max_questions_per_round", 8),
+        ("ask_user.max_rounds_per_input", 0),
+        ("ask_user.max_rounds_per_input", 5),
+    ):
+        assert parameters.check_bounds(name, valid) == valid
+    for name, bad in (
+        ("ask_user.max_questions_per_round", 0),
+        ("ask_user.max_questions_per_round", 9),
+        ("ask_user.max_rounds_per_input", -1),
+        ("ask_user.max_rounds_per_input", 6),
+    ):
+        with pytest.raises(ParameterOutOfBoundsError):
+            parameters.check_bounds(name, bad)
+
+
+def test_new_runs_freeze_ask_user_parameters_and_old_snapshots_preserve_values_with_defaults(tmp_path):
+    # R2（测试按三环留）：新建 run 冻结 ask_user 参数、未接入前拒绝参数改写，旧快照缺这两项时保留既有冻结值并从定义初值补齐
+    for name in ("ask_user.max_questions_per_round", "ask_user.max_rounds_per_input"):
+        assert name in FROZEN_PARAMETERS
+        assert NOT_WIRED_REASONS.get(name, "").strip()
+        assert not parameters.wired(name)
+
+    system = _system(tmp_path)
+    with pytest.raises(ParameterNotWiredError, match="1800"):
+        _set(system, "ask_user.max_questions_per_round", 6)
+    with pytest.raises(ParameterNotWiredError, match="1800"):
+        _set(system, "ask_user.max_rounds_per_input", 4)
+
+    _set(system, "max_model_steps", 7)
+    first_run = system.create_run("冻结提问参数")
+
+    _set(system, "max_model_steps", 11)
+    second_run = system.create_run("再次更改步数参数后的 run")
+
+    reopened = _system(tmp_path)
+    first = frozen_run_parameters(project_run(reopened.store, first_run))
+    second = frozen_run_parameters(project_run(reopened.store, second_run))
+    assert (first["max_model_steps"], first["ask_user.max_questions_per_round"], first["ask_user.max_rounds_per_input"]) == (7, 4, 2)
+    assert (second["max_model_steps"], second["ask_user.max_questions_per_round"], second["ask_user.max_rounds_per_input"]) == (11, 4, 2)
+
+    created_payload = _created(reopened, first_run)
+    assert created_payload["parameters"]["values"]["ask_user.max_questions_per_round"] == 4
+    assert created_payload["parameters"]["values"]["ask_user.max_rounds_per_input"] == 2
+    legacy_values = {
+        key: value
+        for key, value in created_payload["parameters"]["values"].items()
+        if key not in ("ask_user.max_questions_per_round", "ask_user.max_rounds_per_input")
+    }
+    legacy_payload = {
+        **created_payload,
+        "parameters": {**created_payload["parameters"], "values": legacy_values},
+    }
+    legacy_run = "run-legacy-ask-user-snapshot"
+    reopened.orchestrator._transact(
+        run_stream(legacy_run),
+        lambda tx: tx.append(NewEvent(
+            EventType.RUN_CREATED,
+            actor="system",
+            department="product",
+            state_before="running",
+            state_after="running",
+            payload=legacy_payload,
+        )),
+        expected_version=0,
+        definitions=DEFINITIONS,
+    )
+    legacy_frozen = frozen_run_parameters(project_run(reopened.store, legacy_run))
+    assert legacy_frozen["max_model_steps"] == 7
+    assert legacy_frozen["ask_user.max_questions_per_round"] == DEFINITIONS.rule_value("ask_user.max_questions_per_round")
+    assert legacy_frozen["ask_user.max_rounds_per_input"] == DEFINITIONS.rule_value("ask_user.max_rounds_per_input")
+
+    custom = parameters.frozen_values({
+        "values": {"max_model_steps": 5, "ask_user.max_questions_per_round": 6, "ask_user.max_rounds_per_input": 4},
+    })
+    assert (custom["max_model_steps"], custom["ask_user.max_questions_per_round"], custom["ask_user.max_rounds_per_input"]) == (5, 6, 4)
+    assert parameters.frozen_values({"values": {"max_model_steps": 5}})["max_model_steps"] == 5
+    assert parameters.frozen_values({"values": {"max_model_steps": 5}})["ask_user.max_questions_per_round"] == 4
+    assert parameters.frozen_values(None)["ask_user.max_questions_per_round"] == 4
+    assert parameters.frozen_values({"values": {}})["ask_user.max_rounds_per_input"] == 2
+
+    reopened.close()
+    system.close()
+
+
+def _definitions_granting_ask_user(source: Path, target: Path, roles: tuple[str, ...]) -> Any:
+    copied = _copy_form_definitions(source, target)
+    roles_doc = json.loads((copied / "roles.json").read_text(encoding="utf-8"))
+    for role in roles:
+        if "ask_user" not in roles_doc[role]["tools"]:
+            roles_doc[role]["tools"].append("ask_user")
+    (copied / "roles.json").write_text(json.dumps(roles_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    work_items_doc = json.loads((copied / "work_items.json").read_text(encoding="utf-8"))
+    departments = work_items_doc["kinds"]["change"]["departments"]
+    for role in roles:
+        dept_cfg = departments.get(role)
+        if isinstance(dept_cfg, dict) and "tools" in dept_cfg and "ask_user" not in dept_cfg["tools"]:
+            dept_cfg["tools"].append("ask_user")
+    (copied / "work_items.json").write_text(json.dumps(work_items_doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    return load_definitions(copied)
+
+
+def test_ask_branch_tightening_excludes_ask_user_for_watched_outputs_and_direct_routing(tmp_path):
+    # R2（测试按三环留）：询问分支会话收紧剔除 ask_user 并拒绝直接向用户提问
+    default_defs = _definitions_granting_ask_user(
+        DEFINITIONS_DIR, tmp_path / "default-with-ask-user", ("product", "engineering", "quality"))
+    direct_defs = _definitions_granting_ask_user(
+        DEFINITIONS_DIR / "forms" / SEVERAL_ROLES_DIRECT,
+        tmp_path / "direct-with-ask-user",
+        ("product", "engineering"),
+    )
+
+    for tightening, defs, roles in (
+        (WATCHED_OUTPUTS, default_defs, ("product", "engineering", "quality")),
+        (DIRECT_TIGHTENING, direct_defs, ("product", "engineering")),
+    ):
+        main_projection = RunProjection(run_id="run-main", status="running", kind="change")
+        for role in roles:
+            assert "ask_user" in tightening.offered(TightenRequest(
+                department=role, state=main_projection, session_id="main-session", definitions=defs,
+            ))
+            assert tightening.tool(TightenRequest(
+                department=role,
+                state=main_projection,
+                session_id="main-session",
+                definitions=defs,
+                tool={"name": "ask_user", "args": {}},
+            )).reason is None
+
+            branch_projection = RunProjection(
+                run_id="run-branch",
+                status="running",
+                kind="change",
+                ask_stack=[{
+                    "requester": "product" if role != "product" else "engineering",
+                    "recipient": role,
+                    "question": "clarify scope",
+                    "origin_session_id": "origin-session",
+                    "branch_session_id": "branch-session",
+                }],
+            )
+            offered = tightening.offered(TightenRequest(
+                department=role, state=branch_projection, session_id="branch-session", definitions=defs,
+            ))
+            assert "ask_user" not in offered
+            assert "answer" in offered
+            rejected = tightening.tool(TightenRequest(
+                department=role,
+                state=branch_projection,
+                session_id="branch-session",
+                definitions=defs,
+                tool={"name": "ask_user", "args": {}},
+            ))
+            assert rejected.reason
+

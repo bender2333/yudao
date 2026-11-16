@@ -44,6 +44,7 @@ ANSWER_ONLY_IN_BRANCH = "answer tool is only available in an ask branch session"
 BRANCH_CANNOT_WRITE = "The branch session cannot modify files in the running workspace"
 BRANCH_CANNOT_DELIVER = "The branch session cannot submit delivery"
 BRANCH_CANNOT_REVIEW = "The branch session cannot submit QA review"
+BRANCH_CANNOT_ASK_USER = "The branch session cannot ask the user directly"
 # 放行要等发给产品的输入处理完（部门指导 docs/design/department-guidance.md「放行怎么等」，工单 #561）：等不等、为什么等是这一份收紧检查的
 # 判断与说明（工单 #1456），内核只把原因交回部门
 PENDING_INPUT_RELEASE = ("New user input has not been handled yet; the release is judged after the round that "
@@ -178,7 +179,7 @@ class WatchedOutputsTightening:
         definitions = request.definitions
         available = tools_for(department, projection.kind, definitions=definitions)
         if projection.ask_by_branch(request.session_id) is not None:
-            # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
+            # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案、不能向用户提问（工单 #473、#1799）
             chain_allowed, _ = ask_chain_decision(projection.ask_position(request.session_id), ask_chain_max_depth())
             nested = ["ask"] if chain_allowed else []
             if "product_spec" in proposal_kinds_for(department, projection.kind, definitions):
@@ -186,7 +187,7 @@ class WatchedOutputsTightening:
                 # 更新计划是记录类主机工具（工单 #1660）：不是提案、也不写工作区，分支里照样能写下来
                 return ["answer", "update_plan"] + nested
             allowed = [name for name in available
-                       if name != "ask" and not _is_write(name, definitions)
+                       if name not in ("ask", "ask_user") and not _is_write(name, definitions)
                        and proposal_kind(name, definitions=definitions) is None]
             return allowed + ["answer"] + nested
         result = [name for name in offers_with_input(available, request.input_modalities, definitions=definitions)
@@ -242,6 +243,9 @@ class WatchedOutputsTightening:
         if name == "update_plan":
             # 更新计划是记录类主机工具（工单 #1660）：不提交提案、不写工作区，分支里照样能写下来
             return None
+        if name == "ask_user":
+            # 询问分支属于主线一轮里的旁支工作，不允许直接向用户提问（工单 #1799）
+            return Tightened(reason=BRANCH_CANNOT_ASK_USER)
         if "product_spec" in proposal_kinds_for(department, projection.kind, definitions):
             return Tightened(reason=_branch_answer_only(department))
         if _is_write(name, definitions):
