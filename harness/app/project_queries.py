@@ -4148,6 +4148,8 @@ WORK_ITEM_MATERIALS = QueryDefinition(
                 EventType.ARTIFACT_ACCEPTED,
                 # 成果失效（S1b，工单 #858）：交付的失效状态在这一页的交付清单里
                 EventType.ARTIFACT_INVALIDATED,
+                # PRD 新版本替代旧版本时，既有合同条目上的结构化 PRD 状态随之更新（工单 #1807）
+                EventType.SPEC_SUPERSEDED,
                 ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN,
