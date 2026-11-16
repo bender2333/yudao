@@ -396,7 +396,7 @@ function prdDiffOf(current: ProductSpecLike, previous: ProductSpecLike | null): 
   };
 }
 
-function prdOf(spec: ProductSpecLike, previous: ProductSpecLike | null): PrdView {
+export function prdOf(spec: ProductSpecLike, previous: ProductSpecLike | null): PrdView {
   const acceptedInputs = [...(spec.accepted_inputs ?? [])]
     .sort((left, right) => left.version - right.version)
     .map((item) => ({

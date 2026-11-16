@@ -246,6 +246,16 @@ button.y10-cv-ask:hover { border-color: var(--blue); background: var(--tint); }
 .y10-th-msg.is-release .y10-th-bubble { border-color: var(--green); background: color-mix(in srgb, var(--green) 8%, var(--surface)); }
 .y10-th-bubble .y10-link { margin-left: 8px; }
 
+/* 被接纳的产品 PRD 一等主卡片（工单 #1808）：默认露版本号、目标概要与验收条件数，支持就地展开全文 */
+.y10-th-prd { max-width: 92%; }
+.y10-th-prd-card { display: grid; gap: 6px; }
+.y10-th-prd-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.y10-th-prd-title { font-size: 13.5px; color: var(--text); }
+.y10-th-prd-goal { margin: 0; font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+.y10-th-prd-actions { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; }
+.y10-th-prd-actions .y10-link { margin-left: 0; }
+.y10-th-prd-body { margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--line); min-width: 0; }
+
 /* 折叠行：角色之间的往来折成一行，点开才展开；问答里工程回答质检的分事实与解释 */
 .y10-th-fold { justify-self: start; max-width: 86%; }
 .y10-th-fold-head { background: none; border: 0; padding: 2px 0; color: var(--muted); font-size: 13px; cursor: pointer; }

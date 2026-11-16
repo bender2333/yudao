@@ -101,6 +101,34 @@ function decision(fields: Partial<ThreadDecision> & Pick<ThreadDecision, "decisi
   };
 }
 
+function spec(over: Record<string, unknown> = {}) {
+  return {
+    spec_id: "spec-1",
+    spec_revision: 1,
+    spec_status: "active",
+    spec_event_id: "ev-spec-1",
+    spec_hash: "hash-spec-1",
+    parent_hash: null,
+    input_version: 1,
+    accepted_inputs: [{ version: 1, kind: "text", text: "把订单导出成 CSV", created_event_id: "ev-in-1" }],
+    goal: "按创建时间倒序导出订单为 CSV",
+    non_goals: ["不做异步任务导出"],
+    boundaries: ["仅处理已支付与已取消订单"],
+    constraints: ["保持 UTF-8 BOM"],
+    requirements: ["按创建时间倒序输出", "保留订单编号列"],
+    acceptance_criteria: ["导出表头包含订单编号", "按创建时间倒序排列"],
+    requirement_mapping: [
+      { requirement: 1, criteria: ["AC2"], gap: null },
+      { requirement: 2, criteria: ["AC1"], gap: null },
+    ],
+    fatal_conditions: ["金额列出现浮点精度误差"],
+    decisions: [],
+    decision_changes: [],
+    change_record: null,
+    ...over,
+  };
+}
+
 /** 一条时间线：`entries` 里能看见的那些话按时间不倒流（测试里多处核对这一条）。 */
 function times(entries: ReturnType<typeof itemThread>): number[] {
   return entries
@@ -108,11 +136,18 @@ function times(entries: ReturnType<typeof itemThread>): number[] {
     .map((entry) => Date.parse((entry as { at: string }).at));
 }
 
-test("三种默认消息：你写的、要你决定的、交完成或放行；角色之间的往来只折成一行，不另露原话", () => {
+test("四种默认主轴条目：你写的、PRD 版本卡片、要你决定的、交完成或放行；其余角色往来折成一行", () => {
   const organization = three();
   const flow = [
     rec({ flow_id: "in1", kind: "你的输入", position: 0, round: 0, content: "把订单导出成 CSV" }),
-    rec({ flow_id: "prd1", kind: "PRD 新版本", position: 1, direction_from: "product", direction_to: "engineering", content: "PRD 第 1 版：按创建时间倒序" }),
+    rec({
+      flow_id: "prd1:eng", event_id: "ev-spec-1", kind: "PRD 新版本", position: 1,
+      direction_from: "product", direction_to: "engineering", content: "第 1 版", prd: spec(),
+    }),
+    rec({
+      flow_id: "prd1:qua", event_id: "ev-spec-1", kind: "PRD 新版本", position: 1,
+      direction_from: "product", direction_to: "quality", content: "第 1 版", prd: spec(),
+    }),
     rec({ flow_id: "del1", kind: "版本交付", position: 2, direction_from: "engineering", direction_to: "quality", content: "导出第 1 版" }),
     rec({ flow_id: "def1", kind: "问题反馈", position: 3, direction_from: "quality", direction_to: "engineering", content: "金额列四舍五入错一分" }),
   ];
@@ -127,20 +162,32 @@ test("三种默认消息：你写的、要你决定的、交完成或放行；�
     titles: { w1: "导出订单为 CSV" }, expanded: true,
   });
 
-  // 默认露出的三种话加上事项之间的细线；其余都是折叠行
+  // 默认露出的四类主轴条目加上事项之间的细线；其余角色往来都是折叠行
   const kinds = entries.map((entry) => entry.kind);
   assert.equal(kinds[0], "sep");
   for (const entry of entries.slice(1)) {
-    assert.ok(["you", "decision", "done", "fold"].includes(entry.kind), `多出了 ${entry.kind}`);
+    assert.ok(["you", "prd", "decision", "done", "fold"].includes(entry.kind), `多出了 ${entry.kind}`);
   }
-  // 角色之间的话不在顶层：它们只出现在折叠行的 messages 里
+  // 同一版 PRD 发给多个职能时只升格为一张主卡片，不并入折叠行
+  const prds = entries.filter((entry) => entry.kind === "prd");
+  assert.equal(prds.length, 1);
+  if (prds[0]?.kind === "prd") {
+    assert.equal(prds[0].revision, 1);
+    assert.equal(prds[0].title, "PRD 第 1 版");
+    assert.equal(prds[0].goalSummary, "按创建时间倒序导出订单为 CSV");
+    assert.equal(prds[0].criteriaCount, 2);
+    assert.equal(prds[0].flowId, "prd1:eng");
+    assert.equal(prds[0].prd?.requirements.length, 2);
+    assert.deepEqual(prds[0].prd?.acceptanceCriteria, ["导出表头包含订单编号", "按创建时间倒序排列"]);
+  }
+
   const topText = entries.flatMap((entry) => (entry.kind === "you" ? [entry.text] : []));
   assert.deepEqual(topText, ["把订单导出成 CSV"]);
   const folds = entries.filter((entry) => entry.kind === "fold");
-  // 产品 → 工程、工程与质检（交付与退回同一对，连续着折成一行）、工程 → 产品（那次问答）
-  assert.equal(folds.length, 3);
+  // 工程与质检（交付与退回同一对，连续着折成一行）、工程 → 产品（那次问答）
+  assert.equal(folds.length, 2);
   const foldedTexts = folds.flatMap((fold) => fold.messages.map((message) => message.text));
-  assert.ok(foldedTexts.includes("PRD 第 1 版：按创建时间倒序"));
+  assert.equal(foldedTexts.some((text) => text === "第 1 版" || text.includes("PRD")), false);
   assert.ok(foldedTexts.includes("导出第 1 版"));
   assert.ok(foldedTexts.includes("金额列四舍五入错一分"));
   // 你写的这一条带「开始一个新事项」的标签，长文本另标出来
@@ -548,4 +595,197 @@ test("接手职能为空串时收件人说明与选项文案保持主语完整",
     "产品接，已有的交付要重新验收",
   );
 });
+
+// ---------------------------------------------------------------- PRD 一等主卡片（工单 #1808）
+
+test("多版 PRD 卡片按顺序独立呈现、打断连续往来并带上与上一版差异，缺结构化数据时降级保留", () => {
+  const organization = three();
+  const prdV1 = spec({ spec_status: "superseded" });
+  const prdV2 = spec({
+    spec_id: "spec-2",
+    spec_revision: 2,
+    spec_status: "active",
+    spec_event_id: "ev-spec-2",
+    spec_hash: "hash-spec-2",
+    parent_hash: "hash-spec-1",
+    goal: "支持带汇总行的 CSV 导出",
+    acceptance_criteria: ["导出表头包含订单编号", "按创建时间倒序排列", "末尾附汇总行"],
+    change_record: {
+      changed: ["末尾附汇总行"],
+      retained: ["按创建时间倒序输出"],
+      retired: [],
+      rationale: "工程询问后明确需要汇总行。",
+    },
+  });
+  const flow = [
+    rec({
+      flow_id: "prd1:eng", event_id: "ev-spec-1", kind: "PRD 新版本", position: 1,
+      direction_from: "product", direction_to: "engineering", content: "第 1 版", prd: prdV1,
+    }),
+    rec({ flow_id: "del1", kind: "版本交付", position: 2, direction_from: "engineering", direction_to: "quality", content: "交付第 1 版" }),
+    rec({
+      flow_id: "prd2:qua", event_id: "ev-spec-2", kind: "PRD 新版本", position: 3,
+      direction_from: "product", direction_to: "quality", content: "第 2 版", prd: prdV2,
+    }),
+    rec({
+      flow_id: "prd2:eng", event_id: "ev-spec-2", kind: "PRD 新版本", position: 3,
+      direction_from: "product", direction_to: "engineering", content: "第 2 版", prd: prdV2,
+    }),
+    rec({ flow_id: "del2", kind: "版本交付", position: 4, direction_from: "engineering", direction_to: "quality", content: "交付第 2 版" }),
+  ];
+
+  const entries = itemThread({
+    item: item({ work_item_id: "w1", organization }),
+    flow,
+    asks: [],
+    decisions: [],
+    titles: { w1: "导出订单" },
+    expanded: true,
+  });
+
+  // prd2 打断了 del1 与 del2 之间的折叠行，形成 prd -> fold -> prd -> fold
+  assert.deepEqual(entries.map((entry) => entry.kind), ["sep", "prd", "fold", "prd", "fold"]);
+  const prds = entries.filter((entry) => entry.kind === "prd");
+  assert.equal(prds.length, 2);
+  if (prds[0]?.kind === "prd" && prds[1]?.kind === "prd") {
+    assert.equal(prds[0].statusName, "已被取代");
+    assert.equal(prds[0].prd?.diffFromPrevious, null);
+    assert.equal(prds[1].statusName, "当前版本");
+    assert.equal(prds[1].revision, 2);
+    assert.equal(prds[1].criteriaCount, 3);
+    // 即使记录顺序里 quality 在前，主线接收者 engineering 的 flow_id 仍优先作为定位标识
+    assert.equal(prds[1].flowId, "prd2:eng");
+    assert.ok(prds[1].prd?.diffFromPrevious !== null);
+    assert.match(prds[1].prd?.diffFromPrevious?.summary ?? "", /目标有调整/);
+  }
+
+  // 无结构化 prd 字段的旧流转记录降级显示版本号与原文，不虚构验收条数
+  const legacyEntries = itemThread({
+    item: item({ work_item_id: "w2", organization }),
+    flow: [rec({
+      flow_id: "prd-legacy", kind: "PRD 新版本", position: 1,
+      direction_from: "product", direction_to: "engineering", content: "第 3 版；改动：补导出参数",
+    })],
+    asks: [],
+    decisions: [],
+    expanded: true,
+  });
+  const legacyPrd = legacyEntries.find((entry) => entry.kind === "prd");
+  assert.ok(legacyPrd !== undefined && legacyPrd.kind === "prd");
+  if (legacyPrd && legacyPrd.kind === "prd") {
+    assert.equal(legacyPrd.revision, 3);
+    assert.equal(legacyPrd.title, "PRD 第 3 版");
+    assert.equal(legacyPrd.criteriaCount, null);
+    assert.equal(legacyPrd.prd, null);
+    assert.equal(legacyPrd.fallbackText, "第 3 版；改动：补导出参数");
+  }
+});
+
+test("ThreadView 未展开折叠行时直接渲染 PRD 主卡片，并支持就地展开完整 PRD 与「看这一版」", async () => {
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    const js = ts.transpileModule(code, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".tsx"] = loader;
+  req.extensions[".ts"] = loader;
+
+  const threadPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../src/renderer/src/views/project/thread.tsx");
+  const threadMod = req(threadPath);
+  const prdData = spec();
+
+  const htmlCollapsed = renderToStaticMarkup(React.createElement(threadMod.ThreadView, {
+    app: null,
+    items: [item({ work_item_id: "w1", organization: three() })],
+    titles: { w1: "导出订单" },
+    flow: [
+      rec({ flow_id: "in1", work_item_id: "w1", kind: "你的输入", position: 0, round: 0, content: "把订单导出成 CSV" }),
+      rec({
+        flow_id: "prd1:eng", work_item_id: "w1", event_id: "ev-spec-1", kind: "PRD 新版本", position: 1,
+        direction_from: "product", direction_to: "engineering", content: "第 1 版", prd: prdData,
+      }),
+      rec({
+        flow_id: "prd1:qua", work_item_id: "w1", event_id: "ev-spec-1", kind: "PRD 新版本", position: 1,
+        direction_from: "product", direction_to: "quality", content: "第 1 版", prd: prdData,
+      }),
+      rec({ flow_id: "del1", work_item_id: "w1", kind: "版本交付", position: 2, direction_from: "engineering", direction_to: "quality", content: "导出第 1 版" }),
+    ],
+    decisions: [],
+    labels: {},
+    selected: "w1",
+    opened: {},
+    onToggleItem: () => {},
+    onSelectItem: () => {},
+    onLook: () => {},
+    onSequence: () => {},
+    onNavigate: () => {},
+    scrollSignal: 0,
+  }));
+
+  // 折叠行默认收起（未展开往来），PRD 主卡片默认直接可见版本号、目标概要、验收条数与看这一版
+  for (const snippet of [
+    "PRD 第 1 版",
+    "当前版本",
+    "按创建时间倒序导出订单为 CSV",
+    "验收条件 2 条",
+    "展开完整 PRD",
+    "看这一版",
+    "工程与质检往来 1 条",
+  ]) {
+    assert.ok(htmlCollapsed.includes(snippet), `线程默认视图缺少：${snippet}`);
+  }
+  // 默认不渲染未展开的完整 PRD 内部各节标题，避免占用线程首屏
+  assert.equal(htmlCollapsed.includes("致命条件与风险边界"), false);
+
+  // 展开 PRD 主卡片后直接展示完整结构化 PRD 各节
+  const entries = itemThread({
+    item: item({ work_item_id: "w1", organization: three() }),
+    flow: [rec({
+      flow_id: "prd1:eng", event_id: "ev-spec-1", kind: "PRD 新版本", position: 1,
+      direction_from: "product", direction_to: "engineering", content: "第 1 版", prd: prdData,
+    })],
+    asks: [],
+    decisions: [],
+    expanded: true,
+  });
+  const prdEntry = entries.find((entry) => entry.kind === "prd");
+  assert.ok(prdEntry !== undefined && prdEntry.kind === "prd");
+  const htmlExpanded = renderToStaticMarkup(React.createElement(threadMod.PrdCard, {
+    entry: prdEntry,
+    onLook: () => {},
+    defaultOpen: true,
+  }));
+  for (const snippet of [
+    "接纳来源",
+    "把订单导出成 CSV",
+    "非目标",
+    "不做异步任务导出",
+    "范围与边界",
+    "仅处理已支付与已取消订单",
+    "约束与默认决定",
+    "保持 UTF-8 BOM",
+    "功能需求",
+    "按创建时间倒序输出",
+    "验收条件清单",
+    "导出表头包含订单编号",
+    "致命条件与风险边界",
+    "金额列出现浮点精度误差",
+    "收起 PRD",
+    "看这一版",
+  ]) {
+    assert.ok(htmlExpanded.includes(snippet), `展开后的 PRD 卡片缺少：${snippet}`);
+  }
+});
+
 

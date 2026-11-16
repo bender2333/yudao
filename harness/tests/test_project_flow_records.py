@@ -216,3 +216,91 @@ def test_old_events_rebuild_the_same_records_and_the_replay_does_not_change(data
             record.model_dump() for record in written.data.records]
     finally:
         readonly.close()
+
+
+def test_prd_flow_records_carry_full_structured_prd_and_mark_superseded_versions(data_dir):
+    # R2 + R3（工单 #1808）：project.flow 中被接纳的产品 PRD 记录随带完整结构化章节，
+    # 新版 PRD 替代旧版时旧记录的 spec_status 同步更新为 superseded，且从老事件重放重建结果完全一致
+    system = _system(data_dir, {
+        "product": [
+            product_spec(
+                goal="支持对话主轴直读结构化 PRD",
+                requirements=["默认展示版本号与目标概要", "支持就地展开完整章节"],
+                acceptance=["主轴卡片展示验收条数", "点击看这一版打开对应箭头面板"],
+                non_goals=["不改写已有折叠行交互"],
+                boundaries=["仅扩展流转记录的 PRD 字段"],
+                constraints=["保持既有字段向后兼容"],
+                fatal_conditions=["遗漏验收条件清单"],
+            ),
+        ],
+        "engineering": [
+            ask_turn(recipient="product", question="修订后是否补充非功能约束？"),
+            delivery_turn(),
+        ],
+        "product:ask": [
+            answer_turn(
+                answer="补充兼容性约束并更新验收条件。",
+                goal="支持多版本结构化 PRD 与差异对比",
+                requirements=["默认展示版本号与目标概要", "支持就地展开完整章节", "展示修订说明"],
+                acceptance=["主轴卡片展示验收条数", "点击看这一版打开对应箭头面板", "旧版标为已替代"],
+                non_goals=["不改写已有折叠行交互"],
+                boundaries=["仅扩展流转记录的 PRD 字段"],
+                constraints=["保持既有字段向后兼容", "旧事件重放结果不变"],
+                fatal_conditions=["遗漏验收条件清单"],
+                change_record={
+                    "changed": ["支持多版本结构化 PRD 与差异对比", "展示修订说明"],
+                    "retained": ["默认展示版本号与目标概要", "支持就地展开完整章节"],
+                    "retired": [],
+                    "rationale": "回答工程提问后补充多版本与重放约束。",
+                },
+            ),
+        ],
+        "quality": quality_turns("release", "checks passed"),
+    })
+    project_id = system.projects.register("结构化流转PRD", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, INITIAL_INPUT)
+    system.run_until_stop(run_id)
+    application = Application(system)
+
+    records = _flow(application, project_id, work_item_id).data.records
+    prd_records = _of_kind(records, "PRD 新版本")
+    assert len(prd_records) == 4
+    # 非 PRD 记录不随带结构化 PRD
+    assert all(record.prd is None for record in records if record.kind != "PRD 新版本")
+
+    v1_records = [record for record in prd_records if record.prd is not None and record.prd.spec_revision == 1]
+    v2_records = [record for record in prd_records if record.prd is not None and record.prd.spec_revision == 2]
+    assert len(v1_records) == 2
+    assert len(v2_records) == 2
+
+    v1 = v1_records[0].prd
+    assert v1 is not None
+    assert v1.spec_status == "superseded"
+    assert v1.spec_event_id == v1_records[0].event_id
+    assert v1.goal == "支持对话主轴直读结构化 PRD"
+    assert v1.non_goals == ["不改写已有折叠行交互"]
+    assert v1.boundaries == ["仅扩展流转记录的 PRD 字段"]
+    assert v1.constraints == ["保持既有字段向后兼容"]
+    assert v1.requirements == ["默认展示版本号与目标概要", "支持就地展开完整章节"]
+    assert v1.acceptance_criteria == ["主轴卡片展示验收条数", "点击看这一版打开对应箭头面板"]
+    assert len(v1.requirement_mapping) == 2
+    assert v1.fatal_conditions == ["遗漏验收条件清单"]
+    assert [item.text for item in v1.accepted_inputs] == [INITIAL_INPUT]
+    assert v1.change_record is None
+
+    v2 = v2_records[0].prd
+    assert v2 is not None
+    assert v2.spec_status == "active"
+    assert v2.spec_event_id == v2_records[0].event_id
+    assert v2.parent_hash == v1.spec_hash
+    assert v2.goal == "支持多版本结构化 PRD 与差异对比"
+    assert v2.acceptance_criteria == ["主轴卡片展示验收条数", "点击看这一版打开对应箭头面板", "旧版标为已替代"]
+    assert v2.change_record is not None
+    assert v2.change_record.rationale == "回答工程提问后补充多版本与重放约束。"
+
+    # 重放重建结果完全一致
+    written_dump = [record.model_dump() for record in records]
+    application.rebuild_read_models()
+    rebuilt_dump = [record.model_dump() for record in _flow(application, project_id, work_item_id).data.records]
+    assert rebuilt_dump == written_dump
+
