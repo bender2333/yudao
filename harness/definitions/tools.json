@@ -1064,6 +1064,88 @@
       ]
     }
   },
+  "ask_user": {
+    "kind": "host",
+    "description": "Ask the user one to a small batch of bounded decision questions when key requirements, scope, or trade-offs require user choice. The round pauses until the user chooses an option per question or cancels the batch; user answers are returned as this tool's result.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "questions": {
+          "type": "array",
+          "description": "Ordered list of decision questions in this round; non-empty and within the round limit, with unique question ids in the batch.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for this question within the batch."
+              },
+              "question": {
+                "type": "string",
+                "description": "Short question text shown to the user."
+              },
+              "options": {
+                "type": "array",
+                "description": "At least two mutually exclusive choices for this question.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for this option within the question."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Short option label shown to the user."
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional brief explanation of this option."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "label"
+                  ]
+                }
+              },
+              "recommended": {
+                "type": "string",
+                "description": "Option id from options recommended by the caller."
+              },
+              "rationale": {
+                "type": "string",
+                "description": "One-sentence reason why recommended is suggested."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "question",
+              "options",
+              "recommended",
+              "rationale"
+            ]
+          }
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional brief lead-in note shown above the batch of questions."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "questions"
+      ]
+    }
+  },
   "submit_delivery": {
     "kind": "host",
     "proposal": "delivery_spec",

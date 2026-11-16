@@ -68,9 +68,10 @@ ITEM_END_REASON = "no_open_work"
 # 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，输出）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
-# 询问分支里的两条拒绝理由与成果驱动那一份相同（工具回执上的说明，用户看得到）
+# 询问分支里的拒绝理由与成果驱动那一份相同（工具回执上的说明，用户看得到）
 ANSWER_ONLY_IN_BRANCH = "answer tool is only available in an ask branch session"
 BRANCH_CANNOT_WRITE = "The branch session cannot modify files in the running workspace"
+BRANCH_CANNOT_ASK_USER = "The branch session cannot ask the user directly"
 # 分支这一轮没能回答的两种原因：一步也走不了、跑完这一轮还是没交上回答
 _STEP_LIMIT_REASON = "department reached the model step limit without submitting a proposal"
 _BRANCH_FAILED_REASON = "branch failed to answer"
@@ -727,12 +728,12 @@ class DirectTightening:
         definitions = in_force(request.definitions)
         available = tools_for(department, projection.kind, definitions=definitions)
         if projection.ask_by_branch(request.session_id) is not None:
-            # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案
+            # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案、不能向用户提问
             chain_allowed, _ = ask_chain_decision(projection.ask_position(request.session_id),
                                                   ask_chain_max_depth())
             nested = ["ask"] if chain_allowed else []
             allowed = [name for name in available
-                       if name != "ask" and not _is_write(name, definitions)
+                       if name not in ("ask", "ask_user") and not _is_write(name, definitions)
                        and proposal_kind(name, definitions=definitions) is None]
             return allowed + ["answer"] + nested
         return [name for name in offers_with_input(available, request.input_modalities, definitions=definitions)
@@ -771,6 +772,9 @@ class DirectTightening:
                 return None
             allowed, reason = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
             return None if allowed else Tightened(reason=reason)
+        if name == "ask_user":
+            # 询问分支属于主线一轮里的旁支工作，不允许直接向用户提问（工单 #1799）
+            return Tightened(reason=BRANCH_CANNOT_ASK_USER)
         if _is_write(name, definitions):
             return Tightened(reason=BRANCH_CANNOT_WRITE)
         if proposal_kind(name, definitions=definitions) is not None:
