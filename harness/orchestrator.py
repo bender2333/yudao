@@ -802,6 +802,21 @@ class Orchestrator:
         def receive(transaction: Transaction) -> None:
             self._require_open(run_id, transaction.projection, "This run has ended; create a new task for this input.")
             self.interactions.receive(transaction, text, command=False, base_version=base_version)
+            current_version = transaction.projection.input_version
+            status = transaction.projection.status
+            for decision in list(transaction.decisions.values()):
+                if (decision.status == "open"
+                        and decision.kind == ROLE_CHOICE.name
+                        and decision.request.get("input_version") != current_version):
+                    transaction.append(NewEvent(
+                        EventType.DECISION_WITHDRAWN,
+                        actor="system",
+                        department=decision.request["department"],
+                        parent_event_id=decision.decision_id,
+                        state_before=status,
+                        state_after=status,
+                        payload={"decision_id": decision.decision_id, "reason": "superseded_by_hand_back"},
+                    ))
 
         self._transact(run_stream(run_id), receive, command=command)
         self._wake(run_id, restart=True)
@@ -1765,6 +1780,7 @@ class Orchestrator:
             return False, None, f"向用户提问的问题格式无效：{exc}。", False
 
         stream = run_stream(run_id)
+        superseded_msg = "等待回答期间收到新的用户输入，原决定请求已撤销并交还模型；请结合最新用户输入继续推进。"
         self._thin_driver.pause_session_segment(run_id, scope.session_id)
 
         def ensure_decision(transaction: Transaction) -> tuple[str, Any]:
@@ -1785,6 +1801,17 @@ class Orchestrator:
                 if existing.status == "answered":
                     return ("answered", existing)
                 return ("open", existing.decision_id)
+            superseded = next(
+                (item for item in transaction.decisions.values()
+                 if item.kind == ROLE_CHOICE.name
+                 and item.status == "withdrawn"
+                 and item.request.get("session_id") == scope.session_id
+                 and item.request.get("call_id") == call_id
+                 and (item.withdrawal or {}).get("reason") == "superseded_by_hand_back"),
+                None,
+            )
+            if superseded is not None:
+                return ("rejected", superseded_msg)
 
             frozen = parameter_values.frozen_run_parameters(projection)
             max_questions = int(frozen["ask_user.max_questions_per_round"])
@@ -1853,6 +1880,18 @@ class Orchestrator:
 
         decision, stopped = await self._thin_driver.wait_for_decision(round_work, str(payload))
         if stopped or decision is None:
+            snap = self.writes.read(stream)
+            current_dec = snap.decisions.get(str(payload))
+            if (current_dec is not None
+                    and current_dec.status == "withdrawn"
+                    and (current_dec.withdrawal or {}).get("reason") == "superseded_by_hand_back"
+                    and not round_work.stop_flag.is_set()
+                    and not self._aborted(run_id)
+                    and snap.minimal().status not in TERMINAL_STATUSES
+                    and not blocks_run(snap.decisions.values())):
+                self._resume_run_clock(run_id)
+                self._start_session_segment(run_id, scope.session_id)
+                return False, None, superseded_msg, False
             return False, None, None, True
         return True, self._format_role_choice_result(decision), None, False
 

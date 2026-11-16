@@ -497,11 +497,6 @@ class ThinDriver:
             return
         try:
             dependencies = self._hooks.round_dependencies(round_work, environment)
-            dept_limits = getattr(dependencies.limits, "department_max_time_sec", None) or {}
-            max_time = dept_limits.get(scope.department)
-            if round_work.deadline is None and max_time is not None:
-                used_time = self.session_elapsed_sec(run_id, scope.session_id)
-                round_work.deadline = time.monotonic() + max(0.0, float(max_time) - used_time)
             request = execution_contract.RoundRequest(
                 scope=scope, prompt=round_work.prompt, limits=dependencies.limits,
                 work_ref=dependencies.work_ref, department_settings=round_work.settings,

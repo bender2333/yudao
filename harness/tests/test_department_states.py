@@ -422,7 +422,6 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
     import time
     import traceback
     from harness.definitions import DEFAULT_FORM
-    from harness.engine import StepLimits
     from harness.models import TERMINAL_STATUSES
     from harness.tests.signals import Signals, SignallingAdapter
     from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
@@ -467,11 +466,9 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
         waits={("quality", 0): "ask_opened"},
         signals=signals,
     )
-    # 单职能时限需明显高于运行机并发下工程起步与树摘要的准备耗时（参见 test_ask_branch.py）
     system = LoopSystem.for_testing(
         data_dir / "run_wait",
         adapter,
-        step_limits=StepLimits(department_max_time_sec={"engineering": 20.0}),
         forms={DEFAULT_FORM: (defs, WATCHED_OUTPUTS)},
     )
     try:
@@ -516,12 +513,12 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
                         raise AssertionError("计时器未在等待质检收尾后进入暂停稳态")
                     time.sleep(0.01)
                 snapshots["after_qa"] = _departments(application, project_id, work_item_id)
-                # 此时质检已完成本轮、唯独工程等待用户：等待 21.0 秒超过工程单职能 20.0 秒上限，
-                # 运行与会话计时器保持暂停（wait 前后已用毫秒完全不变），且单职能限时按实际等待时长顺延
+                # 此时质检已完成本轮、唯独工程等待用户：等待 1.5 秒期间运行与会话计时器保持暂停
+                # （wait 前后已用毫秒完全不变），等待结束回答后继续完成本轮
                 eng_session_id = system.project(run_id).sessions["engineering"].session_id
                 timings["run_before"] = system.orchestrator._elapsed_ms(run_id)
                 timings["eng_before"] = int(system.orchestrator._session_elapsed_sec(run_id, eng_session_id) * 1000)
-                time.sleep(21.0)
+                time.sleep(1.5)
                 timings["run_after"] = system.orchestrator._elapsed_ms(run_id)
                 timings["eng_after"] = int(system.orchestrator._session_elapsed_sec(run_id, eng_session_id) * 1000)
                 dec = next(item for item in saved_decisions(system.store, statuses=("open",))[1]
@@ -556,7 +553,7 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
         assert after_qa["engineering"].state == "waiting_user"
         assert after_qa["quality"].state == "waiting"
 
-        # 验证纯等待的 21.0s 未增加工程会话累计耗时与运行总墙钟耗时（同时工程未因 20.0s 限时超时）
+        # 验证纯等待的 1.5s 未增加工程会话累计耗时与运行总墙钟耗时
         assert timings["run_after"] == timings["run_before"]
         assert timings["eng_after"] == timings["eng_before"]
         assert result.delivery_spec is not None

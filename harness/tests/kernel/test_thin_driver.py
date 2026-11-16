@@ -374,8 +374,8 @@ def test_round_dependencies_forwards_ask_user_and_wait_for_decision_pauses_timer
 
         round_work = rig.begin()
         now[0] = 0.125
-        # 等待前已用 0.125 秒：单职能上限设 0.25 秒，剩余预算 0.125 秒；下面等待 0.35 秒后顺延仍不得超时
-        limits = execution_contract.StepLimits(department_max_time_sec={DEPARTMENT: 0.25})
+        # 直接在 round_work 上设置剩余 0.125 秒限时；等待 0.35 秒后顺延，verify deadline 顺延仍不得超时
+        limits = execution_contract.StepLimits()
         decision_box: list[str] = []
 
         def emit_role_choice(tx):
@@ -432,6 +432,7 @@ def test_round_dependencies_forwards_ask_user_and_wait_for_decision_pauses_timer
 
                 rig.hooks.transact_run(rig.run_id, write_answer)
 
+            round_work.deadline = time.monotonic() + 0.125
             threading.Thread(target=answer_soon, daemon=True).start()
             res = await rig.driver.wait_for_decision(round_work, decision_id)
             assert round(rig.driver.session_elapsed_sec(rig.run_id, SESSION), 3) == 0.125

@@ -795,3 +795,168 @@ def test_ask_user_multi_round_structured_answer_and_idempotent_recovery_after_re
         assert pre_reopened.project(run2).product_spec is not None
     finally:
         pre_reopened.close()
+
+
+def test_role_choice_withdrawn_and_handed_back_on_add_input(tmp_path):
+    # 守 R1 与 R2：role_choice 处于 open 且阻塞等待时追加新用户输入，旧请求按
+    # superseded_by_hand_back 撤销、等待中的轮次立即醒来并记录 ask_user 的 TOOL_CALLED(ok=False)；
+    # 后续步骤与崩溃重启恢复均不重放已撤销的 ask_user，并结合新 input_version 正常完成
+    import threading
+    import time
+    from dataclasses import asdict
+    from harness.definitions import DEFAULT_FORM
+    from harness.models import json_dumps
+    from harness.proposals import product_spec
+    from harness.providers.call import ModelResponse
+    from harness.tightening import WATCHED_OUTPUTS
+
+    q1, _ = _sample_questions()
+    defs = _definitions_with_ask_user(tmp_path / "defs_superseded")
+
+    # 1) 在线等待期间调用 add_input：撤回旧 role_choice、立即唤醒当前轮并继续结合新输入完成
+    live_sys = LoopSystem.for_testing(
+        tmp_path / "live_superseded",
+        FakeAdapter({
+            "product": [
+                ModelResponse(output=[_ask_user_call("call-hb-live", [q1])]),
+                product_spec(),
+            ],
+        }),
+        forms={DEFAULT_FORM: (defs, WATCHED_OUTPUTS)},
+    )
+    try:
+        run_id = live_sys.create_run("等待回答时追加新输入")
+        entered = threading.Event()
+        woke_done = threading.Event()
+        live_errors: list[BaseException] = []
+
+        def on_events(events: list[Any]) -> None:
+            for event in events:
+                if (event.type == EventType.DECISION_REQUESTED
+                        and event.run_id == run_id
+                        and (event.payload or {}).get("kind") == "role_choice"):
+                    entered.set()
+
+                    def push_new_input() -> None:
+                        try:
+                            deadline = time.monotonic() + 5.0
+                            while (run_id not in live_sys.orchestrator._thin_driver._waiters
+                                   and time.monotonic() < deadline):
+                                time.sleep(0.005)
+                            live_sys.orchestrator.add_input(run_id, "改按补充要求直接出稿", base_version=1)
+                        except BaseException as exc:  # pragma: no cover - 仅失败诊断
+                            live_errors.append(exc)
+                        finally:
+                            woke_done.set()
+
+                    threading.Thread(target=push_new_input, daemon=True).start()
+
+        live_sys.store.subscribe(on_events)
+        live_sys.activate_once(run_id)
+        assert entered.wait(timeout=5.0)
+        assert woke_done.wait(timeout=5.0)
+        assert not live_errors
+
+        reqs = [e for e in live_sys.store.list_events(run_id)
+                if e.type == EventType.DECISION_REQUESTED and (e.payload or {}).get("kind") == "role_choice"]
+        assert len(reqs) == 1
+        dec = saved_decision(live_sys.store, reqs[0].event_id)
+        assert dec is not None
+        assert dec.status == "withdrawn"
+        assert (dec.withdrawal or {}).get("reason") == "superseded_by_hand_back"
+
+        calls = _called_results(live_sys, run_id, "ask_user")
+        assert len(calls) == 1
+        assert calls[0]["event"].payload["id"] == "call-hb-live"
+        assert calls[0]["ok"] is False
+        assert "新的用户输入" in (calls[0]["error"] or "")
+
+        proj = live_sys.project(run_id)
+        assert proj.input_version == 2
+        assert proj.product_work_input_version == 2
+        assert proj.product_spec is not None
+    finally:
+        live_sys.close()
+
+    # 2) 中断后等待期已被 add_input 撤回：重启恢复不重放已撤销的 ask_user，以 TOOL_CALLED(ok=False) 交还模型继续
+    crash_dir = tmp_path / "crash_superseded"
+    crash_sys = LoopSystem.for_testing(
+        crash_dir,
+        FakeAdapter([]),
+        forms={DEFAULT_FORM: (defs, WATCHED_OUTPUTS)},
+    )
+    dec_box: list[str] = []
+    try:
+        run2 = crash_sys.create_run("中断期间追加新输入后恢复")
+        ses2 = crash_sys.project(run2).sessions["product"].session_id
+        act2 = "act_crashed_superseded"
+        msg_item = _ask_user_call("call-hb-crash", [q1])
+        msg_ref = crash_sys.artifacts.put(run2, "model/msg", json_dumps(msg_item), media_type="application/json")
+
+        def write_scene(tx: Any) -> None:
+            p = tx.append(NewEvent(
+                EventType.DEPARTMENT_ACTIVATED, actor="system", department="product",
+                session_id=ses2, state_before="running", state_after="running",
+                payload={"activation_id": act2, "cycle": 1, "input_version": 1, "guidance_version": 0,
+                         "prompt_version": 1, "prompt_hash": "sha256:p3", "guidance_ids": []},
+            ))[0]
+            tx.append(NewEvent(
+                EventType.MODEL_MESSAGE, actor="department:product", department="product",
+                parent_event_id=p.event_id, session_id=ses2,
+                state_before="running", state_after="running",
+                payload={"activation_id": act2, "step_id": 1, "purpose": "work",
+                         "message_ref": asdict(msg_ref)},
+            ))
+            tx.append(NewEvent(
+                EventType.TOOL_STARTED, actor="department:product", department="product",
+                parent_event_id=p.event_id, session_id=ses2,
+                state_before="running", state_after="running",
+                payload={"id": "call-hb-crash", "name": "ask_user",
+                         "args": {"questions": [q1]}, "step_id": 1, "activation_id": act2, "purpose": "work"},
+            ))
+            req = tx.append(NewEvent(
+                EventType.DECISION_REQUESTED, actor="system", department="product",
+                parent_event_id=p.event_id, session_id=ses2,
+                state_before="running", state_after="running",
+                payload={
+                    "kind": "role_choice", "blocks": "round",
+                    "options": [{"id": opt.id, "label": opt.label} for opt in ROLE_CHOICE.options],
+                    "description": "中断前提问", "facts": [q1["question"]],
+                    "department": "product", "questions": [q1],
+                    "session_id": ses2, "call_id": "call-hb-crash", "input_version": 1, "round": 1, "note": None,
+                },
+            ))[0]
+            dec_box.append(req.event_id)
+
+        crash_sys.writes.transact(run_stream(run2), write_scene)
+        crash_sys.orchestrator.add_input(run2, "停机后补发的新输入", base_version=1)
+        dec2 = saved_decision(crash_sys.store, dec_box[0])
+        assert dec2 is not None
+        assert dec2.status == "withdrawn"
+        assert (dec2.withdrawal or {}).get("reason") == "superseded_by_hand_back"
+    finally:
+        crash_sys.close()
+
+    reopened = LoopSystem.for_testing(
+        crash_dir,
+        FakeAdapter({"product": [product_spec()]}),
+        resume_on_startup=False,
+        forms={DEFAULT_FORM: (defs, WATCHED_OUTPUTS)},
+    )
+    try:
+        reopened.orchestrator.resume_incomplete_run(run2)
+        reopened.activate_once(run2)
+        reqs2 = [e for e in reopened.store.list_events(run2)
+                 if e.type == EventType.DECISION_REQUESTED and (e.payload or {}).get("kind") == "role_choice"]
+        assert len(reqs2) == 1
+        calls2 = _called_results(reopened, run2, "ask_user")
+        assert len(calls2) == 1
+        assert calls2[0]["event"].payload["id"] == "call-hb-crash"
+        assert calls2[0]["ok"] is False
+        assert "新的用户输入" in (calls2[0]["error"] or "")
+        proj2 = reopened.project(run2)
+        assert proj2.input_version == 2
+        assert proj2.product_work_input_version == 2
+        assert proj2.product_spec is not None
+    finally:
+        reopened.close()
