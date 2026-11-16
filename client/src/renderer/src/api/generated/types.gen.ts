@@ -3201,6 +3201,7 @@ export type FlowRecord = {
      * Created At
      */
     created_at: string;
+    prd?: ProductSpecView | null;
 };
 
 /**

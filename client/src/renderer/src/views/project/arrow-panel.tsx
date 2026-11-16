@@ -269,7 +269,7 @@ function PrdRequirementsList(props: { rows: readonly PrdRequirementRowView[] }) 
   );
 }
 
-function PrdSection(props: { prd: PrdView }) {
+export function PrdSection(props: { prd: PrdView }) {
   const prd = props.prd;
   return (
     <div className="v20-arrow-prd" data-testid="arrow-panel-prd">

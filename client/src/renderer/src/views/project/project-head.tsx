@@ -97,7 +97,7 @@ export function ProjectHead(props: {
               >
                 ×
               </button>
-              <h3>当前成果<small>项目现在采纳的那一版，与它的写回</small></h3>
+              <h3>当前成果<small>{outcome.subtitle ?? "项目现在采纳的那一版，与它的写回"}</small></h3>
               {outcome.rows.map((row) => (
                 <p key={row.label} className="y10-phead-panel-row">
                   <span className="y10-phead-panel-label">{row.label}</span>

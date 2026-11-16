@@ -13,13 +13,14 @@
 // 没有时写开环完成。
 
 import type {
-  AdoptionView, ProjectOrganizationResult, ProjectOverviewResult, ProjectWritebackResult, WritebackRecordView,
+  AdoptionView, ProjectOrganizationResult, ProjectOverviewResult, ProjectWritebackResult, WorkItemCard,
+  WritebackRecordView,
 } from "../../api/generated/types.gen";
 import {
   CANCEL_CONFIRM_CANCEL, CANCEL_CONFIRM_CONFIRM, cancelConfirmLines, cancelConfirmTitle,
   type CancelRequest,
 } from "./cancel-text.ts";
-import { formatDuration, formatTime, OPEN_LOOP_STATUS_TEXT } from "./labels.ts";
+import { formatDuration, formatTime, isOpenLoopCompleted, OPEN_LOOP_STATUS_TEXT, workItemStatusText } from "./labels.ts";
 import { WRITEBACK_STATUS, writebackText } from "./writeback-text.ts";
 
 /** 这一份不在这一版发布里（取不到形态名与合成结果）：照实写明，不拿发布带里的标识顶替。 */
@@ -248,6 +249,8 @@ export type OutcomeHead = {
   text: string;
   /** 这一行的调子：写回已经做完时 ok；还没有写回时 open，让用户看得出还差这一步；其余 plain */
   tone: "ok" | "open" | "plain";
+  /** 面板标题旁的小字说明 */
+  subtitle?: string;
   /** 面板里的各行：点开这一行以后写全 */
   rows: OutcomeRow[];
 };
@@ -271,10 +274,99 @@ export function writebackLine(record: WritebackRecordView | null, onboardingBase
   return WRITEBACK_STATUS[record.status] ?? record.status;
 }
 
+const ACTIVE_ITEM_STATUSES: ReadonlySet<string> = new Set(["in_progress", "awaiting_initial_prd"]);
+
+function prdRevisionOf(item: WorkItemCard): number | null {
+  return item.progress?.product_spec_revision ?? null;
+}
+
+function deliveryRevisionOf(item: WorkItemCard): number | null {
+  return item.progress?.delivery_revision ?? item.kept_delivery?.version ?? null;
+}
+
+function hasStageArtifacts(item: WorkItemCard): boolean {
+  return deliveryRevisionOf(item) !== null || prdRevisionOf(item) !== null;
+}
+
+function pickRecentWithArtifacts(items: readonly WorkItemCard[]): WorkItemCard | null {
+  const candidates = items
+    .map((item, index) => ({ item, index, time: Date.parse(item.created_at) }))
+    .filter(({ item }) => hasStageArtifacts(item));
+  if (candidates.length === 0) {
+    return null;
+  }
+  candidates.sort((left, right) => {
+    const lt = Number.isNaN(left.time) ? 0 : left.time;
+    const rt = Number.isNaN(right.time) ? 0 : right.time;
+    return (rt - lt) || (right.index - left.index);
+  });
+  return candidates[0]?.item ?? null;
+}
+
+function stageProgressOutcome(items: readonly WorkItemCard[]): OutcomeHead | null {
+  const active = pickRecentWithArtifacts(items.filter((item) => ACTIVE_ITEM_STATUSES.has(item.status)));
+  const target = active ?? pickRecentWithArtifacts(items);
+  if (target === null) {
+    return null;
+  }
+  const prdRev = prdRevisionOf(target);
+  const deliveryRev = deliveryRevisionOf(target);
+  const isRunning = ACTIVE_ITEM_STATUSES.has(target.status);
+  const openLoop = isOpenLoopCompleted(target);
+  const conclusion = target.progress?.conclusion ?? null;
+
+  let text: string;
+  if (deliveryRev !== null) {
+    const suffix = openLoop
+      ? "（开环完成）"
+      : conclusion === "release"
+        ? "（已放行待采纳）"
+        : conclusion === "rework_engineering"
+          ? "（待返工）"
+          : target.status === "stopped"
+            ? ""
+            : "（待核验）";
+    text = `尚未采纳交付 · 已交第 ${deliveryRev} 版交付${suffix}`;
+  } else {
+    const scope = isRunning ? "当前事项" : "最近事项";
+    text = `尚未采纳交付 · ${scope}已立 PRD 第 ${prdRev} 版`;
+  }
+
+  const rows: OutcomeRow[] = [
+    { label: "当前成果", value: "尚未采纳交付" },
+    { label: "所属事项", value: `${shown(target.title, "未命名事项")}（${workItemStatusText(target)}）` },
+  ];
+  if (prdRev !== null) {
+    rows.push({ label: "PRD 进展", value: `已立 PRD 第 ${prdRev} 版` });
+  }
+  if (deliveryRev !== null) {
+    const basis = target.progress?.delivery_product_spec_revision;
+    const basisText = basis !== null && basis !== undefined ? `依据 PRD 第 ${basis} 版` : "";
+    const verdictText = openLoop
+      ? "开环完成"
+      : conclusion === "release"
+        ? "已放行"
+        : conclusion === "rework_engineering"
+          ? "质检退回"
+          : target.status === "stopped"
+            ? "事项已停止"
+            : "等待核验";
+    const details = [basisText, verdictText].filter((part) => part !== "");
+    rows.push({ label: "交付进展", value: `已交第 ${deliveryRev} 版交付（${details.join(" · ")}）` });
+  }
+
+  return {
+    text,
+    tone: "plain",
+    subtitle: "当前尚未采纳交付，以下为进行中阶段进展",
+    rows,
+  };
+}
+
 /**
- * 当前成果一行（工单 #1714）：读 project.overview 的当前成果与 project.writeback 里这一次采纳的记录，
- * 写当前成果是哪一版、是不是建档基线、写回到了哪一步。概览或写回记录还没有读到时返回 null：
- * 这一行先不出现，不写一半。
+ * 当前成果一行（工单 #1714、#1808）：读 project.overview 的当前成果与 project.writeback 里这一次采纳的记录，
+ * 写当前成果是哪一版、是不是建档基线、写回到了哪一步；尚无采纳交付时，若有已立 PRD 或已交交付则写明
+ * 进行中进展，仅当全无时写「还没有成果」。概览或写回记录还没有读到时返回 null：这一行先不出现，不写一半。
  */
 export function outcomeHead(
   overview: ProjectOverviewResult | null | undefined,
@@ -285,7 +377,8 @@ export function outcomeHead(
   }
   const adoption = overview.current_adoption;
   if (adoption === null) {
-    return { text: NO_ADOPTION, tone: "plain", rows: [{ label: "当前成果", value: NO_ADOPTION_ROW }] };
+    return stageProgressOutcome(overview.work_items ?? [])
+      ?? { text: NO_ADOPTION, tone: "plain", rows: [{ label: "当前成果", value: NO_ADOPTION_ROW }] };
   }
   const baseline = adoption.onboarding_baseline;
   const written = recordOf(writeback.records, adoption.adoption_id);
@@ -295,7 +388,12 @@ export function outcomeHead(
     parts.push("建档基线");
   }
   parts.push(`写回：${line}`);
-  return { text: parts.join(" · "), tone: outcomeTone(written, baseline), rows: outcomeRows(adoption, written, line) };
+  return {
+    text: parts.join(" · "),
+    tone: outcomeTone(written, baseline),
+    subtitle: "项目现在采纳的那一版，与它的写回",
+    rows: outcomeRows(adoption, written, line),
+  };
 }
 
 // 写回记录按这一次采纳找：别的采纳的记录不拿来顶替

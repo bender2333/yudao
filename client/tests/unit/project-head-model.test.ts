@@ -381,3 +381,202 @@ test("概览或写回记录还没有读到时这一行不出现，不写一半",
   assert.equal(outcomeHead(null, writeback()), null);
   assert.equal(outcomeHead(overview(), null), null);
 });
+
+// ---------------------------------------------------------------- 进行中阶段成果（工单 #1808）
+
+function workItem(over: Record<string, unknown> = {}) {
+  return {
+    work_item_id: "w1",
+    kind: "change",
+    title: "导出订单",
+    text: "导出成 CSV",
+    run_id: "r1",
+    version: 1,
+    created_at: "2026-11-12T10:00:00Z",
+    status: "in_progress",
+    department: "engineering",
+    progress: {
+      product_spec_revision: null,
+      delivery_revision: null,
+      delivery_product_spec_revision: null,
+      conclusion: null,
+    },
+    departments: null,
+    round: 1,
+    stop_reason: null,
+    stop_note: null,
+    kept_delivery: null,
+    stopped_at: null,
+    stop_detail: null,
+    human_action: null,
+    pending_question: null,
+    adoption_id: null,
+    start_error: null,
+    ...over,
+  } as ProjectOverviewResult["work_items"][number];
+}
+
+test("尚无采纳交付但当前事项已立 PRD 时显示进行中 PRD 进展，不写还没有成果", () => {
+  const head = outcomeHead(overview({
+    current_adoption: null,
+    work_items: [
+      workItem({
+        status: "in_progress",
+        progress: {
+          product_spec_revision: 2,
+          delivery_revision: null,
+          delivery_product_spec_revision: null,
+          conclusion: null,
+        },
+      }),
+    ],
+  }), writeback());
+  assert.equal(head?.text, "尚未采纳交付 · 当前事项已立 PRD 第 2 版");
+  assert.equal(head?.tone, "plain");
+  assert.equal(rowOf(head, "当前成果"), "尚未采纳交付");
+  assert.equal(rowOf(head, "所属事项"), "导出订单（进行中）");
+  assert.equal(rowOf(head, "PRD 进展"), "已立 PRD 第 2 版");
+});
+
+test("尚无采纳交付但已提交待核验交付或已放行待采纳时显示交付版本进展", () => {
+  const pendingVerify = outcomeHead(overview({
+    current_adoption: null,
+    work_items: [
+      workItem({
+        status: "in_progress",
+        progress: {
+          product_spec_revision: 1,
+          delivery_revision: 3,
+          delivery_product_spec_revision: 1,
+          conclusion: null,
+        },
+      }),
+    ],
+  }), writeback());
+  assert.equal(pendingVerify?.text, "尚未采纳交付 · 已交第 3 版交付（待核验）");
+  assert.equal(rowOf(pendingVerify, "交付进展"), "已交第 3 版交付（依据 PRD 第 1 版 · 等待核验）");
+
+  const openLoopReady = outcomeHead(overview({
+    current_adoption: null,
+    work_items: [
+      workItem({
+        status: "released_unsettled",
+        stop_reason: "open_loop",
+        progress: {
+          product_spec_revision: null,
+          delivery_revision: 1,
+          delivery_product_spec_revision: null,
+          conclusion: null,
+        },
+      }),
+    ],
+  }), writeback());
+  assert.equal(openLoopReady?.text, "尚未采纳交付 · 已交第 1 版交付（开环完成）");
+
+  // 进行中事项尚未产生产物时，退而显示最近已有产物的事项进展
+  const fallbackRecent = outcomeHead(overview({
+    current_adoption: null,
+    work_items: [
+      workItem({
+        work_item_id: "w1",
+        title: "前序任务",
+        created_at: "2026-11-12T09:00:00Z",
+        status: "stopped",
+        kept_delivery: { version: 2, accepted_at: "2026-11-12T09:30:00Z" },
+        progress: {
+          product_spec_revision: 1,
+          delivery_revision: 2,
+          delivery_product_spec_revision: 1,
+          conclusion: null,
+        },
+      }),
+      workItem({
+        work_item_id: "w2",
+        title: "刚新建的任务",
+        created_at: "2026-11-12T10:00:00Z",
+        status: "in_progress",
+        progress: null,
+      }),
+    ],
+  }), writeback());
+  assert.equal(fallbackRecent?.text, "尚未采纳交付 · 已交第 2 版交付");
+  assert.equal(rowOf(fallbackRecent, "所属事项"), "前序任务（已停止）");
+});
+
+test("已有进行中事项但无任何 PRD 或交付时仍保持还没有成果", () => {
+  const head = outcomeHead(overview({
+    current_adoption: null,
+    work_items: [
+      workItem({
+        status: "in_progress",
+        progress: {
+          product_spec_revision: null,
+          delivery_revision: null,
+          delivery_product_spec_revision: null,
+          conclusion: null,
+        },
+      }),
+    ],
+  }), writeback());
+  assert.equal(head?.text, "还没有成果");
+  assert.equal(head?.tone, "plain");
+  assert.deepEqual(head?.rows, [{ label: "当前成果", value: "这个项目还没有采纳过成果" }]);
+});
+
+test("ProjectHead 组件渲染：尚无采纳但有阶段 PRD 时显示进行中进展，全无时显示还没有成果", async () => {
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    const js = ts.transpileModule(code, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".tsx"] = loader;
+  req.extensions[".ts"] = loader;
+
+  const headPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../src/renderer/src/views/project/project-head.tsx");
+  const headMod = req(headPath);
+
+  const stageHtml = renderToStaticMarkup(React.createElement(headMod.ProjectHead, {
+    app: { currentCapabilities: { commands: [] } },
+    projectId: "p1",
+    organization: organization(),
+    overview: overview({
+      current_adoption: null,
+      work_items: [
+        workItem({
+          status: "in_progress",
+          progress: {
+            product_spec_revision: 1,
+            delivery_revision: null,
+            delivery_product_spec_revision: null,
+            conclusion: null,
+          },
+        }),
+      ],
+    }),
+    writeback: writeback(),
+  }));
+  assert.ok(stageHtml.includes("尚未采纳交付 · 当前事项已立 PRD 第 1 版"), stageHtml);
+  assert.equal(stageHtml.includes("还没有成果"), false);
+
+  const emptyHtml = renderToStaticMarkup(React.createElement(headMod.ProjectHead, {
+    app: { currentCapabilities: { commands: [] } },
+    projectId: "p1",
+    organization: organization(),
+    overview: overview({ current_adoption: null, work_items: [] }),
+    writeback: writeback(),
+  }));
+  assert.ok(emptyHtml.includes("还没有成果"), emptyHtml);
+});
+
+
