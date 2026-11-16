@@ -23,8 +23,9 @@ from . import parameters as parameter_values
 from .artifacts import ArtifactStore
 from .decisions import (
     AnswerNotAllowed, DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, QA_CANNOT_VERIFY,
-    RESUMABLE_PAUSE_KINDS,
+    RESUMABLE_PAUSE_KINDS, ROLE_CHOICE,
     DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
+    resolve_role_choice_answers,
 )
 from .event_store import Command, EventStore, is_catalog_stream, is_run_stream, run_stream
 from .models import ArtifactRef, CatalogEventType, DecisionRequest, EventType, ProjectEventType, new_id
@@ -56,7 +57,8 @@ class DecisionFlow:
     # 决定请求的处理与建档的流转。方法的第一项是薄驱动（`driver`），它自己不留状态：
     # 读的是事件日志、写的也是事件日志
     def answer_decision(self, driver: DecisionHost, decision_id: str, option: str, note: str | None, *,
-                        base_version: int, command: Command) -> str | None:
+                        base_version: int, command: Command,
+                        answers: dict[str, str] | None = None) -> str | None:
         # 回答一个决定请求：在写入口的一个事务中登记命令身份，核对请求仍未回答、基准版本等于请求的版本、选项是
         # 请求给出的选项，追加回答，并按回答解除阻塞（待恢复选择停止事项时在同一事务中结束运行）。
         # 核对不通过时抛出 DecisionClosed、StaleDecision 或 InvalidOption，什么也不写，命令不登记。
@@ -88,6 +90,15 @@ class DecisionFlow:
                 raise StaleDecision(decision, base_version)
             if option not in [item["id"] for item in decision.request["options"]]:
                 raise InvalidOption(decision, option)
+            resolved_answers: dict[str, str] | None = None
+            if decision.kind == ROLE_CHOICE.name:
+                resolved_answers = resolve_role_choice_answers(
+                    decision.request.get("questions", []), option, answers, decision=decision)
+            elif answers:
+                raise InvalidOption(
+                    decision, "answers",
+                    detail="只有多题向用户提问决定才接受逐题回答 answers",
+                )
             if is_catalog_stream(saved.stream):
                 # 目录流中的决定请求（工单 #355）：不属于任何 run 或项目，回答只是记下用户的决定
                 transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_ANSWERED, {
@@ -96,7 +107,7 @@ class DecisionFlow:
                 return None
             if is_run_stream(saved.stream):
                 return self._answer_run_decision(driver, transaction, decision, option, note, base_version,
-                                                 decision_id)
+                                                 decision_id, answers=resolved_answers)
             return self._answer_project_decision(driver, transaction, decision, option, note, base_version,
                                                  decision_id)
 
@@ -129,13 +140,19 @@ class DecisionFlow:
         raise ValueError(f"no onboarding revision event names run {run_id}")
 
     def _answer_run_decision(self, driver: DecisionHost, transaction: Transaction, decision: DecisionRequest,
-                             option: str, note: str | None, base_version: int, decision_id: str) -> str | None:
+                             option: str, note: str | None, base_version: int, decision_id: str,
+                             answers: dict[str, str] | None = None) -> str | None:
         # run 流中的决定请求：追加回答，并按回答解除阻塞
         projection = transaction.projection
+        payload: dict[str, Any] = {
+            "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
+        }
+        if answers is not None:
+            payload["answers"] = answers
         transaction.append(NewEvent(
             EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
             state_before=projection.status, state_after=projection.status,
-            payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
+            payload=payload,
         ))
         transaction.on_commit(lambda: driver.wake(projection.run_id))
         if decision.kind in RESUMABLE_PAUSE_KINDS:

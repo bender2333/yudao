@@ -19,11 +19,13 @@ if TYPE_CHECKING:
 
 
 class DecisionAnswer(CommandRequest):
-    # 回答一个决定请求：基准版本是决定请求的版本，取自 decisions.list 的结果
+    # 回答一个决定请求：基准版本是决定请求的版本，取自 decisions.list 的结果；
+    # 多题决定请求（role_choice）可通过 answers 提交逐题选择映射（题号到选项标识）
     base_version: int
     decision_id: str
     option: str
     note: Text | None = None
+    answers: dict[str, str] | None = None
 
 
 class DecisionRefs(Contract):
@@ -35,7 +37,8 @@ class DecisionRefs(Contract):
 async def _answer_decision(application: Application, command: Command, request: DecisionAnswer) -> None:
     try:
         run_id = application.system.orchestrator.answer_decision(
-            request.decision_id, request.option, request.note, base_version=request.base_version, command=command)
+            request.decision_id, request.option, request.note,
+            base_version=request.base_version, command=command, answers=request.answers)
     except DecisionNotFound as missing:
         raise Rejection("not_found", "没有这个决定请求，请重新读取以后提交") from missing
     except DecisionClosed as closed:
@@ -45,6 +48,8 @@ async def _answer_decision(application: Application, command: Command, request: 
         raise Rejection("stale_base", "决定请求的版本已经改变，请重新读取以后提交",
                         current_version=stale.version) from stale
     except InvalidOption as invalid:
+        if invalid.detail is not None:
+            raise Rejection("option_invalid", invalid.detail) from invalid
         offered = "、".join(invalid.options)
         raise Rejection("option_invalid", f"所选选项不是这个决定请求给出的选项，可选的选项：{offered}") from invalid
     except NoteRequired as missing_note:

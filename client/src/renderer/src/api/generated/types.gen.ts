@@ -2130,6 +2130,12 @@ export type DecisionAnswer = {
      * Note
      */
     note?: string | null;
+    /**
+     * Answers
+     */
+    answers?: {
+        [key: string]: string;
+    } | null;
 };
 
 /**
@@ -2164,6 +2170,12 @@ export type DecisionAnswerRecord = {
      * Answered At
      */
     answered_at: string;
+    /**
+     * Answers
+     */
+    answers?: {
+        [key: string]: string;
+    } | null;
 };
 
 /**
@@ -2252,7 +2264,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | KernelModificationRequested | InstanceUpgradeRequested;
+    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | RoleChoiceRequested | KernelModificationRequested | InstanceUpgradeRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -5757,6 +5769,104 @@ export type ReviewEntry = {
      * Unverified
      */
     unverified?: Array<UnverifiedCriterionView>;
+};
+
+/**
+ * RoleChoiceOption
+ */
+export type RoleChoiceOption = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+};
+
+/**
+ * RoleChoiceQuestion
+ */
+export type RoleChoiceQuestion = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Question
+     */
+    question: string;
+    /**
+     * Options
+     */
+    options: Array<RoleChoiceOption>;
+    /**
+     * Recommended
+     */
+    recommended: string;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * RoleChoiceRequested
+ */
+export type RoleChoiceRequested = {
+    /**
+     * Kind
+     */
+    kind: 'role_choice';
+    /**
+     * Blocks
+     */
+    blocks: 'round';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts?: Array<string>;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Questions
+     */
+    questions: Array<RoleChoiceQuestion>;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Call Id
+     */
+    call_id?: string | null;
+    /**
+     * Input Version
+     */
+    input_version?: number | null;
+    /**
+     * Round
+     */
+    round?: number | null;
+    /**
+     * Note
+     */
+    note?: string | null;
 };
 
 /**
@@ -10906,6 +11016,12 @@ export type DecisionAnsweredPayload = {
      * Base Version
      */
     base_version: number;
+    /**
+     * Answers
+     */
+    answers?: {
+        [key: string]: string;
+    } | null;
 };
 
 /**
@@ -10997,7 +11113,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested;
+    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | RoleChoiceRequested;
 };
 
 /**

@@ -29,7 +29,7 @@ class DecisionsList(ReplayRequest):
     status: list[Literal["open", "answered", "withdrawn"]] = Field(default_factory=list)
 
 class DecisionAnswerRecord(Contract):
-    # 回答：所选的选项、说明、回答所依据的请求版本、提出者与引起它的命令
+    # 回答：所选的选项、说明、多题请求的逐题选择映射（旧事件或单选决定为空）、回答所依据的请求版本、提出者与引起它的命令
     event_id: str
     option: str
     note: str | None
@@ -37,6 +37,7 @@ class DecisionAnswerRecord(Contract):
     actor: str
     command_id: CommandId
     answered_at: AwareDatetime
+    answers: dict[str, str] | None = None
 
 class BlockedObjects(Contract):
     # 挡住的对象（界面工作线，工单 #127）：被阻塞的事项，以及同一项目中排在它后面的事项数量。

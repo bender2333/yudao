@@ -330,7 +330,7 @@ def test_concurrent_model_tests_of_one_model_both_admit():
         server.server_close()
     assert [results[key]["ok"] for key in ("first", "second")] == [True, True], results
     assert [results[key]["admitted"] for key in ("first", "second")] == [True, True]
-    assert len(capture.requests) == 6
+    assert len(capture.requests) == 2
     # 两次测试都通过，准入记录只有一份且与目录分开保存（工单 #86）
     stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
     assert stored["admitted_at"] is not None

@@ -1339,19 +1339,53 @@ class KernelModificationRequested(Payload):
     diff: str
     held_adoption: DeliverableAdoptedPayload
 
+class RoleChoiceOption(Payload):
+    # 多题前沿决定请求中单道题目的互斥选项（可选描述由角色给出）
+    id: str
+    label: str
+    description: str | None = None
+
+
+class RoleChoiceQuestion(Payload):
+    # 多题前沿决定请求中的单道问题：题号、题干、互斥选项、唯一推荐选项与推荐理由
+    id: str
+    question: str
+    options: list[RoleChoiceOption]
+    recommended: str
+    rationale: str
+
+
+class RoleChoiceRequested(Payload):
+    # 角色向用户发起多题前沿决定请求（部门循环 docs/design/department-loop.md「向用户提问：多题前沿决定请求」）：
+    # 阻塞范围限定为 round，只暂停发出它的职能或角色这一轮
+    kind: Literal["role_choice"]
+    blocks: Literal["round"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str] = []
+    department: Department
+    questions: list[RoleChoiceQuestion]
+    session_id: str | None = None
+    call_id: str | None = None
+    input_version: int | None = None
+    round: int | None = None
+    note: str | None = None
+
+
 # 决定请求的载荷：以 kind 区分的各种决定请求（UnknownActionRequested 为旧事件保留，新版本不再写）
 DecisionRequestedPayload = (ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested
-                            | PauseRequested | InitialPrdRequested | CannotVerifyRequested)
+                            | PauseRequested | InitialPrdRequested | CannotVerifyRequested | RoleChoiceRequested)
 # 项目流中的决定请求（工单 #136、#354）：写在项目流中的那几种，run 流中没有它们
 ProjectDecisionRequestedPayload = InitialPrdRequested | KernelModificationRequested
 
 
 class DecisionAnsweredPayload(Payload):
-    # 用户的回答：所回答的请求、所选的选项、说明（可以为空）与回答所依据的请求版本
+    # 用户的回答：所回答的请求、所选的选项、多题请求的逐题回答映射（可选）、说明（可以为空）与回答所依据的请求版本
     decision_id: str
     option: str
     note: str | None
     base_version: int
+    answers: dict[str, str] | None = None
 
 
 DecisionWithdrawReason = StopReason | Literal["superseded_by_hand_back"]

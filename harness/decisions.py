@@ -4,10 +4,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any, Literal
 
 from .models import DecisionRequest
+
+
+BlockingScope = Literal["run", "action", "round"]
 
 
 @dataclass(frozen=True)
@@ -70,10 +74,124 @@ QA_CANNOT_VERIFY = DecisionKind("qa_cannot_verify", "run",
 INSTANCE_UPGRADE = DecisionKind("instance_upgrade", "instance",
                                 (Option("approve", "批准升级"), Option("reject", "拒绝")))
 
+# 角色向用户提问的多题前沿决定（部门循环 docs/design/department-loop.md「向用户提问：多题前沿决定请求」）：
+# 阻塞范围限定为 round，只暂停发出它的职能或角色这一轮；支持逐题回答或全部采用每题推荐选项
+ROLE_CHOICE = DecisionKind("role_choice", "round",
+                           (Option("submit", "提交回答"), Option("recommended", "全部采用推荐")))
+
 DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED,
                                                NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD,
                                                INSTANCE_UPGRADE, QA_CANNOT_VERIFY,
-                                               KERNEL_MODIFICATION)}
+                                               KERNEL_MODIFICATION, ROLE_CHOICE)}
+
+
+def _item_field(item: Any, name: str) -> Any:
+    return item.get(name) if isinstance(item, Mapping) else getattr(item, name, None)
+
+
+def _require_non_empty_text(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{label}不能为空")
+    return value
+
+
+def _validate_role_choice_option(q_id: str, opt_index: int, raw: Any, seen_ids: set[str]) -> dict[str, Any]:
+    if isinstance(raw, (str, bytes, int, float, bool)) or raw is None:
+        raise ValueError(f"题目 {q_id} 第 {opt_index} 个选项格式无效")
+    opt_id = _require_non_empty_text(_item_field(raw, "id"), f"题目 {q_id} 第 {opt_index} 个选项标识 id")
+    if opt_id in seen_ids:
+        raise ValueError(f"题目 {q_id} 的选项标识 {opt_id} 重复")
+    seen_ids.add(opt_id)
+    label = _require_non_empty_text(_item_field(raw, "label"), f"题目 {q_id} 选项 {opt_id} 的标题 label")
+    normalized: dict[str, Any] = {"id": opt_id, "label": label}
+    description = _item_field(raw, "description")
+    if description is not None:
+        if not isinstance(description, str):
+            raise ValueError(f"题目 {q_id} 选项 {opt_id} 的说明 description 必须是字符串")
+        normalized["description"] = description
+    return normalized
+
+
+def _validate_role_choice_question(index: int, raw: Any, seen_ids: set[str]) -> dict[str, Any]:
+    if isinstance(raw, (str, bytes, int, float, bool)) or raw is None:
+        raise ValueError(f"第 {index} 道问题格式无效")
+    q_id = _require_non_empty_text(_item_field(raw, "id"), f"第 {index} 题的题号 id")
+    if q_id in seen_ids:
+        raise ValueError(f"题目编号 {q_id} 在同一批问题中重复")
+    seen_ids.add(q_id)
+    question_text = _require_non_empty_text(_item_field(raw, "question"), f"题目 {q_id} 的题干 question")
+    raw_options = _item_field(raw, "options")
+    if not isinstance(raw_options, Sequence) or isinstance(raw_options, (str, bytes, bytearray)) or len(raw_options) < 2:
+        raise ValueError(f"题目 {q_id} 至少需要两个互斥选项")
+    seen_opt_ids: set[str] = set()
+    options = [_validate_role_choice_option(q_id, opt_index, opt, seen_opt_ids)
+               for opt_index, opt in enumerate(raw_options, start=1)]
+    recommended = _require_non_empty_text(_item_field(raw, "recommended"), f"题目 {q_id} 的推荐选项 recommended")
+    if recommended not in seen_opt_ids:
+        raise ValueError(f"题目 {q_id} 的推荐选项 {recommended} 未出现在该题选项列表中")
+    rationale = _require_non_empty_text(_item_field(raw, "rationale"), f"题目 {q_id} 的推荐理由 rationale")
+    return {
+        "id": q_id,
+        "question": question_text,
+        "options": options,
+        "recommended": recommended,
+        "rationale": rationale,
+    }
+
+
+def validate_role_choice_questions(questions: Sequence[Any]) -> list[dict[str, Any]]:
+    # 校验 role_choice 问题列表结构并规范化返回副本：列表非空、题号批内唯一、每题至少两项互斥选项、
+    # 推荐选项命中候选列表且推荐理由非空
+    if not isinstance(questions, Sequence) or isinstance(questions, (str, bytes, bytearray)) or not questions:
+        raise ValueError("多题决定请求的问题列表不能为空")
+    seen_ids: set[str] = set()
+    return [_validate_role_choice_question(index, item, seen_ids)
+            for index, item in enumerate(questions, start=1)]
+
+
+def resolve_role_choice_answers(
+    questions: Sequence[Any],
+    option: str,
+    answers: Mapping[str, str] | None,
+    *,
+    decision: DecisionRequest | None = None,
+) -> dict[str, str]:
+    # 解析并补齐多题决定请求的逐题回答：拒绝未知顶层选项、未知题号或某题未知选项标识，
+    # 未指定回答的题目以及选用 recommended 且未传 answers 时自动按每题 recommended 补齐
+    allowed_top = [item.id for item in ROLE_CHOICE.options]
+    if option not in allowed_top:
+        raise InvalidOption(decision, option, options=allowed_top)
+    if not isinstance(questions, Sequence) or isinstance(questions, (str, bytes, bytearray)) or not questions:
+        raise ValueError("多题决定请求缺少有效的问题列表")
+    by_id: dict[str, tuple[list[str], str]] = {}
+    for index, item in enumerate(questions, start=1):
+        q_id = _require_non_empty_text(_item_field(item, "id"), f"第 {index} 题的题号 id")
+        if q_id in by_id:
+            raise ValueError(f"题目编号 {q_id} 重复")
+        raw_options = _item_field(item, "options") or ()
+        opt_ids = [_require_non_empty_text(_item_field(opt, "id"), f"题目 {q_id} 选项 id") for opt in raw_options]
+        recommended = _require_non_empty_text(_item_field(item, "recommended"), f"题目 {q_id} 的推荐选项 recommended")
+        if recommended not in opt_ids:
+            raise ValueError(f"题目 {q_id} 的推荐选项 {recommended} 未出现在候选选项中")
+        by_id[q_id] = (opt_ids, recommended)
+    if answers is not None:
+        if not isinstance(answers, Mapping):
+            raise InvalidOption(decision, str(answers), options=list(by_id),
+                                detail="逐题回答 answers 必须是题号到选项标识的映射")
+        for q_id, choice in answers.items():
+            if q_id not in by_id:
+                offered = "、".join(by_id)
+                raise InvalidOption(decision, str(q_id), options=list(by_id),
+                                    detail=f"逐题回答包含未知题号 {q_id}，当前题号：{offered}")
+            valid_options, _rec = by_id[q_id]
+            if not isinstance(choice, str) or choice not in valid_options:
+                offered = "、".join(valid_options)
+                raise InvalidOption(decision, str(choice), options=valid_options,
+                                    detail=f"题目 {q_id} 不包含选项 {choice}，可选的选项：{offered}")
+    if option == "recommended" and not answers:
+        return {q_id: rec for q_id, (_opts, rec) in by_id.items()}
+    provided = answers or {}
+    return {q_id: provided.get(q_id, rec) for q_id, (_opts, rec) in by_id.items()}
 
 
 def blocks_run(decisions: Iterable[DecisionRequest]) -> bool:
@@ -115,10 +233,19 @@ class StaleDecision(Exception):
 
 
 class InvalidOption(Exception):
-    # 所选的选项不是这个请求给出的选项
-    def __init__(self, decision: DecisionRequest, option: str) -> None:
-        super().__init__(f"option {option} is not offered by decision request {decision.decision_id}")
-        self.options = [item["id"] for item in decision.request["options"]]
+    # 所选的选项或逐题回答 answers 中的题号、选项不是这个请求给出的选项
+    def __init__(self, decision: DecisionRequest | None, option: str, *,
+                 options: Sequence[str] | None = None, detail: str | None = None) -> None:
+        decision_id = "<unknown>" if decision is None else decision.decision_id
+        message = detail or f"option {option} is not offered by decision request {decision_id}"
+        super().__init__(message)
+        self.detail = detail
+        if options is not None:
+            self.options = list(options)
+        elif decision is not None:
+            self.options = [item["id"] for item in decision.request["options"]]
+        else:
+            self.options = []
 
 
 class NoteRequired(Exception):

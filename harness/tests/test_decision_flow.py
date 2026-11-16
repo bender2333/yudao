@@ -20,12 +20,16 @@ import pytest
 from harness import decision_flow
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.decision_flow import DECISION_FLOW
-from harness.decisions import StaleDecision
-from harness.event_store import Command
-from harness.models import EventType
-from harness.projection import saved_decision, saved_decisions
+from harness.decisions import (
+    DECISION_KINDS, InvalidOption, ROLE_CHOICE, StaleDecision,
+    blocks_run, resolve_role_choice_answers, validate_role_choice_questions,
+)
+from harness.event_store import Command, run_stream
+from harness.models import DecisionRequest, EventType
+from harness.projection import replay_decisions, saved_decision, saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT
+from harness.write_path import NewEvent
 
 HARNESS = Path(__file__).resolve().parents[1]
 # 从薄驱动搬到应用层的处理：两种决定请求的解答、建档的采纳与修改轮、修改轮 run 的建立、继续暂停的 run，
@@ -162,3 +166,142 @@ def test_the_application_module_does_not_import_the_thin_driver():
     imports = _imported("decision_flow.py")
     assert "orchestrator" not in imports
     assert "write_path" in imports
+
+
+def _sample_questions() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "q1",
+            "question": "日志输出格式采用哪一种？",
+            "options": [
+                {"id": "json", "label": "JSON 结构化", "description": "便于脚本解析"},
+                {"id": "text", "label": "纯文本行"},
+            ],
+            "recommended": "json",
+            "rationale": "便于后续工具消费",
+        },
+        {
+            "id": "q2",
+            "question": "错误是否输出到标准错误流？",
+            "options": [
+                {"id": "stderr", "label": "输出到 stderr"},
+                {"id": "stdout", "label": "输出到 stdout"},
+            ],
+            "recommended": "stderr",
+            "rationale": "遵循命令行约定",
+        },
+    ]
+
+
+def test_role_choice_kind_is_round_scoped_and_validates_question_batches():
+    # 守护 R1 与 R2：ROLE_CHOICE 登记在 DECISION_KINDS 且阻塞范围为 round（不阻塞整次运行）；
+    # 多题结构校验对空列表、空或重复题号、空题干、少于两项或重复选项、推荐项越界及空推荐理由均拒绝
+    assert DECISION_KINDS["role_choice"] is ROLE_CHOICE
+    assert ROLE_CHOICE.blocks == "round"
+    assert [opt.id for opt in ROLE_CHOICE.options] == ["submit", "recommended"]
+    open_round = DecisionRequest(
+        decision_id="evt_round", stream="run:r1", run_id="r1", project_id=None, work_item_id=None,
+        requested_at="2026-11-16T00:00:00+00:00",
+        request={"kind": "role_choice", "blocks": "round", "questions": _sample_questions()},
+    )
+    assert blocks_run([open_round]) is False
+
+    normalized = validate_role_choice_questions(_sample_questions())
+    assert [q["id"] for q in normalized] == ["q1", "q2"]
+
+    bad_batches = [
+        [],
+        [{**_sample_questions()[0], "id": " "}],
+        _sample_questions() + [{**_sample_questions()[0], "question": "重复题号"}],
+        [{**_sample_questions()[0], "question": ""}],
+        [{**_sample_questions()[0], "options": [{"id": "only", "label": "只有一项"}]}],
+        [{**_sample_questions()[0], "options": [{"id": "dup", "label": "A"}, {"id": "dup", "label": "B"}]}],
+        [{**_sample_questions()[0], "options": [{"id": "a", "label": ""}, {"id": "b", "label": "B"}]}],
+        [{**_sample_questions()[0], "recommended": "missing"}],
+        [{**_sample_questions()[0], "rationale": "  "}],
+    ]
+    for batch in bad_batches:
+        with pytest.raises(ValueError):
+            validate_role_choice_questions(batch)
+
+
+def _write_role_choice_decision(system: LoopSystem, run_id: str) -> DecisionRequest:
+    questions = _sample_questions()
+    system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
+        EventType.DECISION_REQUESTED, actor="system", department="product",
+        state_before=transaction.projection.status, state_after=transaction.projection.status,
+        payload={
+            "kind": "role_choice",
+            "blocks": "round",
+            "options": [{"id": opt.id, "label": opt.label} for opt in ROLE_CHOICE.options],
+            "description": "产品有两道前置分叉问题等待用户选择",
+            "facts": [],
+            "department": "product",
+            "questions": questions,
+            "input_version": 1,
+            "round": 1,
+        },
+    )))
+    [decision] = [item for item in saved_decisions(system.store, statuses=("open",))[1] if item.run_id == run_id]
+    return decision
+
+
+def test_role_choice_answer_resolution_validation_and_non_role_choice_rejection(tmp_path):
+    # 守护 R1 与 R2：role_choice 支持完整 answers、部分 answers 自动按 recommended 补齐及
+    # option="recommended" 无 answers 全推荐补齐；未知题号、未知选项与对非 role_choice 传 answers
+    # 均抛出 InvalidOption 且不写事件与命令，回答落盘后与事件重放保持一致
+    questions = _sample_questions()
+    assert resolve_role_choice_answers(questions, "submit", {"q1": "text", "q2": "stdout"}) == {
+        "q1": "text", "q2": "stdout",
+    }
+    assert resolve_role_choice_answers(questions, "submit", {"q1": "text"}) == {
+        "q1": "text", "q2": "stderr",
+    }
+    assert resolve_role_choice_answers(questions, "recommended", None) == {
+        "q1": "json", "q2": "stderr",
+    }
+    with pytest.raises(InvalidOption):
+        resolve_role_choice_answers(questions, "submit", {"q_unknown": "json"})
+    with pytest.raises(InvalidOption):
+        resolve_role_choice_answers(questions, "submit", {"q1": "yaml"})
+
+    system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([]))
+    try:
+        run_a = system.create_run("role choice partial")
+        dec_a = _write_role_choice_decision(system, run_a)
+        end_before = system.store.end_position()
+        bad_cmd = _command("submit", dec_a.version)
+        with pytest.raises(InvalidOption):
+            system.orchestrator.answer_decision(
+                dec_a.decision_id, "submit", None, base_version=dec_a.version,
+                command=bad_cmd, answers={"q1": "invalid"},
+            )
+        assert system.store.end_position() == end_before
+        assert system.store.command(bad_cmd.command_id) is None
+
+        returned = system.orchestrator.answer_decision(
+            dec_a.decision_id, "submit", "第二题沿用推荐", base_version=dec_a.version,
+            command=_command("submit", dec_a.version), answers={"q1": "text"},
+        )
+        assert returned == run_a
+        saved_a = saved_decision(system.store, dec_a.decision_id)
+        assert saved_a.status == "answered"
+        assert saved_a.answer["answers"] == {"q1": "text", "q2": "stderr"}
+        replayed_a = replay_decisions(system.store.list_events(run_a))[dec_a.decision_id]
+        assert replayed_a.answer == saved_a.answer
+    finally:
+        system.close()
+
+    paused_system, paused_run, paused_dec = _paused_on_a_decision(tmp_path / "paused")
+    try:
+        end_before = paused_system.store.end_position()
+        rejected_cmd = _command("continue", paused_dec.version)
+        with pytest.raises(InvalidOption):
+            paused_system.orchestrator.answer_decision(
+                paused_dec.decision_id, "continue", None, base_version=paused_dec.version,
+                command=rejected_cmd, answers={"q1": "a"},
+            )
+        assert paused_system.store.end_position() == end_before
+        assert paused_system.store.command(rejected_cmd.command_id) is None
+    finally:
+        paused_system.close()

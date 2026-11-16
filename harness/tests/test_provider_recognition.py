@@ -106,3 +106,108 @@ def test_protocol_comes_from_the_capability_table_first():
     assert empty_protocol["context_window"] == 1048576
     assert empty_protocol["context_window_source"] == "capability_table"
     assert empty_protocol["max_output_tokens"] == 65536
+
+
+@pytest.mark.parametrize(("raw", "expected"), [
+    ("ag/gemini-3.8-flash-high", "gemini-3.8-flash"),
+    ("wb/cn:deepseek-v4.1-flash", "deepseek-v4.1-flash"),
+    ("hf:deepseek-ai/DeepSeek-V4.1-Flash", "deepseek-v4.1-flash"),
+    ("vertex:claude-fable-5:thinking", "claude-fable-5"),
+    ("proxy/model-a-minimal", "model-a"),
+    ("proxy/model-a-low", "model-a"),
+    ("proxy/model-a-medium", "model-a"),
+    ("proxy/model-a-high", "model-a"),
+    ("proxy/model-a-xhigh", "model-a"),
+    ("proxy/model-a-max", "model-a"),
+    ("proxy/model-a-thinking", "model-a"),
+    ("proxy/model-a-latest", "model-a"),
+    ("proxy/model-a:thinking", "model-a"),
+    ("proxy/model-a:free", "model-a"),
+    ("amazon/amazon.nova-lite-v1:0", "amazon.nova-lite-v1:0"),
+    ("ollama/gemma4:31b", "gemma4:31b"),
+])
+def test_normalized_model_name_strips_prefixes_and_mode_suffixes(raw, expected):
+    # R2、R3：归一化按既定顺序剥离前缀与全部声明后缀，同时保留版本号与参数量后缀。
+    assert capabilities.normalize_model_name(raw) == expected
+
+
+def test_capacity_and_protocol_do_not_cross_providers_while_normalized_modality_applies():
+    # R2、R3：带渠道前缀的模型在未识别或同家地址上不借用容量与协议，但跨表一致时预填图像输入。
+    index = _index()
+    [candidate] = _parse_candidates(
+        {"data": [{"id": "ag/gpt-6-luna"}]},
+        "opencode-go",
+        base_url="https://unrecognized.example/v1",
+        capability_index=index,
+    )
+    assert "context_window" not in candidate
+    assert "max_output_tokens" not in candidate
+    assert candidate["protocol"] == "chat_completions"
+    assert candidate["protocol_source"] == "default"
+    assert candidate["input_modalities"] == ["text", "image"]
+    assert candidate["input_modalities_source"] == "capability_table"
+    assert candidate["source_details"]["input_modalities"] == {
+        "source": "capability_table",
+        "provider": "gpt-6-luna",
+        "revision": "2026-10-30.1",
+    }
+
+
+def test_normalized_modality_requires_cross_provider_consistency():
+    # R2、R3：跨服务商按归一化模型名查找输入模态时，仅非空记录结论完全一致才采用能力表，冲突则回退 default。
+    table = ModelCapabilities.model_validate_json(json.dumps({
+        "version": 2,
+        "revision": "2026-10-30.1",
+        "snapshot_date": "2026-10-30",
+        "source": "test-fixture",
+        "providers": {
+            "provider-a": {
+                "api": "https://a.example/v1",
+                "npm": "@ai-sdk/openai-compatible",
+                "models": [
+                    {"model": "vendor/agree-vision:free", "input_modalities": ["text", "image"]},
+                    {"model": "agree-text", "input_modalities": ["text"]},
+                    {"model": "conflict-model", "input_modalities": ["text", "image"]},
+                ],
+            },
+            "provider-b": {
+                "api": "https://b.example/v1",
+                "npm": "@ai-sdk/openai-compatible",
+                "models": [
+                    {"model": "agree-vision-high", "input_modalities": ["text", "image"]},
+                    {"model": "vendor/agree-text-latest", "input_modalities": ["text"]},
+                    {"model": "vendor/conflict-model-high", "input_modalities": ["text"]},
+                ],
+            },
+            "provider-c": {
+                "api": "https://c.example/v1",
+                "npm": "@ai-sdk/openai-compatible",
+                "models": [
+                    {"model": "agree-vision-low", "input_modalities": []},
+                ],
+            },
+        },
+        "presets": {},
+    }))
+    index = capabilities.CapabilityIndex(table, DEFINITIONS.service_presets)
+    parsed = _parse_candidates(
+        {"data": [
+            {"id": "wb/cn:agree-vision-thinking"},
+            {"id": "ag/agree-text-xhigh"},
+            {"id": "wb/cn:conflict-model"},
+            {"id": "unknown-model"},
+        ]},
+        "",
+        base_url="https://unrecognized.example/v1",
+        capability_index=index,
+    )
+    by_id = {item["id"]: item for item in parsed}
+    assert by_id["wb/cn:agree-vision-thinking"]["input_modalities"] == ["text", "image"]
+    assert by_id["wb/cn:agree-vision-thinking"]["input_modalities_source"] == "capability_table"
+    assert by_id["ag/agree-text-xhigh"]["input_modalities"] == ["text"]
+    assert by_id["ag/agree-text-xhigh"]["input_modalities_source"] == "capability_table"
+    assert by_id["wb/cn:conflict-model"]["input_modalities"] == ["text"]
+    assert by_id["wb/cn:conflict-model"]["input_modalities_source"] == "default"
+    assert by_id["wb/cn:conflict-model"]["source_details"]["input_modalities"] == {"source": "default"}
+    assert by_id["unknown-model"]["input_modalities"] == ["text"]
+    assert by_id["unknown-model"]["input_modalities_source"] == "default"
