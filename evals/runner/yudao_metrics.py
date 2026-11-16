@@ -42,6 +42,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
     checkpoints = checkpoints_of(events, status, replay, outcome, parameters_version,
                                  model_service_failure)
     open_loop = recorded_open_loop(events)
+    role_choice = _role_choice_metrics(events)
 
     return {
         "end_status": status,
@@ -52,6 +53,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
         "cycles": int(projection.get("cycle_count") or 0),
         "rework": int(projection.get("rework_count") or 0),
         "collaboration": _count(events, "ask_started"),
+        **role_choice,
         "model_requests": _requests(export),
         # 用量字段缺失为未知：缺失不参与均值与噪声
         "input_tokens": _usage(export, "input_tokens"),
@@ -207,6 +209,47 @@ def _empty_responses(export):
 
 def _count(events, event_type):
     return sum(1 for event in events if event["type"] == event_type)
+
+
+def _role_choice_metrics(events):
+    """从事件流统计 `role_choice` 决定请求次数与总题数，及已回答次数与题数。"""
+    requested_questions_by_id = {}
+    requests = 0
+    questions = 0
+    answered_ids = set()
+    answered_requests = 0
+    answered_questions = 0
+
+    for index, event in enumerate(events):
+        event_type = event.get("type")
+        payload = event.get("payload") or {}
+        if event_type == "decision_requested":
+            if payload.get("kind") != "role_choice":
+                continue
+            requests += 1
+            raw_questions = payload.get("questions")
+            q_count = len(raw_questions) if isinstance(raw_questions, list) else 0
+            questions += q_count
+            decision_id = (event.get("event_id")
+                           or event.get("decision_id")
+                           or payload.get("decision_id"))
+            key = decision_id if isinstance(decision_id, str) and decision_id else index
+            requested_questions_by_id[key] = q_count
+        elif event_type == "decision_answered":
+            decision_id = (payload.get("decision_id")
+                           or event.get("decision_id")
+                           or event.get("parent_event_id"))
+            if decision_id in requested_questions_by_id and decision_id not in answered_ids:
+                answered_ids.add(decision_id)
+                answered_requests += 1
+                answered_questions += requested_questions_by_id[decision_id]
+
+    return {
+        "role_choice_requests": requests,
+        "role_choice_questions": questions,
+        "role_choice_answered_requests": answered_requests,
+        "role_choice_answered_questions": answered_questions,
+    }
 
 
 # ---------------------------------------------------------------------------

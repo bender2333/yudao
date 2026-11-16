@@ -14,6 +14,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
+import uuid
 
 import pytest
 
@@ -2990,5 +2992,509 @@ def test_model_service_failure_recognises_provider_error_stop_reason_on_run_fail
         outcome,
     )
     assert non_provider["model_service_failure"] is False
+
+
+# ---------------------------------------------------------------------------
+# role_choice 多题决定请求自动按推荐选项回答与次要指标统计（工单 #1803）
+
+
+def _role_choice_decision(decision_id, questions, *, version=1, department="product",
+                          round_no=1, status="open", work_item_id="item-1"):
+    return {
+        "decision_id": decision_id,
+        "project_id": "project-1",
+        "work_item_id": work_item_id,
+        "run_id": "yudao-run-1",
+        "kind": "role_choice",
+        "blocks": "round",
+        "version": version,
+        "status": status,
+        "requested_at": "2026-11-16T16:00:00+00:00",
+        "blocked": None,
+        "request": {
+            "kind": "role_choice",
+            "blocks": "round",
+            "options": [{"id": "submit", "label": "提交回答"}, {"id": "recommended", "label": "全部采用推荐"}],
+            "description": "等待用户选择",
+            "facts": [q["question"] for q in questions],
+            "department": department,
+            "questions": questions,
+            "round": round_no,
+        },
+        "answer": None,
+    }
+
+
+def _sample_questions(prefix, specs):
+    return [
+        {
+            "id": q_id,
+            "question": prefix + "：" + q_id,
+            "options": [{"id": opt, "label": opt} for opt in opts],
+            "recommended": rec,
+            "rationale": "推荐理由",
+        }
+        for q_id, opts, rec in specs
+    ]
+
+
+class _RoleChoicePollClient:
+    """按轮询推进的决定请求客户端：验证多轮多题自动推荐作答、幂等去重与非 role_choice 隔离。"""
+
+    def __init__(self, steps, *, fail_once_by_key=None):
+        self.steps = list(steps)
+        self.fail_once_by_key = dict(fail_once_by_key or {})
+        self.step_index = 0
+        self.queries = []
+        self.commands = []
+
+    def query(self, name, params=None):
+        recorded = dict(params or {})
+        self.queries.append((name, recorded))
+        current = self.steps[min(self.step_index, len(self.steps) - 1)]
+        if name == "project.overview":
+            return {"data": {"work_items": [dict(current["card"])]}}
+        if name == "decisions.list":
+            decisions = [dict(item) for item in current.get("decisions", [])]
+            self.step_index += 1
+            return {"data": {"decisions": decisions}}
+        raise AssertionError("unexpected query: " + name)
+
+    def command(self, name, body):
+        recorded = dict(body)
+        self.commands.append((name, recorded))
+        if name == "decision.answer":
+            key = (recorded["decision_id"], recorded["base_version"])
+            if key in self.fail_once_by_key:
+                status, err_body = self.fail_once_by_key.pop(key)
+                raise yudao.YudaoRejected(name, status, err_body)
+            return {"accepted": True}
+        raise AssertionError("unexpected command: " + name)
+
+
+def _assert_lower_uuid(value):
+    parsed = uuid.UUID(value)
+    assert str(parsed) == value
+
+
+def test_wait_for_end_auto_answers_multi_round_role_choice_and_records_stats(monkeypatch):
+    """守 R2、R3：多轮多题 `role_choice` 按每题推荐项提交 `decision.answer`，同 `(decision_id, version)` 不重复提交并统计次数与题数。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+
+    q_round1 = _sample_questions("第一轮", [
+        ("q1", ("opt_a", "opt_b"), "opt_a"),
+        ("q2", ("json", "yaml"), "yaml"),
+        ("q3", ("strict", "loose"), "strict"),
+    ])
+    q_round2 = _sample_questions("第二轮", [
+        ("q4", ("v1", "v2"), "v2"),
+        ("q5", ("keep", "drop"), "keep"),
+    ])
+    other_item_rc = _role_choice_decision(
+        "dec-other-item",
+        _sample_questions("其他事项", [("qx", ("a", "b"), "a")]),
+        version=1,
+        work_item_id="item-other",
+    )
+
+    dec1_v1 = _role_choice_decision("dec-1", q_round1, version=1, department="product", round_no=1)
+    dec2_v2 = _role_choice_decision("dec-2", q_round2, version=2, department="engineering", round_no=2)
+    q_concurrent = _sample_questions("并发", [("q6", ("left", "right"), "right")])
+    dec3_v1 = _role_choice_decision("dec-3", q_concurrent, version=1, department="quality", round_no=2)
+
+    # 第二次轮询仍返回未及切换的同一个 (dec-1, 1)，且夹杂其他事项的请求，第三轮同时出现两个并发 role_choice
+    client = _RoleChoicePollClient([
+        {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [other_item_rc, dec1_v1]},
+        {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec1_v1]},
+        {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec2_v2, dec3_v1]},
+        {"card": {"work_item_id": "item-1", "status": "done", "stop_reason": "released"}, "decisions": []},
+    ])
+
+    stats = {}
+    card, timed_out = yudao.wait_for_end(client, "project-1", "item-1", 5.0,
+                                         role_choice_stats=stats)
+
+    assert timed_out is False
+    assert card == {"work_item_id": "item-1", "status": "done", "stop_reason": "released"}
+    assert len(client.commands) == 3
+
+    cmd1_name, cmd1_body = client.commands[0]
+    assert cmd1_name == "decision.answer"
+    assert cmd1_body["decision_id"] == "dec-1"
+    assert cmd1_body["base_version"] == 1
+    assert cmd1_body["option"] == "recommended"
+    assert cmd1_body["answers"] == {"q1": "opt_a", "q2": "yaml", "q3": "strict"}
+    _assert_lower_uuid(cmd1_body["command_id"])
+
+    cmd2_name, cmd2_body = client.commands[1]
+    assert cmd2_name == "decision.answer"
+    assert cmd2_body["decision_id"] == "dec-2"
+    assert cmd2_body["base_version"] == 2
+    assert cmd2_body["option"] == "recommended"
+    assert cmd2_body["answers"] == {"q4": "v2", "q5": "keep"}
+    _assert_lower_uuid(cmd2_body["command_id"])
+
+    cmd3_name, cmd3_body = client.commands[2]
+    assert cmd3_name == "decision.answer"
+    assert cmd3_body["decision_id"] == "dec-3"
+    assert cmd3_body["base_version"] == 1
+    assert cmd3_body["option"] == "recommended"
+    assert cmd3_body["answers"] == {"q6": "right"}
+    _assert_lower_uuid(cmd3_body["command_id"])
+    assert len({cmd1_body["command_id"], cmd2_body["command_id"], cmd3_body["command_id"]}) == 3
+
+    assert stats["requests"] == 3
+    assert stats["questions"] == 6
+    assert [item["decision_id"] for item in stats["decisions"]] == ["dec-1", "dec-2", "dec-3"]
+    assert [item["question_count"] for item in stats["decisions"]] == [3, 2, 1]
+
+
+def test_wait_for_end_does_not_answer_non_role_choice_blocking_decisions(monkeypatch):
+    """守 R3：非 `role_choice` 的阻塞决定请求保持停止等待且不误答，混合存在时仅自动回答 `role_choice`。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+
+    for kind, blocks in (("qa_cannot_verify", "run"), ("model_unavailable", "run"), ("initial_prd", "work_item")):
+        client = _WaitForEndClient(
+            cards=[{"work_item_id": "item-1", "status": "in_progress"}],
+            decisions_by_poll=[[
+                {"decision_id": "dec-" + kind, "project_id": "project-1", "work_item_id": "item-1",
+                 "status": "open", "version": 1, "blocks": blocks, "kind": kind,
+                 "request": {"blocks": blocks, "kind": kind, "reason": kind}},
+            ]],
+        )
+        stats = {}
+        card, timed_out = yudao.wait_for_end(client, "project-1", "item-1", 5.0,
+                                             role_choice_stats=stats)
+        assert card == {"work_item_id": "item-1", "status": "in_progress"}
+        assert timed_out is False
+        assert client.commands == []
+        assert stats == {"requests": 0, "questions": 0, "decisions": []}
+
+    # 同批同时出现 role_choice 与 model_unavailable：只回答 role_choice，并因 model_unavailable 立即停止等待
+    q_mixed = _sample_questions("混合", [("q1", ("a", "b"), "b")])
+    rc_dec = _role_choice_decision("dec-rc-mix", q_mixed, version=1)
+    blocking_dec = {"decision_id": "dec-block-mix", "project_id": "project-1",
+                    "work_item_id": "item-1", "status": "open", "version": 1,
+                    "blocks": "run", "kind": "model_unavailable",
+                    "request": {"blocks": "run", "kind": "model_unavailable",
+                                "reason": "provider_unavailable"}}
+    mixed_client = _RoleChoicePollClient([
+        {"card": {"work_item_id": "item-1", "status": "in_progress"},
+         "decisions": [rc_dec, blocking_dec]},
+    ])
+    mixed_stats = {}
+    card, timed_out = yudao.wait_for_end(mixed_client, "project-1", "item-1", 5.0,
+                                         role_choice_stats=mixed_stats)
+    assert card == {"work_item_id": "item-1", "status": "in_progress"}
+    assert timed_out is False
+    assert [body["decision_id"] for _name, body in mixed_client.commands] == ["dec-rc-mix"]
+    assert mixed_stats["requests"] == 1
+    assert mixed_stats["questions"] == 1
+
+
+def test_wait_for_end_handles_role_choice_race_and_rejects_malformed_questions(monkeypatch):
+    """守 R2、R3：遇到 `decision_closed` 不计次继续轮询，`stale_base` 等新版本作答；载荷缺推荐项或遇到 `option_invalid` 直接失败。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+
+    q_closed = _sample_questions("已关", [("q1", ("a", "b"), "a")])
+    dec_closed = _role_choice_decision("dec-closed", q_closed, version=1)
+    closed_client = _RoleChoicePollClient(
+        [
+            {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec_closed]},
+            {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec_closed]},
+            {"card": {"work_item_id": "item-1", "status": "done", "stop_reason": "released"}, "decisions": []},
+        ],
+        fail_once_by_key={("dec-closed", 1): (409, json.dumps({"reason": "decision_closed"}))},
+    )
+    closed_stats = {}
+    card, timed_out = yudao.wait_for_end(closed_client, "project-1", "item-1", 5.0,
+                                         role_choice_stats=closed_stats)
+    assert timed_out is False
+    assert card["status"] == "done"
+    assert len(closed_client.commands) == 1
+    assert closed_stats == {"requests": 0, "questions": 0, "decisions": []}
+
+    q_stale = _sample_questions("陈旧", [("q1", ("x", "y"), "y")])
+    dec_v1 = _role_choice_decision("dec-stale", q_stale, version=1)
+    dec_v2 = _role_choice_decision("dec-stale", q_stale, version=2)
+    stale_client = _RoleChoicePollClient(
+        [
+            {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec_v1]},
+            {"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec_v2]},
+            {"card": {"work_item_id": "item-1", "status": "done", "stop_reason": "released"}, "decisions": []},
+        ],
+        fail_once_by_key={("dec-stale", 1): (409, json.dumps({"reason": "stale_base"}))},
+    )
+    stale_stats = {}
+    card2, timed_out2 = yudao.wait_for_end(stale_client, "project-1", "item-1", 5.0,
+                                           role_choice_stats=stale_stats)
+    assert timed_out2 is False
+    assert card2["status"] == "done"
+    assert [b["base_version"] for _n, b in stale_client.commands] == [1, 2]
+    assert stale_stats["requests"] == 1
+    assert stale_stats["questions"] == 1
+
+    # 其他拒绝原因如 option_invalid 立即上抛
+    invalid_client = _RoleChoicePollClient(
+        [{"card": {"work_item_id": "item-1", "status": "in_progress"}, "decisions": [dec_v1]}],
+        fail_once_by_key={("dec-stale", 1): (409, json.dumps({"reason": "option_invalid"}))},
+    )
+    with pytest.raises(yudao.YudaoRejected, match="option_invalid"):
+        yudao.wait_for_end(invalid_client, "project-1", "item-1", 5.0)
+
+    # 畸形 questions 或推荐项不在选项中时立即失败
+    malformed = _role_choice_decision("dec-bad", [
+        {"id": "q1", "question": "bad", "options": [{"id": "a", "label": "A"}], "recommended": "missing"},
+    ])
+    with pytest.raises(ValueError, match="不在可选选项列表中"):
+        yudao.role_choice_answers(malformed)
+    with pytest.raises(ValueError, match="缺少有效的 questions"):
+        yudao.role_choice_answers(_role_choice_decision("dec-empty", []))
+
+
+@contextlib.contextmanager
+def _local_yudao_http_server(rounds_questions):
+    """本地 HTTP 服务：按真接口返回 `decisions.list` 并校验与消费 `decision.answer`，随后收敛结束。"""
+    lock = threading.Lock()
+    state = {
+        "round_index": 0,
+        "overview_polls": 0,
+        "answered": [],
+        "events": [
+            {"type": "run_created", "event_id": "evt-0",
+             "payload": {"definitions_version": "defs-1", "parameters_version": "params-1"}},
+        ],
+    }
+
+    def _current_decision():
+        idx = state["round_index"]
+        if idx >= len(rounds_questions):
+            return None
+        return _role_choice_decision("dec-http-" + str(idx + 1), rounds_questions[idx],
+                                     version=1, round_no=idx + 1, work_item_id="work-item-1")
+
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def _send_json(self, code, payload):
+            raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def do_GET(self):
+            parsed = urllib.parse.urlparse(self.path)
+            if parsed.path == "/api/capabilities":
+                self._send_json(200, {"capabilities": []})
+                return
+            if parsed.path == "/api/queries/project.overview":
+                with lock:
+                    state["overview_polls"] += 1
+                    done = state["round_index"] >= len(rounds_questions)
+                    status = "done" if done else "in_progress"
+                    card = {"work_item_id": "work-item-1", "status": status}
+                    if done:
+                        card["stop_reason"] = "released"
+                self._send_json(200, {"data": {"work_items": [card]}})
+                return
+            if parsed.path == "/api/queries/decisions.list":
+                with lock:
+                    dec = _current_decision()
+                    decisions = [] if dec is None else [dec]
+                self._send_json(200, {"data": {"decisions": decisions}})
+                return
+            if parsed.path == "/api/queries/run.export":
+                with lock:
+                    events = list(state["events"]) + [
+                        {"type": "delivery_accepted", "event_id": "evt-del-1",
+                         "payload": {"files": ["src/cli.py"], "code_tree_digest": "tree-1",
+                                     "content_hash": "content-1"}},
+                        {"type": "qa_submitted", "event_id": "evt-qa-1",
+                         "payload": {"verdict": "release"}},
+                        {"type": "run_done", "event_id": "evt-done", "state_after": "DONE",
+                         "stop_reason": "released", "payload": {"stop_reason": "released"}},
+                    ]
+                self._send_json(200, {"data": {
+                    "run_id": "yudao-run-1",
+                    "projection": {"status": "done", "stop_reason": "released",
+                                   "cycle_count": 2, "rework_count": 0, "request_count": 4},
+                    "events": events,
+                    "usage": {"totals": {"attempts": 4}},
+                }})
+                return
+            if parsed.path == "/api/queries/replay.check":
+                self._send_json(200, {"data": {"consistent": True, "differences": []}})
+                return
+            if parsed.path == "/api/queries/delivery.file":
+                self._send_json(200, {"data": {"path": "src/cli.py",
+                                               "content": "print('ok')\n", "base64": None}})
+                return
+            self._send_json(404, {"reason": "not_found", "message": parsed.path})
+
+        def do_POST(self):
+            parsed = urllib.parse.urlparse(self.path)
+            length = int(self.headers.get("Content-Length") or "0")
+            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+            body = json.loads(raw)
+            if parsed.path == "/api/system/stop":
+                self._send_json(200, {"stopped": True})
+                return
+            if parsed.path == "/api/commands/decision.answer":
+                with lock:
+                    dec = _current_decision()
+                    if dec is None:
+                        self._send_json(409, {"reason": "decision_closed", "message": "already closed"})
+                        return
+                    if body["decision_id"] != dec["decision_id"]:
+                        self._send_json(404, {"reason": "not_found", "message": "wrong id"})
+                        return
+                    if body["base_version"] != dec["version"]:
+                        self._send_json(409, {"reason": "stale_base", "message": "stale"})
+                        return
+                    state["answered"].append(body)
+                    idx = state["round_index"]
+                    state["events"].append({
+                        "type": "decision_requested",
+                        "event_id": dec["decision_id"],
+                        "department": dec["request"]["department"],
+                        "payload": dec["request"],
+                    })
+                    state["events"].append({
+                        "type": "decision_answered",
+                        "event_id": "evt-ans-" + str(idx + 1),
+                        "payload": {
+                            "decision_id": dec["decision_id"],
+                            "option": body["option"],
+                            "answers": body.get("answers"),
+                            "base_version": body["base_version"],
+                        },
+                    })
+                    state["round_index"] += 1
+                self._send_json(200, {"accepted": True, "refs": {"decision_id": dec["decision_id"]}})
+                return
+            self._send_json(404, {"reason": "not_found", "message": parsed.path})
+
+        def log_message(self, format_string, *args):
+            return None
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield "http://127.0.0.1:" + str(server.server_address[1]), state
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5.0)
+
+
+def test_http_server_wait_for_end_and_run_once_record_role_choice_metrics(runs_root, tmp_path,
+                                                                         monkeypatch):
+    """守 R2、R3：经真实 HTTP `YudaoClient` 在运行期间自动回答多轮 `role_choice`，`run_once` 收敛并记录提问次数与题数。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    rounds = [
+        _sample_questions("第一轮", [
+            ("q1", ("opt1", "opt2"), "opt2"),
+            ("q2", ("yes", "no"), "yes"),
+        ]),
+        _sample_questions("第二轮", [
+            ("q3", ("fast", "safe"), "safe"),
+        ]),
+    ]
+    with _local_yudao_http_server(rounds) as (base_url, server_state):
+        real_client = yudao.YudaoClient(base_url)
+        data_dir = str(tmp_path / "data")
+        os.makedirs(data_dir, exist_ok=True)
+        monkeypatch.setattr(yudao, "data_dir_for", lambda root, rid: data_dir)
+        monkeypatch.setattr(yudao, "free_port", lambda: 0)
+        monkeypatch.setattr(yudao, "start_service", lambda ddir, port: (None, real_client))
+        monkeypatch.setattr(yudao, "register_model",
+                            lambda c, model_name, limits: {"admitted_model": model_name})
+        monkeypatch.setattr(yudao, "create_project",
+                            lambda c, name, goal, initial_directory=None: "project-1")
+        monkeypatch.setattr(yudao, "save_department_settings", lambda c, pid: {})
+        monkeypatch.setattr(yudao, "submit_requirement",
+                            lambda c, pid, text: ("work-item-1", "yudao-run-1"))
+        monkeypatch.setattr(yudao, "stop_service", lambda p, timeout_seconds=60: ("", ""))
+        monkeypatch.setattr(run_yudao_eval, "score_delivery",
+                            lambda ddir, edir: {
+                                "checks": [], "material_version": "scenario-3@3",
+                                "scorer_version": "scorer-3@3", "completion": 1.0,
+                                "correctness": 1.0, "not_done_count": 0, "wrong_count": 0,
+                                "requirements": {},
+                            })
+
+        run = run_yudao_eval.run_once("run-rc-http", runs_root, str(tmp_path / "evidence"),
+                                      MODEL, 5.0, LIMITS)
+
+    assert len(server_state["answered"]) == 2
+    assert server_state["answered"][0]["option"] == "recommended"
+    assert server_state["answered"][0]["answers"] == {"q1": "opt2", "q2": "yes"}
+    _assert_lower_uuid(server_state["answered"][0]["command_id"])
+    assert server_state["answered"][1]["option"] == "recommended"
+    assert server_state["answered"][1]["answers"] == {"q3": "safe"}
+    _assert_lower_uuid(server_state["answered"][1]["command_id"])
+    assert server_state["answered"][0]["command_id"] != server_state["answered"][1]["command_id"]
+
+    assert run["void"] is False
+    assert run["role_choice"]["requests"] == 2
+    assert run["role_choice"]["questions"] == 3
+    assert len(run["role_choice"]["decisions"]) == 2
+    assert run["metrics"]["role_choice_requests"] == 2
+    assert run["metrics"]["role_choice_questions"] == 3
+    assert run["metrics"]["role_choice_answered_requests"] == 2
+    assert run["metrics"]["role_choice_answered_questions"] == 3
+
+    metrics_file = os.path.join(run["evidence_dir"], "metrics.json")
+    with open(metrics_file, encoding="utf-8") as handle:
+        written = json.load(handle)
+    assert written["role_choice"]["requests"] == 2
+    assert written["role_choice"]["questions"] == 3
+    assert written["metrics"]["role_choice_requests"] == 2
+    assert written["metrics"]["role_choice_questions"] == 3
+    assert urllib.parse.urlparse(base_url).scheme == "http"
+
+
+def test_metrics_collect_counts_role_choice_requests_and_questions_from_events():
+    """守 R2、R3：`yudao_metrics.collect` 从事件日志统计 `role_choice` 请求次数与总题数，不计入其他决定种类。"""
+    outcome = {"timed_out": False, "elapsed_seconds": 10.0, "hidden_failures": []}
+
+    empty_collected = yudao_metrics.collect(_export(), outcome)
+    assert empty_collected["role_choice_requests"] == 0
+    assert empty_collected["role_choice_questions"] == 0
+    assert empty_collected["role_choice_answered_requests"] == 0
+    assert empty_collected["role_choice_answered_questions"] == 0
+
+    q1 = _sample_questions("一", [("q1", ("a", "b"), "a"), ("q2", ("c", "d"), "d")])
+    q2 = _sample_questions("二", [("q3", ("e", "f"), "f")])
+    q3 = _sample_questions("三", [("q4", ("g", "h"), "g"), ("q5", ("i", "j"), "j"), ("q6", ("k", "l"), "k")])
+    events = [
+        {"type": "decision_requested", "event_id": "evt-rc-1",
+         "payload": {"kind": "role_choice", "blocks": "round", "questions": q1}},
+        {"type": "decision_answered", "event_id": "evt-ans-1",
+         "payload": {"decision_id": "evt-rc-1", "option": "recommended",
+                     "answers": {"q1": "a", "q2": "d"}, "base_version": 1}},
+        {"type": "decision_requested", "event_id": "evt-other",
+         "payload": {"kind": "model_unavailable", "blocks": "run", "reason": "provider_unavailable"}},
+        {"type": "decision_answered", "event_id": "evt-ans-other",
+         "payload": {"decision_id": "evt-other", "option": "continue", "base_version": 1}},
+        {"type": "decision_requested", "event_id": "evt-rc-2",
+         "payload": {"kind": "role_choice", "blocks": "round", "questions": q2}},
+        {"type": "decision_withdrawn", "event_id": "evt-wd-2",
+         "payload": {"decision_id": "evt-rc-2", "reason": "superseded_by_hand_back"}},
+        {"type": "decision_requested", "event_id": "evt-rc-3",
+         "payload": {"kind": "role_choice", "blocks": "round", "questions": q3}},
+        {"type": "decision_answered", "event_id": "evt-ans-3",
+         "payload": {"decision_id": "evt-rc-3", "option": "recommended",
+                     "answers": {"q4": "g", "q5": "j", "q6": "k"}, "base_version": 1}},
+        {"type": "run_done", "state_after": "DONE", "stop_reason": "released",
+         "payload": {"stop_reason": "released"}},
+    ]
+    collected = yudao_metrics.collect(_export("released", events), outcome)
+    assert collected["role_choice_requests"] == 3
+    assert collected["role_choice_questions"] == 6
+    assert collected["role_choice_answered_requests"] == 2
+    assert collected["role_choice_answered_questions"] == 5
+
 
 
