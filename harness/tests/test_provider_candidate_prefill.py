@@ -1,5 +1,8 @@
+import json
+
 import pytest
 
+from harness.definitions import DEFINITIONS, ModelCapabilities
 from harness.providers import capabilities
 from harness.providers.discovery import _parse_candidates
 
@@ -162,3 +165,80 @@ def test_candidates_fall_back_to_the_capability_table():
         recorded.context_window, "capability_table")
     assert (candidate["max_output_tokens"], candidate["max_output_tokens_source"]) == (
         recorded.max_output_tokens, "capability_table")
+
+
+def test_input_modalities_respects_resolution_precedence_and_preserves_capacity_isolation():
+    # R2、R3：输入模态按上游列表、同服务商精确匹配、跨表归一化一致匹配的顺序解析，并保持容量不跨服务商借用。
+    table = ModelCapabilities.model_validate_json(json.dumps({
+        "version": 2,
+        "revision": "2026-10-30.1",
+        "snapshot_date": "2026-10-30",
+        "source": "unit-fixture",
+        "providers": {
+            "opencode-go": {
+                "api": "https://opencode.ai/zen/go/v1",
+                "npm": "@ai-sdk/openai-compatible",
+                "models": [
+                    {
+                        "model": "exact-text-model",
+                        "context_window": 32000,
+                        "max_output_tokens": 4096,
+                        "input_modalities": ["text"],
+                    },
+                ],
+            },
+            "other-provider": {
+                "api": "https://other.example/v1",
+                "npm": "@ai-sdk/openai-compatible",
+                "models": [
+                    {
+                        "model": "other/exact-text-model-high",
+                        "context_window": 999000,
+                        "max_output_tokens": 16384,
+                        "input_modalities": ["text", "image"],
+                    },
+                    {
+                        "model": "shared-vision-model",
+                        "context_window": 256000,
+                        "max_output_tokens": 32768,
+                        "input_modalities": ["text", "image"],
+                    },
+                ],
+            },
+        },
+        "presets": {},
+    }))
+    index = capabilities.CapabilityIndex(table, DEFINITIONS.service_presets)
+    parsed = _parse_candidates(
+        {"data": [
+            {"id": "shared-vision-model", "modalities": {"input": ["text"]}},
+            {"id": "exact-text-model"},
+            {"id": "wb/cn:shared-vision-model-high"},
+        ]},
+        "opencode-go",
+        base_url="https://opencode.ai/zen/go/v1",
+        capability_index=index,
+    )
+    by_id = {item["id"]: item for item in parsed}
+
+    # 第 1 步优先：上游 /models 显式声明仅 text，不采用能力表的 image
+    from_upstream = by_id["shared-vision-model"]
+    assert from_upstream["input_modalities"] == ["text"]
+    assert from_upstream["input_modalities_source"] == "models_url"
+    assert from_upstream["source_details"]["input_modalities"] == {"source": "models_url"}
+    assert "context_window" not in from_upstream
+
+    # 第 2 步优先于第 3 步：已识别服务商内精确条目取同服务商自身结论
+    from_exact = by_id["exact-text-model"]
+    assert from_exact["input_modalities"] == ["text"]
+    assert from_exact["source_details"]["input_modalities"] == {
+        "source": "capability_table", "provider": "opencode-go", "revision": "2026-10-30.1"}
+    assert from_exact["context_window"] == 32000
+
+    # 第 3 步：跨表按归一化名匹配一致的图像输入，但绝不借用他家容量
+    from_normalized = by_id["wb/cn:shared-vision-model-high"]
+    assert from_normalized["input_modalities"] == ["text", "image"]
+    assert from_normalized["source_details"]["input_modalities"] == {
+        "source": "capability_table", "provider": "shared-vision-model", "revision": "2026-10-30.1"}
+    assert "context_window" not in from_normalized
+    assert "max_output_tokens" not in from_normalized
