@@ -50,6 +50,9 @@ const SYSTEM_PAGES: Record<string, string> = {
 // 顶栏的路径里的页名（设计说明第 3.4、9.1 节）：项目内页面写页名，系统页写它自己的页名。
 // 系统页的页名与页面里的标题一致，不写路由里的英文段名（工单 #702）
 const PAGE_LABELS: Record<string, string> = {
+  // 独立新建与接入已有项目页（工单 #1806）
+  "new-project": "从想法新建项目",
+  "onboard-project": "接入已有项目",
   // 对话页是打开项目时的那一页（工单 #1638）：上面是循环图，线程与时序图由后面的工单接上
   conversation: "对话",
   "observe-detail": "请求详情",
@@ -66,7 +69,7 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 /**
- * 顶栏的路径：项目内页面写「项目名 / 页名」，系统页只写页名（设计说明第 9.1 节）。
+ * 顶栏的路径：项目内页面写「项目名 / 页名」，系统页与新建/接入页只写页名（设计说明第 9.1 节）。
  * 部门页的页名就是部门名，与页签一致（产品、工程、质检）。
  */
 export function pathLabel(route: Route, projects: { project_id: string; name: string }[]): string {
@@ -75,6 +78,9 @@ export function pathLabel(route: Route, projects: { project_id: string; name: st
   }
   if (route.name.startsWith("sys-")) {
     return PAGE_LABELS[route.name] ?? "系统";
+  }
+  if (route.name === "new-project" || route.name === "onboard-project") {
+    return PAGE_LABELS[route.name];
   }
   const named = route.name === "dept" || route.name === "dept-detail";
   const page = named ? departmentName(route.department) : PAGE_LABELS[route.name] ?? "这个页面";
@@ -100,6 +106,18 @@ export function parseRoute(hash: string): Route {
   const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), settingsSection: sectionOf(query), requestFilters: filtersFromQuery(query), attemptOrigin: attemptOrigin(query) };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
+    return route;
+  }
+  // 独立新建与接入已有项目（工单 #1806）：规范路径为 #/projects/new 与 #/projects/onboard，
+  // 同时兼容识别 #/new 与 #/onboard
+  if ((segments[0] === "projects" && segments[1] === "new" && segments.length === 2)
+    || (segments[0] === "new" && segments.length === 1)) {
+    route.name = "new-project";
+    return route;
+  }
+  if ((segments[0] === "projects" && segments[1] === "onboard" && segments.length === 2)
+    || (segments[0] === "onboard" && segments.length === 1)) {
+    route.name = "onboard-project";
     return route;
   }
   if (segments[0] === "sys" && segments.length === 2) {
@@ -210,6 +228,9 @@ function scopeQuery(workItem: string | null | undefined): string {
 // 构造函数随旧页面一起删掉（工单 #1716）：它们的地址由 parseRoute 落到对话。
 export const paths = {
   home: () => "#/home",
+  // 独立新建与接入已有项目页（工单 #1806）：规范路径，与项目组织设计及原型一致
+  newProject: () => "#/projects/new",
+  onboardProject: () => "#/projects/onboard",
   // 对话页（工单 #1638、#1745）：项目页先是对话，循环图在它上面；事项范围写入 ?w=，回放位置写入 ?at=
   conversation: (projectId: string, options: { workItem?: string | null; at?: number | null } = {}) => {
     const query = new URLSearchParams();
