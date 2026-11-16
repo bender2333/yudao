@@ -235,9 +235,19 @@ def _parse_candidates(payload: Any, preset_id: str, *, base_url: str | None = No
                 candidate[f"{field}_source"] = "capability_table"
         inputs = _modalities(item, "input")
         input_source = "models_url"
+        input_provider = provider_id or ""
         if inputs is None:
-            inputs = list(entry.input_modalities) if entry is not None and entry.input_modalities else None
-            input_source = "capability_table" if inputs is not None else "default"
+            if entry is not None and entry.input_modalities:
+                inputs = list(entry.input_modalities)
+                input_source = "capability_table"
+            else:
+                normalized = index.normalized_input_modalities(model_id)
+                if normalized is not None:
+                    inputs = list(normalized[0])
+                    input_source = "capability_table"
+                    input_provider = normalized[1]
+                else:
+                    input_source = "default"
         candidate["input_modalities"] = ["text", "image"] if inputs and "image" in inputs else ["text"]
         candidate["input_modalities_source"] = input_source
         outputs = _modalities(item, "output")
@@ -260,7 +270,10 @@ def _parse_candidates(payload: Any, preset_id: str, *, base_url: str | None = No
         candidate["applicable"] = outputs is None or "text" in outputs
         candidate["applicable_source"] = output_source
         candidate["source_details"] = {
-            field.removesuffix("_source"): index.source_details(source, provider_id or "")
+            field.removesuffix("_source"): index.source_details(
+                source,
+                input_provider if field == "input_modalities_source" else (provider_id or ""),
+            )
             for field, source in candidate.items() if field.endswith("_source")
         }
         candidates.append(candidate)

@@ -146,7 +146,7 @@ class CatalogModelTest(CommandRequest):
 
 
 class CatalogCandidateTest(CommandRequest):
-    # 对一个还没有选用的候选做与模型测试相同的两组请求；候选没有保存的定义，只给连接与上游模型 ID
+    # 对一个还没有选用的候选做一次极简文本连通性请求；候选没有保存的定义，只给连接与上游模型 ID
     base_version: int
     provider_id: Text
     model: Text
@@ -565,7 +565,7 @@ def _test_payload(base_revision: int, kind: str, provider_id: str, model_id: str
         "protocol": result.get("protocol"), "error": error,
         # 连接测试读的是模型列表地址：把实际读取的地址写进事件，界面才能写明测的是什么
         "source_url": result.get("source_url"),
-        "actual_model": result.get("model") if kind in {"model", "candidate"} else None,
+        "actual_model": result.get("model") if kind == "model" else None,
         "elapsed_ms": int(round((time.monotonic() - started) * 1000)),
         "admitted": (bool(result["admitted"]) if "admitted" in result and result["admitted"] is not None else None),
     }
@@ -644,7 +644,7 @@ def _schedule_candidate_test(application: Application, base_version: int, test) 
                 facade.run_candidate_test, test,
                 lambda: int(application.system.parameters()["provider.model_test_max_concurrent"]))
         except (CatalogValidationError, ProviderError) as exc:
-            result = {"ok": False, "error": str(exc), "model": None, "elapsed_ms": 0,
+            result = {"ok": False, "error": str(exc), "model": None, "elapsed_ms": None,
                       "accepts_required_tool_call": None, "failure_group": None, "failure_step": None}
             if not facade.selections.finish_candidate(test, result):
                 return
