@@ -960,3 +960,98 @@ def test_role_choice_withdrawn_and_handed_back_on_add_input(tmp_path):
         assert proj2.product_spec is not None
     finally:
         reopened.close()
+
+
+def test_start_after_work_item_role_choice_answer_waits_without_concurrent_loop(tmp_path):
+    # 守 R1 与 R2：经 orchestrator.start_work_item 启动的 run 在职能触发 role_choice 等待期间，
+    # 回答决定后紧接调用 orchestrator.start(run_id) 时统一感知 _work_item_tasks 里的活跃任务并等待其收尾，
+    # 不会并发启动第二个 run_until_stop 或因 no_new_work 误报失败，最终收敛至 done 并完成采纳
+    import asyncio
+    from harness.definitions import DEFAULT_FORM
+    from harness.models import ProjectEventType
+    from harness.proposals import delivery_turn, product_spec
+    from harness.providers.call import ModelResponse
+    from harness.tests.helpers import quality_turns
+    from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+    from harness.tightening import WATCHED_OUTPUTS
+
+    q1, _ = _sample_questions()
+    defs = _definitions_with_ask_user(tmp_path / "defs_coord")
+    system = LoopSystem.for_testing(
+        tmp_path / "run_coord",
+        FakeAdapter({
+            "product": [
+                ModelResponse(output=[_ask_user_call("call-coord", [q1])]),
+                product_spec(),
+            ],
+            "engineering": [delivery_turn()],
+            "quality": quality_turns("release", "checks passed on the current snapshot"),
+        }),
+        forms={DEFAULT_FORM: (defs, WATCHED_OUTPUTS)},
+    )
+    try:
+        project_id = system.projects.register("任务协同防并发", "核对 start_work_item 与 start 不并发重入")
+        _work_item_id, run_id = system.projects.start_work_item(project_id, "回答提问后继续并采纳")
+
+        observed_calls: list[str] = []
+        in_flight = 0
+        max_in_flight = 0
+        orig_run_until_stop = system.orchestrator.run_until_stop
+
+        async def tracked_run_until_stop(target_run_id: str) -> Any:
+            nonlocal in_flight, max_in_flight
+            observed_calls.append(target_run_id)
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+            try:
+                return await orig_run_until_stop(target_run_id)
+            finally:
+                in_flight -= 1
+
+        system.orchestrator.run_until_stop = tracked_run_until_stop  # type: ignore[method-assign]
+
+        async def drive() -> None:
+            loop = asyncio.get_running_loop()
+            opened = asyncio.Event()
+            dec_box: list[str] = []
+
+            def on_events(events: list[Any]) -> None:
+                for ev in events:
+                    if (ev.type == EventType.DECISION_REQUESTED
+                            and ev.run_id == run_id
+                            and (ev.payload or {}).get("kind") == "role_choice"):
+                        dec_box.append(ev.event_id)
+                        loop.call_soon_threadsafe(opened.set)
+
+            system.store.subscribe(on_events)
+            work_task = system.orchestrator.start_work_item(run_id)
+            await asyncio.wait_for(opened.wait(), timeout=WAIT_FOR_HOST_WORK_SEC)
+            assert system.orchestrator.work_item_execution(run_id) is work_task
+            assert not work_task.done()
+
+            dec = saved_decision(system.store, dec_box[0])
+            assert dec is not None
+            system.orchestrator.answer_decision(
+                dec.decision_id, "submit", "选定纯文本格式",
+                base_version=dec.version, command=_command("submit", dec.version), answers={"q1": "text"},
+            )
+            resume_task = system.orchestrator.start(run_id)
+            await asyncio.wait_for(asyncio.gather(work_task, resume_task), timeout=WAIT_FOR_HOST_WORK_SEC)
+
+        asyncio.run(drive())
+
+        assert observed_calls == [run_id]
+        assert max_in_flight == 1
+        assert [e for e in system.store.list_events(run_id) if e.type == EventType.RUN_FAILED] == []
+        final_proj = system.project(run_id)
+        assert final_proj.status == "done"
+        assert final_proj.stop_reason == "released"
+        adopted = [
+            e for e in system.store.list_project_events(project_id)
+            if e.type == ProjectEventType.DELIVERABLE_ADOPTED and (e.payload or {}).get("run_id") == run_id
+        ]
+        assert len(adopted) == 1
+        assert system.orchestrator.execution(run_id) is None
+        assert system.orchestrator.work_item_execution(run_id) is None
+    finally:
+        system.close()

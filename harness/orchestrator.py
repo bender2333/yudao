@@ -1061,11 +1061,19 @@ class Orchestrator:
         # 没有部门可以开始一轮工作时的收尾在薄驱动（工单 #1512）：事项以什么结束由路由判断
         return await self._thin_driver.no_new_work(run_id)
 
+    def _active_run_tasks(self, run_id: str) -> tuple[asyncio.Task[Any], ...]:
+        # 同一 run 当前尚未结束的执行任务（汇总 _tasks 与 _work_item_tasks 并去重），避免回答决定后并发启动第二个运行循环
+        tasks: list[asyncio.Task[Any]] = []
+        for existing in (self._tasks.get(run_id), self._work_item_tasks.get(run_id)):
+            if existing is not None and not existing.done() and existing not in tasks:
+                tasks.append(existing)
+        return tuple(tasks)
+
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
         # 在当前事件循环中把这个 run 作为任务运行到停止（run_until_stop）；这个 run 已有任务时，新任务在它结束以后开始。
         # 停止以后与事项的执行走同一处结算（run_until_stop_and_settle），run 属于事项并已到终态时写入采纳（幂等，工单 #299）。
         # 任务出错时交给事件循环的异常处理报告
-        previous = self._tasks.get(run_id)
+        previous = self._active_run_tasks(run_id)
         task = asyncio.get_running_loop().create_task(self._run_after(previous, run_id))
         self._tasks[run_id] = task
         task.add_done_callback(lambda done: self._task_done(run_id, done))
@@ -1094,23 +1102,27 @@ class Orchestrator:
     def start_work_item(self, run_id: str) -> asyncio.Task[ProjectEvent | None]:
         # 在接口进程的事件循环中把事项的 run 作为任务运行；run 结束以后由流程编排结算（采纳）。
         # 任务出错时交给事件循环的异常处理报告
-        previous = self._work_item_tasks.get(run_id)
+        previous = self._active_run_tasks(run_id)
         task = asyncio.get_running_loop().create_task(self._run_work_item(previous, run_id))
         self._work_item_tasks[run_id] = task
         task.add_done_callback(lambda done: self._work_item_task_done(run_id, done))
         return task
 
-    async def _run_work_item(self, previous: asyncio.Task[Any] | None, run_id: str) -> ProjectEvent | None:
+    async def _run_work_item(self, previous: tuple[asyncio.Task[Any], ...], run_id: str) -> ProjectEvent | None:
         # 事项的执行：运行到停止以后结算这一次 run，交回结算写入的项目事件（没有时为 None）
-        if previous is not None:
-            await asyncio.wait([previous])
+        if previous:
+            await asyncio.wait(previous)
         _projection, event = await self.run_until_stop_and_settle(run_id)
         return event
 
-    async def _run_after(self, previous: asyncio.Task[RunProjection] | None, run_id: str) -> RunProjection:
-        # 回答决定以后继续等入口：同样运行到停止并结算，交回停止时的运行状态
-        if previous is not None:
-            await asyncio.wait([previous])
+    async def _run_after(self, previous: tuple[asyncio.Task[Any], ...], run_id: str) -> RunProjection:
+        # 回答决定以后继续等入口：先等已有执行任务收尾；若已有任务已将 run 推进到终态则直接返回终态投影，
+        # 否则继续运行到停止并结算
+        if previous:
+            await asyncio.wait(previous)
+            projection = self.project(run_id)
+            if projection.status in TERMINAL_STATUSES:
+                return projection
         projection, _event = await self.run_until_stop_and_settle(run_id)
         return projection
 
