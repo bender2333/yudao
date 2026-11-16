@@ -1003,6 +1003,15 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         return None
     waiting_user = {decision.request.get("department") for decision in decisions.values()
                     if decision.status == "open" and decision.blocks in BLOCKING_SCOPES}
+    role_choice_notes: dict[str, str] = {}
+    for decision in decisions.values():
+        if decision.status == "open" and decision.kind == "role_choice":
+            dept = decision.request.get("department")
+            if dept and dept not in role_choice_notes:
+                count = len(decision.request.get("questions") or [])
+                role_choice_notes[dept] = (
+                    f"向用户提问，等待选择（{count} 题）" if count else "向用户提问，等待选择"
+                )
     # 还没回答的询问：链上每一层一个，最内层在最后（投影的 ask_stack）
     asks = list(run.ask_stack)
     departments: dict[str, DepartmentState] = {}
@@ -1016,6 +1025,8 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         incoming = next((ask for ask in reversed(asks) if ask.get("recipient") == department), None)
         if department in waiting_user:
             state, note = "waiting_user", None
+        elif department in role_choice_notes:
+            state, note = "waiting_user", role_choice_notes[department]
         elif incoming is not None:
             state, note = "working", f"回答{_department_label(definitions, incoming.get('requester') or '')}的询问"
         elif own_ask is not None:

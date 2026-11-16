@@ -465,7 +465,7 @@ class RunRecovery:
                 started = info["started_event"]
                 if info["status"] != ACTION_UNKNOWN or started is None:
                     continue
-                if info["tool"] == "ask":
+                if info["tool"] in ("ask", "ask_user"):
                     continue
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)

@@ -17,7 +17,7 @@ import json
 import math
 import re
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import aclosing
 from dataclasses import asdict, dataclass, replace
 from threading import Event
@@ -228,13 +228,14 @@ class StepDriver:
               cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
               refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
               definitions: Definitions | None = None,
-              mcp_sessions: Any | None = None) -> StepDriver:
+              mcp_sessions: Any | None = None,
+              ask_user: Callable[[str, dict[str, Any]], Awaitable[tuple[bool, Any, str | None, bool]]] | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(request, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
                      cancelled=cancelled, deltas=deltas, tightening=tightening,
                      refresh_workspace=refresh_workspace, definitions=definitions,
-                     mcp_sessions=mcp_sessions)
+                     mcp_sessions=mcp_sessions, ask_user=ask_user)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
@@ -244,7 +245,8 @@ class StepDriver:
                  cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
                  refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
                  definitions: Definitions | None = None,
-                 mcp_sessions: Any | None = None) -> None:
+                 mcp_sessions: Any | None = None,
+                 ask_user: Callable[[str, dict[str, Any]], Awaitable[tuple[bool, Any, str | None, bool]]] | None = None) -> None:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
@@ -290,6 +292,7 @@ class StepDriver:
         # 检查工作区按会话保留（工单 #558）：新交付封存以后质检的检查工作区要重建，
         # 由编排层给出重建好的工作区，这里只接着用
         self._refresh_workspace = refresh_workspace
+        self._ask_user = ask_user
         self._request: ModelRequest | None = None
         self._action: Action | None = None
         self._step: StepRequest | None = None
@@ -671,6 +674,13 @@ class StepDriver:
                         ok, output, error = ask_ok, ask_output, ask_error
                         if ok and new_contract_hash is not None:
                             self._adopt_contract(new_contract_hash)
+                    elif name == "ask_user":
+                        ok, output, error, stopped = await self._run_ask_user(identity, args)
+                        if stopped:
+                            self._proceed()
+                            self._skip(request, response.output[index + 1:],
+                                       "Not executed because this round stopped while waiting for the user's answer.")
+                            return RoundResult(version=self._version)
                     elif name == "answer":
                         # 工程回答质检时回答分两部分：facts 是事实部分，explanation 是解释部分（工单 #554）
                         text = args.get("answer") or args.get("text") or args.get("facts") or ""
@@ -784,6 +794,12 @@ class StepDriver:
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 
+    async def _run_ask_user(self, call_id: str, args: dict[str, Any]) -> tuple[bool, Any, str | None, bool]:
+        # 向用户提问经开始一轮工作时传入的回调执行：未接入时明确返回失败，不触发等待
+        if self._ask_user is None:
+            return False, None, "当前轮次未接入向用户提问执行能力。", False
+        return await self._ask_user(call_id, args)
+
     async def _continue_unexecuted_calls(self) -> None:
         # 工单 #17（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」、「角色任务的恢复」）：上一次激活的完整模型响应里，有 Function Call 既没有 tool_started，
         # 也没有 tool_called 或 tool_skipped——进程在把整个响应执行完之前退出。这里补执行这些动作，
@@ -792,7 +808,8 @@ class StepDriver:
         for call in calls:
             if not self._proceed().proceed:
                 return
-            await self._execute_call(request, call)
+            if await self._execute_call(request, call):
+                return
 
     def _unexecuted_calls(self) -> tuple[list[dict[str, Any]], _RecoveredCall | None]:
         # 最近一次进入历史的完整模型响应里，没有得到处置的工具调用。每一条 MODEL_MESSAGE 事件保存响应中的一个
@@ -813,7 +830,7 @@ class StepDriver:
                 if identity:
                     dispositioned.add(str(identity))
             elif event.type == EventType.TOOL_STARTED:
-                if payload.get("name") != "ask":
+                if payload.get("name") not in ("ask", "ask_user"):
                     identity = payload.get("id")
                     if identity:
                         dispositioned.add(str(identity))
@@ -848,7 +865,7 @@ class StepDriver:
             call_target=dict(self._call_public or {}), purpose="work",
         )
 
-    async def _execute_call(self, request: "_RecoveredCall", item: dict[str, Any]) -> None:
+    async def _execute_call(self, request: "_RecoveredCall", item: dict[str, Any]) -> bool:
         # 执行一个没有处置的工具调用并记录结果：与 _steps 的工具循环走同一条路径（工具许可、环境执行、记录）。
         identity = str(item.get("id") or "")
         name = str(item.get("name") or "")
@@ -867,7 +884,7 @@ class StepDriver:
             call = {"id": identity, "name": name, "args": args, "step_id": request.step_id}
             permission, facts = await self._begin_tool_waiting_for_input(request, call)
             if permission.stopped or not permission.allowed:
-                return
+                return False
             if name == "ask":
                 ask_call = {
                     "id": identity,
@@ -881,6 +898,11 @@ class StepDriver:
                 ok, output, error = ask_ok, ask_output, ask_error
                 if ok and new_contract_hash is not None:
                     self._adopt_contract(new_contract_hash)
+            elif name == "ask_user":
+                ok, output, error, stopped = await self._run_ask_user(identity, args)
+                if stopped:
+                    self._proceed()
+                    return True
             elif name in TRIAL_CASE_TOOLS:
                 outcome = self._trial_case_call(name, args)
                 ok, output, error = outcome.ok, outcome.output, outcome.error
@@ -914,6 +936,7 @@ class StepDriver:
                                    after_snapshot=after_snapshot,
                                    qa_tests_saved=qa_tests_saved,
                                    trial_case=trial_case_draft)
+        return False
 
     def _save_qa_tests_if_changed(self, request: ModelRequest | _RecoveredCall) -> dict[str, Any] | None:
         # 检查材料只由写入范围是检查材料的角色保存（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」，工单 #1390）

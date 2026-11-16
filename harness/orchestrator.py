@@ -37,8 +37,8 @@ from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import artifact_hash
 from .decisions import (
-    MODEL_UNAVAILABLE, QA_CANNOT_VERIFY, RESUMABLE_PAUSE_KINDS, DecisionKind, blocked_by_other_session,
-    blocks_run,
+    MODEL_UNAVAILABLE, QA_CANNOT_VERIFY, RESUMABLE_PAUSE_KINDS, ROLE_CHOICE, DecisionKind,
+    blocked_by_other_session, blocks_run, resolve_role_choice_answers, validate_role_choice_questions,
 )
 from .environment import (
     LocalEnvironment, RoundWorkspace, Workspaces, cleanup_inspection_workspace,
@@ -1490,6 +1490,7 @@ class Orchestrator:
             limits=self._session_limits(run_id, scope.session_id),
             work_ref=self._item_routing(run_id).work_reference(self.project(run_id), department=scope.department),
             refresh_workspace=self._workspaces.refresh_for(self._round_workspace(round_work)),
+            ask_user=lambda call_id, args: self._execute_ask_user(round_work, call_id, args),
         )
 
     @staticmethod
@@ -1739,6 +1740,154 @@ class Orchestrator:
             return True, outcome.answer, None, new_contract_hash, steps
         return False, None, outcome.reason, None, steps
 
+    async def _execute_ask_user(
+        self,
+        round_work: RoundWork,
+        call_id: str,
+        args: dict[str, Any],
+    ) -> tuple[bool, Any, str | None, bool]:
+        # 执行向用户提问：校验入参、分支禁止、同次输入轮数与单轮题数上限；校验通过后闭合当前会话计时段，
+        # 按 (session_id, call_id) 幂等复用未撤销的 role_choice 决定请求，仅暂停当前职能这一轮等待回答
+        scope = round_work.scope
+        run_id = scope.run_id
+        unknown = sorted(set(args) - {"questions", "note"})
+        if unknown:
+            return False, None, f"向用户提问包含未支持的参数：{', '.join(unknown)}。", False
+        if "questions" not in args:
+            return False, None, "向用户提问缺少 questions 参数。", False
+        raw_note = args.get("note")
+        if raw_note is not None and not isinstance(raw_note, str):
+            return False, None, "向用户提问的 note 必须是字符串或 null。", False
+        note = raw_note if (raw_note is None or raw_note.strip()) else None
+        try:
+            questions = validate_role_choice_questions(args["questions"])
+        except ValueError as exc:
+            return False, None, f"向用户提问的问题格式无效：{exc}。", False
+
+        stream = run_stream(run_id)
+        self._thin_driver.pause_session_segment(run_id, scope.session_id)
+
+        def ensure_decision(transaction: Transaction) -> tuple[str, Any]:
+            projection = transaction.projection
+            if projection.status in TERMINAL_STATUSES or self._aborted(run_id):
+                return ("stopped", None)
+            if projection.ask_by_branch(scope.session_id) is not None:
+                return ("rejected", "当前为询问分支会话，不能直接向用户提问；请在 answer 中写明需要向用户确认的事项。")
+            existing = next(
+                (item for item in transaction.decisions.values()
+                 if item.kind == ROLE_CHOICE.name
+                 and item.status != "withdrawn"
+                 and item.request.get("session_id") == scope.session_id
+                 and item.request.get("call_id") == call_id),
+                None,
+            )
+            if existing is not None:
+                if existing.status == "answered":
+                    return ("answered", existing)
+                return ("open", existing.decision_id)
+
+            frozen = parameter_values.frozen_run_parameters(projection)
+            max_questions = int(frozen["ask_user.max_questions_per_round"])
+            max_rounds = int(frozen["ask_user.max_rounds_per_input"])
+            current_input_version = projection.input_version
+            used_rounds = sum(
+                1 for item in transaction.decisions.values()
+                if item.kind == ROLE_CHOICE.name
+                and item.status != "withdrawn"
+                and item.request.get("input_version") == current_input_version
+            )
+            if max_rounds <= 0:
+                return ("rejected", "当前运行已禁用向用户提问（ask_user.max_rounds_per_input=0），请根据现有信息继续推进。")
+            if used_rounds >= max_rounds:
+                return ("rejected", (
+                    f"当前输入版本（第 {current_input_version} 版）下已向用户提问 {used_rounds} 轮，"
+                    f"已达到上限 {max_rounds} 轮；请基于已获回答继续推进。"
+                ))
+            if len(questions) > max_questions:
+                return ("rejected", (
+                    f"本轮向用户提问共 {len(questions)} 题，超过单轮最多提问上限 {max_questions} 题；"
+                    "请精简为不超过上限的独立问题后重试。"
+                ))
+
+            definitions = self.item_definitions(run_id)
+            dept_label = definitions.department_labels.get(scope.department, scope.department)
+            round_number = used_rounds + 1
+            description = f"{dept_label}发出 {len(questions)} 道前置决定问题，等待用户选择"
+            if note:
+                description = f"{description}：{note}"
+            requested = transaction.append(NewEvent(
+                EventType.DECISION_REQUESTED,
+                actor="system",
+                department=scope.department,
+                parent_event_id=scope.parent_event_id,
+                session_id=scope.session_id,
+                state_before=projection.status,
+                state_after=projection.status,
+                payload={
+                    "kind": ROLE_CHOICE.name,
+                    "blocks": ROLE_CHOICE.blocks,
+                    "options": [{"id": opt.id, "label": opt.label} for opt in ROLE_CHOICE.options],
+                    "description": description,
+                    "facts": [item["question"] for item in questions],
+                    "department": scope.department,
+                    "questions": questions,
+                    "session_id": scope.session_id,
+                    "call_id": call_id,
+                    "input_version": current_input_version,
+                    "round": round_number,
+                    "note": note,
+                },
+            ))[0]
+            return ("open", requested.event_id)
+
+        outcome_kind, payload = self._transact(
+            stream, ensure_decision, dispatch_number=scope.dispatch_number or None)
+        if outcome_kind == "stopped":
+            return False, None, None, True
+        if outcome_kind == "rejected":
+            self._start_session_segment(run_id, scope.session_id)
+            return False, None, str(payload), False
+        if outcome_kind == "answered":
+            self._start_session_segment(run_id, scope.session_id)
+            return True, self._format_role_choice_result(payload), None, False
+
+        decision, stopped = await self._thin_driver.wait_for_decision(round_work, str(payload))
+        if stopped or decision is None:
+            return False, None, None, True
+        return True, self._format_role_choice_result(decision), None, False
+
+    @staticmethod
+    def _format_role_choice_result(decision: DecisionRequest) -> dict[str, Any]:
+        # 将用户已回答的多题决定整理为结构化工具结果，交回原会话继续本轮
+        request = decision.request
+        questions = list(request.get("questions") or [])
+        answer = decision.answer or {}
+        option = str(answer.get("option") or "submit")
+        resolved = resolve_role_choice_answers(
+            questions, option, answer.get("answers"), decision=decision)
+        items: list[dict[str, Any]] = []
+        for item in questions:
+            q_id = str(item["id"])
+            selected_id = resolved[q_id]
+            option_labels = {str(opt["id"]): str(opt["label"]) for opt in item["options"]}
+            items.append({
+                "id": q_id,
+                "question": str(item["question"]),
+                "selected_option_id": selected_id,
+                "selected_option_label": option_labels[selected_id],
+                "recommended": str(item["recommended"]),
+                "from_recommended": selected_id == str(item["recommended"]),
+            })
+        return {
+            "decision_id": decision.decision_id,
+            "option": option,
+            "input_version": request.get("input_version"),
+            "round": request.get("round"),
+            "note": answer.get("note"),
+            "selections": resolved,
+            "answers": items,
+        }
+
     def _commit_answer_revision(self, round_work: RoundWork, scope: ActivationScope,
                                 branch: routing_contract.AskBranch, proposal: dict[str, Any],
                                 response: Any) -> tuple[int, str]:
@@ -1882,6 +2031,7 @@ class Orchestrator:
             definitions=self.item_definitions(run_id), environment=environment, limits=limits,
             work_ref=branch.work_ref,
             refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
+            ask_user=lambda call_id, args: self._execute_ask_user(branch_activation, call_id, args),
         )
         driver = self._thin_driver.start_execution(
             branch_activation,
