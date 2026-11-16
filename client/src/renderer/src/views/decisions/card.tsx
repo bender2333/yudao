@@ -4,14 +4,31 @@
 // 提交以后显示「已提交」，事件到达以后按事件显示结果并移出等待列表；已经被回答或撤销时显示原因；
 // 「在项目中查看」跳到项目中的对应页面。界面只解释已经存在的事实，不自行推进状态。
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { DecisionView, WorkItemMaterialsResult } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { Icon } from "../../shell/kit";
 import { CommandFeedback, KeyValue, Tag, TextArea, hasCommand } from "../project/common";
 import { DECISION_BLOCKS, DECISION_KIND, formatDuration, formatTime, label } from "../project/labels";
 import { useCommand } from "../project/use-snapshot";
-import { blockedText, decisionLinks, materialRows, metaLine, missingNoteText, viewHref, waitedSeconds } from "./card-logic";
+import {
+  answeredRoleChoiceSummary,
+  blockedText,
+  decisionLinks,
+  defaultRoleChoiceAnswers,
+  materialRows,
+  metaLine,
+  missingNoteText,
+  prepareRoleChoiceSubmit,
+  reconcileRoleChoiceAnswers,
+  roleChoiceActions,
+  roleChoiceQuestions,
+  viewHref,
+  waitedSeconds,
+  type RoleChoiceActions,
+  type RoleChoiceAnsweredView,
+  type RoleChoiceQuestionView,
+} from "./card-logic";
 
 export type DecisionCardProps = {
   app: ClientApp | null;
@@ -101,6 +118,167 @@ function noteOf(decision: DecisionView, notes: Record<string, Record<number, str
 // 按决定标识记在会话里，事件到达、卡片移出等待列表或状态改变以后清除。
 const submitted = new Set<string>();
 
+function sameSelection(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  return leftKeys.every((key) => left[key] === right[key]);
+}
+
+/** 管理 role_choice 多题逐题选项状态：默认按每题 recommended 预选，切题保留有效选择。 */
+export function useRoleChoiceSelection(
+  decisionId: string,
+  questions: readonly RoleChoiceQuestionView[],
+): [Record<string, string>, (questionId: string, optionId: string) => void, () => void] {
+  const [selected, setSelected] = useState<Record<string, string>>(() => defaultRoleChoiceAnswers(questions));
+  const lastDecisionId = useRef(decisionId);
+
+  useEffect(() => {
+    if (lastDecisionId.current !== decisionId) {
+      lastDecisionId.current = decisionId;
+      setSelected(defaultRoleChoiceAnswers(questions));
+      return;
+    }
+    setSelected((previous) => {
+      const reconciled = reconcileRoleChoiceAnswers(questions, previous);
+      return sameSelection(previous, reconciled) ? previous : reconciled;
+    });
+  }, [decisionId, questions]);
+
+  const pick = (questionId: string, optionId: string): void => {
+    setSelected((previous) => (previous[questionId] === optionId ? previous : { ...previous, [questionId]: optionId }));
+  };
+  const reset = (): void => {
+    setSelected(defaultRoleChoiceAnswers(questions));
+  };
+  return [selected, pick, reset];
+}
+
+/** 多题 role_choice 待回答交互区：决定卡片与对话线程气泡共用同一份渲染。 */
+export function RoleChoiceForm(props: {
+  questions: readonly RoleChoiceQuestionView[];
+  actions: RoleChoiceActions;
+  selected: Record<string, string>;
+  note: string;
+  noteMissing: string;
+  disabled: boolean;
+  inputDisabled: boolean;
+  onSelect: (questionId: string, optionId: string) => void;
+  onNote: (note: string) => void;
+  onSubmit: (action: "submit" | "recommended") => void;
+  statusSlot?: React.ReactNode;
+  feedbackSlot?: React.ReactNode;
+}) {
+  const radioPrefix = useId();
+  return (
+    <div className="y10-rc-choices">
+      {props.questions.map((item, index) => (
+        <fieldset key={item.id} className="y10-rc-choice-q">
+          <legend className="y10-rc-choice-stem">
+            {index + 1}. {item.question}
+          </legend>
+          <div className="y10-rc-choice-opts">
+            {item.options.map((option) => {
+              const checked = props.selected[item.id] === option.id;
+              return (
+                <label
+                  key={option.id}
+                  className={`y10-rc-choice-opt${checked ? " is-selected" : ""}${option.recommended ? " is-recommended" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name={`${radioPrefix}-${item.id}`}
+                    value={option.id}
+                    checked={checked}
+                    disabled={props.inputDisabled}
+                    onChange={() => props.onSelect(item.id, option.id)}
+                  />
+                  <span className="y10-rc-choice-opt-body">
+                    <span className="y10-rc-choice-opt-head">
+                      <strong>{option.label}</strong>
+                      {option.recommended ? <span className="y10-rc-rec-badge">推荐</span> : null}
+                    </span>
+                    {option.description === null ? null : (
+                      <small className="y10-rc-choice-opt-desc">{option.description}</small>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {item.rationale === "" ? null : (
+            <p className="y10-rc-choice-rationale">推荐理由：{item.rationale}</p>
+          )}
+        </fieldset>
+      ))}
+      <TextArea
+        label="补充说明（可选）"
+        value={props.note}
+        rows={2}
+        disabled={props.inputDisabled}
+        onInput={props.onNote}
+      />
+      <div className="y10-row row-actions">
+        <button
+          type="button"
+          className="y10-btn small primary"
+          disabled={props.disabled}
+          onClick={() => props.onSubmit("submit")}
+        >
+          {props.actions.submitLabel}
+        </button>
+        <button
+          type="button"
+          className="y10-btn small"
+          disabled={props.disabled}
+          onClick={() => props.onSubmit("recommended")}
+        >
+          {props.actions.recommendedLabel}
+        </button>
+        {props.statusSlot}
+      </div>
+      {props.noteMissing === "" ? null : (
+        <span className="hint" role="status">
+          {props.noteMissing}
+        </span>
+      )}
+      {props.feedbackSlot}
+    </div>
+  );
+}
+
+/** 已回答多题 role_choice 的逐题选择摘要与补充说明展示。 */
+export function RoleChoiceAnsweredBox(props: {
+  summary: RoleChoiceAnsweredView;
+  answeredAt: string | null;
+  resultClassName: string;
+  prefix: string;
+}) {
+  return (
+    <div className="y10-rc-choice-answered-box" role="status">
+      <p className={props.resultClassName}>
+        {props.prefix}：{props.summary.actionLabel}（{formatTime(props.answeredAt)}）
+      </p>
+      <ul className="y10-rc-choice-answered">
+        {props.summary.items.map((item) => (
+          <li key={item.questionId}>
+            <span className="y10-rc-choice-answered-q">{item.question}</span>
+            <span className="y10-rc-choice-answered-a">
+              <strong>{item.optionLabel}</strong>
+              {item.recommended ? <span className="y10-rc-rec-badge">推荐</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {props.summary.note === "" ? null : (
+        <p className="y10-rc-choice-answered-note">补充说明：{props.summary.note}</p>
+      )}
+    </div>
+  );
+}
+
 export function DecisionCard(props: DecisionCardProps) {
   const { decision } = props;
   const [note, setNote] = useState("");
@@ -110,6 +288,14 @@ export function DecisionCard(props: DecisionCardProps) {
   const answered = decision.status !== "open";
   const waiting = decision.status === "open";
   const isSubmitted = waiting && submitted.has(decision.decision_id);
+  const questions = useMemo(() => roleChoiceQuestions(decision), [decision]);
+  const isMultiRoleChoice = questions.length > 0;
+  const rcActions = useMemo(() => roleChoiceActions(decision), [decision]);
+  const rcSummary = useMemo(
+    () => (decision.status === "answered" ? answeredRoleChoiceSummary(decision) : null),
+    [decision],
+  );
+  const [selected, selectQuestion, resetSelection] = useRoleChoiceSelection(decision.decision_id, questions);
 
   // 系统通知点进来的这张卡片：滚到视口里并描边标出（styles.css 的 .decision-card.is-targeted）
   const cardRef = useRef<HTMLElement | null>(null);
@@ -165,6 +351,26 @@ export function DecisionCard(props: DecisionCardProps) {
       });
   };
 
+  const submitRoleChoice = (action: "submit" | "recommended") => {
+    const prepared = prepareRoleChoiceSubmit(decision, rcActions, action, selected, note);
+    if (prepared.payload === null) {
+      setNoteMissing(prepared.missing);
+      return;
+    }
+    setNoteMissing("");
+    void command
+      .submit("decision.answer", prepared.payload)
+      .then((ok) => {
+        if (ok) {
+          submitted.add(decision.decision_id);
+          setNote("");
+          if (action === "recommended") {
+            resetSelection();
+          }
+        }
+      });
+  };
+
   return (
     <article ref={cardRef} className={`y10-card decision-card${answered ? " answered" : ""}${isSubmitted ? " submitted" : ""}${targeted ? " is-targeted" : ""}`} id={`decision-${decision.decision_id}`}>
       <header className="y10-card-head decision-head">
@@ -198,11 +404,37 @@ export function DecisionCard(props: DecisionCardProps) {
         </details>
       ) : null}
       {answered ? (
-        <p className="y10-card-result decision-result" role="status">
-          {decision.status === "answered"
-            ? `已提交：${answeredLabel(decision)}（${formatTime(decision.answer?.answered_at ?? null)}）`
-            : "决定请求已经撤销，卡片不再等待回答"}
-        </p>
+        decision.status === "answered" && rcSummary !== null ? (
+          <RoleChoiceAnsweredBox
+            summary={rcSummary}
+            answeredAt={decision.answer?.answered_at ?? null}
+            resultClassName="y10-card-result decision-result"
+            prefix="已提交"
+          />
+        ) : (
+          <p className="y10-card-result decision-result" role="status">
+            {decision.status === "answered"
+              ? `已提交：${answeredLabel(decision)}（${formatTime(decision.answer?.answered_at ?? null)}）`
+              : "决定请求已经撤销，卡片不再等待回答"}
+          </p>
+        )
+      ) : isMultiRoleChoice ? (
+        <div className="y10-card-answer decision-answer">
+          <RoleChoiceForm
+            questions={questions}
+            actions={rcActions}
+            selected={selected}
+            note={note}
+            noteMissing={noteMissing}
+            disabled={command.busy || isSubmitted || !hasCommand(props.app, "decision.answer")}
+            inputDisabled={isSubmitted}
+            onSelect={selectQuestion}
+            onNote={setNote}
+            onSubmit={submitRoleChoice}
+            statusSlot={isSubmitted ? <span className="y10-card-submitted">已提交，等待控制主机确认</span> : null}
+            feedbackSlot={<CommandFeedback submitted={command.submitted && !isSubmitted} problem={command.problem} />}
+          />
+        </div>
       ) : (
         <div className="y10-card-answer decision-answer">
           <TextArea label="说明（可选）" value={note} rows={2} disabled={isSubmitted} onInput={(value) => setNote(value)} />
@@ -242,8 +474,12 @@ export function DecisionCard(props: DecisionCardProps) {
   );
 }
 
-// 已回答时的显示：优先用回答记录的选项标识，没有时回落到记录的选项名
+// 已回答时的显示：多题 role_choice 返回逐题摘要，单选优先用回答记录的选项标识
 function answeredLabel(decision: DecisionView): string {
+  const rcSummary = answeredRoleChoiceSummary(decision);
+  if (rcSummary !== null) {
+    return rcSummary.summaryText;
+  }
   const answer = decision.answer;
   if (answer === null) {
     return "已回答";
