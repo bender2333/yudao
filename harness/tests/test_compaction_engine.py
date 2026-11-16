@@ -49,7 +49,9 @@ def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path)
     assert "FIRST_TOOL_ORIGINAL " * 100 not in json_dumps(last.input_items)
     events = system.store.list_events(run_id)
     raw_tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
-    assert system.artifacts.get_text(raw_tool.payload["output_ref"]["content_hash"]).count("FIRST_TOOL_ORIGINAL") == 2200
+    expected_count = (system.workspace(run_id).root / "large.txt").read_text(encoding="utf-8").count("FIRST_TOOL_ORIGINAL")
+    assert expected_count >= 2200
+    assert system.artifacts.get_text(raw_tool.payload["output_ref"]["content_hash"]).count("FIRST_TOOL_ORIGINAL") == expected_count
     for request, manifest in zip(adapter.invocations, result.manifests):
         pinned_index = 1 if request.purpose == "compaction" else 0
         assert request.input_items[pinned_index]["content"].startswith(f"[intend]\n{original}\n\n[current_work]\n")
@@ -98,6 +100,7 @@ def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tm
     source = next(event for event in system.store.list_events(run_id)
                   if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
     original = system.artifacts.get_text(source.payload["output_ref"]["content_hash"])
+    expected_count = (system.workspace(run_id).root / "large.txt").read_text(encoding="utf-8").count("FIRST_TOOL_ORIGINAL")
     system.workspace(run_id).write_file("large.txt", "SECOND_TOOL_ORIGINAL " * 2200)
     reloaded = LoopSystem.for_testing(tmp_path, adapter, resume_on_startup=False)
     result = reloaded.activate_once(run_id)
@@ -111,7 +114,7 @@ def test_changed_contract_rebuilds_compaction_from_preserved_original_sources(tm
     assert source.event_id in {ref["event_id"] for record in later for ref in record["source_refs"]}
     assert first_checkpoint in {record["source_event_id"] for record in result.compactions}
     assert system.artifacts.get_text(source.payload["output_ref"]["content_hash"]) == original
-    assert original.count("FIRST_TOOL_ORIGINAL") == 2200
+    assert expected_count >= 2200 and original.count("FIRST_TOOL_ORIGINAL") == expected_count
     assert later[-1]["checkpoint"]["boundary"]
     product_invocations = [r for r in adapter.invocations if r.department == "product"]
     assert recorded_context(reloaded, product_invocations[-1]).manifest.compaction_event_id == later[-1]["source_event_id"]
@@ -200,7 +203,7 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
 
 
 def _tight_window_runner(tmp_path, respond, *, room=COMPACTION_ROOM, task="Original intent",
-                         keys=("product", "engineering", "quality")):
+                         keys=("product", "engineering", "quality"), margin: int = 400):
     """窗口按三个部门里最长的固定材料推出（pinned_window，测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
 
     历史超过压缩阈值，而未压缩的工作请求仍放得下。窗口低于实测的可行区间时未压缩的工作请求放不下
@@ -214,7 +217,7 @@ def _tight_window_runner(tmp_path, respond, *, room=COMPACTION_ROOM, task="Origi
     run_id = system.create_run(task, context_window=window)
     # 大文件按「窗口的 85%（压缩阈值）减去产品的固定材料」定尺寸：读一次就顶过阈值，未压缩的请求仍放得下
     system.workspace(run_id).write_file(
-        "large.txt", oversized_file(window, pinned_input_tokens(system, measure_id, "product")))
+        "large.txt", oversized_file(window, pinned_input_tokens(system, measure_id, "product"), margin=margin))
     system.workspace(run_id).write_file("small.txt", "SMALL_TOOL_OUTPUT " * 4)
     return system, adapter, run_id
 
@@ -246,8 +249,9 @@ def test_a_compaction_failure_in_an_ask_branch_does_not_make_it_unanswerable(tmp
             return answer_turn("Yes, print in uppercase.")(request)
         return _read(request, "large.txt") if count == 0 else product_spec()
 
+    # 询问分支收紧移除提交工具与 ask_user（工单 #1801）后固定材料比主线产品略短，放大 margin 使分支也超过 85% 阈值
     system, adapter, run_id = _tight_window_runner(
-        tmp_path, respond, keys=("product", "engineering", "quality", "product:ask"))
+        tmp_path, respond, keys=("product", "engineering", "quality", "product:ask"), margin=1000)
     # PRD 被接纳以后工程才开始一轮，询问在那里发出（工单 #557）
     result = system.activate_once(run_id)
     assert result.product_spec is not None
