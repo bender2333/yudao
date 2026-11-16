@@ -423,6 +423,7 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
     from harness.definitions import DEFAULT_FORM
     from harness.engine import StepLimits
     from harness.tests.signals import Signals, SignallingAdapter
+    from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
     from harness.tightening import WATCHED_OUTPUTS
 
     questions = [
@@ -450,6 +451,7 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
     decision_id_box: list[str] = []
     snapshots: dict[str, Any] = {}
     timings: dict[str, int] = {}
+    thread_errors: list[BaseException] = []
 
     defs = _definitions_with_ask_user(data_dir / "defs_wait")
     signals = Signals({"ask_opened": "工程已发出 role_choice 决定请求"})
@@ -465,7 +467,7 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
     system = LoopSystem.for_testing(
         data_dir / "run_wait",
         adapter,
-        step_limits=StepLimits(department_max_time_sec={"engineering": 0.6}),
+        step_limits=StepLimits(department_max_time_sec={"engineering": 1.2}),
         forms={DEFAULT_FORM: (defs, WATCHED_OUTPUTS)},
     )
     try:
@@ -477,43 +479,50 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
             for event in events:
                 if event.type == EventType.DECISION_REQUESTED and (event.payload or {}).get("kind") == "role_choice":
                     decision_id_box.append(event.event_id)
-                    snapshots["while_waiting"] = _departments(application, project_id, work_item_id)
-                    snapshots["overview_while_waiting"] = application.query(
-                        "project.overview", ProjectOverview(project_id=project_id, work_item=work_item_id)
-                    ).data.work_items[0]
-                    signals.fire("ask_opened")
                     eng_waiting.set()
                 elif event.type == EventType.ACTIVATION_FINISHED and event.department == "quality":
-                    if "after_qa" not in snapshots:
-                        snapshots["after_qa"] = _departments(application, project_id, work_item_id)
-                        qa_finished.set()
+                    qa_finished.set()
 
         system.store.subscribe(on_events)
 
         def answer_after_qa_and_pause() -> None:
-            assert eng_waiting.wait(timeout=5.0)
-            assert qa_finished.wait(timeout=5.0)
-            # 此时质检已完成本轮、唯独工程等待用户：等待 0.75 秒超过工程单职能 0.6 秒上限，
-            # 运行与会话计时器保持暂停（wait 前后已用毫秒完全不变），且单职能限时按实际等待时长顺延
-            eng_session_id = system.project(run_id).sessions["engineering"].session_id
-            timings["run_before"] = system.orchestrator._elapsed_ms(run_id)
-            timings["eng_before"] = int(system.orchestrator._session_elapsed_sec(run_id, eng_session_id) * 1000)
-            time.sleep(0.75)
-            timings["run_after"] = system.orchestrator._elapsed_ms(run_id)
-            timings["eng_after"] = int(system.orchestrator._session_elapsed_sec(run_id, eng_session_id) * 1000)
-            dec = next(item for item in saved_decisions(system.store, statuses=("open",))[1]
-                       if item.decision_id == decision_id_box[0])
-            cmd = Command(str(uuid.uuid4()), "decision.answer", "sha256:rc", "user:local")
-            system.orchestrator.answer_decision(
-                dec.decision_id, "submit", "按推荐与约定", base_version=dec.version,
-                command=cmd, answers={"q1": "nonzero"},
-            )
+            try:
+                assert eng_waiting.wait(timeout=WAIT_FOR_HOST_WORK_SEC)
+                snapshots["while_waiting"] = _departments(application, project_id, work_item_id)
+                snapshots["overview_while_waiting"] = application.query(
+                    "project.overview", ProjectOverview(project_id=project_id, work_item=work_item_id)
+                ).data.work_items[0]
+                signals.fire("ask_opened")
+                assert qa_finished.wait(timeout=WAIT_FOR_HOST_WORK_SEC)
+                snapshots["after_qa"] = _departments(application, project_id, work_item_id)
+                # 此时质检已完成本轮、唯独工程等待用户：等待 1.4 秒超过工程单职能 1.2 秒上限，
+                # 运行与会话计时器保持暂停（wait 前后已用毫秒完全不变），且单职能限时按实际等待时长顺延
+                eng_session_id = system.project(run_id).sessions["engineering"].session_id
+                timings["run_before"] = system.orchestrator._elapsed_ms(run_id)
+                timings["eng_before"] = int(system.orchestrator._session_elapsed_sec(run_id, eng_session_id) * 1000)
+                time.sleep(1.4)
+                timings["run_after"] = system.orchestrator._elapsed_ms(run_id)
+                timings["eng_after"] = int(system.orchestrator._session_elapsed_sec(run_id, eng_session_id) * 1000)
+                dec = next(item for item in saved_decisions(system.store, statuses=("open",))[1]
+                           if item.decision_id == decision_id_box[0])
+                cmd = Command(str(uuid.uuid4()), "decision.answer", "sha256:rc", "user:local")
+                system.orchestrator.answer_decision(
+                    dec.decision_id, "submit", "按推荐与约定", base_version=dec.version,
+                    command=cmd, answers={"q1": "nonzero"},
+                )
+            except BaseException as exc:
+                thread_errors.append(exc)
+                try:
+                    system.orchestrator.cancel(run_id)
+                except Exception:
+                    pass
 
         answerer = threading.Thread(target=answer_after_qa_and_pause, daemon=True)
         answerer.start()
         result = system.run_until_stop(run_id)
-        answerer.join(timeout=5.0)
+        answerer.join(timeout=WAIT_FOR_HOST_WORK_SEC)
 
+        assert not thread_errors, repr(thread_errors)
         assert adapter.wait_failures == []
         assert result.status == "done"
         assert snapshots["overview_while_waiting"].status == "in_progress"
@@ -526,7 +535,7 @@ def test_role_choice_marks_only_asker_waiting_user_without_blocking_other_depart
         assert after_qa["engineering"].state == "waiting_user"
         assert after_qa["quality"].state == "waiting"
 
-        # 验证纯等待的 0.75s 未增加工程会话累计耗时与运行总墙钟耗时（同时工程未因 0.6s 限时超时）
+        # 验证纯等待的 1.4s 未增加工程会话累计耗时与运行总墙钟耗时（同时工程未因 1.2s 限时超时）
         assert timings["run_after"] == timings["run_before"]
         assert timings["eng_after"] == timings["eng_before"]
         assert result.delivery_spec is not None
@@ -539,6 +548,7 @@ def test_waiting_role_choice_is_withdrawn_when_run_cancels_or_ends(data_dir):
     import threading
     from harness.definitions import DEFAULT_FORM
     from harness.tests.signals import Signals, SignallingAdapter
+    from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
     from harness.tightening import WATCHED_OUTPUTS
 
     questions = [
@@ -551,6 +561,7 @@ def test_waiting_role_choice_is_withdrawn_when_run_cancels_or_ends(data_dir):
         }
     ]
     opened = threading.Event()
+    cancel_errors: list[BaseException] = []
     defs = _definitions_with_ask_user(data_dir / "defs_cancel")
     signals = Signals({"ask_opened": "工程已发出 role_choice 决定请求"})
     adapter = SignallingAdapter(
@@ -580,13 +591,22 @@ def test_waiting_role_choice_is_withdrawn_when_run_cancels_or_ends(data_dir):
         system.store.subscribe(on_events)
 
         def cancel_when_waiting() -> None:
-            assert opened.wait(timeout=5.0)
-            system.orchestrator.cancel(run_id)
+            try:
+                assert opened.wait(timeout=WAIT_FOR_HOST_WORK_SEC)
+                system.orchestrator.cancel(run_id)
+            except BaseException as exc:
+                cancel_errors.append(exc)
+                try:
+                    system.orchestrator.cancel(run_id)
+                except Exception:
+                    pass
 
         canceller = threading.Thread(target=cancel_when_waiting, daemon=True)
         canceller.start()
         result = system.run_until_stop(run_id)
-        canceller.join(timeout=5.0)
+        canceller.join(timeout=WAIT_FOR_HOST_WORK_SEC)
+
+        assert not cancel_errors, repr(cancel_errors)
 
         assert result.status == "failed"
         assert result.stop_reason == "cancelled"
