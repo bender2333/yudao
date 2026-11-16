@@ -517,6 +517,38 @@ html.is-annotate .y10-block { outline: 1.5px dashed color-mix(in srgb, var(--vio
 .y10-card-submitted { color: var(--blue); font-size: 12.5px; }
 .y10-card-result { color: var(--green); font-weight: 600; }
 .y10-card-foot { display: flex; justify-content: flex-end; }
+.y10-rc-choices { display: grid; gap: 10px; }
+.y10-rc-choice-q {
+  margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface-2); display: grid; gap: 8px; min-width: 0;
+}
+.y10-rc-choice-stem { font-size: 13px; font-weight: 600; color: var(--text); padding: 0 4px; overflow-wrap: anywhere; }
+.y10-rc-choice-opts { display: grid; gap: 6px; }
+.y10-rc-choice-opt {
+  display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px;
+  border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); cursor: pointer;
+}
+.y10-rc-choice-opt:hover { border-color: var(--green); }
+.y10-rc-choice-opt.is-selected { border-color: var(--green); background: var(--tint); }
+.y10-rc-choice-opt input[type="radio"] { margin: 3px 0 0; accent-color: var(--green); flex: none; }
+.y10-rc-choice-opt-body { display: grid; gap: 2px; min-width: 0; }
+.y10-rc-choice-opt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.y10-rc-choice-opt-desc { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.y10-rc-rec-badge {
+  display: inline-flex; align-items: center; padding: 0 6px; height: 18px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; color: var(--green); background: var(--tint);
+  border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+}
+.y10-rc-choice-rationale { margin: 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.y10-rc-choice-answered-box { display: grid; gap: 6px; }
+.y10-rc-choice-answered {
+  list-style: none; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface-2); display: grid; gap: 6px; font-size: 12.5px;
+}
+.y10-rc-choice-answered li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.y10-rc-choice-answered-q { color: var(--muted); overflow-wrap: anywhere; }
+.y10-rc-choice-answered-a { display: inline-flex; align-items: center; gap: 6px; }
+.y10-rc-choice-answered-note { margin: 0; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 
 /* ---------------------------------------------------------------- 时间轴与回放 */
 
