@@ -626,3 +626,62 @@ def test_stream_handler_protocol_declares_the_five_methods_and_signatures():
         if hasattr(StreamHandler, name)
     }
     assert declared == expected
+
+
+def test_apply_decision_event_copies_non_empty_answers_and_keeps_legacy_events_compatible():
+    # 守护 R1 与 R2：DECISION_ANSWERED 含非空 answers 时拷入 decision.answer["answers"] 且隔离外部修改；
+    # answers 为空字典、None 或旧事件缺少该字段时省略 answers 键，保持既有结构不变
+    decisions: dict[str, DecisionRequest] = {}
+    for idx in (1, 2, 3):
+        apply_decision_event(
+            decisions,
+            _make_run_event(
+                SkeletonEventType.DECISION_REQUESTED,
+                f"evt_rc_req_{idx}",
+                position=idx,
+                stream="run:rc",
+                payload={"kind": "role_choice", "blocks": "round"},
+            ),
+        )
+
+    provided = {"q1": "opt_a", "q2": "opt_b"}
+    apply_decision_event(
+        decisions,
+        _make_run_event(
+            SkeletonEventType.DECISION_ANSWERED,
+            "evt_rc_ans_1",
+            position=4,
+            stream="run:rc",
+            actor="user:local",
+            command_id="cmd_rc_1",
+            payload={
+                "decision_id": "evt_rc_req_1",
+                "option": "submit",
+                "note": "按建议处理",
+                "base_version": 1,
+                "answers": provided,
+            },
+        ),
+    )
+    provided["q1"] = "tampered"
+    assert decisions["evt_rc_req_1"].status == "answered"
+    assert decisions["evt_rc_req_1"].answer["answers"] == {"q1": "opt_a", "q2": "opt_b"}
+
+    for idx, empty_answers in ((2, {}), (3, None)):
+        apply_decision_event(
+            decisions,
+            _make_run_event(
+                SkeletonEventType.DECISION_ANSWERED,
+                f"evt_rc_ans_{idx}",
+                position=3 + idx,
+                stream="run:rc",
+                payload={
+                    "decision_id": f"evt_rc_req_{idx}",
+                    "option": "continue",
+                    "note": None,
+                    "base_version": 1,
+                    "answers": empty_answers,
+                },
+            ),
+        )
+        assert "answers" not in decisions[f"evt_rc_req_{idx}"].answer

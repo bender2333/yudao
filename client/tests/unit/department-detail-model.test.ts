@@ -165,11 +165,11 @@ test("模型与 Prompt 每项写明跟随发布还是本项目写入，按这一
   assert.equal(sourceText(false), FOLLOW_SOURCE);
 });
 
-test("「本职能的模型请求」到设置页的「模型请求与用量」，带着这个职能进来就生效", () => {
+test("「本职能的模型请求」到「事项与用量」页的「模型请求与用量」，带着这个职能进来就生效", () => {
   const hash = requestsPath("p1", "w1", "engineering");
   const route = parseRoute(hash);
-  assert.equal(route.name, "settings");
-  assert.equal(route.settingsSection, "requests");
+  assert.equal(route.name, "items");
+  assert.equal(route.itemsTab, "requests");
   assert.equal(route.requestFilters.department, "engineering");
   assert.equal(route.workItemId, "w1");
   // 没有事项范围时不写 w

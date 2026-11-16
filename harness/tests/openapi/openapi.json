@@ -8383,6 +8383,20 @@
               }
             ],
             "title": "Note"
+          },
+          "answers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answers"
           }
         },
         "additionalProperties": false,
@@ -8433,6 +8447,20 @@
             "type": "string",
             "format": "date-time",
             "title": "Answered At"
+          },
+          "answers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answers"
           }
         },
         "additionalProperties": false,
@@ -8609,6 +8637,9 @@
               },
               {
                 "$ref": "#/components/schemas/CannotVerifyRequested"
+              },
+              {
+                "$ref": "#/components/schemas/RoleChoiceRequested"
               },
               {
                 "$ref": "#/components/schemas/KernelModificationRequested"
@@ -14598,6 +14629,183 @@
           "checks"
         ],
         "title": "ReviewEntry"
+      },
+      "RoleChoiceOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "RoleChoiceOption"
+      },
+      "RoleChoiceQuestion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/RoleChoiceOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "recommended": {
+            "type": "string",
+            "title": "Recommended"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "options",
+          "recommended",
+          "rationale"
+        ],
+        "title": "RoleChoiceQuestion"
+      },
+      "RoleChoiceRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "role_choice",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "round",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts",
+            "default": []
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/RoleChoiceQuestion"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id"
+          },
+          "input_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Version"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "department",
+          "questions"
+        ],
+        "title": "RoleChoiceRequested"
       },
       "RoomCrt": {
         "properties": {
@@ -24242,6 +24450,20 @@
           "base_version": {
             "title": "Base Version",
             "type": "integer"
+          },
+          "answers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answers"
           }
         },
         "required": [
@@ -24420,6 +24642,9 @@
               },
               {
                 "$ref": "#/components/schemas/CannotVerifyRequested"
+              },
+              {
+                "$ref": "#/components/schemas/RoleChoiceRequested"
               }
             ],
             "title": "Payload"

@@ -2160,12 +2160,12 @@ class Orchestrator:
         transaction.on_commit(lambda: self._wake(run_id))
 
     def answer_decision(self, decision_id: str, option: str, note: str | None, *, base_version: int,
-                        command: Command) -> str | None:
+                        command: Command, answers: dict[str, str] | None = None) -> str | None:
         # 决定请求的处理在应用层（工单 #827）：薄驱动只转交。返回回答以后需要继续执行的 run，由调用方开始
         # （start）；没有时为空。核对不通过时的 DecisionNotFound、DecisionClosed、StaleDecision、
         # InvalidOption 与 NoteRequired 照旧向上抛出
         return self.decision_flow.answer_decision(self, decision_id, option, note, base_version=base_version,
-                                                  command=command)
+                                                  command=command, answers=answers)
 
     def create_revision_run(self, project_id: str, candidate: Any, run_id: str, round_number: int,
                             note: str | None) -> None:

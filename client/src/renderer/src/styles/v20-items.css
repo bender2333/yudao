@@ -77,3 +77,181 @@
 .v20-all-items-stop { color: var(--amber); font-size: 12px; }
 
 .v20-all-items-identity { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+/* 工单 #1809：「事项与用量」页（子视图切换、统计条、状态筛选与事项卡片） */
+.v20-items-page { display: flex; flex-direction: column; gap: 14px; }
+
+.v20-it-subtabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  align-self: flex-start;
+}
+
+.v20-it-subtab {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.v20-it-subtab:hover { color: var(--text); background: var(--soft); }
+.v20-it-subtab.is-active {
+  color: var(--on-accent);
+  background: var(--green);
+}
+
+.v20-it-body { display: flex; flex-direction: column; gap: 12px; }
+
+.v20-it-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.v20-it-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.v20-it-stat-label { font-size: 12px; color: var(--muted); }
+.v20-it-stat-value { font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.v20-it-stat.is-progress .v20-it-stat-value { color: var(--green); }
+.v20-it-stat.is-warn .v20-it-stat-value { color: var(--amber); }
+.v20-it-stat.is-released .v20-it-stat-value { color: var(--teal); }
+.v20-it-stat.is-open-loop .v20-it-stat-value { color: var(--blue); }
+.v20-it-stat.is-stopped .v20-it-stat-value { color: var(--red); }
+
+.v20-it-slotbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 12.5px;
+}
+
+.v20-it-slotlabel { font-weight: 600; color: var(--text); }
+.v20-it-slotval { color: var(--green); font-variant-numeric: tabular-nums; }
+
+.v20-it-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.v20-it-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.v20-it-filter:hover { color: var(--text); border-color: var(--line-strong); }
+.v20-it-filter.is-active {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--tint);
+  font-weight: 500;
+}
+
+.v20-it-count {
+  font-size: 11.5px;
+  font-family: var(--mono);
+  color: var(--muted);
+}
+
+.v20-it-groups { display: flex; flex-direction: column; gap: 14px; }
+.v20-it-group { display: flex; flex-direction: column; gap: 8px; }
+
+.v20-it-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.v20-it-group-title { margin: 0; font-size: 13.5px; font-weight: 600; }
+
+.v20-it-list { display: flex; flex-direction: column; gap: 8px; }
+
+.v20-it-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.v20-it-card.is-selected {
+  border-color: var(--green);
+  background: var(--tint);
+}
+
+.v20-it-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.v20-it-title-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.v20-it-title { font-size: 14px; font-weight: 600; }
+.v20-it-id { font-size: 11.5px; font-family: var(--mono); color: var(--faint); }
+.v20-it-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.v20-it-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.v20-it-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--line);
+  font-size: 12.5px;
+}
+
+.v20-it-stop-reason { color: var(--red); font-weight: 500; }
+.v20-it-warn { margin: 0; font-size: 12.5px; color: var(--red); }
+.v20-it-question { margin: 0; font-size: 12.5px; color: var(--amber); }
+
+.v20-it-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
