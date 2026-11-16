@@ -375,20 +375,6 @@ export const CANDIDATE_TEST_STATUS_LABELS: Record<string, string> = {
   failed: "测试未通过",
 };
 
-// 失败在哪一组、哪一步：服务端给的是内部标识，页面上写中文（不出现英文标识）
-export const CANDIDATE_TEST_GROUP_LABELS: Record<string, string> = {
-  minimal_qa: "最小问答",
-  tool_round_trip: "工具往返",
-};
-
-export const CANDIDATE_TEST_STEP_LABELS: Record<string, string> = {
-  request: "请求",
-  tool_call: "调用测试工具",
-  tool_call_retry: "不要求调用工具重试",
-  tool_result: "回传工具结果",
-  save_capability: "保存测试能力",
-};
-
 // 容量未知的候选没有可以发送的参数（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）：
 // 缺窗口与输出上限中的哪一项，按服务的候选字段判
 export function candidateMissingCapacity(candidate: CatalogCandidate): string[] {
@@ -402,43 +388,15 @@ export function candidateMissingCapacity(candidate: CatalogCandidate): string[] 
   return missing;
 }
 
-// 是否接受要求调用工具：未读到时不猜
-function acceptsRequiredToolText(value: boolean | null | undefined): string {
-  if (value === true) {
-    return "接受要求调用工具";
-  }
-  if (value === false) {
-    return "不接受要求调用工具";
-  }
-  return "是否接受要求调用工具：未读到";
-}
-
-// 未通过时的一组、一步与原因（401 与 403 只写状态码与含义，由服务端给）。
-// 服务端的 error 常常已经带着「组 / 步骤：」前缀，这里只在缺前缀时补上，同一段话不写两遍
+// 失败时的简明原因：未给出时兜底写「未给出原因」，不在候选行展示组与步骤诊断信息。
 function candidateTestFailureText(test: CatalogCandidateTestState): string {
-  const group = CANDIDATE_TEST_GROUP_LABELS[test.failure_group ?? ""] ?? "";
-  const step = CANDIDATE_TEST_STEP_LABELS[test.failure_step ?? ""] ?? "";
-  const where = [group, step].filter((item) => item !== "").join(" / ");
   const reason = (test.error ?? "").trim();
-  if (reason === "") {
-    return where === "" ? "未给出原因" : `${where}：未给出原因`;
-  }
-  if (where === "" || reason.startsWith(`${where}：`)) {
-    return reason;
-  }
-  return `${where}：${reason}`;
+  return reason === "" ? "未给出原因" : reason;
 }
 
-// 一个候选测试的状态与结果：等待测试、测试中、测试通过（用时、实际返回的模型、是否接受要求调用工具）、
-// 测试未通过（哪一组、哪一步与上游给出的原因）
+// 一个候选测试的状态与结果：等待测试、测试中、测试通过、测试未通过（简明原因）
 export function candidateTestResultText(test: CatalogCandidateTestState): string {
   const label = CANDIDATE_TEST_STATUS_LABELS[test.status] ?? "";
-  if (test.status === "passed") {
-    const elapsed = typeof test.elapsed_ms === "number" ? `${test.elapsed_ms} 毫秒` : "未读到";
-    const actual = test.actual_model ?? "未读到";
-    return `${label}：用时 ${elapsed}，实际返回的模型：${actual}，`
-      + acceptsRequiredToolText(test.accepts_required_tool_call);
-  }
   if (test.status === "failed") {
     return `${label}：${candidateTestFailureText(test)}`;
   }
@@ -447,7 +405,7 @@ export function candidateTestResultText(test: CatalogCandidateTestState): string
 
 // 一个候选行上的测试按钮与状态（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）：
 // 没有选用的、适用于职能任务的候选才有按钮；容量未知与正在等待或测试中的按钮不可用；
-// 通过与未通过以后按钮写「重新测试」
+// 按钮文案在各状态下始终保持「测试」。
 export type CandidateTestView = {
   visible: boolean;
   enabled: boolean;
@@ -467,11 +425,10 @@ export function candidateTestView(input: {
   }
   const missing = candidateMissingCapacity(input.candidate);
   const inProgress = test !== null && (test.status === "waiting" || test.status === "testing");
-  const hasResult = test !== null && (test.status === "passed" || test.status === "failed");
   return {
     visible: true,
     enabled: !input.busy && missing.length === 0 && !inProgress,
-    buttonText: hasResult ? "重新测试" : "测试",
+    buttonText: "测试",
     note: missing.length === 0 ? "" : `先选用并填写容量（${capacityMissingText(missing)}）`,
     state: test === null ? "" : candidateTestResultText(test),
   };
@@ -851,6 +808,62 @@ export function modelInputOf(model: CatalogModel): Record<string, unknown> {
     default_reasoning_level: model.default_reasoning_level,
     reasoning_mode: model.reasoning_mode,
   };
+}
+
+// 目录里的连接 → 保存时要写的一份（catalog.connection.save 的 provider 字段）
+export function providerInputOf(provider: CatalogProvider): Record<string, unknown> {
+  return {
+    id: provider.id,
+    name: provider.name,
+    base_url: provider.base_url,
+    credential_ref: provider.credential_ref,
+    timeout_sec: provider.timeout_sec,
+    preset_id: provider.preset_id,
+    models_url: provider.models_url,
+  };
+}
+
+// 模型是否支持图像输入
+export function modelSupportsImage(inputModalities: readonly string[]): boolean {
+  return inputModalities.includes("image");
+}
+
+// 已选用模型详情页展示的图像输入文案
+export function modelImageInputLabel(inputModalities: readonly string[]): string {
+  return modelSupportsImage(inputModalities) ? "支持" : "不支持";
+}
+
+// 切换模型是否支持图像输入后的输入方式列表（保持包含文本）
+export function toggledImageModalities(
+  inputModalities: readonly string[],
+  supportsImage: boolean,
+): string[] {
+  const base = inputModalities.filter((item) => item !== "image");
+  if (base.length === 0) {
+    base.push("text");
+  }
+  return supportsImage ? [...base, "image"] : base;
+}
+
+// 仅在窗口与输出上限均已确定时允许直接保存图像输入切换（容量未知的定义需先填容量）
+export function canToggleSelectedImage(
+  row: Pick<SelectedModelRow, "context_window" | "max_output_tokens">,
+): boolean {
+  return row.context_window !== null && row.max_output_tokens !== null;
+}
+
+// 只修改目标模型的图像输入方式，其余模型与字段原样保留
+export function providerModelsWithImageToggled(
+  models: readonly CatalogModel[],
+  modelId: string,
+  supportsImage: boolean,
+): Record<string, unknown>[] {
+  return models.map((model) => (model.id === modelId
+    ? {
+      ...modelInputOf(model),
+      input_modalities: toggledImageModalities(model.input_modalities, supportsImage),
+    }
+    : modelInputOf(model)));
 }
 
 // ---------------------------------------------------------------------------

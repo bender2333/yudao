@@ -7,10 +7,12 @@ import assert from "node:assert/strict";
 import {
   CANDIDATES_PER_PAGE,
   admittedModels,
+  canToggleSelectedImage,
   candidateKey,
   candidatePageAfter,
   candidatePageCount,
   candidatePageView,
+  candidateTestResultText,
   candidateTestView,
   capacityInputIssue,
   capacityKnown,
@@ -28,11 +30,14 @@ import {
   matchesSearch,
   mergedModelId,
   modelById,
+  modelImageInputLabel,
+  modelSupportsImage,
   removalRejectionText,
   selectedModelRows,
   selectionStatusKind,
   selectionStatusLabel,
   tierOptions,
+  toggledImageModalities,
 } from "../../src/renderer/src/views/models/model-logic.ts";
 
 // 一个候选：窗口与输出上限已知，协议按服务端给的值
@@ -214,7 +219,7 @@ test("候选测试：容量未知的按钮不可用，并写明缺哪一项", ()
   assert.doesNotMatch(output.note, /缺少窗口/);
 });
 
-test("候选测试：等待测试、测试中、测试通过三种状态的文字，完成后按钮改为重新测试", () => {
+test("候选测试：等待测试、测试中、测试通过三种状态的文字精简，按钮文案始终为「测试」", () => {
   const waiting = candidateTestView({
     candidate: candidate("m", { test: candidateTest({ status: "waiting" }) }), selected: false, busy: false,
   });
@@ -234,59 +239,72 @@ test("候选测试：等待测试、测试中、测试通过三种状态的文�
       status: "passed", elapsed_ms: 1234, actual_model: "maker/m-real", accepts_required_tool_call: true,
     }) }), selected: false, busy: false,
   });
-  assert.equal(passed.buttonText, "重新测试");
+  assert.equal(passed.buttonText, "测试");
   assert.equal(passed.enabled, true);
-  assert.match(passed.state, /测试通过/);
-  assert.match(passed.state, /用时 1234 毫秒/);
-  assert.match(passed.state, /实际返回的模型：maker\/m-real/);
-  assert.match(passed.state, /接受要求调用工具/);
+  assert.equal(passed.state, "测试通过");
 
   const notAccepted = candidateTestView({
     candidate: candidate("m", { test: candidateTest({
-      status: "passed", elapsed_ms: 20, actual_model: "m", accepts_required_tool_call: false,
+      status: "passed", elapsed_ms: 20, actual_model: "maker/m-other", accepts_required_tool_call: false,
     }) }), selected: false, busy: false,
   });
-  assert.match(notAccepted.state, /不接受要求调用工具/);
+  assert.equal(notAccepted.buttonText, "测试");
+  assert.equal(notAccepted.state, "测试通过");
+  for (const text of [passed.state, notAccepted.state]) {
+    assert.doesNotMatch(text, /毫秒|实际返回的模型|maker\/|接受要求调用工具|不接受要求调用工具/);
+  }
 });
 
-test("候选测试未通过：写明哪一组、哪一步与原因，页面上不出现内部标识", () => {
+test("候选测试未通过：只展示「测试未通过：<简明原因>」，按钮保持「测试」", () => {
   const failed = candidateTestView({
     candidate: candidate("m", { test: candidateTest({
-      status: "failed", failure_group: "tool_round_trip", failure_step: "tool_call",
-      error: "工具往返 / 调用测试工具：模型没有调用测试工具",
+      status: "failed", failure_group: "minimal_qa", failure_step: "request",
+      error: "连接超时",
     }) }), selected: false, busy: false,
   });
-  assert.equal(failed.buttonText, "重新测试");
+  assert.equal(failed.buttonText, "测试");
   assert.equal(failed.enabled, true);
-  assert.match(failed.state, /测试未通过/);
-  assert.match(failed.state, /工具往返/);
-  assert.match(failed.state, /调用测试工具/);
-  assert.match(failed.state, /模型没有调用测试工具/);
-  // 同一段话不写两遍
-  assert.equal((failed.state.match(/工具往返/g) ?? []).length, 1);
+  assert.equal(failed.state, "测试未通过：连接超时");
 
-  // 服务端只给出内部标识时页面写中文；401 与 403 只出现状态码与含义
+  const missingReason = candidateTestView({
+    candidate: candidate("m", { test: candidateTest({
+      status: "failed", failure_group: "tool_round_trip", failure_step: "tool_call", error: "   ",
+    }) }), selected: false, busy: false,
+  });
+  assert.equal(missingReason.buttonText, "测试");
+  assert.equal(missingReason.state, "测试未通过：未给出原因");
+
   const unauthorized = candidateTestView({
     candidate: candidate("m", { test: candidateTest({
       status: "failed", failure_group: "minimal_qa", failure_step: "request",
       error: "HTTP 401：凭据无效",
     }) }), selected: false, busy: false,
   });
-  assert.match(unauthorized.state, /最小问答/);
-  assert.match(unauthorized.state, /请求/);
-  assert.match(unauthorized.state, /HTTP 401/);
-  assert.match(unauthorized.state, /凭据无效/);
+  assert.equal(unauthorized.state, "测试未通过：HTTP 401：凭据无效");
   const forbidden = candidateTestView({
     candidate: candidate("m", { test: candidateTest({
       status: "failed", failure_group: "minimal_qa", failure_step: "request",
       error: "HTTP 403：没有访问权限",
     }) }), selected: false, busy: false,
   });
-  assert.match(forbidden.state, /HTTP 403/);
-  assert.match(forbidden.state, /没有访问权限/);
-  for (const text of [failed.state, unauthorized.state, forbidden.state]) {
-    assert.doesNotMatch(text, /minimal_qa|tool_round_trip|tool_call|request/);
+  assert.equal(forbidden.state, "测试未通过：HTTP 403：没有访问权限");
+  for (const text of [failed.state, missingReason.state, unauthorized.state, forbidden.state]) {
+    assert.doesNotMatch(text, /minimal_qa|tool_round_trip|tool_call|request|最小问答|工具往返|调用测试工具|实际返回的模型|毫秒|接受要求调用工具/);
   }
+  assert.equal(candidateTestResultText(candidateTest({ status: "passed", elapsed_ms: 88, actual_model: "x" })), "测试通过");
+});
+
+test("已选用模型区的图像输入标签、支持文案与勾选切换计算", () => {
+  assert.equal(modelSupportsImage(["text", "image"]), true);
+  assert.equal(modelSupportsImage(["text"]), false);
+  assert.equal(modelImageInputLabel(["text", "image"]), "支持");
+  assert.equal(modelImageInputLabel(["text"]), "不支持");
+  assert.deepEqual(toggledImageModalities(["text"], true), ["text", "image"]);
+  assert.deepEqual(toggledImageModalities(["text", "image"], true), ["text", "image"]);
+  assert.deepEqual(toggledImageModalities(["text", "image"], false), ["text"]);
+  assert.deepEqual(toggledImageModalities([], false), ["text"]);
+  assert.equal(canToggleSelectedImage({ context_window: 128000, max_output_tokens: 16000 }), true);
+  assert.equal(canToggleSelectedImage({ context_window: null, max_output_tokens: 16000 }), false);
 });
 
 test("候选测试：页面在忙时按钮不可用", () => {

@@ -13,6 +13,8 @@ import {
   fetchNoteText,
   fetchSummaryOf,
   modelInputOf,
+  providerInputOf,
+  providerModelsWithImageToggled,
   selectedModelRows,
 } from "../../src/renderer/src/views/models/model-logic.ts";
 import type {
@@ -247,4 +249,48 @@ test("连接卡片上的最近一次结果：成功写数量与时间，没取�
     "已获取 1 个模型 · 2026-10-30T10:00:00Z");
   assert.deepEqual(fetchSummaryOf(provider("go", "http://a/v1", null)),
     { text: "还没有获取过模型列表。", kind: "none" });
+});
+
+test("已选用模型保留准入与输入方式，手动切换图像输入只更新该模型并保留其余定义与连接字段", () => {
+  const p = provider("go", "http://a/v1", []);
+  const m1 = model("d1", { model: "ag/gemini-3.8-flash-high", input_modalities: ["text"] });
+  const m2 = model("d2", { model: "glm-4.6", input_modalities: ["text", "image"] });
+  const rows = selectedModelRows({
+    providers: [p],
+    models: [m1, m2],
+    admissions: [
+      {
+        model_id: "d1", provider_id: "go", admitted: true, stale: false,
+        admitted_at: "2026-11-16T00:00:00Z", admitted_model: "gemini-3.8-flash",
+        protocol: "chat_completions", base_url: "http://a/v1",
+        credential_ref: "GO_KEY", model: "ag/gemini-3.8-flash-high",
+      },
+    ],
+    selections: [
+      { provider_id: "go", model_id: "d2", model: "glm-4.6", sequence: 1, status: "testing", missing: [], error: null },
+    ],
+  });
+  assert.equal(rows.find((row) => row.model_id === "d1")?.status, "enabled");
+  assert.deepEqual(rows.find((row) => row.model_id === "d1")?.input_modalities, ["text"]);
+  assert.equal(rows.find((row) => row.model_id === "d1")?.admitted_model, "gemini-3.8-flash");
+  assert.deepEqual(rows.find((row) => row.model_id === "d2")?.input_modalities, ["text", "image"]);
+
+  assert.deepEqual(providerInputOf(p), {
+    id: "go",
+    name: "go",
+    base_url: "http://a/v1",
+    credential_ref: "GO_KEY",
+    timeout_sec: 600,
+    preset_id: "",
+    models_url: "",
+  });
+
+  const savedOn = providerModelsWithImageToggled([m1, m2], "d1", true);
+  assert.deepEqual(savedOn[0].input_modalities, ["text", "image"]);
+  assert.equal(savedOn[0].protocol, "chat_completions");
+  assert.deepEqual(savedOn[1].input_modalities, ["text", "image"]);
+
+  const savedOff = providerModelsWithImageToggled([m1, m2], "d2", false);
+  assert.deepEqual(savedOff[0].input_modalities, ["text"]);
+  assert.deepEqual(savedOff[1].input_modalities, ["text"]);
 });
