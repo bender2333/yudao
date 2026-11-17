@@ -115,7 +115,7 @@ export function ConnectCard(props: ConnectCardProps) {
                 <small>{credentialStatusLabel(provider.credential)}</small>
               </span>
               <span className="y10-conn-count mm-count">
-                {summary.kind === "ok" ? summary.text : summary.kind === "error" ? "获取失败" : "未获取"}
+                {summary.kind === "ok" ? "已获取" : summary.kind === "error" ? "获取失败" : "未获取"}
               </span>
             </div>
             <div className="y10-conn-body mm-body">

@@ -227,7 +227,8 @@ def test_department_defaults_save_reports_the_missing_capability(tmp_path):
             assert accepted.status_code == 200, accepted.text
             reminders = accepted.json()["refs"]["reminders"]
             assert len(reminders) == 1
-            assert "quality" in reminders[0] and "text-model" in reminders[0]
+            assert "质检" in reminders[0] and "upstream-a" in reminders[0]
+            assert "quality" not in reminders[0] and "text-model" not in reminders[0]
             assert QUALITY_IMPACT in reminders[0]
             # 一直显示：catalog 返回质检的提醒，其他部门为空
             catalog = _catalog(client)
@@ -315,6 +316,67 @@ def test_workspace_reminder_disappears_after_the_model_gains_the_capability(tmp_
             workspace = client.get("/api/queries/department.workspace",
                                    params={"project_id": project_id, "department": "quality"}).json()["data"]
             assert workspace["reminders"] == []
+
+
+# 守 R2/R3（模型管理 docs/design/model-management.md「职能的建议能力」）：
+# 提醒按定义写出中文职能名（取自 DEFINITIONS.department_labels）与可读模型名（model 字段），
+# 不暴露英文职能键与内部 selected-... 哈希标识
+def test_suggestion_reminder_hides_selected_hash_and_uses_department_label(tmp_path):
+    from harness.providers import suggested
+    from harness.providers.store import ModelDefinition
+
+    hashed_id = "selected-f32c8713bb5752517e3534d6"
+    readable_name = "wb/cn:deepseek-v4.1-flash"
+    expected_text = (
+        f"质检部门的模型建议具备图像输入，当前模型 {readable_name} "
+        f"的输入方式为 文本输入：{QUALITY_IMPACT}"
+    )
+
+    definition = ModelDefinition(
+        id=hashed_id, provider_id="provider-a", model=readable_name,
+        protocol="responses", context_window=32000, max_output_tokens=4096,
+        input_modalities=("text",),
+    )
+    direct = suggested.reminder("quality", definition)
+    assert direct == expected_text
+    assert "quality" not in direct and "selected-" not in direct
+
+    mapping_note = suggested.reminder(
+        "quality", {"id": hashed_id, "model": readable_name, "input_modalities": ["text"]},
+    )
+    assert mapping_note == expected_text
+
+    fallback_note = suggested.reminder(
+        "quality", {"id": "fallback-model-id", "model": "", "input_modalities": ["text"]},
+    )
+    assert fallback_note is not None
+    assert "质检部门的模型建议具备图像输入" in fallback_note
+    assert "fallback-model-id" in fallback_note
+    assert "quality" not in fallback_note
+
+    with _Upstream({"data": []}) as upstream:
+        opened = _Opened(tmp_path, {
+            "providers": [_provider(base_url=upstream.base)],
+            "models": [_document_model(hashed_id, upstream=readable_name, input_modalities=["text"])],
+            "bindings": {},
+        })
+        with running_api(opened) as client:
+            opened.admit(hashed_id)
+            accepted = _save_quality_default(client, hashed_id, base_version=_catalog(client)["revision"])
+            assert accepted.status_code == 200, accepted.text
+            assert accepted.json()["refs"]["reminders"] == [expected_text]
+            catalog = _catalog(client)
+            assert catalog["department_reminders"]["quality"] == [expected_text]
+            assert catalog["model_reminders"][hashed_id]["quality"] == [expected_text]
+            created = _command(client, "project.create", name="P", goal="隐藏内部模型标识")
+            assert created.status_code == 200, created.text
+            project_id = created.json()["refs"]["project_id"]
+            settings = client.get("/api/queries/project.settings",
+                                  params={"project_id": project_id}).json()["data"]
+            assert settings["department_reminders"]["quality"] == [expected_text]
+            workspace = client.get("/api/queries/department.workspace",
+                                   params={"project_id": project_id, "department": "quality"}).json()["data"]
+            assert workspace["reminders"] == [expected_text]
 
 # ---------------------------------------------------------------------------
 # 调用目标按输入方式提供工具（验收第 5 项）
