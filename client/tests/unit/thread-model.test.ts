@@ -13,8 +13,9 @@ import assert from "node:assert/strict";
 
 import {
   LONG_TEXT_LIMIT, ORGANIZATION_CHANGE_NOTE, activeChanged, afterSend, chosenRecipient, decisionsForItem,
-  defaultRecipient, draftChanged, focusRecipient, isLongText, itemThread, organizationChangeAfter, pickRecipient,
-  projectDecisions, receiverOf, recipientHint, recipientOptions, shortText,
+  defaultRecipient, draftChanged, focusRecipient, isLongText, itemThread, normalizeDoneContent,
+  organizationChangeAfter, pickRecipient, projectDecisions, receiverOf, recipientHint, recipientOptions,
+  shortText,
   type ComposerInput, type ComposerState, type ThreadAsk, type ThreadDecision, type ThreadFlowRecord,
   type ThreadItemView, type ThreadOrganization, type ThreadOrganizationChange,
 } from "../../src/renderer/src/views/project/thread-model.ts";
@@ -786,6 +787,117 @@ test("ThreadView 未展开折叠行时直接渲染 PRD 主卡片，并支持就�
   ]) {
     assert.ok(htmlExpanded.includes(snippet), `展开后的 PRD 卡片缺少：${snippet}`);
   }
+});
+
+test("放行与开环完成气泡将字面转义换行规范化为真实换行，并配合气泡样式 pre-wrap 断行展示", async () => {
+  // R1/R3：守 Tb82d83d7-07 放行与完成气泡换行展示，字面 \n1. / \n2. 转为真实换行且单行结论不增添多余换行
+  assert.equal(
+    normalizeDoneContent("核验通过：\\n1. 单元测试通过\\n2. 构建成功\\r\\n3. 验收满足"),
+    "核验通过：\n1. 单元测试通过\n2. 构建成功\n3. 验收满足",
+  );
+  assert.equal(normalizeDoneContent("核验了交付第 2 版：12 条用例通过"), "核验了交付第 2 版：12 条用例通过");
+
+  const releaseEntries = itemThread({
+    item: item({ work_item_id: "w-rel", status: "adopted", organization: three() }),
+    flow: [
+      rec({ flow_id: "del1", kind: "版本交付", position: 1, direction_from: "engineering", direction_to: "quality", content: "交付" }),
+      rec({
+        flow_id: "rel1",
+        kind: "放行",
+        position: 2,
+        direction_from: "quality",
+        direction_to: "engineering",
+        content: "满足全部条件：\\n1. 单测全部通过\\n2. 类型检查无误\\n3. 页面构建完成",
+      }),
+    ],
+    asks: [],
+    decisions: [],
+    expanded: false,
+  });
+  const releaseDone = releaseEntries.find((entry) => entry.kind === "done");
+  assert.ok(releaseDone !== undefined && releaseDone.kind === "done");
+  assert.equal(
+    releaseDone.text,
+    "满足全部条件：\n1. 单测全部通过\n2. 类型检查无误\n3. 页面构建完成",
+  );
+  assert.equal(releaseDone.text.includes("\\n"), false);
+
+  const openLoopEntries = itemThread({
+    item: item({ work_item_id: "w-open", status: "released_unsettled", stop_reason: "open_loop", organization: directOne() }),
+    flow: [
+      rec({
+        flow_id: "del-open",
+        kind: "版本交付",
+        position: 1,
+        direction_from: "engineering",
+        direction_to: null,
+        content: "完成改动：\\n1. 更新配置\\n2. 补充测试",
+      }),
+    ],
+    asks: [],
+    decisions: [],
+    expanded: false,
+  });
+  const openDone = openLoopEntries.find((entry) => entry.kind === "done");
+  assert.ok(openDone !== undefined && openDone.kind === "done");
+  assert.equal(openDone.text, "做完了：完成改动：\n1. 更新配置\n2. 补充测试。开环完成：没有人核验");
+  assert.equal(openDone.text.includes("\\n"), false);
+
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    const js = ts.transpileModule(code, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".ts"] = loader;
+  req.extensions[".tsx"] = loader;
+
+  const hereDir = path.dirname(fileURLToPath(import.meta.url));
+  const threadMod = req(path.resolve(hereDir, "../../src/renderer/src/views/project/thread.tsx"));
+  const html = renderToStaticMarkup(React.createElement(threadMod.ThreadView, {
+    app: null,
+    items: [item({ work_item_id: "w-rel", status: "adopted", organization: three() })],
+    titles: { "w-rel": "换行验收" },
+    flow: [
+      rec({ flow_id: "del1", work_item_id: "w-rel", kind: "版本交付", position: 1, direction_from: "engineering", direction_to: "quality", content: "交付" }),
+      rec({
+        flow_id: "rel1",
+        work_item_id: "w-rel",
+        kind: "放行",
+        position: 2,
+        direction_from: "quality",
+        direction_to: "engineering",
+        content: "核验放行：\\n1. 条目一\\n2. 条目二",
+      }),
+    ],
+    decisions: [],
+    labels: {},
+    selected: "w-rel",
+    opened: {},
+    onToggleItem: () => {},
+    onSelectItem: () => {},
+    onLook: () => {},
+    onSequence: () => {},
+    onNavigate: () => {},
+    scrollSignal: 0,
+  }));
+  assert.ok(html.includes("核验放行：\n1. 条目一\n2. 条目二"), html);
+  assert.equal(html.includes("\\n1."), false);
+
+  const v10Css = fs.readFileSync(path.resolve(hereDir, "../../src/renderer/src/styles/v10-project.css"), "utf8");
+  const bubbleRule = v10Css.match(/\.y10-th-bubble\s*\{([^}]*)\}/);
+  assert.ok(bubbleRule !== null, "缺少 .y10-th-bubble 样式规则");
+  assert.match(bubbleRule[1], /white-space\s*:\s*pre-wrap\b/);
 });
 
 
