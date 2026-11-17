@@ -431,3 +431,168 @@ test("整份现场窗口视图串联工作间、最近请求链接、结果未�
   assert.equal(idleView?.recentRequest, null);
   assert.equal(idleView?.lastCall?.summary, NO_LAST_CALL_TEXT);
 });
+
+test("部门工作间探针与现场窗口兜底订阅使用互不冲突的 viewId，关停兜底订阅不影响探针刷新", async () => {
+  // R2/R3：守 Tb82d83d7-02 订阅隔离合同——探针与现场窗口兜底读各自拥有独立前缀的 viewId
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    let js = ts.transpileModule(code, {
+      compilerOptions: {
+        jsx: ts.JsxEmit.React,
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+        esModuleInterop: true,
+      },
+    }).outputText;
+    js = js.replace(/require\((["'])([^"']+\.css)\?raw\1\)/g, (_m: string, _q: string, rel: string) => {
+      const cssPath = path.resolve(path.dirname(filename), rel);
+      return `({ default: ${JSON.stringify(fs.readFileSync(cssPath, "utf8"))} })`;
+    });
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".ts"] = loader;
+  req.extensions[".tsx"] = loader;
+
+  const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../src/renderer/src/views/project");
+  const liveWindowMod = req(path.join(projectDir, "live-window.tsx"));
+  const { ViewSync } = req(path.resolve(projectDir, "../../contract/view-sync.ts")) as typeof import("../../src/renderer/src/contract/view-sync.ts");
+
+  assert.equal(typeof liveWindowMod.probeWorkspaceViewId, "function", "live-window.tsx 需导出 probeWorkspaceViewId");
+  assert.equal(typeof liveWindowMod.liveWorkspaceViewId, "function", "live-window.tsx 需导出 liveWorkspaceViewId");
+
+  const probeEng = liveWindowMod.probeWorkspaceViewId("engineering");
+  const liveEng = liveWindowMod.liveWorkspaceViewId("engineering");
+  const probeProd = liveWindowMod.probeWorkspaceViewId("product");
+  const liveProd = liveWindowMod.liveWorkspaceViewId("product");
+
+  assert.notEqual(probeEng, liveEng);
+  assert.notEqual(probeProd, liveProd);
+  assert.notEqual(probeEng, probeProd);
+  assert.notEqual(liveEng, liveProd);
+  assert.ok(probeEng.startsWith("page.cv.probe.workspace."), probeEng);
+  assert.ok(liveEng.startsWith("page.cv.live.workspace."), liveEng);
+
+  const convSource = fs.readFileSync(path.join(projectDir, "conversation.tsx"), "utf8");
+  const liveSource = fs.readFileSync(path.join(projectDir, "live-window.tsx"), "utf8");
+  assert.equal(convSource.includes("page.cv.node.workspace."), false, "conversation.tsx 不应继续使用旧共用 viewId");
+  assert.equal(liveSource.includes("page.cv.node.workspace."), false, "live-window.tsx 不应继续使用旧共用 viewId");
+  assert.ok(convSource.includes("probeWorkspaceViewId("));
+  assert.ok(liveSource.includes("liveWorkspaceViewId("));
+
+  // 用真实 ViewSync 验证：关闭现场窗口兜底订阅后，后台探针订阅仍保留并能收到后续事件刷新
+  let guidanceText = "第一条指导";
+  const views = new ViewSync(
+    (async (_query: string, params: Record<string, unknown> | undefined) => ({
+      position: guidanceText === "第一条指导" ? 1 : 2,
+      data: { department: params?.["department"], guidanceText },
+    })) as import("../../src/renderer/src/contract/view-sync.ts").QueryRunner,
+    { queries: [{ name: "department.workspace", changed_by: ["department_guidance_received"] }] },
+  );
+  try {
+    const probeSnapshots: Array<{ department: unknown; guidanceText: unknown }> = [];
+    await views.open(
+      probeEng,
+      { query: "department.workspace", params: { project_id: "p1", department: "engineering", work_item: "w1" } },
+      (data) => {
+        probeSnapshots.push(data as { department: unknown; guidanceText: unknown });
+      },
+    );
+    await views.open(
+      liveEng,
+      { query: "department.workspace", params: { project_id: "p1", department: "engineering", work_item: "w1" } },
+      () => {},
+    );
+    // 模拟 externalWorkspace 就绪使 fallbackWorkspace 的 skip 为 true，关闭兜底订阅
+    views.close(liveEng);
+
+    guidanceText = "第二条指导";
+    views.applyEvent("department_guidance_received", 2);
+    await new Promise((resolve) => setTimeout(resolve, 260));
+
+    assert.equal(probeSnapshots.length, 2);
+    assert.equal(probeSnapshots[1]?.guidanceText, "第二条指导");
+  } finally {
+    views.closeAll();
+  }
+
+  // 验证传入 workspaces 时 LiveWindow 正常渲染工作间机器与指导内容
+  const org = threeOrg();
+  const item: LoopItemView = {
+    work_item_id: "w1",
+    status: "adopted",
+    organization: org,
+    departments: { engineering: { state: "waiting" } },
+  };
+  const graph = graphOf({ item, flow: [], materials: null });
+  const workspace = {
+    project_id: "p1",
+    department: "engineering",
+    work_item_id: "w1",
+    run_id: "r1",
+    run_status: "done",
+    status: "adopted",
+    stop_reason: "released",
+    active: false,
+    department_setting: { department: "engineering", configured_version: 1, configured_text: "", source: "default", used_version: 1 },
+    setting: { department: "engineering", version: 1, text: "", source: "default", model_id: "m1", requested_tier: "high" },
+    effective: { state: "effective", model_id: "m1", model: "claude-sonnet-4-6", protocol: "messages", requested_tier: "high", sent_tier: "high" },
+    guidance: [{
+      guidance_id: "g1",
+      version: 1,
+      text: "补充回归测试",
+      status: "applied",
+      applied_activation_id: "act-1",
+      answered_activation_id: null,
+      outcome: null,
+      created_event_id: "ev-g1",
+    }],
+    messages: [],
+    context: {},
+    last_call: null,
+    reminders: [],
+    room: {
+      machine: "win-host-01",
+      waiting_provider: false,
+      remote_unknown: false,
+      mailbox: 0,
+      summaries: 0,
+      pinned_notes: 0,
+      pipes: { out: "idle", letters_waiting: 0 },
+      roles: [],
+    },
+  } as unknown as DepartmentWorkspaceResult;
+  const html = renderToStaticMarkup(React.createElement(liveWindowMod.LiveWindow, {
+    app: {} as never,
+    projectId: "p1",
+    workItemId: "w1",
+    runId: "r1",
+    item,
+    graph,
+    arrows: [],
+    flow: [],
+    materials: null,
+    decisions: [],
+    asks: [],
+    department: "engineering",
+    roles: org.roles,
+    workspaces: {
+      engineering: { data: workspace, loading: false, error: null, position: 10 },
+    },
+    onSelectDepartment: () => {},
+    onPickArrow: () => {},
+    onFocusGuidance: () => {},
+    onScrollToDecision: () => {},
+    onClose: () => {},
+  }));
+  assert.ok(html.includes("win-host-01"), html);
+  assert.ok(html.includes("补充回归测试"), html);
+});
