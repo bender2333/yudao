@@ -33,6 +33,7 @@ import {
   discardedMark,
   foldedText,
   hasMoreText,
+  isRecoveryEnded,
   lengthLabel,
   selectedActivation,
   stepBlocks,
@@ -95,12 +96,13 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
   const data = steps.data;
   const selected = selectedActivation(data, chosen);
   const unassigned = unassignedBlock(data);
+  const runEnded = isRecoveryEnded(recovery.data);
   return (
     <>
       <RunningBackgroundCommands commands={data.background_commands} />
       {selected === null ? <Empty text={NO_ACTIVATION} /> : (
         <>
-          <ActivationStrip result={data} selected={selected.activation_id} onSelect={setChosen} />
+          <ActivationStrip result={data} selected={selected.activation_id} runEnded={runEnded} onSelect={setChosen} />
           <ol className="y10-ws-steps">
             {data.steps.map((step) => (
               <li key={step.step_id} className="y10-ws-step">
@@ -155,11 +157,13 @@ function StepHeader(props: { step: RunStepView }) {
 }
 
 // 激活选择：每个激活一格，默认选中最近一次；点其他格用那个编号重新取步骤
-function ActivationStrip(props: {
+export function ActivationStrip(props: {
   result: RunStepsResult;
   selected: string;
+  runEnded: boolean;
   onSelect: (activationId: string) => void;
 }) {
+  const latestActivationId = props.result.activations[props.result.activations.length - 1]?.activation_id ?? null;
   return (
     <div className="y10-ws-activations" role="tablist" aria-label="这一轮的激活">
       {props.result.activations.map((activation, index) => {
@@ -173,7 +177,11 @@ function ActivationStrip(props: {
             className={`y10-ws-activation${active ? " is-active active" : ""}`}
             onClick={() => props.onSelect(activation.activation_id)}
           >
-            {activationLabel(activation, index)}
+            {activationLabel(activation, index, {
+              isLatest: index === props.result.activations.length - 1,
+              activeActivationId: latestActivationId,
+              runEnded: props.runEnded,
+            })}
           </button>
         );
       })}

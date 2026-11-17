@@ -1070,3 +1070,108 @@ test("左侧状态栏的阶段进度随组织与核验角色动态推出，不�
   ]);
 });
 
+test("循环图网格列模板对节点与端点列使用 max-content，样式取消节点格压窄并收敛 troupe 节点尺寸", async () => {
+  // R3：守 Tb82d83d7-03 循环蓝图防重叠约束——三部门与单部门列模板均由 max-content 与 minmax(44px, 1fr) 构成
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    let js = ts.transpileModule(code, {
+      compilerOptions: {
+        jsx: ts.JsxEmit.React,
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+        esModuleInterop: true,
+      },
+    }).outputText;
+    js = js.replace(/require\((["'])([^"']+\.css)\?raw\1\)/g, (_m: string, _q: string, rel: string) => {
+      const cssPath = path.resolve(path.dirname(filename), rel);
+      return `({ default: ${JSON.stringify(fs.readFileSync(cssPath, "utf8"))} })`;
+    });
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".ts"] = loader;
+  req.extensions[".tsx"] = loader;
+
+  const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../src/renderer/src/views/project");
+  const stylesDir = path.resolve(projectDir, "../../styles");
+  const loopGraphMod = req(path.join(projectDir, "loop-graph.tsx"));
+
+  assert.equal(typeof loopGraphMod.loopGridColumns, "function", "loop-graph.tsx 需导出 loopGridColumns");
+  assert.deepEqual(loopGraphMod.loopGridColumns(3), [
+    "max-content",
+    "minmax(44px, 1fr)",
+    "max-content",
+    "minmax(44px, 1fr)",
+    "max-content",
+    "minmax(44px, 1fr)",
+    "max-content",
+    "minmax(44px, 1fr)",
+    "max-content",
+  ]);
+  assert.deepEqual(loopGraphMod.loopGridColumns(1), [
+    "max-content",
+    "minmax(44px, 1fr)",
+    "max-content",
+    "minmax(44px, 1fr)",
+    "max-content",
+  ]);
+
+  const threeGraph = graphOf({
+    item: item({ work_item_id: "w-grid-3", organization: threeDepartments() }),
+    flow: [],
+    materials: null,
+  });
+  const threeHtml = renderToStaticMarkup(React.createElement(loopGraphMod.LoopGraphView, {
+    graph: threeGraph,
+    pick: null,
+    troupe: true,
+    onPickNode: () => {},
+    onPickArrow: () => {},
+    onPickAsk: () => {},
+  }));
+  const expectedThree = "max-content minmax(44px, 1fr) max-content minmax(44px, 1fr) max-content minmax(44px, 1fr) max-content minmax(44px, 1fr) max-content";
+  assert.ok(threeHtml.includes(`grid-template-columns:${expectedThree}`), threeHtml);
+
+  const oneGraph = graphOf({
+    item: item({ work_item_id: "w-grid-1", organization: engineeringOnly() }),
+    flow: [],
+    materials: null,
+  });
+  const oneHtml = renderToStaticMarkup(React.createElement(loopGraphMod.LoopGraphView, {
+    graph: oneGraph,
+    pick: null,
+    troupe: true,
+    onPickNode: () => {},
+    onPickArrow: () => {},
+    onPickAsk: () => {},
+  }));
+  const expectedOne = "max-content minmax(44px, 1fr) max-content minmax(44px, 1fr) max-content";
+  assert.ok(oneHtml.includes(`grid-template-columns:${expectedOne}`), oneHtml);
+
+  const v10Css = fs.readFileSync(path.join(stylesDir, "v10-project.css"), "utf8");
+  const cellRule = v10Css.match(/\.y10-cv-cell\s*\{([^}]*)\}/);
+  assert.ok(cellRule !== null, "缺少 .y10-cv-cell 样式规则");
+  assert.equal(/min-width\s*:\s*0\b/.test(cellRule[1]), false, ".y10-cv-cell 不应使用 min-width: 0 压窄节点格");
+  assert.match(cellRule[1], /min-width\s*:\s*max-content\b/);
+  const wrapRule = v10Css.match(/\.y10-cv-wrap\s*\{([^}]*)\}/);
+  assert.ok(wrapRule !== null && /overflow-x\s*:\s*auto\b/.test(wrapRule[1]));
+
+  const v21Css = fs.readFileSync(path.join(stylesDir, "v21-blueprint.css"), "utf8");
+  const troupeNodeRule = v21Css.match(/\.y10-cv-graph\.is-troupe\s+\.y10-cv-node\s*\{([^}]*)\}/);
+  assert.ok(troupeNodeRule !== null, "缺少 .y10-cv-graph.is-troupe .y10-cv-node 样式规则");
+  const minW = troupeNodeRule[1].match(/min-width\s*:\s*(\d+)px/);
+  const maxW = troupeNodeRule[1].match(/max-width\s*:\s*(\d+)px/);
+  assert.ok(minW !== null && Number(minW[1]) <= 160 && Number(minW[1]) >= 140, troupeNodeRule[1]);
+  assert.ok(maxW !== null && Number(maxW[1]) >= 200, troupeNodeRule[1]);
+  assert.match(v21Css, /\.y21-bp-shell\s*\{/);
+  assert.match(v21Css, /\.y21-node-model\s*\{/);
+});
+

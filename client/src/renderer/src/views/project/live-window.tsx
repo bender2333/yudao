@@ -46,6 +46,46 @@ import { useSnapshot, type SnapshotState } from "./use-snapshot";
 import { WorkLineItem } from "./work-process";
 import { workBlocks, workLines, type WorkLine } from "./work-process-model";
 
+const LIVE_DONE_STATUSES = new Set(["adopted", "released_unsettled", "stopped"]);
+const LIVE_ENDED_RECOVERY = new Set(["completed", "stopped", "cancelled", "interrupted", "waiting_resume"]);
+
+/** 对话页部门工作间后台探针的 ViewSync 标识（与现场窗口兜底订阅隔离）。 */
+export function probeWorkspaceViewId(department: string): string {
+  return `page.cv.probe.workspace.${department}`;
+}
+
+/** 现场窗口独立兜底订阅 department.workspace 的 ViewSync 标识。 */
+export function liveWorkspaceViewId(department: string): string {
+  return `page.cv.live.workspace.${department}`;
+}
+
+/** 判断当前现场窗口所属事项或运行是否已结束/中断，供激活标签区分「进行中」与「已中断」。 */
+export function isLiveRunEnded(
+  item: LoopItemView | null,
+  workspace: DepartmentWorkspaceResult | null | undefined,
+): boolean {
+  if (item !== null && LIVE_DONE_STATUSES.has(item.status)) {
+    return true;
+  }
+  const recoveryState = (item as { recovery_state?: string | null } | null)?.recovery_state ?? null;
+  if (recoveryState !== null && LIVE_ENDED_RECOVERY.has(recoveryState)) {
+    return true;
+  }
+  if (workspace !== null && workspace !== undefined) {
+    if (LIVE_DONE_STATUSES.has(workspace.status ?? "")) {
+      return true;
+    }
+    if (workspace.run_status === "done" || workspace.run_status === "failed") {
+      return true;
+    }
+    const roomStatus = workspace.room?.status ?? "";
+    if (roomStatus === "waiting_resume" || roomStatus === "interrupted") {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface LiveWindowProps {
   app: ClientApp;
   projectId: string;
@@ -116,7 +156,7 @@ export function LiveWindow(props: LiveWindowProps): React.JSX.Element | null {
   const externalWorkspace = props.workspaces?.[props.department];
   const fallbackWorkspace = useSnapshot<DepartmentWorkspaceResult>(
     props.app,
-    `page.cv.node.workspace.${props.department}`,
+    liveWorkspaceViewId(props.department),
     "department.workspace",
     {
       project_id: props.projectId,
@@ -188,7 +228,11 @@ export function LiveWindow(props: LiveWindowProps): React.JSX.Element | null {
 
   const blocks = workBlocks(workLines(stepsData), stepsData?.tasks ?? []);
   const activations = stepsBase.data?.activations ?? [];
-  const activeActivationId = stepsData?.activation_id ?? "";
+  const selectedActivationId = stepsData?.activation_id ?? "";
+  const latestActivationId = stepsBase.data?.activation_id
+    ?? activations[activations.length - 1]?.activation_id
+    ?? null;
+  const runEnded = isLiveRunEnded(props.item, workspaceState.data);
   const workshop = workshopFacts(workspaceState.data);
   const runningBg = (stepsData?.background_commands ?? []).filter((cmd) => cmd.status === "running");
   const showStreamBox = view.panelView.live || runningBg.length > 0;
@@ -354,7 +398,7 @@ export function LiveWindow(props: LiveWindowProps): React.JSX.Element | null {
           {activations.length > 1 ? (
             <div className="y21-live-acts" role="tablist" aria-label="这个职能的各次激活">
               {activations.map((activation, index) => {
-                const selected = activation.activation_id === activeActivationId;
+                const selected = activation.activation_id === selectedActivationId;
                 return (
                   <button
                     key={activation.activation_id}
@@ -368,7 +412,11 @@ export function LiveWindow(props: LiveWindowProps): React.JSX.Element | null {
                       activationId: activation.activation_id,
                     })}
                   >
-                    {activationLabel(activation, index)}
+                    {activationLabel(activation, index, {
+                      isLatest: index === activations.length - 1,
+                      activeActivationId: latestActivationId,
+                      runEnded,
+                    })}
                   </button>
                 );
               })}

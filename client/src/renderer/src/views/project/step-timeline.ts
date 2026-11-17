@@ -5,6 +5,7 @@
 import type {
   ActionView,
   ActivationView,
+  RunRecoveryResult,
   RunStepView,
   RunStepsResult,
   StepText,
@@ -94,9 +95,42 @@ export function hasMoreText(value: StepText): boolean {
   return value.readable && value.length > value.preview.length;
 }
 
-// 激活的一格：「第 N 次工作 · 开始时间 · 共 M 步 · 进行中或已结束」
-export function activationLabel(activation: ActivationView, index: number): string {
-  const state = activation.finished_at === null ? "进行中" : "已结束";
+const ENDED_RECOVERY_STATES = new Set(["completed", "stopped", "cancelled", "interrupted", "waiting_resume"]);
+
+/** 判断激活标签展示上下文：是否最后一次激活、当前最新激活标识，以及运行是否已结束或中断。 */
+export interface ActivationLabelContext {
+  isLatest?: boolean;
+  activeActivationId?: string | null;
+  runEnded?: boolean;
+}
+
+/** 根据 run.recovery 判断运行是否已结束或处于中断待恢复状态。 */
+export function isRecoveryEnded(recovery: RunRecoveryResult | null | undefined): boolean {
+  if (recovery === null || recovery === undefined) {
+    return false;
+  }
+  return !recovery.executable || ENDED_RECOVERY_STATES.has(recovery.state);
+}
+
+// 激活的一格：「第 N 次工作 · 开始时间 · 共 M 步 · 进行中 / 已中断 / 已结束」
+export function activationLabel(
+  activation: ActivationView,
+  index: number,
+  context?: ActivationLabelContext,
+): string {
+  let state: string;
+  if (activation.finished_at !== null) {
+    state = "已结束";
+  } else if (context === undefined) {
+    state = "进行中";
+  } else {
+    const interrupted = context.runEnded === true
+      || context.isLatest === false
+      || (context.activeActivationId != null
+        && context.activeActivationId !== ""
+        && context.activeActivationId !== activation.activation_id);
+    state = interrupted ? "已中断" : "进行中";
+  }
   return `第 ${index + 1} 次工作 · ${formatTime(activation.started_at)} · 共 ${activation.step_count} 步 · ${state}`;
 }
 
