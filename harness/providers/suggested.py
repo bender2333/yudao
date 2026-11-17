@@ -29,19 +29,21 @@ def missing_capabilities(department: str, model: ModelDefinition | Mapping[str, 
 
 def reminder(department: str, model: ModelDefinition | Mapping[str, Any],
               model_id: str | None = None) -> str | None:
-    # 一条提醒：写明部门、模型、缺少的能力与影响。
-    # 模型具备本部门的建议能力，或部门没有建议能力时没有提醒
+    # 一条提醒：写明职能中文名、可读模型名、缺少的能力与影响。
+    # 模型具备本职能的建议能力，或职能没有建议能力时没有提醒
     missing = missing_capabilities(department, model)
     if not missing:
         return None
     if model_id is None:
         model_id = model.id if isinstance(model, ModelDefinition) else str(model.get("id") or "")
-    label = model_id
+    display_model = model.model if isinstance(model, ModelDefinition) else str(model.get("model") or "")
+    label = display_model.strip() or model_id
+    department_label = DEFINITIONS.department_labels.get(department) or department
     declared = model.input_modalities if isinstance(model, ModelDefinition) else tuple(model.get("input_modalities") or ())
     abilities = "、".join(_CAPABILITY_NAMES.get(item, item) for item in missing)
     declared_text = "、".join(_CAPABILITY_NAMES.get(item, item) for item in declared)
     impact = "；".join(_MISSING_IMPACT.get(item, item) for item in missing)
-    return f"{department} 部门的模型建议具备{abilities}，当前模型 {label} 的输入方式为 {declared_text}：{impact}"
+    return f"{department_label}部门的模型建议具备{abilities}，当前模型 {label} 的输入方式为 {declared_text}：{impact}"
 
 def reminders(department: str, model: ModelDefinition | Mapping[str, Any] | None,
               model_id: str | None = None) -> list[str]:

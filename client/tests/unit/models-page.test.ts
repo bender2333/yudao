@@ -294,3 +294,66 @@ test("已选用模型保留准入与输入方式，手动切换图像输入只�
   assert.deepEqual(savedOff[0].input_modalities, ["text"]);
   assert.deepEqual(savedOff[1].input_modalities, ["text"]);
 });
+
+// 守 R3（模型管理 docs/design/model-management.md「模型管理页」）：连接卡片只在一处呈现完整获取计数与时间
+test("ConnectCard 渲染连接卡片时只在明细中保留完整计数，头部状态徽标不重复输出", async () => {
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    const js = ts.transpileModule(code, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".tsx"] = loader;
+  req.extensions[".ts"] = loader;
+
+  const cardPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../src/renderer/src/views/models/connect-card.tsx",
+  );
+  const { ConnectCard } = req(cardPath);
+
+  const okProvider = providerWithResult("ok", "2026-10-30T10:00:00Z");
+  const errProvider = providerWithResult("unknown", "", "服务拒绝了这个 API Key");
+  const noneProvider = provider("idle", "http://c/v1", null);
+
+  const baseProps = {
+    target: null,
+    address: "",
+    apiKey: "",
+    busy: false,
+    fetching: null,
+    status: {},
+    onTarget: () => {},
+    onAddress: () => {},
+    onApiKey: () => {},
+    onConnect: () => {},
+    onRefresh: () => {},
+    onRemove: () => {},
+  };
+
+  // 成功获取：头部 .mm-count 只写「已获取」，完整计数与时间只在 connection-fetch 出现一次
+  const okHtml = renderToStaticMarkup(React.createElement(ConnectCard, { ...baseProps, providers: [okProvider] }));
+  const fullSummary = "已获取 1 个模型 · 2026-10-30T10:00:00Z";
+  assert.match(okHtml, /class="y10-conn-count mm-count">已获取<\/span>/);
+  assert.match(okHtml, /data-testid="connection-fetch">已获取 1 个模型 · 2026-10-30T10:00:00Z<\/p>/);
+  assert.equal(okHtml.split(fullSummary).length - 1, 1);
+
+  // 获取失败与未获取保持各自头部状态徽标
+  const errHtml = renderToStaticMarkup(React.createElement(ConnectCard, { ...baseProps, providers: [errProvider] }));
+  assert.match(errHtml, /class="y10-conn-count mm-count">获取失败<\/span>/);
+  assert.match(errHtml, /data-testid="connection-fetch">服务拒绝了这个 API Key<\/p>/);
+
+  const noneHtml = renderToStaticMarkup(React.createElement(ConnectCard, { ...baseProps, providers: [noneProvider] }));
+  assert.match(noneHtml, /class="y10-conn-count mm-count">未获取<\/span>/);
+  assert.equal(noneHtml.includes('data-testid="connection-fetch"'), false);
+});
