@@ -575,6 +575,12 @@ def _check_false_release(released, outcome):
             "detail": "质检误放行，失败的隐藏检查：" + "、".join(failures)}
 
 
+def _first_present(mapping, primary, fallback):
+    """优先读取现行键；仅当现行键缺失或为 None 时回退旧键，避免 0/0.0 误触发回退。"""
+    value = mapping.get(primary)
+    return mapping.get(fallback) if value is None else value
+
+
 def _check_release_coverage(events, released):
     """：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
     没有放行时本项不适用，按通过计。无逐条覆盖数据的历史记录写未知。
@@ -592,9 +598,9 @@ def _check_release_coverage(events, released):
     review = reviews[-1]
     payload = review.get("payload") or {}
     coverage = payload.get("coverage") or {}
-    covered = coverage.get("covered_ratio")
-    model_read = coverage.get("model_read_count")
-    open_loop = coverage.get("open_loop_count")
+    covered = _first_present(coverage, "coverage_ratio", "covered_ratio")
+    model_read = _first_present(coverage, "model_reading", "model_read_count")
+    open_loop = _first_present(coverage, "open", "open_loop_count")
     if covered is None and model_read is None and open_loop is None:
         return {"passed": None, "applicable": True,
                 "covered_ratio": None, "model_read_count": None, "open_loop_count": None,
@@ -605,7 +611,8 @@ def _check_release_coverage(events, released):
     if (model_read or 0) > 0:
         reasons.append("存在靠模型阅读作出判断的条件")
     if (open_loop or 0) > 0:
-        reasons.append("存在开环条件：" + "、".join(payload.get("open_loop_conditions") or []))
+        open_conditions = _first_present(payload, "open_criteria", "open_loop_conditions") or []
+        reasons.append("存在开环条件：" + "、".join(open_conditions))
     return {"passed": not reasons, "applicable": True,
             "covered_ratio": covered, "model_read_count": model_read,
             "open_loop_count": open_loop,
