@@ -1889,9 +1889,16 @@ class LocalEnvironment:
                 "baseline": receipt.baseline,
             }, finished.status
 
-    def _delivery_check_command(self, name: str) -> str | None:
-        # 同名交付检查已经记录的命令：交付封存时主机把工程 run_check 的命令一起记下（DeliverySpec.checks）。
+    def _delivery_check_command(self, name: str, department: str | None = None) -> str | None:
+        # 同名交付检查已经记录的命令：传入 department 时优先取主机在当前交付工作区上为该部门记录的
+        # 非基线、未改树 run_check 命令（含质检编写 .yudao-qa-tests/ 后跑过的检查），
+        # 未命中再回退交付封存时主机一起记下的工程 run_check 命令（DeliverySpec.checks）。
         # 基线运行不能改写命令：这里只取记录，模型给不出 command 这个参数
+        if department:
+            tree = self.query(FactsQuery(tree=True)).tree
+            receipt = None if tree is None else tree.latest_check(department, name)
+            if receipt is not None and isinstance(receipt.command, str) and receipt.command.strip():
+                return receipt.command
         for check in getattr(self, "_delivery_checks", ()) or ():
             if isinstance(check, dict) and check.get("name") == name and isinstance(check.get("command"), str):
                 return check["command"]
@@ -1922,7 +1929,7 @@ class LocalEnvironment:
         if unknown:
             raise ValueError("declared files must be paths changed between the start tree and the delivery: "
                              + ", ".join(unknown))
-        command = self._delivery_check_command(name)
+        command = self._delivery_check_command(name, action.department)
         if command is None:
             raise ValueError(f"the delivery records no check named {name!r}; run the delivery check first, "
                              "the baseline runs the same command")
