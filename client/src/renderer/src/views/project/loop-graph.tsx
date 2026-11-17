@@ -150,6 +150,17 @@ function NodeCard(props: {
   );
 }
 
+/** 循环图网格列模板：来源、节点与终点列采用 max-content 防止卡片被压窄重叠，缝列按 minmax(44px, 1fr) 弹性分布。 */
+export function loopGridColumns(chainCount: number): string[] {
+  const count = Math.max(0, Math.floor(chainCount));
+  const template = ["max-content"];
+  for (let index = 0; index < count; index += 1) {
+    template.push("minmax(44px, 1fr)", "max-content");
+  }
+  template.push("minmax(44px, 1fr)", "max-content");
+  return template;
+}
+
 /**
  * 一张循环图。`pick` 是面板打开的那一个，用来把选中的节点或箭头标出来；
  * 点节点、点箭头都交给调用处打开同一个面板；点询问线（开着的或累计的）只看这两个职能的时序图。
@@ -201,11 +212,7 @@ export function LoopGraphView(props: {
     sideAt.set(index, [...(sideAt.get(index) ?? []), part]);
   }
   // 列：来源 | 缝 | 节点 | 缝 | 节点 | … | 缝 | 结束
-  const template = ["auto"];
-  for (let index = 0; index < count; index += 1) {
-    template.push("minmax(56px, 1fr)", "auto");
-  }
-  template.push("minmax(56px, 1fr)", "auto");
+  const template = loopGridColumns(count);
   const nodeColumn = (index: number): number => 3 + 2 * index;
   const gapColumn = (index: number): number => 2 + 2 * index;
   const selectedNode = props.pick?.kind === "node" ? props.pick.id : (props.selectedDepartmentId ?? null);

@@ -384,15 +384,21 @@ function endingOf(item: ThreadItemView, flow: readonly ThreadFlowRecord[]): Endi
   return delivery === null ? null : { done: delivery, delivery, release: false, openLoop: false };
 }
 
+/** 将结论正文中的字面转义换行（\r\n / \n）规范化为真实换行符，供气泡断行展示。 */
+export function normalizeDoneContent(text: string): string {
+  return text.replace(/\\r\\n|\\n/g, "\n").replace(/\r\n/g, "\n");
+}
+
 /** 交完成那一条的正文：开环完成写明没有人核验，不写成放行。 */
 function doneText(ending: Ending): string {
+  const content = normalizeDoneContent(ending.done.content);
   if (ending.release) {
-    return ending.done.content;
+    return content;
   }
   if (!ending.openLoop) {
-    return ending.done.content;
+    return content;
   }
-  const summary = ending.done.content.trim();
+  const summary = content.trim();
   const head = summary === "" ? "做完了。" : `做完了：${summary}。`;
   return `${head}开环完成：没有人核验`;
 }

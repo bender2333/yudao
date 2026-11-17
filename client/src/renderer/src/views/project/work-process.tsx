@@ -12,14 +12,14 @@
 
 import { useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { ActivationView, EventDetailResult, RunStepsResult, StepText } from "../../api/generated/types.gen";
+import type { ActivationView, EventDetailResult, RunRecoveryResult, RunStepsResult, StepText } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import { paths } from "../../shell/routing";
 import { actionRow, toolOutput, type ExternalSourceRefView } from "./action-table.ts";
 import { Empty, Modal, Tag } from "./common";
 import { ExternalSource } from "./external-source.tsx";
 import { formatTime } from "./labels";
-import { activationLabel } from "./step-timeline.ts";
+import { activationLabel, isRecoveryEnded } from "./step-timeline.ts";
 import { StepTextItem } from "./step-timeline.tsx";
 import { useSnapshot } from "./use-snapshot";
 import {
@@ -51,6 +51,7 @@ export function WorkProcess(props: {
   departmentLabel: string;
   /** 这个事项的询问编号（图上的询问）：按第几轮找激活时排掉询问分支的那几次 */
   branchSessions: readonly string[];
+  runEnded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -63,6 +64,13 @@ export function WorkProcess(props: {
     "run.steps",
     { run_id: props.runId, department },
     !ready,
+  );
+  const recovery = useSnapshot<RunRecoveryResult>(
+    props.app,
+    `page.cv.work.recovery.${props.runId}`,
+    "run.recovery",
+    { run_id: props.runId },
+    !ready || props.runEnded !== undefined,
   );
   const matches = activationsOf(list.data?.activations ?? [], props.target, props.branchSessions);
   const picked = (chosen === null ? undefined : matches.find((item) => item.activation_id === chosen))
@@ -79,6 +87,10 @@ export function WorkProcess(props: {
   );
   const data = same ? list.data : steps.data;
   const error = list.error ?? steps.error;
+  const latestActivationId = list.data?.activation_id
+    ?? list.data?.activations[list.data.activations.length - 1]?.activation_id
+    ?? null;
+  const runEnded = props.runEnded ?? isRecoveryEnded(recovery.data);
   return (
     <div className="y10-wp">
       <button
@@ -100,6 +112,8 @@ export function WorkProcess(props: {
           departmentLabel={props.departmentLabel}
           matches={matches}
           picked={picked}
+          latestActivationId={latestActivationId}
+          runEnded={runEnded}
           data={data}
           loading={ready && data === null && error === null}
           error={error}
@@ -124,12 +138,15 @@ export function WorkProcessBody(props: {
   /** 与这一行对得上的那几次激活（按开始时间升序）：多于一次时列出来，默认最后一次 */
   matches: ActivationView[];
   picked: ActivationView | null;
+  latestActivationId?: string | null;
+  runEnded?: boolean;
   /** 正在看的那一次的步骤；还没读到时为空 */
   data: RunStepsResult | null;
   loading: boolean;
   error: string | null;
   onPick: (activationId: string) => void;
 }): React.JSX.Element {
+  const latestId = props.latestActivationId ?? props.matches[props.matches.length - 1]?.activation_id ?? null;
   return (
     <div className="y10-wp-body" data-testid="work-process">
       <p className="y10-wp-head">
@@ -152,7 +169,11 @@ export function WorkProcessBody(props: {
               className={`y10-wp-activation${props.picked !== null && activation.activation_id === props.picked.activation_id ? " is-active" : ""}`}
               onClick={() => props.onPick(activation.activation_id)}
             >
-              {activationLabel(activation, index)}
+              {activationLabel(activation, index, {
+                isLatest: latestId !== null ? activation.activation_id === latestId : index === props.matches.length - 1,
+                activeActivationId: latestId,
+                runEnded: props.runEnded,
+              })}
             </button>
           ))}
         </div>

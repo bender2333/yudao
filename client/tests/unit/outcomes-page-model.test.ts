@@ -19,6 +19,7 @@ import {
   outcomeCardDetail,
   outcomesPageView,
   parseGitDiffLines,
+  workItemMaterialsQuery,
 } from "../../src/renderer/src/views/project/outcomes-page-model.ts";
 import type { DepartmentView } from "../../src/renderer/src/views/project/organization.ts";
 
@@ -968,6 +969,7 @@ test("outcomeCardDetail + OutcomesPageContent SSR：渲染结构化 PRD（无缺
   ]) {
     assert.ok(deliveryHtml.includes(expected), `交付展开内容缺少 ${expected}`);
   }
+  assert.equal(deliveryHtml.split("检验覆盖 100%（1/1）").length - 1, 1, "逐条结论表已渲染覆盖汇总时不重复输出覆盖行");
   assert.ok(!deliveryHtml.includes(MISSING_REVIEW_TEXT));
 
   // 5. 展开开环完成事项：只写「开环完成：没有人核验」，不渲染空核验表
@@ -1039,5 +1041,223 @@ test("outcomeCardDetail + OutcomesPageContent SSR：渲染结构化 PRD（无缺
     "准许进入正式流程",
   ]) {
     assert.ok(obHtml.includes(expected), `建档初始 PRD 展开内容缺少 ${expected}`);
+  }
+});
+
+test("workItemMaterialsQuery 与 OutcomesPage：统一构造 { project_id, work_item } 并在缺参或预加载时跳过请求", async () => {
+  // R2 + R3：成果库路由定位材料查询与卡片展开详情均以 { project_id, work_item } 请求 work_item.materials
+  assert.deepEqual(workItemMaterialsQuery("proj-1", "w1"), {
+    params: { project_id: "proj-1", work_item: "w1" },
+    skip: false,
+  });
+  assert.deepEqual(workItemMaterialsQuery("", "w1"), {
+    params: { project_id: "", work_item: "w1" },
+    skip: true,
+  });
+  assert.deepEqual(workItemMaterialsQuery("   ", "w1"), {
+    params: { project_id: "", work_item: "w1" },
+    skip: true,
+  });
+  assert.deepEqual(workItemMaterialsQuery("proj-1", ""), {
+    params: { project_id: "proj-1", work_item: "" },
+    skip: true,
+  });
+  assert.deepEqual(workItemMaterialsQuery("proj-1", null), {
+    params: { project_id: "proj-1", work_item: "" },
+    skip: true,
+  });
+  assert.deepEqual(workItemMaterialsQuery("proj-1", undefined), {
+    params: { project_id: "proj-1", work_item: "" },
+    skip: true,
+  });
+  assert.deepEqual(workItemMaterialsQuery("proj-1", "w1", true), {
+    params: { project_id: "proj-1", work_item: "w1" },
+    skip: true,
+  });
+
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript") as typeof import("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const register = (module: NodeModule, filename: string) => {
+    const src = fs.readFileSync(filename, "utf8");
+    const out = ts.transpileModule(src, {
+      compilerOptions: {
+        jsx: ts.JsxEmit.React,
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(out, filename);
+  };
+  req.extensions[".tsx"] = register;
+  req.extensions[".ts"] = register;
+  req.extensions[".css"] = () => {};
+
+  const { OutcomesPageContent } = req("../../src/renderer/src/views/project/outcomes-page.tsx");
+
+  const overview: ProjectOverviewResult = {
+    work_items: [card({ work_item_id: "w1", title: "需求交付项", status: "released_unsettled" })],
+  } as unknown as ProjectOverviewResult;
+  const loop: ProjectLoopResult = {
+    work_items: [
+      loopItem({
+        work_item_id: "w1",
+        status: "released_unsettled",
+        progress: {
+          product_spec_revision: 1,
+          delivery_revision: 1,
+          delivery_product_spec_revision: 1,
+          conclusion: "release",
+        },
+        organization: verifiedOrg(),
+      }),
+    ],
+  } as unknown as ProjectLoopResult;
+  const flow: ProjectFlowResult = {
+    records: [
+      flowRec({
+        flow_id: "w1-del1",
+        event_id: "ev-w1-del1",
+        work_item_id: "w1",
+        kind: "版本交付",
+        direction_from: "engineering",
+        direction_to: "quality",
+        content: "交付说明",
+        position: 1,
+      }),
+      flowRec({
+        flow_id: "w1-rel1",
+        event_id: "ev-w1-rel1",
+        work_item_id: "w1",
+        kind: "放行",
+        direction_from: "quality",
+        direction_to: null,
+        content: "放行",
+        position: 2,
+      }),
+    ],
+  };
+
+  // projectId 为空时，展开卡片应跳过 work_item.materials 查询（不进入整卡读取中占位）
+  const emptyProjectHtml = renderToStaticMarkup(
+    React.createElement(OutcomesPageContent, {
+      app: { viewSync: null },
+      projectId: "",
+      workItemId: null,
+      departments: DEPARTMENTS,
+      overviewState: { data: overview, loading: false, error: null },
+      loopState: { data: loop, loading: false, error: null },
+      flowState: { data: flow, loading: false, error: null },
+      scopedMaterials: null,
+      initialExpandedIds: { "w1:w1-del1": true },
+      onNavigate: () => {},
+    }),
+  );
+  assert.ok(
+    emptyProjectHtml.includes('data-testid="outcome-detail-w1:w1-del1"'),
+    "projectId 为空时展开卡片必须跳过材料查询并直接渲染详情区域",
+  );
+
+  // projectId 与 workItemId 均非空且无预加载数据时，展开卡片触发整卡读取中占位
+  const activeProjectHtml = renderToStaticMarkup(
+    React.createElement(OutcomesPageContent, {
+      app: { viewSync: null },
+      projectId: "proj-1",
+      workItemId: null,
+      departments: DEPARTMENTS,
+      overviewState: { data: overview, loading: false, error: null },
+      loopState: { data: loop, loading: false, error: null },
+      flowState: { data: flow, loading: false, error: null },
+      scopedMaterials: null,
+      initialExpandedIds: { "w1:w1-del1": true },
+      onNavigate: () => {},
+    }),
+  );
+  assert.equal(
+    activeProjectHtml.includes('data-testid="outcome-detail-w1:w1-del1"'),
+    false,
+    "projectId 与 workItemId 非空且无预加载时应发起材料查询并显示读取占位",
+  );
+  assert.ok(activeProjectHtml.includes("正在读取数据"), "projectId 与 workItemId 非空且无预加载时应发起材料查询");
+
+  // 已命中路由预加载材料时，跳过卡片级重复查询并直接呈现材料详情
+  const preloadedMaterials: WorkItemMaterialsResult = {
+    contracts: [],
+    deliveries: [{ event_id: "ev-w1-del1", revision: 1, summary: "预加载交付正文", files: ["src/main.ts"], launch: [] }],
+    reviews: [],
+    inputs: [],
+    onboarding_rounds: [],
+  } as unknown as WorkItemMaterialsResult;
+  const preloadedHtml = renderToStaticMarkup(
+    React.createElement(OutcomesPageContent, {
+      app: { viewSync: null },
+      projectId: "proj-1",
+      workItemId: "w1",
+      departments: DEPARTMENTS,
+      overviewState: { data: overview, loading: false, error: null },
+      loopState: { data: loop, loading: false, error: null },
+      flowState: { data: flow, loading: false, error: null },
+      scopedMaterials: preloadedMaterials,
+      initialExpandedIds: { "w1:w1-del1": true },
+      onNavigate: () => {},
+    }),
+  );
+  assert.ok(preloadedHtml.includes('data-testid="outcome-detail-w1:w1-del1"'));
+  assert.ok(preloadedHtml.includes("预加载交付正文"));
+  assert.ok(preloadedHtml.includes("src/main.ts"));
+
+  // AST 护栏：outcomes-page.tsx 两处 work_item.materials 查询均通过 workItemMaterialsQuery 传参，绝不传入 work_item_id
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const outcomesPagePath = path.resolve(here, "../../src/renderer/src/views/project/outcomes-page.tsx");
+  const source = fs.readFileSync(outcomesPagePath, "utf8");
+  const sf = ts.createSourceFile(outcomesPagePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const queryVars = new Set<string>();
+  const materialCalls: Array<{ paramsText: string; skipText: string; fullText: string }> = [];
+  let hasWorkItemIdProp = false;
+  function visit(node: import("typescript").Node) {
+    if (ts.isPropertyAssignment(node) && node.name.getText(sf) === "work_item_id") {
+      hasWorkItemIdProp = true;
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      ts.isCallExpression(node.initializer) &&
+      node.initializer.expression.getText(sf) === "workItemMaterialsQuery"
+    ) {
+      queryVars.add(node.name.text);
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText(sf) === "useSnapshot" &&
+      node.arguments.length >= 5 &&
+      ts.isStringLiteral(node.arguments[2]) &&
+      node.arguments[2].text === "work_item.materials"
+    ) {
+      materialCalls.push({
+        paramsText: node.arguments[3].getText(sf),
+        skipText: node.arguments[4].getText(sf),
+        fullText: node.getText(sf),
+      });
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sf);
+  assert.equal(hasWorkItemIdProp, false, "outcomes-page.tsx 不得再构造 { work_item_id } 查询参数");
+  assert.equal(materialCalls.length, 2, "outcomes-page.tsx 应包含路由作用域与卡片展开两处 work_item.materials 查询");
+  for (const call of materialCalls) {
+    const matchedVar = [...queryVars].find(
+      (name) => call.paramsText === `${name}.params` && call.skipText === `${name}.skip`,
+    );
+    assert.ok(
+      matchedVar !== undefined,
+      `work_item.materials 调用必须直接接入 workItemMaterialsQuery 的 params 与 skip：${call.fullText}`,
+    );
   }
 });

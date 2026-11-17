@@ -147,7 +147,29 @@ function trialOf(data: RunTrialsResult | null, actions: RunActionsResult | null,
 // ---------------------------------------------------------------------------
 // 标着放行或打回的那一版：结论、逐条结论、检查回执、缺陷、检验覆盖，证据里点得开试用用例
 
-function ConclusionSection(props: {
+/** 判断 CriteriaTable 是否已渲染同一 review_event_id 的检验覆盖汇总行。 */
+export function criteriaTableShowsCoverage(
+  review: ReviewEntry | null,
+  coverage: AcceptanceCoverageResult | null,
+): boolean {
+  return (
+    review !== null &&
+    (review.criteria?.length ?? 0) > 0 &&
+    coverage !== null &&
+    coverage.review_event_id === review.event_id
+  );
+}
+
+/** 仅当存在 coverageText 且 CriteriaTable 未渲染覆盖汇总时显示兜底覆盖行，避免页面重复输出。 */
+export function shouldShowArrowCoverageFallback(
+  coverageText: string | null,
+  review: ReviewEntry | null,
+  coverage: AcceptanceCoverageResult | null,
+): boolean {
+  return coverageText !== null && !criteriaTableShowsCoverage(review, coverage);
+}
+
+export function ConclusionSection(props: {
   app: ClientApp;
   conclusion: ConclusionView;
   review: ReviewEntry | null;
@@ -168,9 +190,9 @@ function ConclusionSection(props: {
             结论：<Tag tone={conclusion.tone === "release" ? "ok" : "danger"}>{conclusion.verdictName}</Tag>
             {` · ${conclusion.rationale}`}
           </p>
-          {conclusion.coverageText === null ? null : (
+          {shouldShowArrowCoverageFallback(conclusion.coverageText, props.review, props.coverage) ? (
             <p className="y10-note note" data-testid="arrow-panel-coverage">{conclusion.coverageText}</p>
-          )}
+          ) : null}
           {props.review === null ? null : (
             <CriteriaTable app={props.app} review={props.review} coverage={props.coverage} />
           )}

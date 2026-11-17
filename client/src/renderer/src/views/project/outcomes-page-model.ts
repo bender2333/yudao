@@ -349,6 +349,25 @@ function extractGitDiff(detail: EventDetailResult | null | undefined): string | 
   return typeof diff === "string" && diff.trim() !== "" ? diff : null;
 }
 
+export interface WorkItemMaterialsRequest {
+  params: { project_id: string; work_item: string };
+  skip: boolean;
+}
+
+/** 构造 work_item.materials 查询参数与跳过条件：project_id 或 work_item 为空，或已预加载时不发请求。 */
+export function workItemMaterialsQuery(
+  projectId: string | null | undefined,
+  workItemId: string | null | undefined,
+  hasPreloaded = false,
+): WorkItemMaterialsRequest {
+  const pid = (projectId ?? "").trim();
+  const wid = (workItemId ?? "").trim();
+  return {
+    params: { project_id: pid, work_item: wid },
+    skip: hasPreloaded || pid === "" || wid === "",
+  };
+}
+
 /** 将项目概览、循环、流动与已加载资料整理为「成果库」页模型。 */
 export function outcomesPageView(input: OutcomesPageInput): OutcomesPageView {
   const labels = departmentLabels(input.departments);

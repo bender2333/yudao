@@ -32,7 +32,7 @@ import { Composer } from "./composer";
 import { interruptionFactRows } from "./floor-text";
 import { ItemPanel, ITEM_PANEL_PICK, type ItemPanelPick } from "./item-panel";
 import { ItemPicker } from "./item-picker";
-import { LiveWindow } from "./live-window";
+import { LiveWindow, probeWorkspaceViewId } from "./live-window";
 import { arrowMatchesQuery, pickLiveDepartment } from "./live-window-model";
 import type { DepartmentView } from "./organization";
 import { frozenOrganizationOf } from "./form-cards-model";
@@ -72,7 +72,7 @@ function DepartmentWorkspaceProbe(props: {
 }): null {
   const state = useSnapshot<DepartmentWorkspaceResult>(
     props.app,
-    `page.cv.node.workspace.${props.department}`,
+    probeWorkspaceViewId(props.department),
     "department.workspace",
     {
       project_id: props.projectId,
@@ -83,7 +83,7 @@ function DepartmentWorkspaceProbe(props: {
   );
   useEffect(() => {
     props.onUpdate(props.workItemId, props.department, state);
-  }, [props.workItemId, props.department, props.onUpdate, state.data, state.error, state.loading]);
+  }, [props.workItemId, props.department, props.onUpdate, state.data, state.error, state.loading, state.position]);
   return null;
 }
 

@@ -334,13 +334,13 @@
     "action": "check",
     "verification": "query",
     "cancellable": true,
-    "description": "Host-executes the delivery check recorded under the same name on the baseline copy and records exit_code, summary, and snapshot hash. The baseline copy is the work item's start tree, the check materials of this department, plus the delivery files given in files; every declared file must be a path changed between the start tree and the delivery. The command is the one the delivery already recorded and cannot be given here. Time limit, output truncation, process tree cleanup and the tree change verification are the same as run_check. Exit code 0 means the baseline passed; a non-zero exit code other than 124 (timeout) and 130 (cancelled) means the baseline failed, which is what makes a passing delivery check count as evidence for a new capability. A baseline receipt is not check evidence for a delivery.",
+    "description": "Host-executes the check recorded under the same name on the baseline copy and records exit_code, summary, and snapshot hash. The command comes from either a non-baseline run_check receipt this department ran on the current delivery snapshot (including tests under .yudao-qa-tests/) or a check recorded in the delivery specification, and cannot be given here; run the passing delivery check with run_check before calling run_baseline_check. The baseline copy is the work item's start tree, the check materials of this department, plus the delivery files given in files; every declared file must be a path changed between the start tree and the delivery. Time limit, output truncation, process tree cleanup and the tree change verification are the same as run_check. Exit code 0 means the baseline passed; a non-zero exit code other than 124 (timeout) and 130 (cancelled) means the baseline failed, which is what makes a passing delivery check count as evidence for a new capability. A baseline receipt is not check evidence for a delivery.",
     "parameters": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Check name of a delivery check, e.g. smoke"
+          "description": "Check name of a run_check run on the current delivery snapshot or a check recorded in the delivery specification, e.g. smoke"
         },
         "files": {
           "type": "array",

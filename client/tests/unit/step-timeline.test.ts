@@ -195,3 +195,144 @@ test("没有激活时的空状态说法", () => {
   assert.equal(NO_ACTIVATION, "这个职能在这次运行里还没有工作记录");
   assert.equal(UNASSIGNED_TITLE, "未归到步骤的动作");
 });
+
+test("未结束激活在运行已结束、非最新或非当前活跃时返回「已中断」，两参兼容保持「进行中」", async () => {
+  // R1/R3：守 Tb82d83d7-06 激活状态展示真实性——中断旧激活与终态事项不再误报「进行中」
+  const compatRunning = activationLabel(activation({ activation_id: "act-compat", finished_at: null, step_count: 1 }), 0);
+  assert.match(compatRunning, /共 1 步 · 进行中$/);
+
+  const endedInterrupted = activationLabel(
+    activation({ activation_id: "act-1", finished_at: null, step_count: 3 }),
+    0,
+    { isLatest: true, activeActivationId: "act-1", runEnded: true },
+  );
+  assert.match(endedInterrupted, /共 3 步 · 已中断$/);
+
+  const supersededInterrupted = activationLabel(
+    activation({ activation_id: "act-1", finished_at: null, step_count: 2 }),
+    0,
+    { isLatest: false, activeActivationId: "act-2", runEnded: false },
+  );
+  assert.match(supersededInterrupted, /共 2 步 · 已中断$/);
+
+  const notActiveInterrupted = activationLabel(
+    activation({ activation_id: "act-1", finished_at: null, step_count: 2 }),
+    0,
+    { isLatest: true, activeActivationId: "act-2", runEnded: false },
+  );
+  assert.match(notActiveInterrupted, /共 2 步 · 已中断$/);
+
+  const genuinelyRunning = activationLabel(
+    activation({ activation_id: "act-2", finished_at: null, step_count: 4 }),
+    1,
+    { isLatest: true, activeActivationId: "act-2", runEnded: false },
+  );
+  assert.match(genuinelyRunning, /共 4 步 · 进行中$/);
+
+  const finishedStillDone = activationLabel(
+    activation({ activation_id: "act-1", finished_at: "2026-10-30T08:40:00Z", step_count: 2 }),
+    0,
+    { isLatest: false, activeActivationId: "act-2", runEnded: true },
+  );
+  assert.match(finishedStillDone, /共 2 步 · 已结束$/);
+
+  // 检验 WorkProcessBody 与 LiveWindow 终态判断同步传入上下文
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  (globalThis as Record<string, unknown>)["React"] = React;
+  const loader = (module: NodeModule, filename: string) => {
+    const code = fs.readFileSync(filename, "utf8");
+    let js = ts.transpileModule(code, {
+      compilerOptions: {
+        jsx: ts.JsxEmit.React,
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+        esModuleInterop: true,
+      },
+    }).outputText;
+    js = js.replace(/require\((["'])([^"']+\.css)\?raw\1\)/g, (_m: string, _q: string, rel: string) => {
+      const cssPath = path.resolve(path.dirname(filename), rel);
+      return `({ default: ${JSON.stringify(fs.readFileSync(cssPath, "utf8"))} })`;
+    });
+    (module as unknown as { _compile(code: string, name: string): void })._compile(js, filename);
+  };
+  req.extensions[".ts"] = loader;
+  req.extensions[".tsx"] = loader;
+
+  const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../src/renderer/src/views/project");
+  const workProcessMod = req(path.join(projectDir, "work-process.tsx"));
+  const liveWindowMod = req(path.join(projectDir, "live-window.tsx"));
+
+  assert.equal(typeof liveWindowMod.isLiveRunEnded, "function", "live-window.tsx 需导出 isLiveRunEnded");
+  assert.equal(liveWindowMod.isLiveRunEnded({ work_item_id: "w1", status: "adopted" }, null), true);
+  assert.equal(liveWindowMod.isLiveRunEnded({ work_item_id: "w1", status: "in_progress" }, null), false);
+
+  const wpHtml = renderToStaticMarkup(React.createElement(workProcessMod.WorkProcessBody, {
+    app: {} as never,
+    projectId: "p1",
+    workItemId: "w1",
+    runId: "r1",
+    target: { kind: "cycle", department: "engineering", cycle: 1 },
+    departmentLabel: "工程",
+    matches: [
+      activation({ activation_id: "act-old", finished_at: null, step_count: 1 }),
+      activation({ activation_id: "act-new", finished_at: null, step_count: 2 }),
+    ],
+    picked: activation({ activation_id: "act-new", finished_at: null, step_count: 2 }),
+    latestActivationId: "act-new",
+    runEnded: false,
+    data: null,
+    loading: false,
+    error: null,
+    onPick: () => {},
+  }));
+  assert.match(wpHtml, /第 1 次工作 · .* · 共 1 步 · 已中断/);
+  assert.match(wpHtml, /第 2 次工作 · .* · 共 2 步 · 进行中/);
+
+  const wpEndedHtml = renderToStaticMarkup(React.createElement(workProcessMod.WorkProcessBody, {
+    app: {} as never,
+    projectId: "p1",
+    workItemId: "w1",
+    runId: "r1",
+    target: { kind: "cycle", department: "engineering", cycle: 1 },
+    departmentLabel: "工程",
+    matches: [
+      activation({ activation_id: "act-only", finished_at: null, step_count: 3 }),
+      activation({ activation_id: "act-two", finished_at: "2026-10-30T08:45:00Z", step_count: 1 }),
+    ],
+    picked: activation({ activation_id: "act-two", finished_at: "2026-10-30T08:45:00Z", step_count: 1 }),
+    latestActivationId: "act-two",
+    runEnded: true,
+    data: null,
+    loading: false,
+    error: null,
+    onPick: () => {},
+  }));
+  assert.match(wpEndedHtml, /第 1 次工作 · .* · 共 3 步 · 已中断/);
+  assert.match(wpEndedHtml, /第 2 次工作 · .* · 共 1 步 · 已结束/);
+
+  const stepTimelineMod = req(path.join(projectDir, "step-timeline.tsx"));
+  const stripHtml = renderToStaticMarkup(React.createElement(stepTimelineMod.ActivationStrip, {
+    result: result({
+      activation_id: "act-latest",
+      activations: [
+        activation({ activation_id: "act-old", finished_at: null, step_count: 2 }),
+        activation({ activation_id: "act-latest", finished_at: null, step_count: 1 }),
+      ],
+    }),
+    selected: "act-latest",
+    runEnded: false,
+    onSelect: () => {},
+  }));
+  assert.match(stripHtml, /第 1 次工作 · .* · 共 2 步 · 已中断/);
+  assert.match(stripHtml, /第 2 次工作 · .* · 共 1 步 · 进行中/);
+
+  const liveSource = fs.readFileSync(path.join(projectDir, "live-window.tsx"), "utf8");
+  assert.match(liveSource, /activationLabel\(activation,\s*index,\s*\{/);
+});
