@@ -19,6 +19,7 @@ import { readFailureText } from "../../contract/read-failure";
 import { Block, PageHead } from "../../shell/kit";
 import { paths, type Route } from "../../shell/routing";
 import { Empty, Loading, Tag } from "./common";
+import { shouldShowArrowCoverageFallback } from "./arrow-panel";
 import { CoverageUnreadable, CriteriaTable, LaunchMethods } from "./criteria-table";
 import { formatTime } from "./labels";
 import { fileDownload } from "./materials-download";
@@ -28,6 +29,7 @@ import {
   NO_FILES_TEXT,
   outcomeCardDetail,
   outcomesPageView,
+  workItemMaterialsQuery,
   type OnboardingRoundDetailView,
   type OutcomeCategory,
   type OutcomeEntry,
@@ -72,12 +74,13 @@ export function OutcomesPage(props: {
     { project_id: projectId },
     projectId === "",
   );
+  const scopedMaterialsQuery = workItemMaterialsQuery(projectId, requestedWorkItemId);
   const scopedMaterialsState = useSnapshot<WorkItemMaterialsResult>(
     props.app,
     `page.oc.scope.materials.${requestedWorkItemId ?? "none"}`,
     "work_item.materials",
-    { work_item_id: requestedWorkItemId ?? "" },
-    requestedWorkItemId === null || requestedWorkItemId === "",
+    scopedMaterialsQuery.params,
+    scopedMaterialsQuery.skip,
   );
 
   return (
@@ -270,6 +273,7 @@ export function OutcomesPageContent(props: OutcomesPageContentProps) {
             <OutcomeCard
               key={entry.id}
               app={props.app}
+              projectId={projectId}
               entry={entry}
               departments={props.departments}
               preloadedMaterials={
@@ -301,6 +305,7 @@ function cardToneClass(entry: OutcomeEntry): string {
 
 function OutcomeCard(props: {
   app: ClientApp;
+  projectId: string;
   entry: OutcomeEntry;
   departments: DepartmentView[];
   preloadedMaterials: WorkItemMaterialsResult | null;
@@ -379,6 +384,7 @@ function OutcomeCard(props: {
       {props.expanded ? (
         <OutcomeExpandedBody
           app={props.app}
+          projectId={props.projectId}
           entry={entry}
           departments={props.departments}
           preloadedMaterials={props.preloadedMaterials}
@@ -390,18 +396,23 @@ function OutcomeCard(props: {
 
 function OutcomeExpandedBody(props: {
   app: ClientApp;
+  projectId: string;
   entry: OutcomeEntry;
   departments: DepartmentView[];
   preloadedMaterials: WorkItemMaterialsResult | null;
 }) {
   const { entry } = props;
-  const skipMaterials = props.preloadedMaterials !== null || entry.workItemId === "";
+  const materialsQuery = workItemMaterialsQuery(
+    props.projectId,
+    entry.workItemId,
+    props.preloadedMaterials !== null,
+  );
   const materialsState = useSnapshot<WorkItemMaterialsResult>(
     props.app,
     `page.oc.card.materials.${entry.workItemId}`,
     "work_item.materials",
-    { work_item_id: entry.workItemId },
-    skipMaterials,
+    materialsQuery.params,
+    materialsQuery.skip,
   );
   const materials = props.preloadedMaterials ?? materialsState.data;
 
@@ -443,8 +454,8 @@ function OutcomeExpandedBody(props: {
       entry={entry}
       departments={props.departments}
       materials={materials}
-      materialsLoading={!skipMaterials && materialsState.loading && materials === null}
-      materialsError={!skipMaterials ? materialsState.error : null}
+      materialsLoading={!materialsQuery.skip && materialsState.loading && materials === null}
+      materialsError={!materialsQuery.skip ? materialsState.error : null}
       eventDetail={eventDetailState.data}
       eventDetailLoading={eventDetailState.loading}
       eventDetailError={eventDetailState.error}
@@ -575,7 +586,8 @@ export function OutcomeExpandedContent(props: OutcomeExpandedContentProps) {
                 {detail.conclusion?.rationale ? (
                   <p className="v21-oc-summary-text">{detail.conclusion.rationale}</p>
                 ) : null}
-                {detail.conclusion?.coverageText ? (
+                {detail.conclusion &&
+                shouldShowArrowCoverageFallback(detail.conclusion.coverageText, detail.review, coverage) ? (
                   <p className="y10-note note">{detail.conclusion.coverageText}</p>
                 ) : null}
                 {props.coverageError ? <CoverageUnreadable /> : null}

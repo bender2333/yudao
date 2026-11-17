@@ -677,3 +677,112 @@ test("ArrowPanel VersionSection：PRD 箭头画完整结构化 PRD 且不显示�
   );
   assert.ok(deliveryHtml.includes(NO_FILES_TEXT), "空文件清单的工程交付应该显示「这一版没有附文件清单」");
 });
+
+test("ArrowPanel ConclusionSection：CriteriaTable 展示覆盖汇总时不重复渲染 arrow-panel-coverage，无逐条结论或无匹配 review 时保留兜底行", async () => {
+  // R3：验收第 15 条「放行或打回的那一版看得到逐条结论与检验覆盖」，同一份覆盖汇总不在页面重复输出两次
+  const { createRequire } = await import("node:module");
+  const fs = await import("node:fs");
+  const req = createRequire(import.meta.url);
+  const ts = req("typescript");
+  const React = req("react");
+  const { renderToStaticMarkup } = req("react-dom/server");
+  const globalScope = globalThis as Record<string, unknown>;
+  globalScope["React"] = React;
+  const register = (module: NodeModule, filename: string) => {
+    const src = fs.readFileSync(filename, "utf8");
+    const out = ts.transpileModule(src, {
+      compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    (module as unknown as { _compile(code: string, name: string): void })._compile(out, filename);
+  };
+  req.extensions[".tsx"] = register;
+  req.extensions[".ts"] = register;
+
+  const {
+    ConclusionSection,
+    criteriaTableShowsCoverage,
+    shouldShowArrowCoverageFallback,
+  } = req("../../src/renderer/src/views/project/arrow-panel.tsx");
+
+  const delivered = arrow({
+    eventId: "ev-delivery-2",
+    verdict: { tone: "release", by: "质检", text: "放行 · 质检" },
+  });
+  const cov = coverage();
+  const revWithCriteria = review();
+  const revEmptyCriteria = review({ criteria: [] });
+  const mismatchedCov = coverage({ review_event_id: "ev-other-review" });
+
+  // conclusionOf(...).coverageText 维持原值
+  const conclusion = conclusionOf(delivered, materials({ reviews: [revWithCriteria] }), cov);
+  assert.ok(conclusion !== null);
+  const expectedCoverageText = "检验覆盖 100%（2/2）· 开环条件 0 条（其中模型阅读 1 条）";
+  assert.equal(conclusion.coverageText, expectedCoverageText);
+
+  // 纯函数判定覆盖兜底行与 CriteriaTable 渲染关系
+  assert.equal(criteriaTableShowsCoverage(revWithCriteria, cov), true);
+  assert.equal(shouldShowArrowCoverageFallback(expectedCoverageText, revWithCriteria, cov), false);
+
+  assert.equal(criteriaTableShowsCoverage(revEmptyCriteria, cov), false);
+  assert.equal(shouldShowArrowCoverageFallback(expectedCoverageText, revEmptyCriteria, cov), true);
+
+  assert.equal(criteriaTableShowsCoverage(null, cov), false);
+  assert.equal(shouldShowArrowCoverageFallback(expectedCoverageText, null, cov), true);
+
+  assert.equal(criteriaTableShowsCoverage(revWithCriteria, mismatchedCov), false);
+  assert.equal(shouldShowArrowCoverageFallback(expectedCoverageText, revWithCriteria, mismatchedCov), true);
+
+  assert.equal(shouldShowArrowCoverageFallback(null, revWithCriteria, cov), false);
+  assert.equal(shouldShowArrowCoverageFallback(null, revEmptyCriteria, null), false);
+
+  // 1. 有逐条结论且 review_event_id 匹配：只由 CriteriaTable (.y10-mt-coverage) 输出一次，不渲染 arrow-panel-coverage
+  const htmlWithCriteria = renderToStaticMarkup(
+    React.createElement(ConclusionSection, {
+      app: {},
+      conclusion,
+      review: revWithCriteria,
+      coverage: cov,
+      cited: { rows: [], missing: [] },
+      sessions: [],
+      textOnly: false,
+    }),
+  );
+  assert.equal(htmlWithCriteria.includes('data-testid="arrow-panel-coverage"'), false);
+  assert.equal(htmlWithCriteria.includes("y10-mt-coverage"), true);
+  assert.equal(htmlWithCriteria.split(expectedCoverageText).length - 1, 1);
+
+  // 2. 逐条结论为空：CriteriaTable 不显示覆盖行，保留 arrow-panel-coverage 兜底行
+  const emptyConclusion = conclusionOf(delivered, materials({ reviews: [revEmptyCriteria] }), cov);
+  assert.ok(emptyConclusion !== null);
+  assert.equal(emptyConclusion.coverageText, expectedCoverageText);
+  const htmlEmptyCriteria = renderToStaticMarkup(
+    React.createElement(ConclusionSection, {
+      app: {},
+      conclusion: emptyConclusion,
+      review: revEmptyCriteria,
+      coverage: cov,
+      cited: { rows: [], missing: [] },
+      sessions: [],
+      textOnly: false,
+    }),
+  );
+  assert.equal(htmlEmptyCriteria.includes('data-testid="arrow-panel-coverage"'), true);
+  assert.equal(htmlEmptyCriteria.includes("y10-mt-coverage"), false);
+  assert.equal(htmlEmptyCriteria.split(expectedCoverageText).length - 1, 1);
+
+  // 3. 无匹配 review（review 为 null）：CriteriaTable 不渲染，保留 arrow-panel-coverage 兜底行
+  const htmlNoReview = renderToStaticMarkup(
+    React.createElement(ConclusionSection, {
+      app: {},
+      conclusion,
+      review: null,
+      coverage: cov,
+      cited: { rows: [], missing: [] },
+      sessions: [],
+      textOnly: false,
+    }),
+  );
+  assert.equal(htmlNoReview.includes('data-testid="arrow-panel-coverage"'), true);
+  assert.equal(htmlNoReview.includes("y10-mt-coverage"), false);
+  assert.equal(htmlNoReview.split(expectedCoverageText).length - 1, 1);
+});

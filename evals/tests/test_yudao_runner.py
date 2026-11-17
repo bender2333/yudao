@@ -682,6 +682,64 @@ def test_release_coverage_is_not_applicable_without_a_release():
     assert "不适用" in checkpoint["detail"]
 
 
+def test_release_coverage_reads_current_payload_keys_including_zero_values():
+    """第五项：现行 `qa_submitted` 使用 `coverage_ratio`/`model_reading`/`open` 与 `open_criteria`，数值 0/0.0 不误触发旧键回退。"""
+    export = _load_fixture("handoff_release.json")
+    review = next(e for e in export["events"] if e["type"] == "qa_submitted")
+    params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
+        "parameters_version")
+
+    # 1. 现行完整覆盖（含 0 值字段）
+    review["payload"]["coverage"] = {
+        "criteria_total": 2, "executable": 2, "covered": 2,
+        "coverage_ratio": 1.0, "model_reading": 0, "open": 0,
+        "changed": 0, "baseline_valid": True,
+    }
+    review["payload"]["open_criteria"] = []
+    full = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
+                                          "hidden_failures": []}, None, params)
+    full_cp = full["checkpoints"]["release_coverage"]
+    assert full_cp["passed"] is True
+    assert full_cp["applicable"] is True
+    assert full_cp["covered_ratio"] == 1.0
+    assert full_cp["model_read_count"] == 0
+    assert full_cp["open_loop_count"] == 0
+
+    # 2. 现行 0.0 / 0 值不被当作 None（即使同时存在旧键也不误触发回退）
+    review["payload"]["coverage"] = {
+        "coverage_ratio": 0.0, "model_reading": 0, "open": 0,
+        "covered_ratio": 1.0, "model_read_count": 2, "open_loop_count": 3,
+    }
+    review["payload"]["open_criteria"] = []
+    review["payload"]["open_loop_conditions"] = ["R-OLD"]
+    zero = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
+                                          "hidden_failures": []}, None, params)
+    zero_cp = zero["checkpoints"]["release_coverage"]
+    assert zero_cp["passed"] is False
+    assert zero_cp["applicable"] is True
+    assert zero_cp["covered_ratio"] == 0.0
+    assert zero_cp["model_read_count"] == 0
+    assert zero_cp["open_loop_count"] == 0
+    assert "检验覆盖比例小于 1.0" in zero_cp["detail"]
+    assert "未核实" not in zero_cp["detail"]
+    assert "模型阅读作出判断" not in zero_cp["detail"]
+    assert "R-OLD" not in zero_cp["detail"]
+
+    # 3. 现行含模型阅读与开环条件（读取 open_criteria）
+    review["payload"]["coverage"] = {"coverage_ratio": 0.5, "model_reading": 1, "open": 1}
+    review["payload"]["open_criteria"] = ["AC2", "AC3"]
+    review["payload"].pop("open_loop_conditions", None)
+    partial = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
+                                             "hidden_failures": []}, None, params)
+    partial_cp = partial["checkpoints"]["release_coverage"]
+    assert partial_cp["passed"] is False
+    assert partial_cp["covered_ratio"] == 0.5
+    assert partial_cp["model_read_count"] == 1
+    assert partial_cp["open_loop_count"] == 1
+    assert "存在靠模型阅读作出判断的条件" in partial_cp["detail"]
+    assert "存在开环条件：AC2、AC3" in partial_cp["detail"]
+
+
 def test_checkpoints_cover_all_five_items():
     """五项检查点：键集合固定。"""
     collected = yudao_metrics.collect(_export("paused"), {"timed_out": False, "elapsed_seconds": 1.0,
