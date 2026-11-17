@@ -12,19 +12,22 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
+from types import SimpleNamespace
 
 from harness.actions import CheckReceipt, FactsQuery, TreeFacts
 from harness.adapters.fake import FakeAdapter
+from harness.artifacts import ArtifactStore
 from harness.coverage import (BASELINE_UNAVAILABLE, baseline_open_records, baseline_outcome,
                               baseline_records, coverage_report)
-from harness.environment import LocalEnvironment
+from harness.environment import LocalEnvironment, Workspaces
 from harness.models import ArtifactRef, DeliverySpec, EffectiveContract, SessionRecord
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import perform
+from harness.tree_archive import store_tree
 from harness.workspace import Workspace
 
 START_FILE = "src/lib.py"
@@ -346,3 +349,116 @@ def test_the_release_gate_is_unchanged_by_the_baseline(tmp_path):
     assert content["coverage"]["covered"] == 0 and content["coverage"]["baseline_valid"] is False
     assert content["baseline_checks"] == [{"criterion": "AC1", "checks": "smoke", "outcome": "passed"}]
     assert content["verdict"] == "release"
+
+
+def test_baseline_runs_qa_check_recorded_via_run_check_and_counts_coverage(tmp_path):
+    # 守 R3（检验的有效性）：质检在检查工作区编写 .yudao-qa-tests/ 并经 run_check 在交付快照运行通过后，
+    # 调用同名 run_baseline_check 在「起点树 + .yudao-qa-tests/ + 声明交付文件」上运行同一条已记录命令，
+    # 基线非零失败且交付通过时 coverage_report 计入 covered、coverage_ratio == 1.0 且 baseline_valid 为真
+    start = _tree((START_FILE, START_BODY))
+    sealed = _tree((START_FILE, DELIVERY_BODY))
+    environment = LocalEnvironment.establish(tmp_path / "run", sealed, check_timeout_sec=60)
+    environment.bind_baseline_source(start, (START_FILE,))
+    environment.bind_delivery_checks([], sealed)
+
+    qa_script = "import sys\nsys.path.insert(0, '.')\nfrom src.lib import VALUE\nassert VALUE == 2, f'got {VALUE}'\n"
+    written = perform(environment, "write_file", {"path": QA_TEST, "content": qa_script}, department="quality")
+    assert written.ok, written.error
+
+    delivery_run = perform(environment, "run_check",
+                           {"name": "qa_suite", "command": f'"{PYTHON}" {QA_TEST}'},
+                           department="quality")
+    assert delivery_run.ok, delivery_run.error
+    assert delivery_run.output["exit_code"] == 0
+
+    baseline_run = perform(environment, "run_baseline_check", _baseline_call("qa_suite", files=[]),
+                           department="quality")
+    assert baseline_run.ok, baseline_run.error
+    assert baseline_run.output["baseline"] is True
+    assert baseline_run.output["exit_code"] == 1
+
+    facts = environment.query(FactsQuery(tree=True)).tree
+    baseline = baseline_records(facts.checks, ["qa_suite"])
+    report = coverage_report([_criterion(checks=("qa_suite",))], baseline=baseline)
+    assert report["covered"] == 1 and report["coverage_ratio"] == 1.0 and report["baseline_valid"] is True
+
+    # 传入 command 企图改写命令仍然被忽略；传入声明交付文件后基线副本叠加该文件并按交付版本通过
+    ignored = perform(environment, "run_baseline_check",
+                      {"name": "qa_suite", "command": f'"{PYTHON}" -c "print(\'HIJACKED\')"'},
+                      department="quality")
+    assert ignored.ok, ignored.error
+    assert "HIJACKED" not in ignored.output["summary"]
+    assert ignored.output["exit_code"] == 1
+
+    with_declared = perform(environment, "run_baseline_check",
+                            _baseline_call("qa_suite", files=[START_FILE]),
+                            department="quality")
+    assert with_declared.ok, with_declared.error
+    assert with_declared.output["exit_code"] == 0
+
+    unknown = perform(environment, "run_baseline_check", _baseline_call("missing_qa_check"),
+                      department="quality")
+    assert unknown.ok is False
+    assert "records no check named" in (unknown.error or "")
+
+
+def test_baseline_uses_workspaces_wiring_and_prefers_valid_department_check(tmp_path):
+    # 守 R2/R3：通过 Workspaces 建立质检检查工作区（DeliverySpec.checks 无同名记录或有旧记录时），
+    # 优先使用该部门当前交付副本上最近一条非基线、未改树 run_check 命令，忽略改树回执与其他部门回执
+    start = _tree((START_FILE, START_BODY))
+    sealed = _tree((START_FILE, DELIVERY_BODY))
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    start_ref = store_tree(artifacts, "run_1", start)
+    sealed_ref = store_tree(artifacts, "run_1", sealed)
+    delivery = DeliverySpec(
+        id="del_1", run_id="run_1", revision=1, parent_hash=None, content_hash="sha256:" + "d" * 64,
+        issuer="engineering", status="active",
+        created_event_id="evt_del", product_spec_hash="sha256:" + "p" * 64,
+        effective_contract_hash="sha256:" + "e" * 64, summary="delivered", files=[START_FILE],
+        check_names=["shared"],
+        checks=[{"name": "shared", "exit_code": 0, "summary": "eng",
+                 "command": f'"{PYTHON}" -c "print(\'FROM_DELIVERY_SPEC\')"'}],
+        known_risks=[], code_tree_digest=sealed.digest, tree_ref=sealed_ref,
+    )
+    projection = SimpleNamespace(
+        run_id="run_1", parameters=None, sessions={}, branch_sessions=set(),
+        delivery_spec=delivery, baseline={"tree_ref": asdict(start_ref)}, snapshot=None,
+        qa_tests_archive_ref=None,
+    )
+    workspaces = Workspaces(tmp_path / "ws", view=lambda _rid: projection, writes=None, artifacts=artifacts)
+    environment = workspaces.new_inspection("run_1", "quality", session_id="ses_q")
+
+    # 未运行部门 run_check 时回退到 DeliverySpec.checks
+    fallback = perform(environment, "run_baseline_check", _baseline_call("shared", files=[]),
+                       department="quality")
+    assert fallback.ok, fallback.error
+    assert "FROM_DELIVERY_SPEC" in fallback.output["summary"]
+
+    # 部门自己运行同名 run_check 后，基线检查优先采用该部门的非基线、未改树命令（取最新一条）
+    qa_first = f'"{PYTHON}" -c "print(\'FROM_QA_FIRST\')"'
+    qa_latest = f'"{PYTHON}" -c "print(\'FROM_QA_LATEST\')"'
+    assert perform(environment, "run_check", {"name": "shared", "command": qa_first},
+                   department="quality").ok
+    assert perform(environment, "run_check", {"name": "shared", "command": qa_latest},
+                   department="quality").ok
+    preferred = perform(environment, "run_baseline_check", _baseline_call("shared", files=[]),
+                        department="quality")
+    assert preferred.ok, preferred.error
+    assert "FROM_QA_LATEST" in preferred.output["summary"]
+    assert "FROM_DELIVERY_SPEC" not in preferred.output["summary"]
+
+    # 改树 check 回执与其他部门的 check 回执不作为该部门的交付检查命令
+    assert perform(environment, "run_check",
+                   {"name": "other_only", "command": f'"{PYTHON}" -c "print(\'OTHER\')"'},
+                   department="other").ok
+    other_reject = perform(environment, "run_baseline_check", _baseline_call("other_only"),
+                           department="quality")
+    assert other_reject.ok is False and "records no check named" in (other_reject.error or "")
+
+    mutating_cmd = f'"{PYTHON}" -c "from pathlib import Path; Path(\'src/lib.py\').write_text(\'MUTATED=1\\n\')"'
+    mutating_run = perform(environment, "run_check", {"name": "mutating", "command": mutating_cmd},
+                           department="quality")
+    assert mutating_run.output["tree_changed"] is True
+    mutating_reject = perform(environment, "run_baseline_check", _baseline_call("mutating"),
+                              department="quality")
+    assert mutating_reject.ok is False and "records no check named" in (mutating_reject.error or "")
