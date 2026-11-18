@@ -295,6 +295,7 @@
 "test_issue_856.py" = "integration"
 "test_issue_865.py" = "integration"
 "test_issue_1015_usage_from_projection.py" = "module"
+"test_issue_1839_pwsh_path.py" = "integration"
 "test_item_sources.py" = "module"
 "test_fault_matrix_row7_incomplete_model_output.py" = "integration"
 "test_fault_matrix_row8_write_failure.py" = "integration"

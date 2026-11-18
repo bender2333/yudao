@@ -7,6 +7,7 @@ credentials in the environment and skip without them.
 import base64
 import contextlib
 import http.server
+import io
 import json
 import os
 import shutil
@@ -16,6 +17,7 @@ import threading
 import time
 import urllib.parse
 import uuid
+from types import SimpleNamespace
 
 import pytest
 
@@ -307,6 +309,109 @@ def test_model_definition_carries_the_reported_capacity():
     adjusted = yudao.model_definition(MODEL, from_args)
     assert adjusted["context_window"] == 100_000
     assert adjusted["max_output_tokens"] == 4_000
+
+
+@pytest.fixture
+def mock_model_test(monkeypatch):
+    # 模拟公开 HTTP 合同，包括命令接受位置、可续读的事件流和独立的准入快照。
+    def serve(*, admitted, previous=None, snapshot_updates=True):
+        target = {"kind": "model", "base_revision": 7,
+                  "provider_id": yudao.PROVIDER_ID, "model_id": yudao.MODEL_DEFINITION_ID}
+        reason = "工具往返超时"
+        current = {**target, "admitted": admitted, "ok": admitted,
+                   "error": None if admitted else reason,
+                   "actual_model": "served-model" if admitted else None,
+                   "authorization": "Bearer sensitive-fixture-value"}
+        historical = {**current, "admitted": True, "ok": True, "error": None,
+                      "actual_model": "previous-model"}
+        events = [(41, historical),
+                  (43, {**current, "kind": "candidate", "admitted": None, "ok": False, "error": "other test"}),
+                  (44, {**current, "base_revision": 6, "admitted": False, "error": "other revision"}),
+                  (45, current)]
+        admission = {"model_id": yudao.MODEL_DEFINITION_ID, "provider_id": yudao.PROVIDER_ID,
+                     "admitted": True, "stale": False, "admitted_at": "2026-11-18T12:00:00+00:00",
+                     "admitted_model": "served-model"}
+        stream_opened = False
+        requests = []
+
+        def urlopen(request, *, timeout):
+            nonlocal stream_opened
+            url = urllib.parse.urlparse(request.full_url)
+            requests.append(url.path)
+            if url.path == "/api/queries/catalog.document":
+                body = {"position": 40, "data": {"revision": 7}}
+            elif url.path == "/api/commands/catalog.model.test":
+                command = json.loads(request.data)
+                assert command["base_version"] == 7
+                assert command["provider_id"] == yudao.PROVIDER_ID
+                assert command["model_id"] == yudao.MODEL_DEFINITION_ID
+                body = {"position": 42, "command_id": command["command_id"], "refs": {}, "duplicate": False}
+            elif url.path == "/api/events":
+                params = urllib.parse.parse_qs(url.query)
+                assert params["type"] == ["catalog_test_finished"]
+                after = int(params["after"][0])
+                frames = [": keep-alive\r\n\r\nevent: checkpoint\r\ndata: {}\r\n\r\n"]
+                for position, payload in events:
+                    if position > after:
+                        event = {"type": "catalog_test_finished", "position": position, "payload": payload}
+                        frames.append(f"id: {position}\r\nevent: event\r\ndata: {json.dumps(event)}\r\n\r\n")
+                stream_opened = True
+                return io.BytesIO("".join(frames).encode("utf-8"))
+            elif url.path == "/api/queries/catalog":
+                record = admission if admitted and stream_opened and snapshot_updates else previous
+                body = {"position": 45, "data": {"admissions": [record] if record else []}}
+            else:
+                pytest.fail(f"unexpected HTTP request: {url.path}")
+            return io.BytesIO(json.dumps(body).encode("utf-8"))
+
+        clock = 0.0
+
+        def sleep(seconds):
+            nonlocal clock
+            clock += seconds
+
+        monkeypatch.setattr(yudao, "time", SimpleNamespace(monotonic=lambda: clock, sleep=sleep))
+        monkeypatch.setattr(yudao.urllib.request, "urlopen", urlopen)
+        return yudao.YudaoClient("http://yudao.invalid"), admission, reason, lambda: clock, requests
+
+    return serve
+
+
+def test_model_admission_returns_the_current_success(mock_model_test):
+    """守 R3：从本次完成事件确认成功，再返回准入快照中的实际模型。"""
+    client, admission, _, _, _ = mock_model_test(admitted=True)
+
+    assert yudao._admit_model(client) == admission
+
+
+def test_model_admission_does_not_return_a_mismatched_snapshot(mock_model_test):
+    """守 R3：成功事件报告的实际模型与目录中的旧准入不符时，停止评测准备。"""
+    previous = {"model_id": yudao.MODEL_DEFINITION_ID, "provider_id": yudao.PROVIDER_ID,
+                "admitted": True, "stale": False, "admitted_model": "previous-model"}
+    client, _, _, _, _ = mock_model_test(admitted=True, previous=previous, snapshot_updates=False)
+
+    with pytest.raises(RuntimeError, match="without a matching current admission"):
+        yudao._admit_model(client)
+
+
+@pytest.mark.parametrize("previous_stale", [None, False, True], ids=["no-old-record", "old-current", "old-stale"])
+def test_model_admission_reports_the_current_failure(mock_model_test, previous_stale):
+    """守 R3：已结束的失败带明确原因，旧准入有无或作废均不影响本次结论。"""
+    previous = None if previous_stale is None else {
+        "model_id": yudao.MODEL_DEFINITION_ID, "provider_id": yudao.PROVIDER_ID,
+        "admitted": not previous_stale, "stale": previous_stale,
+        "admitted_at": "2026-11-17T12:00:00+00:00", "admitted_model": "previous-model",
+        "credential_ref": "sensitive-fixture-field",
+    }
+    client, _, reason, elapsed, requests = mock_model_test(admitted=False, previous=previous)
+
+    with pytest.raises(RuntimeError, match=reason) as failure:
+        yudao._admit_model(client)
+
+    assert elapsed() < 300
+    assert "/api/queries/catalog" not in requests
+    assert "sensitive-fixture-field" not in str(failure.value)
+    assert "sensitive-fixture-value" not in str(failure.value)
 
 
 def test_the_model_list_reports_the_capacity():
