@@ -281,6 +281,33 @@ class YudaoClient:
             url += "?" + urllib.parse.urlencode(params, doseq=True)
         return self._send(urllib.request.Request(url, method="GET"), name)
 
+    def events(self, event_type, *, after, timeout_seconds):
+        """Read matching events from the public event stream after a known log position."""
+        params = urllib.parse.urlencode({"after": after, "type": event_type})
+        request = urllib.request.Request(self.base_url + "/api/events?" + params, method="GET")
+        deadline = time.monotonic() + timeout_seconds
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                for name, data in _sse_messages(response):
+                    if time.monotonic() >= deadline:
+                        return
+                    if name == "resync":
+                        raise RuntimeError("the model test event stream requires resynchronization")
+                    if name != "event":
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError:
+                        raise RuntimeError("the model test event stream returned invalid data") from None
+                    if not isinstance(event, dict):
+                        raise RuntimeError("the model test event stream returned invalid data")
+                    if event.get("type") == event_type:
+                        yield event
+        except TimeoutError:
+            return
+        except urllib.error.HTTPError as error:
+            raise RuntimeError("the model test event stream failed with HTTP " + str(error.code)) from None
+
     def _send(self, request, name):
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
@@ -317,6 +344,22 @@ class YudaoRejected(Exception):
         self.name = name
         self.status = status
         self.body = body
+
+
+def _sse_messages(response):
+    """Yield named SSE messages while ignoring comments and transport metadata."""
+    name = "message"
+    data = []
+    for raw_line in response:
+        line = raw_line.decode("utf-8").rstrip("\r\n")
+        if not line:
+            if data:
+                yield name, "\n".join(data)
+            name, data = "message", []
+        elif line.startswith("event:"):
+            name = line[6:].strip()
+        elif line.startswith("data:"):
+            data.append(line[5:].lstrip())
 
 
 # ---------------------------------------------------------------------------
@@ -753,25 +796,38 @@ def wait_for_end(client, project_id, work_item_id, limit_seconds, *, role_choice
 
 
 def _admit_model(client):
-    """模型测试：请求真正发一次，被测模型没有响应就没有准入（#86 准入记录单独返回）。"""
+    """先等本次模型测试结束，再读取它的准入记录（#86）。"""
     revision = client.query("catalog.document")["data"]["revision"]
-    client.command("catalog.model.test",
-                   {"base_version": revision, "provider_id": PROVIDER_ID,
-                    "model_id": MODEL_DEFINITION_ID})
-    deadline = time.monotonic() + 300.0
-    while time.monotonic() < deadline:
-        for admission in client.query("catalog")["data"]["admissions"]:
-            if admission["model_id"] != MODEL_DEFINITION_ID:
+    accepted = client.command("catalog.model.test",
+                              {"base_version": revision, "provider_id": PROVIDER_ID,
+                               "model_id": MODEL_DEFINITION_ID})
+    # 每次评测独占实例。命令接受位置排除历史结果，目录修订号和模型身份限定测试目标。
+    events = client.events("catalog_test_finished", after=accepted["position"], timeout_seconds=300.0)
+    with contextlib.closing(events):
+        for event in events:
+            payload = event.get("payload")
+            if not isinstance(payload, dict):
+                raise RuntimeError("the model test returned an invalid result")
+            if (payload.get("kind") != "model" or payload.get("provider_id") != PROVIDER_ID
+                    or payload.get("model_id") != MODEL_DEFINITION_ID
+                    or payload.get("base_revision") != revision):
                 continue
-            # 准入记录可能来自以前那次测试：作废的记录不算这次模型测试的结果
-            if admission.get("stale"):
-                raise RuntimeError("the model test recorded a stale admission")
-            if not admission["admitted"]:
-                raise RuntimeError("the model test did not admit the model under test")
-            # 服务返回的模型名由服务决定（网关可能换成一个具体的模型）；报告记录它实际服务的名字
+            if payload.get("admitted") is True:
+                break
+            # 只转述服务公开的错误原因，不回显整条事件或目录内容。
+            reason = payload.get("error")
+            if not isinstance(reason, str) or not reason.strip():
+                reason = "the model test did not admit the model under test"
+            raise RuntimeError("the model test failed: " + reason)
+        else:
+            raise RuntimeError("the model test did not finish within 300 seconds")
+
+    for admission in client.query("catalog")["data"]["admissions"]:
+        if (admission["model_id"] == MODEL_DEFINITION_ID and admission["provider_id"] == PROVIDER_ID
+                and admission["admitted"] and not admission["stale"]
+                and admission["admitted_model"] == (payload.get("actual_model") or "")):
             return admission
-        time.sleep(1.0)
-    raise RuntimeError("the model test did not finish within 300 seconds")
+    raise RuntimeError("the model test succeeded without a matching current admission")
 
 
 def _cancel(client, work_item_id):
