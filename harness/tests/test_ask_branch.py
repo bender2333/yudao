@@ -13,29 +13,41 @@ from harness.tightening import WATCHED_OUTPUTS
 
 
 def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
-    # 工单 #555：质检的结论只有缺陷记录与放行，要求有问题时质检询问产品，
-    # 产品在回答里修订 PRD；质检对旧交付的放行被拒绝（交付依据的 PRD 版本过期，#471）
+    # R3：产品合同只写偏好项优先，未明确它与更新时间冲突时的取舍；
+    # 质检询问产品，答案修订 PRD 后旧交付因合同版本过期而不得放行（#471）
+    goal = "排序时优先置顶项，同组尽量按最近更新时间从新到旧。"
     adapter = FakeAdapter({
-        "product": [product_spec()],
+        "product": [product_spec(
+            goal=goal,
+            requirements=[goal],
+            acceptance=["排序应优先置顶项，同组尽量按最近更新时间从新到旧。"],
+        )],
         "engineering": [delivery_turn()],
         "quality": [
-            ask_turn(recipient="product", question="验收标准漏了空输入，请修订 PRD。"),
+            ask_turn(
+                recipient="product",
+                question="置顶项较旧而普通项较新时哪项排前？请明确取舍，并修订合同加入冲突样例。",
+                background="现行 AC 使用‘优先’和‘尽量’，没有定义二者冲突时的规则。",
+                expected="有明确优先级与可区分的排序断言。",
+            ),
             review_turn("release", "the delivery passed the criterion the quality had"),
             judgement_turn(),
             review_turn("release", "the delivery passed the criterion the quality had"),
         ],
         "product:ask": [answer_turn(
-            answer="已补上空输入的验收标准。",
-            requirements=["print the given argument to stdout"],
-            acceptance=["running the program with a word prints that word",
-                        "empty input prints a blank line"],
+            answer="置顶是硬优先级，普通项不得排在置顶项前。",
+            goal=goal,
+            requirements=[goal],
+            acceptance=["较早置顶的 A 与较新的普通 B 冲突时，A 排在 B 前。"],
             change_record={
-                "changed": ["empty input prints a blank line"],
-                "retained": ["running the program with a word prints that word"],
-                "retired": [], "rationale": "The acceptance criteria missed the empty input."})],
+                "changed": ["明确置顶相对普通项为硬优先级"],
+                "retained": [],
+                "retired": [],
+                "rationale": "旧验收条件没有定义置顶与时间冲突时的优先级。",
+            })],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("build echo")
+    run_id = system.create_run(goal)
     system.activate_once(run_id)  # 产品提交初始 PRD
     system.activate_once(run_id)  # 工程交付
     projection = system.activate_once(run_id)  # 质检询问产品，产品在回答里修订 PRD，质检的放行被拒绝
@@ -43,9 +55,12 @@ def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path)
     # 产品在回答里修订了 PRD，修订版是第 2 版
     assert projection.product_spec is not None
     assert projection.product_spec.revision == 2
+    assert "较早置顶的 A" in projection.product_spec.acceptance_criteria[0]
     # 询问与回答各有一条事件，修订由产品的回答带来
     events = system.store.list_events(run_id)
-    assert any(event.type == EventType.ASK_STARTED for event in events)
+    asked = [event for event in events if event.type == EventType.ASK_STARTED]
+    assert len(asked) == 1
+    assert "哪项排前" in asked[0].payload["question"]
     answered = [event for event in events if event.type == EventType.ASK_ANSWERED]
     assert len(answered) == 1
     assert answered[0].payload["with_spec_revision"] is True
@@ -56,6 +71,7 @@ def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path)
         for item in projection.rejections
         for error in item["errors"]
     )
+    assert not [event for event in events if event.type == EventType.QA_SUBMITTED]
 
 
 def _call(identity: str, name: str, **args: Any) -> dict[str, Any]:
