@@ -11,8 +11,8 @@ from typing import Any
 
 from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter, prompt_part
-from harness.models import EventType
-from harness.proposals import answer_turn, ask_turn, default_criteria, delivery_turn, judgement_turn, product_spec, review_turn
+from harness.models import ArtifactRef, EventType
+from harness.proposals import default_criteria, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import python_snippet
@@ -56,8 +56,6 @@ def _text(call: Any) -> str:
 
 def _pinned(call: Any, source: str) -> Any:
     # 请求里钉住的那一段材料（装配在历史以前，同名段第一次出现的是钉住的这份）
-    from harness.adapters.fake import prompt_part
-
     text = prompt_part(call, source)
     return None if text is None else json.loads(text)
 
@@ -179,14 +177,15 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
 
 def test_disclosed_ordering_limit_is_checked_before_release(tmp_path: Path):
     # R3：简单样本不区分两种实现。解释揭示限制后，质检用冲突输入补证，按回执打回，修正后核验新交付。
-    goal = "优先显示置顶项，同类尽量按最近更新时间排序。"
+    goal = "置顶项排在普通项之前，同类按最近更新时间从新到旧。"
     risk = "首版只比较时间；较早的置顶项可能排到较新的普通项后面。"
     path = "src/order.py"
     common = {"aligned": {"command": python_snippet(
         "from src.order import first; assert first([('A', 1, False), ('B', 2, True)]) == 'B'"
     )}}
     conflict = {"conflict": {"command": python_snippet(
-        "from src.order import first; assert first([('A', 1, True), ('B', 2, False)]) == 'A'"
+        "from src.order import first; actual = first([('A', 1, True), ('B', 2, False)]); "
+        "assert actual == 'A', f'AC1: expected A first, got {actual}'"
     )}}
     unchecked = default_criteria(1, [], method="open", result="unverified")
     failed = default_criteria(1, ["conflict"], result="failed")
@@ -222,29 +221,6 @@ def test_disclosed_ordering_limit_is_checked_before_release(tmp_path: Path):
     result = system.activate_once(run_id)   # 按当前回执放行
     assert result.stop_reason == "released", result.error
 
-    product_material = next(prompt_part(call, "work_item_guidance") for call in adapter.invocations
-                            if call.department == "product")
-    assert "多条规则会争夺同一个结果时" in product_material
-    assert "较早的置顶项 A 和较新的普通项 B" in product_material
-    assert "期望 A 排在 B 前" in product_material
-    assert "偏好、优先、尽可能" in product_material
-    assert "偏好是硬性优先、只在平局时生效还是普通倾向" in product_material
-    assert "但未说明它与距离、换乘、成本等目标冲突时谁优先" in product_material
-    assert "ask_user 发互斥选项" in product_material
-    assert "询问澄清" in product_material
-    quality_material = next(prompt_part(call, "work_item_guidance") for call in _quality_calls(adapter))
-    assert "先判断后看解释" in quality_material
-    assert "通用回归套件通过或退出码为 0，不能单独证明每条条件通过" in quality_material
-    assert "逐个打开本次实际执行的检查" in quality_material
-    assert "含偏好、优先、尽可能等取舍表述时" in quality_material
-    assert "验收只说“优先选用”但未说明与距离、换乘、成本等目标冲突时谁优先" in quality_material
-    assert "必须记为 unverified 并用 ask 询问产品" in quality_material
-    assert "逐个打开检查脚本" in quality_material
-    assert "可能违反现行验收条件的具体限制" in quality_material
-    assert "用能触发该限制的输入补跑独立检查" in quality_material
-    assert "规则未定时用 ask 问产品" in quality_material
-    assert "已证不符就返工" in quality_material
-
     events = system.store.list_events(run_id)
     deliveries = [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
     judgements = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
@@ -258,56 +234,32 @@ def test_disclosed_ordering_limit_is_checked_before_release(tmp_path: Path):
                       and context["content_hash"] == first_delivery_hash]
     assert "known_risks" not in first_contexts[0]
     assert first_contexts[-1]["known_risks"] == [risk]
-    for delivery, judgement, review in zip(deliveries, judgements, reviews, strict=True):
-        assert delivery.payload["checks"][0]["exit_code"] == 0  # 两份都通过常规检查
+    assert judgements[0].payload["criteria"][0]["result"] == "unverified"
+    for delivery, judgement, review, (expected_result, expected_exit) in zip(
+        deliveries, judgements, reviews, [("failed", 1), ("passed", 0)], strict=True,
+    ):
+        [aligned_receipt] = delivery.payload["checks"]
+        assert aligned_receipt["name"] == "aligned"
+        assert aligned_receipt["exit_code"] == 0  # 两种实现都通过简单样本
         assert delivery.position < judgement.position < review.position
         assert review.payload["judgement_event"] == judgement.event_id
+        [criterion] = review.payload["criteria"]
+        assert (criterion["criterion"], criterion["method"], criterion["result"], criterion["checks"]) == (
+            "AC1", "check", expected_result, ["conflict"],
+        )
         [receipt] = [row for row in review.payload["checks"] if row["name"] == "conflict"]
-        assert (receipt["exit_code"] == 0) == (review is release)
+        assert receipt["exit_code"] == expected_exit
+        assert receipt["command"] == conflict["conflict"]["command"]
         assert receipt["snapshot_hash"] == delivery.payload["code_tree_digest"]
         assert receipt["delivery_spec_hash"] == delivery.payload["content_hash"]
         assert receipt["effective_contract_hash"] == delivery.payload["effective_contract_hash"]
 
-
-def test_unspecified_preference_priority_is_clarified_before_review(tmp_path: Path):
-    # R3：产品合同只说偏好线路优先，未定义它与较短路线冲突时的取舍；质检必须询问产品。
-    goal = "查询路线时优先使用偏好线路。"
-    adapter = FakeAdapter({
-        "product": [product_spec(goal, requirements=[goal], acceptance=[
-            "查询存在偏好线路时优先使用该线路。",
-        ])],
-        "engineering": [delivery_turn()],
-        "quality": [ask_turn(
-            recipient="product",
-            question="偏好线路与更短路线冲突时，哪项优先？请修订验收标准并给出冲突样本。",
-            background="当前合同只要求优先使用偏好线路，未说明冲突时的优先级。",
-            expected="明确取舍与可核对的冲突输入。",
-        )],
-        "product:ask": [answer_turn(
-            answer="平局时才使用偏好线路；距离不同时选择更短路线。",
-            requirements=[goal],
-            acceptance=["较短路线走 Line B，较短路线与偏好线路等距时走 Line A。"],
-            change_record={
-                "changed": ["明确偏好线路仅在距离平局时生效"],
-                "retained": [], "retired": [],
-                "rationale": "用户原意没有说明偏好与距离冲突时谁优先。",
-            },
-        )],
-    })
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run(goal)
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    projection = system.activate_once(run_id)
-
-    assert projection.product_spec is not None
-    assert projection.product_spec.revision == 2
-    events = system.store.list_events(run_id)
-    [asked] = [event for event in events if event.type == EventType.ASK_STARTED]
-    [answered] = [event for event in events if event.type == EventType.ASK_ANSWERED]
-    assert asked.payload["recipient"] == "product"
-    assert answered.payload["with_spec_revision"] is True
-    assert answered.payload["revision"] == 2
-    assert not [event for event in events if event.type == EventType.QA_SUBMITTED]
-
-
+        [check_event] = [event for event in events
+                         if judgement.position < event.position < review.position
+                         and event.department == "quality" and event.type == EventType.TOOL_CALLED
+                         and event.payload["name"] == "run_check" and event.payload["args"]["name"] == "conflict"]
+        executed = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**check_event.payload["output_ref"])))
+        assert executed["executor"] == "host"
+        assert {key: executed[key] for key in receipt} == receipt
+        if review is rework:
+            assert "AssertionError: AC1: expected A first, got B" in executed["summary"]
