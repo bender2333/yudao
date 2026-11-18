@@ -22,13 +22,13 @@ def _junction(path: Path, target: Path) -> None:
 def _probe(pwsh: Path, search_path: str, workdir: Path) -> dict[str, object]:
     probe = r"""
 $ErrorActionPreference = 'Stop'
-# pwsh 进程初始化会把自己的目录加到 PATH 前面，启动后再设置测试顺序。
-$env:PATH = $env:ISSUE_1839_PATH
 $manifestPath = Join-Path (Get-Location).ProviderPath 'manifest.json'
-# 点载脚本只定义函数，Inspect 在独有的临时目录里读不到 manifest 后即停止。
+# 点载时执行 Inspect，遇到缺失的 manifest 后退出，已定义的函数保留。
 try { . $env:ISSUE_1839_SCRIPT -Action Inspect -Manifest $manifestPath } catch {
   if ($_.Exception.Message -notlike "manifest 不存在：*") { throw }
 }
+# 保留启动及点载所需的 PATH，只在查找 pwsh 时使用测试路径。
+$env:PATH = [string]$env:ISSUE_1839_PATH
 $candidates = @(Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | ForEach-Object Source)
 $errorMessage = $null
 $launch = $null
@@ -37,10 +37,11 @@ function Assert-ServerInputs { }
 function Start-Process {
   [CmdletBinding()]
   param([string]$FilePath, [string]$ArgumentList, [string]$WorkingDirectory, [string]$WindowStyle, [switch]$PassThru)
+  $script:launch = @{ file_path = $FilePath; window_style = $WindowStyle }
   $process = Microsoft.PowerShell.Management\Start-Process -FilePath $FilePath `
     -ArgumentList '-NoLogo -NoProfile -NonInteractive -Command exit 0' `
     -WorkingDirectory $WorkingDirectory -WindowStyle $WindowStyle -Wait -PassThru:$PassThru
-  $script:launch = @{ file_path = $FilePath; window_style = $WindowStyle; exit_code = $process.ExitCode }
+  $script:launch.exit_code = $process.ExitCode
   throw [OperationCanceledException]::new('probe: process started')
 }
 $serverInputs = [ordered]@{
@@ -55,9 +56,11 @@ try { $null = Start-Server $serverInputs $true } catch [OperationCanceledExcepti
 @{ matches = $candidates; launch = $launch; error = $errorMessage } | ConvertTo-Json -Compress
 """
     encoded = base64.b64encode(probe.encode("utf-16le")).decode("ascii")
-    environment = {key: os.environ[key] for key in ("SystemRoot", "WINDIR", "PATHEXT") if key in os.environ}
+    system_keys = ("PSModulePath", "SystemRoot", "WINDIR", "PATHEXT")
+    environment = {key: os.environ[key] for key in system_keys if key in os.environ}
     environment.update(
-        TEMP=str(workdir), TMP=str(workdir), ISSUE_1839_PATH=search_path, ISSUE_1839_SCRIPT=str(INSTANCE_SCRIPT),
+        PATH=os.environ["PATH"], TEMP=str(workdir), TMP=str(workdir),
+        ISSUE_1839_PATH=search_path, ISSUE_1839_SCRIPT=str(INSTANCE_SCRIPT),
     )
     result = subprocess.run(
         [str(pwsh), "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
@@ -96,10 +99,7 @@ def test_instance_start_uses_first_pwsh_application_in_path(tmp_path: Path, cand
 def test_instance_start_reports_when_pwsh_is_missing(tmp_path: Path) -> None:
     pwsh = shutil.which("pwsh")
     assert pwsh, "Windows test runner must have PowerShell 7 on PATH"
-    empty_path = tmp_path / "empty-path"
-    empty_path.mkdir()
-
-    result = _probe(Path(pwsh), str(empty_path), tmp_path)
+    result = _probe(Path(pwsh), "", tmp_path)
 
     assert result["matches"] == []
     assert result["launch"] is None
