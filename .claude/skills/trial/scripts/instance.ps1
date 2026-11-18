@@ -320,6 +320,12 @@ function Assert-OutsideRepository([string]$Directory) {
   }
 }
 
+function Get-PowerShellExecutable {
+  $commands = @(Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue)
+  if ($commands.Count -eq 0) { throw '找不到 PowerShell 7 可执行文件 pwsh，请确认 pwsh.exe 已安装并位于 PATH 中' }
+  return [string]$commands[0].Source
+}
+
 # ---- 启动 ----
 
 function Assert-ServerInputs($M, [bool]$FreshData, [int]$AllowedListenerId = 0) {
@@ -372,7 +378,7 @@ exit $LASTEXITCODE
   [IO.File]::WriteAllText($bootPath, $bootScript, [Text.UTF8Encoding]::new($false))
   $bootConfig = [ordered]@{ python = $python; data_dir = $dataDir; port = $portNumber; stdout = $outFile; stderr = $errFile }
   [IO.File]::WriteAllText($bootConfigPath, (ConvertTo-Json $bootConfig), [Text.UTF8Encoding]::new($false))
-  $shell = (Get-Command pwsh -CommandType Application -ErrorAction Stop).Source
+  $shell = Get-PowerShellExecutable
   $argumentLine = "-NoProfile -File `"$bootPath`" -Config `"$bootConfigPath`""
   $launcher = Start-Process -FilePath $shell -ArgumentList $argumentLine -WorkingDirectory $workDir -WindowStyle Hidden -PassThru
   $null = $launcher.Handle
