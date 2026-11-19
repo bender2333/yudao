@@ -445,9 +445,10 @@ class ContextAssembler:
             current_delivery = None
         # 核验角色请求里可以放入的被核验方内容（工单 #554、#1401）：事实部分总在，
         # 解释部分看它有没有对当前交付下结论。是核验角色的判断按核验声明取，不按部门名
+        verifies_delivery = department in definitions.verified_by("delivery_spec")
         verified_content = (quality_engineering_content(events or [], delivery=current_delivery,
                                                        definitions=definitions)
-                            if department in definitions.verified_by("delivery_spec") else None)
+                            if verifies_delivery else None)
         # 这个会话要回答的那一次询问：询问分支看自己那一次（一个部门可以同时有几个分支，工单 #559），
         # 主线会话沿用询问链上最内层的那一次
         pending_ask = projection.ask_by_branch(session_id) or projection.active_ask
@@ -525,6 +526,11 @@ class ContextAssembler:
             ))
         work = definitions.department_work(department, projection.kind)
         work_text = work.prompt if work is not None else definitions.role(department).prompt
+        binding_refs = _binding_refs(projection, department)
+        # 当前交付可能晚于激活；只说明本轮有没有冻结的交付依据，不带出旧交付的标识或内容。
+        if (verifies_delivery and session_id not in projection.branch_sessions
+                and projection.last_activations.get(department) == activation_id):
+            binding_refs["activation_has_delivery_basis"] = department in projection.department_delivery_bases
         parts.extend([
             ContextPart("department_rules", str(prompt.version), prompt.text),
             ContextPart("work_item_guidance", projection.kind, work_text),
@@ -536,7 +542,7 @@ class ContextAssembler:
             ContextPart("professional_completion", None, rules.professional_completion),
             ContextPart("collaboration_rules", None, rules.collaboration_rules),
             ContextPart("proposal_contract", department, json_dumps(definitions.proposal_contract(department, projection.kind))),
-            ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
+            ContextPart("binding_refs", None, json_dumps(binding_refs)),
             ContextPart("allowed_tools", department, json_dumps(tool_names)),
         ])
         pending_inputs = [item for item in projection.inputs
