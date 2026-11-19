@@ -10,10 +10,13 @@
 #
 # 集成层：真实代码、真实事件日志与写入口，假模型按部门给出脚本。
 
-from harness.adapters.fake import FakeAdapter
-from harness.models import EventType
-from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
+import json
+
+from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.models import ArtifactRef, EventType
+from harness.proposals import default_criteria, delivery_turn, judgement, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.helpers import python_snippet
 from harness.tests.signals import Signals, SignallingAdapter
 
 
@@ -98,15 +101,25 @@ def test_a_second_judgement_for_the_same_delivery_is_rejected(tmp_path):
 
 def test_an_exploration_round_cannot_commit_a_judgement(tmp_path):
     # 探索轮没有交付：判断被拒绝，理由写明这一轮没有交付可看（与 #557 的口径一致）。
-    # 质检的脚本全是判断：还没有交付时每次提交都被拒绝，运行到轮次上限暂停。
+    # 以真实探索检查和未核验条目结束这一轮，不提交放行或缺陷结论。
     # 工程与质检同时开始一轮工作，判断与交付谁先落盘不靠调度猜（工单 #1621）：工程的交付等到质检这一轮
     # 的激活落盘以后才交出，质检的判断等到交付被接纳以后才交出——先后由事件日志里的信号决定
     signals = Signals({"quality_activated": "质检进入一轮工作（department_activated 事件）",
                        "delivery_accepted": "工程交付被接纳（delivery_accepted 事件）"})
+    checks = {"echo": {"command": python_snippet(
+        "import subprocess, sys; "
+        "assert subprocess.check_output([sys.executable, 'src/echo.py', 'hello']).strip() == b'hello'"
+    )}}
+    exploration = FakeTurn(
+        checks=checks,
+        proposal=judgement(checks=list(checks), basis_delivery_spec_hash=None,
+                           criteria=default_criteria(1, [], result="unverified")),
+    )
     adapter = SignallingAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [judgement_turn()] * 8,
+        "quality": [exploration, judgement_turn(checks=checks),
+                    review_turn("release", "核对当前交付的回显输出", checks=checks)],
     }, waits={("engineering", 0): "quality_activated",
               ("quality", 0): "delivery_accepted"}, signals=signals)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -114,24 +127,27 @@ def test_an_exploration_round_cannot_commit_a_judgement(tmp_path):
     run_id = system.create_run("build echo")
     projection = system.run_until_stop(run_id)
     assert not adapter.wait_failures, adapter.wait_failures[0]
-    assert projection.status != "done"
+    assert projection.stop_reason == "released", projection.error
 
     events = _events(system, run_id)
-    rejected = [event for event in events
-                if event.type == EventType.PROPOSAL_REJECTED
-                and (event.payload or {}).get("kind") == "independent_judgement"]
-    assert rejected, "还没有交付时独立判断没有被拒绝"
-    [error] = rejected[0].payload["errors"]
-    assert error["field"] == "delivery_spec"
-    assert "no delivery to review" in error["message"]
-    # 这一轮的情形：质检这一轮在交付之前开始（它记下的交付为空），交付先被接纳，判断才被拒绝
+    [rejection] = [event for event in events
+                   if event.type == EventType.PROPOSAL_REJECTED and event.department == "quality"]
+    assert rejection.payload["kind"] == "independent_judgement"
+    assert rejection.payload["errors"] == [
+        {"field": "delivery_spec", "message": "this work has no delivery to review"},
+    ]
     quality_round = _position(events, lambda event: event.type == EventType.DEPARTMENT_ACTIVATED
                               and event.department == "quality")
     delivery = _position(events, lambda event: event.type == EventType.DELIVERY_ACCEPTED)
-    first_rejection = _position(events, lambda event: event is rejected[0])
-    assert quality_round < delivery < first_rejection, (quality_round, delivery, first_rejection)
-    # 工程交付以后判断可以提交：交付的判断只交一次
-    projection = system.run_until_stop(run_id)
-    committed = [event for event in _events(system, run_id)
-                 if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
-    assert len(committed) == 1
+    activation_id = events[quality_round].payload["activation_id"]
+    [check] = [event for event in events if event.type == EventType.TOOL_CALLED
+               and event.payload.get("activation_id") == activation_id and event.payload["name"] == "run_check"]
+    receipt = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**check.payload["output_ref"])))
+    assert receipt["executor"] == "host" and receipt["name"] == "echo"
+    exploration_finished = _position(events, lambda event: event.type == EventType.ACTIVATION_FINISHED
+                                     and event.payload["activation_id"] == activation_id)
+    [committed] = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
+    [review] = [event for event in events if event.type == EventType.QA_SUBMITTED]
+    assert quality_round < delivery < events.index(check) < events.index(rejection)
+    assert events.index(rejection) < exploration_finished < events.index(committed) < events.index(review)
+    assert review.payload["judgement_event"] == committed.event_id
