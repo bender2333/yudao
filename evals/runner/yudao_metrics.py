@@ -29,9 +29,7 @@ CHECKPOINT_KEYS = ("ended_within_limit", "quality_release_bound_to_delivery", "r
 # 用量字段：模型未上报时为未知，进度时按 `notes[].reason` 写明原因
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens",
                 "cache_write_tokens", "total_tokens", "cost", "model_latency_ms")
-# 冻结参数只通过 `run_created` 事件的 `parameters_version` 摘要给出。
-# 摘要本身不携带参数现值，run.export 之外无法读取；读不到时这一项写「未核实」，
-# 不引用仓库内任何规则文件（评测工具与 harness 分层）。
+
 
 def collect(export, outcome, replay=None, parameters_version=None):
     """从一次 `run.export` 与运行器结果算指标与过程检查点。"""
@@ -461,91 +459,72 @@ def _within_frozen_limits(events, parameters_version):
 # --- 第 2 项：质检放行绑定最后交付 + recheck_ratio 核对 -------------------
 
 def _check_release_binding(events, parameters_version, released):
-    """：
-    - 质检最后引用的 `code_snapshot_hash` 等于最后一次封存的 `code_tree_digest`；
-    - 引用的 `delivery_spec_hash` 等于最后一次封存的 `content_hash`；
-    - 引用的每条 `checks[i].activation_id` 在质检本次激活的部门激活列表里；
-      取回比例满足冻结的 `verification.recheck_ratio`。
-    """
     reviews = [event for event in events if event["type"] == "qa_submitted"]
     deliveries = [event for event in events if event["type"] == "delivery_accepted"]
+    # 公开导出不提供 verification.recheck_ratio 的冻结取值，参数摘要不能还原该值。
+    ratio_note = (f"参数版本为 {parameters_version}，导出未提供比例"
+                  if parameters_version and "<" not in parameters_version
+                  else "导出未提供比例，也没有可识别的参数版本")
+    reading = {"recheck_ratio": None, "recheck_ratio_status": "unverified",
+               "recheck_ratio_note": ratio_note, "checks_total": 0, "self_run": None,
+               "release_event_id": None, "release_activation_id": None,
+               "release_snapshot_hash": None, "release_delivery_spec_hash": None,
+               "delivery_binding_passed": None, "receipt_hash_binding_passed": None}
     if not reviews or not deliveries:
-        return {"passed": False,
-                "detail": "没有质检提交或没有封存的交付",
-                "recheck_ratio": None, "self_run": 0, "checks_total": 0,
-                "recheck_ratio_status": "unverified",
-                "recheck_ratio_note": "没有质检提交或交付，无法核对"}
+        return {**reading, "passed": False, "detail": "没有质检提交或没有封存的交付"}
     review = reviews[-1]
-    delivery = deliveries[-1]
     r_payload = review.get("payload") or {}
-    d_payload = delivery.get("payload") or {}
+    if not released or r_payload.get("verdict") != "release":
+        return {**reading, "passed": not released, "detail": "本次没有放行，放行绑定核对不适用"}
 
-    reasons = []
-    if r_payload.get("code_snapshot_hash") != d_payload.get("code_tree_digest"):
-        reasons.append("放行引用的交付快照与最后一次封存的交付不同")
-    if r_payload.get("delivery_spec_hash") != d_payload.get("content_hash"):
-        reasons.append("放行引用的交付规格与最后一次封存的不同")
-    if not r_payload.get("checks"):
-        reasons.append("放行没有引用质检自己取得的检查回执")
+    d_payload = deliveries[-1].get("payload") or {}
+    expected = (d_payload.get("code_tree_digest"), d_payload.get("content_hash"))
+    snapshot_hash = r_payload.get("code_snapshot_hash")
+    delivery_spec_hash = r_payload.get("delivery_spec_hash")
+    delivery_binding = _hash_binding((snapshot_hash, delivery_spec_hash), expected)
+    checks = r_payload.get("checks") or []
+    receipt_statuses = [_hash_binding((check.get("snapshot_hash"), check.get("delivery_spec_hash")), expected)
+                        for check in checks]
+    receipt_binding = (False if False in receipt_statuses
+                       else True if checks and all(receipt_statuses) else None)
+    activation_id = _release_activation_id(events, review)
+    self_run = (sum(bound is True and check.get("activation_id") == activation_id
+                    for check, bound in zip(checks, receipt_statuses)) if activation_id else None)
 
-    quality_activations = _quality_activation_ids(events)
-    r_checks = r_payload.get("checks") or []
-    self_run = 0
-    for check in r_checks:
-        if check.get("activation_id") in quality_activations:
-            self_run += 1
-    ratio_value, ratio_status, ratio_note = _recheck_ratio_state(parameters_version)
-    if not released:
-        passed = True
-    elif reasons:
-        passed = False
-    elif ratio_value is None:
-        passed = None
-    else:
-        passed = self_run / max(len(r_checks), 1) >= ratio_value - 1e-9
-    return {"passed": passed,
-            "detail": _release_binding_detail(reasons, self_run, len(r_checks), ratio_value,
-                                              ratio_status, ratio_note, released),
-            "recheck_ratio": ratio_value,
-            "recheck_ratio_status": ratio_status,
-            "recheck_ratio_note": ratio_note,
-            "self_run": self_run, "checks_total": len(r_checks)}
+    binding_text = {True: "已核实", False: "不符", None: "未核实"}
+    receipt_text = binding_text[receipt_binding] if checks else "没有引用检查回执"
+    activation_text = (f"放行当次质检激活已核实取回 {self_run}/{len(checks)} 条回执（{activation_id}）"
+                       if activation_id else "放行当次质检激活未知：没有可证实的父激活，无法核实取回数量")
+    release_id = review.get("event_id")
+    detail = (f"交付绑定：{binding_text[delivery_binding]}（放行事件 {release_id or '未知'}，"
+              f"引用快照 {snapshot_hash or '未知'}、交付规格 {delivery_spec_hash or '未知'}）；"
+              f"回执绑定：{receipt_text}（快照与交付规格）；{activation_text}；"
+              f"冻结复跑比例：未核实（{ratio_note}）")
+    # 摘要不符或没有提供回执仍是明确失败；其余不能因为回执齐全就推断比例达标。
+    passed = False if delivery_binding is False or receipt_binding is False or not checks else None
+    return {**reading, "passed": passed, "detail": detail, "delivery_binding_passed": delivery_binding,
+            "receipt_hash_binding_passed": receipt_binding, "release_event_id": release_id,
+            "release_activation_id": activation_id, "release_snapshot_hash": snapshot_hash,
+            "release_delivery_spec_hash": delivery_spec_hash, "checks_total": len(checks), "self_run": self_run}
 
 
-def _quality_activation_ids(events):
-    ids = set()
+def _hash_binding(actual, expected):
+    if any(left and right and left != right for left, right in zip(actual, expected)):
+        return False
+    return True if all(actual) and all(expected) else None
+
+
+def _release_activation_id(events, review):
+    parent_id = review.get("parent_event_id")
+    if not parent_id:
+        return None
     for event in events:
-        if event.get("type") != "department_activated":
-            continue
-        if event.get("department") != "quality":
-            continue
-        payload = event.get("payload") or {}
-        aid = payload.get("activation_id")
-        if aid:
-            ids.add(aid)
-    return ids
-
-
-def _recheck_ratio_state(parameters_version):
-    """冻结参数（`run_created` 的 `parameters_version`）缺失或不可识别时，记「未核实」。
-
-    `parameters_version` 是参数现值的内容摘要，run.export 之外无法读出参数。
-    这一项只在冻结参数可识别时按比例核对；读不到时显式标记，不引用仓库内文件。
-    """
-    if not parameters_version or "<" in parameters_version:
-        return None, "unverified", "未取到冻结的 parameters_version"
-    return None, "frozen", "参数版本为 " + str(parameters_version) + "，比例未在导出中给出"
-
-
-def _release_binding_detail(reasons, self_run, total, ratio, status, note, released):
-    coverage = "质检本次激活中已取回 " + str(self_run) + "/" + str(total) + " 条回执"
-    if ratio is not None:
-        coverage += "，要求 ≥ " + str(ratio)
-    if not released:
-        return "本次没有放行，放行绑定核对不适用；" + coverage + "（" + note + "）"
-    if reasons:
-        return "放行绑定不通过：" + "；".join(reasons) + "；" + coverage + "（" + note + "）"
-    return coverage + "（" + note + "）"
+        if event is review:
+            break
+        if (event.get("event_id") == parent_id and event.get("type") == "department_activated"
+                and event.get("department") == "quality"):
+            return (event.get("payload") or {}).get("activation_id") or None
+    return None
 
 
 # --- 第 3 项：重放结果与记录一致 ---------------------------------------
