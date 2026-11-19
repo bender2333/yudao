@@ -8,8 +8,10 @@ from contextlib import contextmanager
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Event, Thread
+from types import SimpleNamespace
 
 import pytest
+from httpcore._async import http11
 
 from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
@@ -225,19 +227,34 @@ def test_request_observation_matches_the_json_body_sent_by_httpx():
     assert "Authorization" not in requests[0].payload
 
 
-def test_connection_loop_keeps_same_url_different_credentials_separate():
+def test_connection_loop_reuses_connections_and_isolates_credentials(monkeypatch):
+    # 只冻结 HTTP/1.1 池的空闲计时，保留 SDK 默认值与真实套接字。
+    monkeypatch.setattr(http11, "time", SimpleNamespace(monotonic=lambda: 0.0))
     first_key = "first-provider-credential"
     second_key = "second-provider-credential"
-    with _keepalive_server(key=first_key) as (config, captures, client_ports, authorizations, _meta, errors):
-        second_config = replace(config, api_key=second_key, model="second-model")
+    replies = [_stream([TEXT])] * 4
+    with _keepalive_server(
+        key=first_key, replies=replies,
+    ) as (config, captures, client_ports, authorizations, _meta, errors):
+        other_credential = replace(config, api_key=second_key)
+        other_model = replace(config, model="second-model")
         with ConnectionLoop() as loop:
-            ResponsesAdapter(config, loop=loop).complete(_request(session_id="first"))
-            ResponsesAdapter(second_config, loop=loop).complete(_request(session_id="second"))
+            first = ResponsesAdapter(config, loop=loop)
+            second = ResponsesAdapter(other_credential, loop=loop)
+            # 顺序完成请求：另一份凭据的请求插在中间，同一凭据仍可跨模型和会话复用。
+            first.complete(_request(session_id="first-one"))
+            second.complete(_request(session_id="second-one"))
+            ResponsesAdapter(other_model, loop=loop).complete(_request(session_id="first-two"))
+            second.complete(_request(session_id="second-two"))
 
     assert not errors
-    assert len(captures) == 2
-    assert len(set(client_ports)) == 2
-    assert authorizations == [f"Bearer {first_key}", f"Bearer {second_key}"]
+    assert len(captures) == 4
+    first_port, second_port, first_again, second_again = client_ports
+    assert first_port == first_again, client_ports
+    assert second_port == second_again, client_ports
+    assert first_port != second_port, client_ports
+    assert authorizations == [f"Bearer {first_key}", f"Bearer {second_key}"] * 2
+    assert [body["model"] for body in captures] == [config.model, config.model, other_model.model, config.model]
 
 
 @pytest.mark.parametrize("status,code,reason", [
