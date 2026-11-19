@@ -666,69 +666,125 @@ def test_release_checkpoint_fails_on_a_provider_error():
     assert collected["checkpoints"]["ended_within_limit"]["passed"] is False
     assert "模型服务故障" in collected["checkpoints"]["ended_within_limit"]["detail"]
 
-def test_release_binding_passes_when_qa_review_and_delivery_match():
-    """第二项：放行引用的快照与最后一次封存一致；recheck_ratio 只在冻结参数可识别时核对。"""
-    export = _load_fixture("handoff_release.json")
-    # 事件序列基准只保留关键字段（#537），qa_submitted 的 checks 不在其中：
-    # 这里按质检本次激活补上一条回执，再核对绑定。
-    review = next(e for e in export["events"] if e["type"] == "qa_submitted")
-    quality_activation = next(e["payload"]["activation_id"] for e in export["events"]
-                              if e["type"] == "department_activated" and e["department"] == "quality")
-    review["payload"]["checks"] = [{"name": "smoke", "activation_id": quality_activation,
-                                    "snapshot_hash": review["payload"]["code_snapshot_hash"]}]
-    params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
-        "parameters_version")
-    collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
-                                               "hidden_failures": []}, None, params)
-    checkpoint = collected["checkpoints"]["quality_release_bound_to_delivery"]
-    assert checkpoint["passed"] is None  # 冻结参数的 ratio 未在导出中给出，记未核实
-    assert checkpoint["recheck_ratio"] is None
-    assert checkpoint["recheck_ratio_status"] == "unverified"
+def _release_binding_export(receipt_activation_id="final-quality"):
+    # 同一份交付先后有两次质检激活；只有放行父事件点名的激活属于这次放行。
+    return _export(events=[
+        {"type": "run_created", "payload": {"parameters_version": "sha256:frozen"}},
+        {"event_id": "delivery", "type": "delivery_accepted",
+         "payload": {"content_hash": "spec", "code_tree_digest": "tree"}},
+        {"event_id": "earlier", "type": "department_activated", "department": "quality",
+         "session_id": "quality-session", "payload": {"activation_id": "earlier-quality"}},
+        {"event_id": "final", "type": "department_activated", "department": "quality",
+         "session_id": "quality-session", "payload": {"activation_id": "final-quality"}},
+        {"event_id": "release", "type": "qa_submitted", "department": "quality",
+         "session_id": "quality-session", "parent_event_id": "final",
+         "payload": {"verdict": "release", "code_snapshot_hash": "tree", "delivery_spec_hash": "spec",
+                     "checks": [{"name": "smoke", "activation_id": receipt_activation_id,
+                                 "snapshot_hash": "tree", "delivery_spec_hash": "spec"}]}},
+        {"type": "run_done", "state_after": "done", "stop_reason": "released"},
+    ])
+
+
+def _release_binding_metrics(export):
+    params = run_yudao_eval._run_versions(export)["parameters_version"]
+    return yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
+                                          "hidden_failures": []}, None, params)
+
+
+def _release_binding_checkpoint(export):
+    return _release_binding_metrics(export)["checkpoints"]["quality_release_bound_to_delivery"]
+
+
+@pytest.mark.parametrize(("receipt_activation_id", "count"), [("final-quality", 1), ("earlier-quality", 0)])
+def test_release_binding_counts_only_receipts_from_the_release_activation(receipt_activation_id, count):
+    """守 R3：同一交付与快照不代表同一轮独立核验。"""
+    checkpoint = _release_binding_checkpoint(_release_binding_export(receipt_activation_id))
+    assert checkpoint["self_run"] == count
     assert checkpoint["checks_total"] == 1
+    assert checkpoint["release_activation_id"] == "final-quality"
+    assert checkpoint["delivery_binding_passed"] is True
+    assert checkpoint["receipt_hash_binding_passed"] is True
+    assert checkpoint["passed"] is None
+
+
+def test_release_binding_follows_the_parent_instead_of_the_last_quality_activation():
+    """守 R3：按放行父事件的身份核对回执，不按会话最后一轮推定。"""
+    export = _release_binding_export()
+    export["events"].insert(-2, {"event_id": "other", "type": "department_activated",
+                               "department": "quality", "session_id": "quality-session",
+                               "payload": {"activation_id": "other-quality"}})
+    checkpoint = _release_binding_checkpoint(export)
+    assert checkpoint["release_activation_id"] == "final-quality"
     assert checkpoint["self_run"] == 1
 
 
-def test_release_binding_fails_when_qa_review_and_delivery_differ():
-    """第二项：放行引用与最后一次封存不同，绑定核对不通过。"""
-    export = _load_fixture("handoff_release.json")
-    review = next(e for e in export["events"] if e["type"] == "qa_submitted")
-    review["payload"]["code_snapshot_hash"] = "tree-other"
-    params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
-        "parameters_version")
-    collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
-                                               "hidden_failures": []}, None, params)
-    checkpoint = collected["checkpoints"]["quality_release_bound_to_delivery"]
+@pytest.mark.parametrize("parent_event_id", [None, "missing", "delivery"])
+def test_release_binding_leaves_unproven_activation_unknown(parent_event_id):
+    """守 R3：父事件不能证明当次激活时不借用同一会话的其他轮次。"""
+    export = _release_binding_export()
+    export["events"][-2]["parent_event_id"] = parent_event_id
+    checkpoint = _release_binding_checkpoint(export)
+    assert checkpoint["self_run"] is None
+    assert checkpoint["checks_total"] == 1
+    assert checkpoint["release_activation_id"] is None
+    assert "放行当次质检激活未知" in checkpoint["detail"]
+    assert checkpoint["delivery_binding_passed"] is True
+    assert checkpoint["receipt_hash_binding_passed"] is True
+    assert checkpoint["passed"] is None
+
+
+@pytest.mark.parametrize(("is_receipt", "hash_field"), [
+    (False, "code_snapshot_hash"), (False, "delivery_spec_hash"),
+    (True, "snapshot_hash"), (True, "delivery_spec_hash"),
+])
+def test_release_binding_fails_when_qa_review_and_delivery_differ(is_receipt, hash_field):
+    """守 R3：放行或回执绑定了不同的交付版本时，缺少比例也不能掩盖失败。"""
+    export = _release_binding_export()
+    review = export["events"][-2]["payload"]
+    record = review["checks"][0] if is_receipt else review
+    record[hash_field] = "different"
+    checkpoint = _release_binding_checkpoint(export)
     assert checkpoint["passed"] is False
-    assert "交付快照" in checkpoint["detail"]
+    assert checkpoint["delivery_binding_passed"] is is_receipt
+    assert checkpoint["receipt_hash_binding_passed"] is not is_receipt
+    assert checkpoint["self_run"] == (0 if is_receipt else 1)
+    assert checkpoint["recheck_ratio_status"] == "unverified"
 
 
-def test_release_binding_is_unverified_when_ratio_is_unreadable():
-    """第二项：`parameters_version` 只是参数内容摘要，不含参数现值。
-
-    导出中取不到冻结的 `verification.recheck_ratio` 时（`run_created` 的
-    `parameters_version` 缺失、不可识别或只是摘要），比例核对记「未核实」，
-    不用仓库内文件顶替；绑定本身仍按摘要与回执引用核对。
-    """
-    export = _load_fixture("handoff_release.json")
-    review = next(e for e in export["events"] if e["type"] == "qa_submitted")
-    review["payload"]["checks"] = [{"name": "smoke", "activation_id": "act-other",
-                                    "snapshot_hash": review["payload"]["code_snapshot_hash"]}]
-    params = next(e["payload"] for e in export["events"] if e["type"] == "run_created").get(
-        "parameters_version")
-    collected = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
-                                               "hidden_failures": []}, None, params)
-    checkpoint = collected["checkpoints"]["quality_release_bound_to_delivery"]
-    assert checkpoint["self_run"] == 0
+@pytest.mark.parametrize("parameters_version", [None, "sha256:frozen"])
+def test_release_binding_is_unverified_when_ratio_is_unreadable(parameters_version):
+    """守 R3：即使核实了绑定与全部回执，参数版本也不能代替冻结比例。"""
+    export = _release_binding_export()
+    export["events"][0]["payload"]["parameters_version"] = parameters_version
+    checkpoint = _release_binding_checkpoint(export)
+    assert checkpoint["passed"] is None
     assert checkpoint["recheck_ratio"] is None
     assert checkpoint["recheck_ratio_status"] == "unverified"
+    assert checkpoint["self_run"] == 1
+
+
+def test_release_binding_does_not_count_receipts_without_a_provable_hash_binding():
+    """守 R3：历史回执缺少摘要时，不能把同一激活的回执当成已核实。"""
+    export = _release_binding_export()
+    del export["events"][-2]["payload"]["checks"][0]["delivery_spec_hash"]
+    checkpoint = _release_binding_checkpoint(export)
+    assert checkpoint["delivery_binding_passed"] is True
+    assert checkpoint["receipt_hash_binding_passed"] is None
+    assert checkpoint["self_run"] == 0
     assert checkpoint["passed"] is None
-    # 摘要可识别时仍只确认已冻结，比例仍取不到，仍按未核实
-    fixed = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 1.0,
-                                            "hidden_failures": []}, None,
-                                   "sha256:frozen")
-    fixed_checkpoint = fixed["checkpoints"]["quality_release_bound_to_delivery"]
-    assert fixed_checkpoint["recheck_ratio_status"] == "frozen"
-    assert fixed_checkpoint["passed"] is None
+
+
+def test_release_binding_does_not_count_a_rework_review_as_release_evidence():
+    """守 R3：没有放行时不把打回记录里的回执报成放行证据。"""
+    export = _release_binding_export()
+    export["projection"].update(status="paused", stop_reason="no_tool_call")
+    export["events"][-1] = {"type": "run_paused", "state_after": "paused", "stop_reason": "no_tool_call"}
+    export["events"][-2]["payload"]["verdict"] = "rework_engineering"
+    checkpoint = _release_binding_checkpoint(export)
+    assert checkpoint["passed"] is True
+    assert checkpoint["release_activation_id"] is None
+    assert checkpoint["self_run"] is None
+    assert "本次没有放行" in checkpoint["detail"]
 
 
 def test_release_coverage_is_unknown_when_per_data_is_absent():
@@ -874,6 +930,35 @@ def _run(**overrides):
                                                         "hidden_failures": ["cmd_3_1b"]})}
     run.update(overrides)
     return run
+
+
+@pytest.mark.parametrize(("receipt_activation_id", "count"), [("final-quality", 1), ("earlier-quality", 0)])
+def test_report_separates_release_binding_from_unknown_recheck_ratio(tmp_path, receipt_activation_id, count):
+    """守 R3：机器结果和人读报告都区分可核实的独立证据与缺失的历史参数。"""
+    run = _run(metrics=_release_binding_metrics(_release_binding_export(receipt_activation_id)))
+    result = yudao_report.build_result("neutral", "neutral@1", "scorer@1", MODEL, [run])
+    result_path = tmp_path / "result.json"
+    report_path = tmp_path / "report.md"
+    yudao_report.write_result(result, result_path)
+    yudao_report.write_report(result, report_path, [])
+
+    metrics = json.loads(result_path.read_text(encoding="utf-8"))["runs"][0]["metrics"]
+    checkpoint = metrics["checkpoints"]["quality_release_bound_to_delivery"]
+    assert checkpoint["delivery_binding_passed"] is True
+    assert checkpoint["receipt_hash_binding_passed"] is True
+    assert checkpoint["release_event_id"] == "release"
+    assert checkpoint["release_activation_id"] == "final-quality"
+    assert checkpoint["release_snapshot_hash"] == "tree"
+    assert checkpoint["release_delivery_spec_hash"] == "spec"
+    assert checkpoint["recheck_ratio_status"] == "unverified"
+    assert checkpoint["passed"] is None
+    assert checkpoint["self_run"] == count
+    text = report_path.read_text(encoding="utf-8")
+    assert "质检的放行绑定最后提交的交付树 | 未核实" in text
+    assert "交付绑定：已核实（放行事件 release，引用快照 tree、交付规格 spec）" in text
+    assert "回执绑定：已核实" in text
+    assert f"放行当次质检激活已核实取回 {count}/1 条回执" in text
+    assert "冻结复跑比例：未核实" in text
 
 
 def test_result_records_the_yudao_commit_and_the_host_environment():
