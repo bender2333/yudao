@@ -1986,6 +1986,109 @@ def test_the_compare_command_writes_the_result_and_the_report(tmp_path):
 # ---------------------------------------------------------------------------
 # 版本比较按运行序号配对（docs/design/evaluation-scenarios.md「噪声范围与三种结论」）
 
+def _model_identity_result(model, *run_fields):
+    return {
+        "material_version": "neutral@1", "scorer_version": "neutral-scorer@1", "model": model,
+        "runs": [{"run_id": f"neutral-{index}", "score": {"completion": 0.5}, **fields}
+                 for index, fields in enumerate(run_fields, start=1)],
+    }
+
+
+def test_version_compare_blocks_different_served_models_even_with_the_same_alias():
+    """守 R3：同一请求别名不能把不同服务回报身份配成发布版本回归。"""
+    import yudao_compare
+
+    current = _model_identity_result("shared-alias", {"served_model": "served-north"})
+    baseline = _model_identity_result("shared-alias", {"served_model": "served-south"})
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert "模型身份不一致" in comparison["block_reason"]
+    assert "served-north" in comparison["block_reason"]
+    assert "served-south" in comparison["block_reason"]
+    assert comparison["paired_tasks"] == []
+    assert comparison["noise"] is None
+    assert comparison["primary"]["difference"] is None
+    assert comparison["secondary"] == []
+
+
+def test_version_compare_blocks_different_legacy_models():
+    """守 R3：旧报告的顶层身份也必须相同，才能用作发布版本回归。"""
+    import yudao_compare
+
+    comparison = yudao_compare.compare(_model_identity_result("served-north", {}),
+                                       _model_identity_result("served-south", {}))
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert "模型身份不一致" in comparison["block_reason"]
+    assert comparison["paired_tasks"] == []
+
+
+@pytest.mark.parametrize("mixed_side", ["候选", "基线"])
+def test_version_compare_blocks_a_mixed_batch_even_beyond_the_paired_runs(mixed_side):
+    """守 R3：首个运行的顶层摘要不能掩盖组内另一条有效运行的模型身份。"""
+    import yudao_compare
+
+    mixed = _model_identity_result("served-north", {"served_model": "served-north"},
+                                   {"served_model": "served-south"})
+    homogeneous = _model_identity_result("served-north", {})
+    current, baseline = (mixed, homogeneous) if mixed_side == "候选" else (homogeneous, mixed)
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert mixed_side + " 组内模型身份不一致" in comparison["block_reason"]
+    assert "served-north" in comparison["block_reason"] and "served-south" in comparison["block_reason"]
+    assert comparison["paired_tasks"] == []
+
+
+@pytest.mark.parametrize("unknown_model", [None, "  ", "未知", "unknown"])
+def test_version_compare_blocks_an_unidentifiable_legacy_model(unknown_model):
+    """守 R3：没有可识别顶层身份的旧读数不能证明使用了同一模型。"""
+    import yudao_compare
+
+    current = _model_identity_result(unknown_model, {})
+    baseline = _model_identity_result("served-north", {})
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert "模型身份无法核验" in comparison["block_reason"]
+    assert "served-north" in comparison["block_reason"]
+    assert comparison["paired_tasks"] == []
+
+
+@pytest.mark.parametrize("unknown_run", [{}, {"served_model": None}])
+def test_version_compare_does_not_fill_unknown_run_identity_from_a_batch_summary(unknown_run):
+    """守 R3：有逐次身份的一批结果不能用首轮的摘要补齐另一轮。"""
+    import yudao_compare
+
+    current = _model_identity_result("served-north", {"served_model": "served-north"}, unknown_run)
+    baseline = _model_identity_result("served-north", {})
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert comparison["compared"] is False
+    assert comparison["verdict"] == "blocked"
+    assert "第 2 次" in comparison["block_reason"]
+    assert comparison["paired_tasks"] == []
+
+
+def test_version_compare_accepts_matching_legacy_and_run_identity_ignoring_void_runs():
+    """守 R3：有效逐次身份与旧报告身份相同时照常比较，作废运行不参与身份核对。"""
+    import yudao_compare
+
+    current = _model_identity_result("void-model", {"served_model": "void-model", "void": True},
+                                     {"served_model": "served-north"})
+    baseline = _model_identity_result("served-north", {}, {})
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert comparison["compared"] is True
+    assert comparison["verdict"] == "no_difference"
+    assert [pair["run_index"] for pair in comparison["paired_tasks"]] == [2]
+    assert comparison["unpaired"] == {"current": [], "baseline": [1]}
+
+
 def test_version_compare_pairs_by_run_ordinal_not_by_run_id():
     """两组运行编号前缀不同：按 `runs` 的位置配对（第 1 次对第 1 次）。"""
     import yudao_compare
