@@ -2130,6 +2130,12 @@ export type DecisionAnswer = {
      * Note
      */
     note?: string | null;
+    /**
+     * Answers
+     */
+    answers?: {
+        [key: string]: string;
+    } | null;
 };
 
 /**
@@ -2164,6 +2170,12 @@ export type DecisionAnswerRecord = {
      * Answered At
      */
     answered_at: string;
+    /**
+     * Answers
+     */
+    answers?: {
+        [key: string]: string;
+    } | null;
 };
 
 /**
@@ -2252,7 +2264,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | KernelModificationRequested | InstanceUpgradeRequested;
+    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | RoleChoiceRequested | KernelModificationRequested | InstanceUpgradeRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -3189,6 +3201,7 @@ export type FlowRecord = {
      * Created At
      */
     created_at: string;
+    prd?: ProductSpecView | null;
 };
 
 /**
@@ -4807,6 +4820,177 @@ export type PlaywrightMcpView = {
 };
 
 /**
+ * PrdChangeRecordView
+ */
+export type PrdChangeRecordView = {
+    /**
+     * Changed
+     */
+    changed?: Array<string>;
+    /**
+     * Retained
+     */
+    retained?: Array<string>;
+    /**
+     * Retired
+     */
+    retired?: Array<string>;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * PrdDecisionChangeView
+ */
+export type PrdDecisionChangeView = {
+    /**
+     * Decision Hash
+     */
+    decision_hash: string;
+    /**
+     * Disposition
+     */
+    disposition: string;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * PrdDecisionView
+ */
+export type PrdDecisionView = {
+    /**
+     * Decision Id
+     */
+    decision_id: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Statement
+     */
+    statement: string;
+    /**
+     * Rationale
+     */
+    rationale: string;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Created Event Id
+     */
+    created_event_id: string;
+};
+
+/**
+ * PrdSourceInputView
+ */
+export type PrdSourceInputView = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Created Event Id
+     */
+    created_event_id: string;
+};
+
+/**
+ * ProductSpecView
+ */
+export type ProductSpecView = {
+    /**
+     * Spec Id
+     */
+    spec_id: string;
+    /**
+     * Spec Revision
+     */
+    spec_revision: number;
+    /**
+     * Spec Status
+     */
+    spec_status: string;
+    /**
+     * Spec Event Id
+     */
+    spec_event_id: string;
+    /**
+     * Spec Hash
+     */
+    spec_hash: string;
+    /**
+     * Parent Hash
+     */
+    parent_hash?: string | null;
+    /**
+     * Input Version
+     */
+    input_version: number;
+    /**
+     * Accepted Inputs
+     */
+    accepted_inputs?: Array<PrdSourceInputView>;
+    /**
+     * Goal
+     */
+    goal: string;
+    /**
+     * Non Goals
+     */
+    non_goals?: Array<string>;
+    /**
+     * Boundaries
+     */
+    boundaries?: Array<string>;
+    /**
+     * Constraints
+     */
+    constraints?: Array<string>;
+    /**
+     * Requirements
+     */
+    requirements?: Array<string>;
+    /**
+     * Acceptance Criteria
+     */
+    acceptance_criteria?: Array<string>;
+    /**
+     * Requirement Mapping
+     */
+    requirement_mapping?: Array<RequirementMappingView>;
+    /**
+     * Fatal Conditions
+     */
+    fatal_conditions?: Array<string>;
+    /**
+     * Decisions
+     */
+    decisions?: Array<PrdDecisionView>;
+    /**
+     * Decision Changes
+     */
+    decision_changes?: Array<PrdDecisionChangeView>;
+    change_record?: PrdChangeRecordView | null;
+};
+
+/**
  * ProjectArchive
  */
 export type ProjectArchive = {
@@ -5718,6 +5902,24 @@ export type RequirementMapping = {
 };
 
 /**
+ * RequirementMappingView
+ */
+export type RequirementMappingView = {
+    /**
+     * Requirement
+     */
+    requirement: number;
+    /**
+     * Criteria
+     */
+    criteria?: Array<string>;
+    /**
+     * Gap
+     */
+    gap?: string | null;
+};
+
+/**
  * ReviewEntry
  */
 export type ReviewEntry = {
@@ -5757,6 +5959,104 @@ export type ReviewEntry = {
      * Unverified
      */
     unverified?: Array<UnverifiedCriterionView>;
+};
+
+/**
+ * RoleChoiceOption
+ */
+export type RoleChoiceOption = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+};
+
+/**
+ * RoleChoiceQuestion
+ */
+export type RoleChoiceQuestion = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Question
+     */
+    question: string;
+    /**
+     * Options
+     */
+    options: Array<RoleChoiceOption>;
+    /**
+     * Recommended
+     */
+    recommended: string;
+    /**
+     * Rationale
+     */
+    rationale: string;
+};
+
+/**
+ * RoleChoiceRequested
+ */
+export type RoleChoiceRequested = {
+    /**
+     * Kind
+     */
+    kind: 'role_choice';
+    /**
+     * Blocks
+     */
+    blocks: 'round';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts?: Array<string>;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Questions
+     */
+    questions: Array<RoleChoiceQuestion>;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Call Id
+     */
+    call_id?: string | null;
+    /**
+     * Input Version
+     */
+    input_version?: number | null;
+    /**
+     * Round
+     */
+    round?: number | null;
+    /**
+     * Note
+     */
+    note?: string | null;
 };
 
 /**
@@ -7825,6 +8125,11 @@ export type VersionEntry = {
      * Launch
      */
     launch?: Array<LaunchMethodView>;
+    /**
+     * Spec Event Id
+     */
+    spec_event_id?: string | null;
+    prd?: ProductSpecView | null;
 };
 
 /**
@@ -10906,6 +11211,12 @@ export type DecisionAnsweredPayload = {
      * Base Version
      */
     base_version: number;
+    /**
+     * Answers
+     */
+    answers?: {
+        [key: string]: string;
+    } | null;
 };
 
 /**
@@ -10997,7 +11308,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested;
+    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | RoleChoiceRequested;
 };
 
 /**
