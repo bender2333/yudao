@@ -1,7 +1,7 @@
 """版本比较与两侧对照（`docs/design/evaluation-scenarios.md` docs/design/evaluation-scenarios.md「报告与版本比较」）。
 
 - 版本比较（docs/design/evaluation-scenarios.md「噪声范围与三种结论」）：同一场景按运行的序号配对，第 1 次对第 1 次，不按运行编号；
-  只有材料版本与评分器版本都相同时才配对，否则拒绝比较；噪声来自同一版本的重复运行，
+  只有材料版本、评分器版本与服务回报的模型身份都相同时才配对；噪声来自同一版本的重复运行，
   差值用配对的随机化检验；三种结论：改进 / 无差别 / 退化；必需证据缺失时标受阻并保留
   已算指标。
 - 两侧对照（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）：Yudao 对单个 agent（OpenCode），判定按 D38 的 N-G1，结论是
@@ -33,42 +33,21 @@ def compare(current, baseline):
     scorer = current.get("scorer_version")
     form = current.get("form") or baseline.get("form")
     if form:
-        return {"compared": False,
-                "block_reason": "指定形态的运行不进版本比较：" + str(form),
-                "verdict": "blocked",
-                "material_version": material, "scorer_version": scorer,
-                "paired_tasks": [], "unpaired": {"current": [], "baseline": []},
-                "noise": None,
-                "primary": {"metric": PRIMARY_METRIC, "current": None, "baseline": None,
-                            "difference": None},
-                "secondary": []}
-    if material != baseline.get("material_version") or scorer != baseline.get("scorer_version"):
-        return {"compared": False,
-                "block_reason": ("材料版本或评分器版本不同："
-                                 + str(current.get("material_version")) + "/"
-                                 + str(current.get("scorer_version")) + " 对比 "
-                                 + str(baseline.get("material_version")) + "/"
-                                 + str(baseline.get("scorer_version"))),
-                "verdict": "blocked",
-                "material_version": material, "scorer_version": scorer,
-                "paired_tasks": [], "unpaired": {"current": [], "baseline": []},
-                "noise": None,
-                "primary": {"metric": PRIMARY_METRIC, "current": None, "baseline": None,
-                            "difference": None},
-                "secondary": []}
+        block_reason = "指定形态的运行不进版本比较：" + str(form)
+    elif material != baseline.get("material_version") or scorer != baseline.get("scorer_version"):
+        block_reason = (f"材料版本或评分器版本不同：{material}/{scorer} 对比 "
+                        f"{baseline.get('material_version')}/{baseline.get('scorer_version')}")
+    else:
+        block_reason = _model_block_reason(current, baseline)
+    if block_reason:
+        return _blocked_comparison(material, scorer, block_reason)
+
     current_runs = _run_scores(current)
     baseline_runs = _run_scores(baseline)
     shared = sorted(set(current_runs) & set(baseline_runs))
     if not shared:
-        return {"compared": False,
-                "block_reason": "两侧没有可配对的运行（逐次评分缺失）",
-                "verdict": "blocked",
-                "material_version": material, "scorer_version": scorer,
-                "paired_tasks": [], "unpaired": _unpaired(current_runs, baseline_runs, ()),
-                "noise": None,
-                "primary": {"metric": PRIMARY_METRIC, "current": None, "baseline": None,
-                            "difference": None},
-                "secondary": []}
+        return _blocked_comparison(material, scorer, "两侧没有可配对的运行（逐次评分缺失）",
+                                   _unpaired(current_runs, baseline_runs, ()))
 
     paired = []
     for index in shared:
@@ -103,6 +82,58 @@ def compare(current, baseline):
                         "current": current_total, "baseline": baseline_total,
                         "difference": current_total - baseline_total},
             "secondary": _secondary(paired)}
+
+
+def _blocked_comparison(material, scorer, reason, unpaired=None):
+    return {"compared": False, "block_reason": reason, "verdict": "blocked",
+            "material_version": material, "scorer_version": scorer,
+            "paired_tasks": [], "unpaired": {"current": [], "baseline": []} if unpaired is None else unpaired,
+            "noise": None,
+            "primary": {"metric": PRIMARY_METRIC, "current": None, "baseline": None, "difference": None},
+            "secondary": []}
+
+
+def _model_block_reason(current, baseline):
+    current_model, current_reading = _model_identity(current)
+    baseline_model, baseline_reading = _model_identity(baseline)
+    if current_model is None or baseline_model is None:
+        return f"模型身份无法核验：候选 {current_reading}；基线 {baseline_reading}"
+    if current_model != baseline_model:
+        return f"模型身份不一致：候选 {current_model}；基线 {baseline_model}"
+    return None
+
+
+def _model_identity(result):
+    runs = result.get("runs", [])
+    # 顶层模型可以是首轮摘要，只有未记录任何逐次身份的旧结果才用它。
+    if not any("served_model" in run for run in runs):
+        model = _recorded_model(result.get("model"))
+        return model, model or "顶层模型未知"
+
+    models = set()
+    missing = []
+    for index, run in enumerate(runs, start=1):
+        if run.get("void"):
+            continue
+        model = _recorded_model(run.get("served_model"))
+        if model is None:
+            missing.append(str(index))
+        else:
+            models.add(model)
+    if len(models) > 1:
+        return None, "组内模型身份不一致（" + "、".join(sorted(models)) + "）"
+    if missing:
+        known = "，已记录 " + next(iter(models)) if models else ""
+        return None, "第 " + "、".join(missing) + " 次运行的模型身份未知" + known
+    if not models:
+        return None, "没有有效运行可核对模型身份"
+    model = next(iter(models))
+    return model, model
+
+
+def _recorded_model(value):
+    model = value.strip() if isinstance(value, str) else ""
+    return None if model.casefold() in {"", "未知", "unknown"} else model
 
 
 def _run_scores(result):
