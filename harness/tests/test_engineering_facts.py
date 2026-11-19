@@ -7,6 +7,7 @@
 
 import json
 import re
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -14,8 +15,10 @@ import pytest
 from harness.context import (ContextAssembler, _current_work, engineering_facts_text, prior_round_outcome,
                              quality_engineering_content, work_notifications)
 from harness.definitions import DEFINITIONS, Definitions, VerificationDeclaration
-from harness.models import (ArtifactRef, DeliverySpec, Event, EventType, ProductDecision, ProductSpec,
-                            ProjectEventType, RunProjection)
+from harness.models import (ArtifactRef, DeliverySpec, DepartmentPrompt, Event, EventType, ProductDecision,
+                            ProductSpec, ProjectEventType, RunProjection)
+from harness.projection import replay_events
+from harness.tightening import WATCHED_OUTPUTS
 
 # 一份把被核验方与核验角色都改名的定义：两个名字都不是默认定义里的角色
 RENAMED = {"engineering": "build", "quality": "inspection"}
@@ -205,6 +208,81 @@ def test_the_delivery_arrival_is_notified_to_the_role_that_verifies_it(definitio
     for department in (verified, "product"):
         assert work_notifications(projection, events, department, "ses_other_1",
                                   definitions=definitions) == []
+
+
+def _activation_events(verified, verifier, *, delivery_first):
+    delivery = _delivery(verified=verified)
+    spec = _event(1, EventType.SPEC_ACCEPTED, asdict(_spec()), department="product")
+    delivered = _event(2, EventType.DELIVERY_ACCEPTED, asdict(delivery),
+                       department=verified, session_id="ses_eng_1")
+    activated = _event(3, EventType.DEPARTMENT_ACTIVATED, {
+        "activation_id": "act_1", "effective_contract_hash": delivery.effective_contract_hash,
+    }, department=verifier, session_id="ses_qua_1")
+    if not delivery_first:
+        activated = replace(activated, position=2, stream_version=2)
+        delivered = replace(delivered, position=3, stream_version=3)
+        return [spec, activated, delivered]
+    return [spec, delivered, activated]
+
+
+def _assemble_verifier(events, definitions, verifier, *, session_id="ses_qua_1", activation_id="act_1"):
+    prompt = DepartmentPrompt(verifier, 0, definitions.role(verifier).prompt,
+                              ArtifactRef("department_prompt", "sha256:prompt-1", ""), "")
+    return ContextAssembler(tightening=WATCHED_OUTPUTS).assemble(
+        replay_events(events), department=verifier, session_id=session_id, activation_id=activation_id,
+        prompt=prompt, events=events, definitions=definitions,
+    )
+
+
+def _json_part(context, source):
+    return json.loads(next(part.text for part in context.parts if part.source == source))
+
+
+@pytest.mark.parametrize("definitions, verified, verifier", CASES)
+def test_first_verifier_request_distinguishes_activation_basis_from_current_delivery(definitions, verified, verifier):
+    # R3：只交换同一份交付与主线激活的先后，装配时两轮都能看当前交付，仍只有一轮以它为依据。
+    exploration_events = _activation_events(verified, verifier, delivery_first=False)
+    verification_events = _activation_events(verified, verifier, delivery_first=True)
+    exploration = _assemble_verifier(exploration_events, definitions, verifier)
+    verification = _assemble_verifier(verification_events, definitions, verifier)
+    current = _json_part(exploration, "current_delivery_spec")
+    assert current == _json_part(verification, "current_delivery_spec")
+    assert current["content_hash"] == _delivery(verified=verified).content_hash
+    assert {"summary", "known_risks"}.isdisjoint(current)
+    assert exploration.tools == verification.tools
+    assert exploration.input_items != verification.input_items
+
+    explored_refs = _json_part(exploration, "binding_refs")
+    verified_refs = _json_part(verification, "binding_refs")
+    assert explored_refs.pop("activation_has_delivery_basis") is False
+    assert verified_refs.pop("activation_has_delivery_basis") is True
+    assert explored_refs == verified_refs
+    assert explored_refs["delivery_spec_hash"] == current["content_hash"]
+    assert [part for part in exploration.parts if part.source != "binding_refs"] == [
+        part for part in verification.parts if part.source != "binding_refs"
+    ]
+    assert exploration == _assemble_verifier(exploration_events, definitions, verifier)
+    assert verification == _assemble_verifier(verification_events, definitions, verifier)
+
+
+def test_only_a_delivery_verifier_main_activation_exposes_the_basis():
+    # R3：询问分支不借用同一角色主线的依据；没有交付核验声明时，即使角色与主线相同也没有提示。
+    verified, verifier = RENAMED["engineering"], RENAMED["quality"]
+    events = _activation_events(verified, verifier, delivery_first=True)
+    asked = _asked_event(4, verified=verified, verifier=verifier)
+    branch_id = asked.payload["branch_session_id"]
+    branch_activated = _event(5, EventType.DEPARTMENT_ACTIVATED, {"activation_id": "act_ask_1"},
+                              department=verifier, session_id=branch_id)
+    branch = _assemble_verifier([*events, asked, branch_activated], RENAMED_DEFINITIONS, verifier,
+                                session_id=branch_id, activation_id="act_ask_1")
+    open_loop = RENAMED_DEFINITIONS.model_copy(update={
+        "organization": RENAMED_DEFINITIONS.organization.model_copy(update={
+            "verification": VerificationDeclaration(),
+        }),
+    })
+    other = _assemble_verifier(events, open_loop, verifier)
+    assert "activation_has_delivery_basis" not in _json_part(branch, "binding_refs")
+    assert "activation_has_delivery_basis" not in _json_part(other, "binding_refs")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
