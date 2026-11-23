@@ -20,6 +20,7 @@ from .kernel_events import (
 from .coverage import is_trial_step_tool
 from .models import (
     CatalogEventType,
+    CheckMaterials,
     DecisionRequest,
     DepartmentGuidance,
     ArtifactRef,
@@ -165,6 +166,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         _bind_actual_model(state, event)
 
     if etype == EventType.RUN_CREATED:
+        state.check_materials_index = {}
         state.run_id = event.run_id
         state.task = payload["task"]
         state.intend_ref = payload["intend_ref"]
@@ -593,6 +595,8 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.qa_tests_version = int(payload["version"])
         state.qa_tests_hash = payload["content_hash"]
         state.qa_tests_archive_ref = payload["archive_ref"]
+        if state.check_materials_index is not None and event.department is not None:
+            state.check_materials_index[event.department] = CheckMaterials.from_event(event)
         return
 
     if etype == EventType.RUN_DONE:

@@ -846,8 +846,10 @@ class ThinDriver:
                         self.activate_department(run_id, department, connections))
                 pending = [task for task in tasks.values() if not task.done()]
                 if not pending:
-                    # 没有部门在工作，也没有可以开始的部门：没有新的工作
-                    return await self.no_new_work(run_id)
+                    # 停止前按写入口中的版本重问路由；新输入可能已经到达。
+                    if self._end_idle_run(run_id):
+                        return await asyncio.to_thread(self._hooks.settled, run_id)
+                    continue
                 waiter = loop.create_task(changed.wait())
                 try:
                     done, _pending = await asyncio.wait(
@@ -889,16 +891,25 @@ class ThinDriver:
                 pass
         await asyncio.gather(*pending, return_exceptions=True)
 
-    async def no_new_work(self, run_id: str) -> Any:
-        # 没有部门可以开始一轮工作：事项以什么结束由路由判断，薄驱动只把它的判断写成停止。
-        # 运行视图从钩子取得，只原样交给路由（工单 #1678）
-        def end(transaction: Transaction) -> None:
-            judgment = self._hooks.routing(run_id).item_end(self._hooks.run_view(transaction))
-            if judgment is None:
-                return
-            self.fail(transaction, judgment.stop_reason, judgment.message)
+    def _end_idle_run(self, run_id: str) -> bool:
+        # 有新工作时返回 False，调用方继续排程。停止判断随流版本冲突重算。
+        def end(transaction: Transaction) -> bool:
+            if (transaction.minimal().status in TERMINAL_STATUSES or self._hooks.aborted(run_id)
+                    or self._hooks.blocks_run(transaction.decisions.values())):
+                return True
+            route = self._hooks.routing(run_id)
+            view = self._hooks.run_view(transaction)
+            if route.ready_departments(view, waiting=self._hooks.waiting_departments(run_id)):
+                return False
+            judgment = route.item_end(view)
+            if judgment is not None:
+                self.fail(transaction, judgment.stop_reason, judgment.message)
+            return True
 
-        self._hooks.transact_run(run_id, end)
+        return self._hooks.transact_run(run_id, end)
+
+    async def no_new_work(self, run_id: str) -> Any:
+        self._end_idle_run(run_id)
         return await asyncio.to_thread(self._hooks.settled, run_id)
 
     def wake(self, run_id: str, *, restart: bool = False) -> None:

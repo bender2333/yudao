@@ -257,15 +257,16 @@ def _condition_check_receipts(condition: ProposalCondition, context: _ConditionC
     # 通用条件 3：列出的检查都有主机执行的回执，回执来自这个会话的这一轮，并绑定当前的依据。
     # 绑定的是哪几份成果由合同写（种类 → 当前版本的摘要），内核按名字取，不认识具体有哪几种（工单 #1456）
     names = _condition_check_names(condition.names, context.proposal)
-    activation = context.minimal.rounds.get(condition.department) if condition.activation else None
+    department = context.department if condition.department == "$issuer" else condition.department
+    activation = context.minimal.rounds.get(department) if condition.activation else None
     bindings = {item.target: artifact_hash(_current_artifact(context.minimal, item.target))
                 for item in condition.bind}
     required = {kind: digest for kind, digest in bindings.items() if digest is not None}
     for name, field_name in names:
-        receipt = context.facts.latest_check(condition.department, name, activation_id=activation,
-                                             bindings=required)
+        receipt = None if condition.activation and activation is None else context.facts.latest_check(
+            department, name, activation_id=activation, bindings=required)
         if receipt is None:
-            outcome.errors.append(FieldError(field_name, condition.message.format(name=name)))
+            outcome.errors.append(FieldError(field_name, condition.message.format(name=name, department=department)))
             continue
         outcome.receipts[name] = _receipt_evidence(receipt)
 

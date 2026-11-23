@@ -1,7 +1,10 @@
+import asyncio
+import sys
 from dataclasses import replace
+
 from harness.tests.helpers import adjudication_view, work_basis
 
-from harness.actions import FactsQuery
+from harness.actions import Action, FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import (WorkBasis, commit_decision, facts_query, proposal_decision, submission_basis,
                                   tool_permission)
@@ -65,17 +68,22 @@ def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
     # 工单 #964：新的用户输入同样不再作废这次提交（它作为通知送达，部门接着工作）；
     # 校验以后工作区改变仍然拒绝：回执不能重新绑定到已经改变的快照上
     system, projection = _engineering(tmp_path)
+    projection = replace(projection, last_activations={**projection.last_activations, "engineering": "act_eng"})
     environment = _environment(system, projection)
-    ws = system.workspace(projection.run_id)
-    ws.bind_check(
-        activation_id=projection.last_activations.get("engineering"),
+    environment.bind_check(
+        activation_id=projection.last_activations["engineering"],
         product_spec_hash=projection.product_spec.content_hash,
         delivery_spec_hash=None,
         effective_contract_hash=projection.effective_contract.content_hash,
     )
-    ws.write_file("src/echo.py", "print(1)\n")
-    ws.record_check("engineering", "pytest", 0, "ok")
-    proposal = delivery(check_names=["pytest"],
+    environment.workspace.write_file("src/echo.py", "print(1)\n")
+    executable = sys.executable.replace("\\", "/")
+    check = asyncio.run(environment.perform(Action(
+        action_id="dispatched-check", department="engineering", kind="check", tool="run_check",
+        input={"name": "echo", "command": f'"{executable}" src/echo.py'},
+    )))
+    assert check.ok and check.output["exit_code"] == 0
+    proposal = delivery(check_names=["echo"],
                         basis_product_spec_hash=projection.product_spec.content_hash)
     facts = environment.query(FactsQuery(tree=True)).tree
     events = system.store.list_events(projection.run_id)

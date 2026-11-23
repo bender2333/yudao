@@ -20,16 +20,19 @@ from __future__ import annotations
 
 import asyncio
 import time
+from copy import deepcopy
 from types import SimpleNamespace
 
 from harness import assembly_contract, execution_contract
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.adjudication import WorkBasis
-from harness.definitions import DEFINITIONS
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, definitions_from_contents
 from harness.event_store import run_stream
 from harness.kernel_events import SkeletonEventType
+from harness.proposals import delivery_turn, product_spec
 from harness.runtime import LoopSystem
 from harness.thin_driver import RoundDependencies, RoundPreparation, StopEventFields, ThinDriver
+from harness.tightening import WATCHED_OUTPUTS
 
 DEPARTMENT = "product"
 SESSION = "ses_product_1"
@@ -529,3 +532,61 @@ def test_wait_for_decision_tracks_concurrent_active_dept_and_exits_on_withdraw(t
         [finished] = rig.events(SkeletonEventType.ACTIVATION_FINISHED)
         assert finished.payload["elapsed_ms"] == 400
         assert finished.payload["session_elapsed_ms"] == 0
+
+
+def test_the_idle_stop_does_not_discard_work_from_newer_facts(tmp_path):
+    # R1：调度器认为没有新工作时，终止事务仍须用当前运行流判断。
+    system = LoopSystem(tmp_path / "idle", resume_on_startup=False)
+    try:
+        run_id = system.create_run("检查命令行用法")
+        current = system.add_input(run_id, "还要覆盖错误退出码")
+        driver = ThinDriver(system.writes, system.orchestrator)
+
+        result = asyncio.run(driver.no_new_work(run_id))
+
+        assert result.status == "running" and result.input_version == current.input_version
+        assert not any(event.type == SkeletonEventType.RUN_FAILED for event in system.store.list_events(run_id))
+        assert result.canonical_state() == system.replay(run_id).canonical_state()
+    finally:
+        system.close()
+
+
+def test_the_idle_stop_rechecks_after_a_command_commits_before_the_stop(tmp_path, monkeypatch):
+    # R1：在真实写入口中制造版本竞争。只控制事件先后；读取、裁决与 SQLite 提交仍使用产品实现。
+    contents = deepcopy(DEFINITIONS.contents)
+    departments = contents["organization.json"]["departments"]
+    verifier = next(role for role in departments if role["id"] == "quality")
+    verifier["watched"] = ["guidance"]
+    definitions = definitions_from_contents(contents)
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()],
+                           "quality": [FakeTurn(transcript="收到指导")]})
+    system = LoopSystem.for_testing(tmp_path / "idle-race", adapter,
+                                    forms={DEFAULT_FORM: (definitions, WATCHED_OUTPUTS)})
+    try:
+        run_id = system.create_run("echo")
+        system.activate_once(run_id)
+        system.activate_once(run_id)
+        commit = system.store.commit
+        injected = False
+
+        def commit_after_guidance(stream, version, events, *args, **kwargs):
+            nonlocal injected
+            if not injected and any(event.stop_reason == "no_new_work" for event in events):
+                injected = True
+                system.add_guidance(run_id, "quality", "核对到达的指导")
+            return commit(stream, version, events, *args, **kwargs)
+
+        monkeypatch.setattr(system.store, "commit", commit_after_guidance)
+        result = system.run_until_stop(run_id)
+
+        assert injected and result.stop_reason == "no_new_work"
+        events = system.store.list_events(run_id)
+        [answered] = [event for event in events if event.type == "department_guidance_responded"]
+        [stopped] = [event for event in events if event.type == SkeletonEventType.RUN_FAILED]
+        assert answered.position < stopped.position
+        # 已有终态时再次执行空闲收尾，不追加停止事件。
+        driver = ThinDriver(system.writes, system.orchestrator)
+        assert asyncio.run(driver.no_new_work(run_id)).stream_version == result.stream_version
+        assert result.canonical_state() == system.replay(run_id).canonical_state()
+    finally:
+        system.close()

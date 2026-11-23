@@ -24,13 +24,15 @@ from urllib.parse import urlsplit
 
 from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
-from .watched_outputs import has_new_work, input_department, is_working, proposal_kinds_for
+from .watched_outputs import (DELIVERY_SIGNALS, delivery_feedback, has_new_work, input_department, is_working,
+                              proposal_kinds_for)
 from .contracts import normalize_scope
 from .coverage import (baseline_open_records, baseline_records, changed_criteria, coverage_report,
                        criterion_is_executable, method_is_executable,
                        open_criteria)
 from .definitions import DEFINITIONS, Definitions
-from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
+from .feedback import Feedback, FeedbackPhase, ReviewSignal
+from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS, accepted
 from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
 from .tools import in_force, offers_with_input, proposal_kind, proposal_kinds, tool_action, tools_for
 from . import tightening_contract
@@ -401,8 +403,10 @@ class WatchedOutputsTightening:
             if not bound_checks:
                 errors.append(FieldError(
                     "checks", f"release requires {department}-run evidence bound to the current snapshot"))
-            # 放行要用当前的核验测试材料：材料摘要的比较读的是内容
-            if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
+            # 放行只比较提交角色自己的当前检查材料。
+            materials = projection.check_materials(department, lambda: request.events)
+            materials_hash = None if materials is None else materials.content_hash
+            if any(item.get("qa_tests_hash") != materials_hash for item in bound_checks):
                 errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
         # 逐条结论（验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」，工单 #151）在前面这些检查通过以后才判：
         # 覆盖当前 ProductSpec 的全部验收条件、可执行检验的 passed 至少一个本轮核验回执、放行的三条规则
@@ -427,7 +431,8 @@ class WatchedOutputsTightening:
         # 并且它的逐条结论覆盖当前 PRD 的全部验收条件。字段级错误写明缺什么、哪一条不符
         judgement = None
         if not errors:
-            judgement, reference_errors = _qa_judgement(proposal, request.events, projection, delivery_hash, spec_hash)
+            judgement, reference_errors = _qa_judgement(
+                proposal, request.events, projection, delivery_hash, spec_hash, department)
             errors.extend(reference_errors)
         # 改判（docs/design/independent-verification.md「先判断后看解释」，工单 #1190）：判断与结论不一致的条目逐条写明改判理由，缺了被拒绝；
         # 改判的条数随放行记录写进事实，以后算解释翻转率时从这里取
@@ -443,13 +448,19 @@ class WatchedOutputsTightening:
         if request.commit and verdict == "release" \
                 and pending_product_input(projection, list(request.events), definitions=request.definitions):
             return Tightened(wait=True, reason=PENDING_INPUT_RELEASE)
-        # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
+        # 单个角色的结论不等于事项放行；按当前版本复合各角色的结论。
+        feedback = _pending_delivery_feedback(projection, delivery_hash, department, request.definitions)
+        if feedback is None:
+            return Tightened(errors=(FieldError("delivery_spec", "this delivery is not waiting for your conclusion"),))
+        after_review = feedback.observe([ReviewSignal(department, delivery_hash, DELIVERY_SIGNALS[verdict])])
         changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
-        # 检验的有效性（docs/design/independent-verification.md「检验的有效性」，工单 #1181）：本次激活的基线回执按检查名归并，命令检查的覆盖
-        # 要求同名基线在基线副本上失败。基线回执先于这次提交写进工作区事实（主机执行先写回执），
-        # 这里只读事实，不补运行
-        baseline = baseline_records(facts.checks, sorted({name for row in criteria
-                                                          for name in row["checks"]}))
+        # 基线覆盖计同一核验者在同一交付及合同上的主机回执；它可以在较早的独立判断轮完成。
+        activation = minimal.rounds.get(department)
+        bindings = {"product_spec": spec_hash, "contract": contract_hash, "delivery_spec": delivery_hash}
+        baseline = baseline_records(
+            [receipt for receipt in reversed(facts.checks) if receipt.department == department
+             and receipt.binds(bindings)], sorted({name for row in criteria for name in row["checks"]}),
+        )
         return Tightened(content={
             "product_spec_hash": spec_hash,
             "effective_contract_hash": contract_hash,
@@ -472,8 +483,8 @@ class WatchedOutputsTightening:
             # 缺少回执与无法运行都不计入，放行记录里看得到
             "baseline_checks": baseline_open_records(criteria, baseline),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
-            "evidence_refs": _check_evidence_refs(criteria, request.events),
-        }, ends_run=verdict == "release")
+            "evidence_refs": _check_evidence_refs(criteria, request.events, department, activation),
+        }, ends_run=after_review.phase == FeedbackPhase.RELEASED)
 
     def _independent_judgement(self, request: TightenRequest) -> Tightened:
         # 独立判断的提交（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：核验角色在只看事实的上下文里
@@ -505,8 +516,10 @@ class WatchedOutputsTightening:
             errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts, department))
         if errors:
             return Tightened(errors=tuple(errors))
-        # 一份交付一份判断：这份交付已经有独立判断时重复提交被拒绝（门以第一次为准）
-        if _judgement_exists(request.events, delivery_hash):
+        if _pending_delivery_feedback(projection, delivery_hash, department, request.definitions) is None:
+            return Tightened(errors=(FieldError("delivery_spec", "this delivery is not waiting for your conclusion"),))
+        # 同一个核验角色只能对当前交付交一次独立判断。
+        if _judgement_exists(request.events, delivery_hash, department):
             return Tightened(errors=(FieldError(
                 "kind", "an independent judgement for the current delivery is already committed"),))
         return Tightened(content={
@@ -1184,13 +1197,17 @@ def _cannot_verify_criteria_errors(criteria: list[dict[str, Any]]) -> list[Field
     return errors
 
 
-def _check_evidence_refs(criteria: list[dict[str, Any]], events: tuple[Event, ...] | list[Event]) -> list[dict[str, Any]]:
+def _check_evidence_refs(criteria: list[dict[str, Any]], events: tuple[Event, ...] | list[Event],
+                         department: str, activation: str | None) -> list[dict[str, Any]]:
     # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用。说明工件（结论原文）的引用由接纳时补在前面
     refs: list[dict[str, Any]] = []
     seen: set[str] = set()
+    checks = [event for event in accepted(events) if event.type == EventType.TOOL_CALLED
+              and event.department == department and activation is not None
+              and event.payload.get("activation_id") == activation]
     for row in criteria:
         for name in row["checks"]:
-            ref = _check_output_ref(events, name)
+            ref = _check_output_ref(checks, name)
             if ref is None or ref.get("content_hash") in seen:
                 continue
             seen.add(ref["content_hash"])
@@ -1198,10 +1215,8 @@ def _check_evidence_refs(criteria: list[dict[str, Any]], events: tuple[Event, ..
     return refs
 
 
-def _check_output_ref(events: tuple[Event, ...] | list[Event], name: str) -> dict[str, Any] | None:
-    for event in reversed(list(events)):
-        if event.type != EventType.TOOL_CALLED:
-            continue
+def _check_output_ref(events: list[Event], name: str) -> dict[str, Any] | None:
+    for event in reversed(events):
         payload = event.payload or {}
         if payload.get("name") != "run_check" or (payload.get("args") or {}).get("name") != name:
             continue
@@ -1211,34 +1226,38 @@ def _check_output_ref(events: tuple[Event, ...] | list[Event], name: str) -> dic
     return None
 
 
-def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: str | None) -> bool:
-    # 这份交付已经有独立判断事件（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：门的依据，装配也用它。
-    # 事件与逐条结论里的交付摘要一致才算：写进日志的独立判断是对当前交付的判断
-    if delivery_hash is None:
-        return False
-    return any(
-        event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED
-        and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
-        for event in events
-    )
+def _pending_delivery_feedback(projection: RunProjection, digest: str, department: str,
+                               definitions: Definitions | None) -> Feedback | None:
+    delivery = projection.delivery_spec
+    if delivery is None or delivery.status != "active" or delivery.content_hash != digest:
+        return None
+    feedback = delivery_feedback(projection, delivery, in_force(definitions))
+    return feedback if department in feedback.pending else None
+
+
+def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: str, department: str) -> bool:
+    return any(event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED
+               and event.department == department
+               and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
+               for event in accepted(events))
 
 
 def _qa_judgement(proposal: dict[str, Any], events: tuple[Event, ...] | list[Event],
                   projection: RunProjection, delivery_hash: str,
-                  spec_hash: str) -> tuple[Event | None, list[FieldError]]:
+                  spec_hash: str, department: str) -> tuple[Event | None, list[FieldError]]:
     """结论引用的独立判断（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #1190）。
 
     三件事：
     · 引用存在——结论可以在 judgement_event 里写明它引用的判断的事件编号；没写明时由主机取当前交付的
-      那一条判断（同一份交付只有一条判断，#358 的门保证），结论照样引用一条判断。写明的编号在日志里
-      没有对应的判断事件时被拒绝。
+      该核验角色的判断。引用不存在或指向其他角色的判断时被拒绝。
     · 属于本次激活——引用的判断必须是对当前交付与当前 PRD 的判断，并且写在这份交付被接纳之后：
       新的交付到达以后，上一份交付的判断不再算作这一轮核验的依据。
     · 覆盖全部验收条件——判断的逐条结论覆盖当前 PRD 的每一条验收条件，各一次。
 
     返回引用的判断事件与错误；有错误时以错误为准。
     """
-    committed = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
+    committed = [event for event in accepted(events)
+                 if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED and event.department == department]
     accepted_at = _delivery_position(events, delivery_hash)
     cited = proposal.get("judgement_event")
     if cited is not None:

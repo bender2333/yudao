@@ -41,7 +41,7 @@ FLOW_TYPES = frozenset({
     EventType.ASK_STARTED, EventType.ASK_ANSWERED, EventType.QA_SUBMITTED, EventType.DELIVERY_ACCEPTED,
     EventType.SPEC_ACCEPTED, EventType.SPEC_SUPERSEDED, EventType.USER_INPUT_RECEIVED,
     EventType.DEPARTMENT_GUIDANCE_RECEIVED, EventType.DEPARTMENT_ACTIVATED,
-    EventType.ARTIFACT_ACCEPTED, EventType.RUN_CREATED,
+    EventType.ARTIFACT_ACCEPTED, EventType.RUN_CREATED, EventType.RUN_DONE,
 })
 # 项目流里进流转记录的事件种类：事项的创建就是你给它的第一句输入（工单 #1636）
 PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
@@ -53,7 +53,8 @@ PROJECT_FLOW_TYPES = frozenset({ProjectEventType.WORK_ITEM_CREATED})
 # 第 4 版：直做交完成的那一版进流转记录（工单 #1699）。
 # 第 5 版：流转记录按事项冻结的定义取部门与去向（工单 #1703）。
 # 第 6 版：流转记录的 PRD 新版本随带完整结构化 PRD（工单 #1808）。
-DERIVATION_VERSION = 6
+# 第 7 版：核验通过在同一次接纳记录写入事项终态时才标为放行。
+DERIVATION_VERSION = 7
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
 # 没有事项可依的读取用的定义（工单 #1703）：这个文件里唯一一处读这一版加载的定义，守卫用例按这一行登记
@@ -128,6 +129,7 @@ CREATE TABLE IF NOT EXISTS app_flows (
     prd TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_app_flows_scope ON app_flows(project_id, work_item_id, position);
+CREATE INDEX IF NOT EXISTS idx_app_flows_event ON app_flows(event_id);
 CREATE TABLE IF NOT EXISTS app_flow_state (
     run_id TEXT PRIMARY KEY,
     state TEXT NOT NULL
@@ -297,6 +299,14 @@ class ReadModels:
                     states[run_id] = _empty_flow_state() if saved is None else json.loads(saved["state"])
                 state = states[run_id]
                 _advance_flow_state(state, event)
+            if isinstance(event, Event) and event.type == EventType.RUN_DONE:
+                if event.stop_reason == "released" and state is not None:
+                    completed = state.get("approval")
+                    if completed is not None and ((completed["parent"], completed["department"])
+                                                  == (event.parent_event_id, event.department)):
+                        connection.execute("UPDATE app_flows SET kind = '放行', status = '已放行' WHERE event_id = ?",
+                                           (completed["id"],))
+                continue
             if isinstance(event, Event) and event.type == EventType.SPEC_SUPERSEDED:
                 _supersede_flow_specs(connection, event.run_id, (event.payload or {}).get("content_hash"))
                 continue
@@ -523,6 +533,9 @@ def _advance_flow_state(state: dict[str, Any], event: Event | ProjectEvent) -> N
     if event.type == EventType.USER_INPUT_RECEIVED:
         _record_flow_input(state, payload, event.event_id)
         return
+    if event.type == EventType.QA_SUBMITTED and payload.get("verdict") == "release":
+        state["approval"] = {"id": event.event_id, "parent": event.parent_event_id, "department": event.department}
+        return
     if event.type == EventType.DEPARTMENT_ACTIVATED:
         session = event.session_id
         cycle = payload.get("cycle")
@@ -660,7 +673,7 @@ def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
                  "status": "已退回", "content": payload.get("rationale", "")}
                 for target in targets]
     if event.type == EventType.QA_SUBMITTED and payload.get("verdict") == "release":
-        # 放行（工单 #1636）：核验角色核验过那一版交付以后放行，回到交这一版的那个职能；内容是核验的是哪一版
+        # 个别核验通过先传给交付方；对应的事项结束事件到达后才改成放行。
         targets = _verified_departments(organization, source) or [None]
         revision = (deliveries or {}).get(payload.get("delivery_spec_hash"))
         content = f"核验了交付第 {revision} 版" if revision is not None else "核验了当前交付"
@@ -669,8 +682,8 @@ def flow_rows(event: Event | ProjectEvent, *, work_round: int = 0,
             content = f"{content}：{rationale}"
         return [{**base,
                  "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{target}",
-                 "kind": "放行", "direction_from": source, "direction_to": target,
-                 "status": "已放行", "content": content}
+                 "kind": "核验通过", "direction_from": source, "direction_to": target,
+                 "status": "已通过", "content": content}
                 for target in targets]
     return []
 

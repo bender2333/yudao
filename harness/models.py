@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
 
@@ -26,6 +27,7 @@ from .kernel_events import (
     ProjectEventType,
     QA_VERDICTS,
     SkeletonEventType,
+    accepted,
     canonical_hash,
     json_dumps,
     new_id,
@@ -121,6 +123,16 @@ def estimate_tokens(text: str) -> int:
     if not text:
         return 0
     return max(1, (len(text.encode("utf-8")) + 3) // 4)
+
+
+@dataclass(frozen=True)
+class CheckMaterials:
+    content_hash: str | None
+    archive_ref: dict[str, Any]
+
+    @classmethod
+    def from_event(cls, event: Event) -> CheckMaterials:
+        return cls(event.payload["content_hash"], event.payload["archive_ref"])
 
 
 @dataclass(frozen=True)
@@ -574,14 +586,33 @@ class RunProjection:
     qa_tests_version: int = 0
     qa_tests_hash: str | None = None
     qa_tests_archive_ref: dict[str, Any] | None = None
+    # 仅供运行中查找；None 表示旧保存投影尚未按角色建立此索引。
+    check_materials_index: dict[str, CheckMaterials] | None = field(default=None, repr=False)
+
+    def check_materials(self, department: str, read_events: Callable[[], Sequence[Event]]) -> CheckMaterials | None:
+        if self.check_materials_index is not None:
+            return self.check_materials_index.get(department)
+        if self.qa_tests_version:
+            for event in reversed(accepted(read_events())):
+                if event.type == EventType.QA_TESTS_SAVED and event.department == department:
+                    return CheckMaterials.from_event(event)
+        return None
 
     def to_dict(self) -> dict[str, Any]:
-        return json.loads(json_dumps(self))
+        data = json.loads(json_dumps(self))
+        del data["check_materials_index"]
+        return data
 
     def canonical_state(self) -> dict[str, Any]:
         data = self.to_dict()
         data.pop("last_event_id", None)
         return data
+
+    def pending_ask_departments(self) -> tuple[str, ...]:
+        # 开着的询问分支由各自的提问方主线接续；同一条询问链只启用根会话。
+        sessions = {session.session_id: session.department for session in self.sessions.values()}
+        return tuple(dict.fromkeys(sessions[origin] for item in self.ask_stack
+                                   if (origin := item.get("origin_session_id")) in sessions))
 
     @property
     def provider_bindings(self) -> dict[str, dict[str, Any]]:

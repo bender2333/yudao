@@ -22,9 +22,12 @@ from harness.actions import CheckReceipt, TreeFacts
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS_DIR, load_definitions
 from harness.kernel_events import Event
-from harness.models import (ArtifactRef, DeliverySpec, EffectiveContract, EventType, SessionRecord)
+from harness.models import (
+    ArtifactRef, CheckMaterials, DeliverySpec, EffectiveContract, EventType, QAReview, SessionRecord,
+)
 from harness.proposals import baseline_review, product_spec, review, structure
 from harness.runtime import LoopSystem
+from harness.tests.test_watched_relations import INSPECTOR, with_second_delivery_verifier
 from harness.tightening import WATCHED_OUTPUTS, pending_product_input
 from harness.validation import TightenRequest
 
@@ -90,7 +93,7 @@ def _judgement_event(delivery_hash: str = DELIVERY, spec_hash: str = "sha256:spe
                  work_item_id=None, department="quality")
 
 
-def _delivery_ready(projection, *, qa_tests_hash="sha256:current", receipt_material="sha256:current"):
+def _delivery_ready(projection, *, receipt_material=None):
     # 一份可以核验的交付：当前合同、当前交付与这一轮质检的一条检查回执（核质检的结论用）
     spec = projection.product_spec
     contract = EffectiveContract(content_hash=CONTRACT, revision=1, product_spec_hash=spec.content_hash,
@@ -105,7 +108,7 @@ def _delivery_ready(projection, *, qa_tests_hash="sha256:current", receipt_mater
     receipt = _receipt("smoke", "quality", spec_hash=spec.content_hash, activation="act_q",
                        delivery_hash=DELIVERY, qa_tests_hash=receipt_material)
     ready = replace(projection, effective_contract=contract, delivery_spec=delivery,
-                    last_activations={"quality": "act_q"}, qa_tests_hash=qa_tests_hash)
+                    last_activations={"quality": "act_q"})
     return _working(ready, "quality"), receipt
 
 
@@ -206,8 +209,8 @@ def test_a_review_without_a_delivery_is_refused_as_an_exploration_round(tmp_path
 def test_a_release_must_use_the_current_quality_test_material(tmp_path):
     # R3：测试材料变了以后，旧的检查回执不能拿来放行
     system, run_id = _accepted(tmp_path)
-    projection, receipt = _delivery_ready(system.project(run_id), qa_tests_hash="sha256:current",
-                                          receipt_material="sha256:older")
+    projection, receipt = _delivery_ready(system.project(run_id), receipt_material="sha256:older")
+    projection.check_materials_index = {"quality": CheckMaterials("sha256:current", {})}
     tightened = WATCHED_OUTPUTS.submission(_structured(
         projection, "quality",
         review("release", "verified", checks=["smoke"], basis_delivery_spec_hash=DELIVERY),
@@ -283,3 +286,54 @@ def test_a_boundary_marked_design_not_implemented_is_not_an_existing_defect(tmp_
         facts=_facts(receipt)))
     assert [field for field, _message in _errors(tightened)] == ["conclusions[0].status"]
     assert MARK in tightened.errors[0].message
+
+
+def test_release_requires_every_verifier_to_conclude_on_the_same_delivery(tmp_path):
+    # R3：同一套裁决必须区分第一份放行结论、旧版放行、当前版全部放行与打回。
+    system, run_id = _accepted(tmp_path)
+    try:
+        projection, receipt = _delivery_ready(system.project(run_id))
+        definitions = with_second_delivery_verifier()
+        proposal = review("release", "通过", basis_delivery_spec_hash=DELIVERY)
+        judgement = _judgement_event(spec_hash=projection.product_spec.content_hash)
+
+        def decide():
+            return WATCHED_OUTPUTS.submission(_structured(
+                projection, "quality", proposal, facts=_facts(receipt), events=(judgement,), definitions=definitions))
+
+        first = decide()
+        assert first.accepted and not first.ends_run
+        other = QAReview(
+            id="rv_inspection", run_id=run_id, revision=1, parent_hash=None, content_hash="review-hash",
+            issuer=INSPECTOR, status="active", created_event_id="evt_review", product_spec_hash=judgement.payload[
+                "product_spec_hash"], effective_contract_hash=CONTRACT, delivery_spec_hash="older-delivery",
+            code_snapshot_hash=TREE, verdict="release", rationale="通过", checks=[], defects=[], evidence_refs=[],
+        )
+        projection.reviews[:] = [other]
+        old = decide()
+        assert old.accepted and not old.ends_run
+        projection.reviews[:] = [replace(other, delivery_spec_hash=DELIVERY)]
+        last = decide()
+        assert last.accepted and last.ends_run
+        projection.reviews[:] = [replace(other, delivery_spec_hash=DELIVERY, verdict="rework_engineering")]
+        assert not decide().accepted
+    finally:
+        system.close()
+
+
+def test_a_verifier_cannot_release_using_another_verifiers_independent_judgement(tmp_path):
+    # R3：独立判断属于提交它的角色；显式引用或省略编号都不能借用另一个角色的判断。
+    system, run_id = _accepted(tmp_path)
+    try:
+        projection, receipt = _delivery_ready(system.project(run_id))
+        definitions = with_second_delivery_verifier()
+        other = replace(_judgement_event(spec_hash=projection.product_spec.content_hash), department=INSPECTOR)
+        for cited in (None, other.event_id):
+            decision = WATCHED_OUTPUTS.submission(_structured(
+                projection, "quality", review("release", "通过", basis_delivery_spec_hash=DELIVERY,
+                                              judgement_event=cited),
+                facts=_facts(receipt), events=(other,), definitions=definitions))
+            assert not decision.accepted
+            assert {error.field for error in decision.errors} == {"judgement_event"}
+    finally:
+        system.close()

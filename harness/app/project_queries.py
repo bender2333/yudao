@@ -697,7 +697,10 @@ def _work_item_progress(run: Any, application: Application | None = None,
         if completed is not None:
             return completed
     review = _matching_review(run, delivery)
+    # 核验角色的个别结论仍在事件记录里；进度的放行取事项终态，不把部分通过当成整份放行。
     conclusion = None if review is None else review.verdict
+    if conclusion == "release" and (run.status != "done" or run.stop_reason != "released"):
+        conclusion = None
     # 交付依据的 PRD 版本：按交付记录的 PRD 摘要找到那一版的修订号
     basis_revision = None
     if delivery is not None:
@@ -733,11 +736,11 @@ def _completion_progress(application: Application, run: Any, events: Sequence[An
                  if definitions is not None and isinstance(author, str) else ())
     verdicts = [_conclusion_on(stream, verifier, completion.get("content_hash")) for verifier in verifiers]
     conclusion = None
-    if verdicts and all(verdict is not None for verdict in verdicts):
-        if COMPLETION_REWORK in verdicts:
-            conclusion = COMPLETION_REWORK
-        elif all(verdict == COMPLETION_RELEASE for verdict in verdicts):
-            conclusion = COMPLETION_RELEASE
+    if COMPLETION_REWORK in verdicts:
+        conclusion = COMPLETION_REWORK
+    elif run.status == "done" and run.stop_reason == "released" and verdicts \
+            and all(verdict == COMPLETION_RELEASE for verdict in verdicts):
+        conclusion = COMPLETION_RELEASE
     spec = getattr(run, "product_spec", None)
     return WorkItemProgress(
         product_spec_revision=None if spec is None else spec.revision,
@@ -859,7 +862,7 @@ def _fact_refs(store: Any, item: Any, run: Any, state: Any) -> dict[str, FactRef
     if delivery is not None:
         refs["parcel"] = _fact_ref(store, delivery.created_event_id, "包裹")
     review = _matching_review(run, delivery)
-    if review is not None:
+    if review is not None and (review.verdict != "release" or run.stop_reason == "released"):
         refs["stamp"] = _fact_ref(store, review.created_event_id, "盖章")
     return refs
 
@@ -4084,7 +4087,7 @@ PROJECT_FLOW = QueryDefinition(
                 EventType.SPEC_ACCEPTED, EventType.SPEC_SUPERSEDED, EventType.DELIVERY_ACCEPTED,
                 # 直做交完成的那一版在流转记录里是一条版本交付（工单 #1699）
                 EventType.ARTIFACT_ACCEPTED,
-                EventType.QA_SUBMITTED,
+                EventType.QA_SUBMITTED, EventType.RUN_DONE,
                 EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
                 ProjectEventType.WORK_ITEM_CREATED),
 )

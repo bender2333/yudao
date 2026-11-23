@@ -447,7 +447,7 @@ class ContextAssembler:
         # 解释部分看它有没有对当前交付下结论。是核验角色的判断按核验声明取，不按部门名
         verifies_delivery = department in definitions.verified_by("delivery_spec")
         verified_content = (quality_engineering_content(events or [], delivery=current_delivery,
-                                                       definitions=definitions)
+                                                       definitions=definitions, verifier=department)
                             if verifies_delivery else None)
         # 这个会话要回答的那一次询问：询问分支看自己那一次（一个部门可以同时有几个分支，工单 #559），
         # 主线会话沿用询问链上最内层的那一次
@@ -1024,19 +1024,21 @@ def _delivery_explanation_fields(definitions: Definitions | None, issuer: str) -
 
 
 def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None,
-                                definitions: Definitions | None = None) -> dict[str, Any]:
+                                definitions: Definitions | None = None, verifier: str | None = None) -> dict[str, Any]:
     # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性 docs/design/independent-verification.md「先判断后看解释」）：
     # 事实部分总在；解释部分在核验角色提交了当前交付的独立判断（independent_judgement_committed）
     # 以后进入它之后的请求——先判断后看解释，解释不再等质检的结论；新的交付到达后按新交付重新计算：
     # 解释部分重新藏起来，等核验角色对新交付的独立判断。
     # 三条通道：交付说明、核验角色收到的被核验方的回答、核验角色分支看到的被核验方的问题。
     # 哪两个角色是这一对按核验声明取（工单 #1401），不按部门名。
-    pairs = set((definitions or DEFINITIONS).verification_pairs("delivery_spec"))
+    pairs = {(role, author) for role, author in (definitions or DEFINITIONS).verification_pairs("delivery_spec")
+             if verifier is None or verifier == role}
     delivery_hash = delivery.content_hash if delivery is not None else _latest_delivery_hash(events)
     explanation_visible = delivery_hash is not None and any(
         event.type in (EventType.QA_SUBMITTED, EventType.INDEPENDENT_JUDGEMENT_COMMITTED)
+        and (verifier is None or event.department == verifier)
         and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
-        for event in events
+        for event in accepted(events)
     )
     asks: dict[str, dict[str, Any]] = {}
     questions: list[dict[str, Any]] = []

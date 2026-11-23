@@ -184,12 +184,12 @@
        ]},
       {"condition": "tree_matches", "recorded_in": "delivery_spec", "field": "code_snapshot_hash",
        "message": "workspace snapshot no longer matches the current delivery"},
-      {"condition": "check_receipts", "department": "quality", "names": {"field": "checks", "trim": true},
+      {"condition": "check_receipts", "department": "$issuer", "names": {"field": "checks", "trim": true},
        "bind": [{"field": "product_spec_hash", "target": "product_spec"},
                 {"field": "effective_contract_hash", "target": "contract"},
                 {"field": "delivery_spec_hash", "target": "delivery_spec"}],
        "activation": true,
-       "message": "quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"},
+       "message": "{department} must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"},
       {"condition": "author_separation", "evaluated": "delivery_spec", "field": "issuer",
        "message": "the department {department} authored the delivery it is evaluating; a department cannot evaluate its own artifact"}
     ],
@@ -201,12 +201,12 @@
          {"field": "product_spec_hash", "target": "product_spec", "message": "delivery is not bound to the current ProductSpec"},
          {"field": "effective_contract_hash", "target": "contract", "message": "delivery is not bound to the current effective contract"}
        ]},
-      {"condition": "check_receipts", "department": "quality", "names": {"field": "checks", "trim": true},
+      {"condition": "check_receipts", "department": "$issuer", "names": {"field": "checks", "trim": true},
        "bind": [{"field": "product_spec_hash", "target": "product_spec"},
                 {"field": "effective_contract_hash", "target": "contract"},
                 {"field": "delivery_spec_hash", "target": "delivery_spec"}],
        "activation": true,
-       "message": "quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"}
+       "message": "{department} must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"}
     ],
     "structure": [
       {"condition": "tree_matches", "recorded_in": "snapshot", "field": "code_snapshot_hash",

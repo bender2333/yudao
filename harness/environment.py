@@ -611,10 +611,9 @@ class Workspaces:
             run_root=run_root,
         )
         if department in self.policies(run_id)[1]:
-            ref = projection.qa_tests_archive_ref
-            if ref is not None:
-                if isinstance(ref, dict):
-                    ref = ArtifactRef(**ref)
+            materials = projection.check_materials(department, lambda: self._writes.read(run_stream(run_id)).events())
+            if materials is not None:
+                ref = ArtifactRef(**materials.archive_ref)
                 env.place_qa_tests(load_tree(self._artifacts, artifact_run(ref.path), ref))
             else:
                 env.place_qa_tests(None)

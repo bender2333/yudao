@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 from harness import routing_contract
 from harness.definitions import DEFINITIONS
-from harness.models import EventType, RunProjection
+from harness.models import EventType, RunProjection, SessionRecord
 from harness.watched_outputs import ROUTING
 
 HARNESS = Path(__file__).resolve().parents[1]
@@ -226,3 +226,22 @@ def test_the_thin_driver_only_connects_the_ask_branch():
         source = _function_source(driver, name)
         for department in DEFINITIONS.departments:
             assert f'"{department}"' not in source, (name, department)
+
+
+def test_unanswered_main_sessions_are_ready_after_recovery_without_new_outcomes():
+    # R3：两个并行询问尚未回答时，恢复只凭询问本身重新启用提问方，不等待新的成果。
+    view = _running()
+    view.sessions = {
+        "engineering": SessionRecord(session_id="ses_eng", department="engineering", status="active"),
+        "quality": SessionRecord(session_id="ses_qua", department="quality", status="active"),
+    }
+    _pending(view)
+    view.ask_stack.append({"requester": "quality", "recipient": "engineering", "question": "核对退出码",
+                           "origin_session_id": "ses_qua", "branch_session_id": "ses_ask_eng"})
+    idle = {"engineering", "quality"}
+
+    assert ROUTING.ready_departments(view, waiting=idle) == ["engineering", "quality"]
+    assert ROUTING.next_department(view, waiting=idle) == "engineering"
+    assert ROUTING.next_department(view, waiting={"quality"}) == "quality"
+    assert ROUTING.department_ready(view, department="quality", waiting=idle)
+    assert not ROUTING.department_ready(view, department="quality", waiting={"engineering"})

@@ -18,9 +18,10 @@ from typing import Any
 
 from . import routing_contract
 from .contracts import artifact_hash
-from .definitions import DEFINITIONS
-from .models import (OPEN_LOOP_STOP_REASON, PRD_REVISION_FIELDS, Event, EventType, RunProjection,
-                     new_id)
+from .definitions import DEFINITIONS, Definitions
+from .feedback import Feedback, FeedbackPhase, ReviewSignal, Signal
+from .models import (OPEN_LOOP_STOP_REASON, PRD_REVISION_FIELDS, DeliverySpec, Event, EventType, RunProjection,
+                     TERMINAL_STATUSES, new_id)
 
 # 组织定义 organization.json 的 routing 里写这个名称
 ROUTING_NAME = "watched_outputs"
@@ -139,6 +140,22 @@ def latest_delivery(projection: RunProjection):
     return projection.delivery_spec
 
 
+DELIVERY_SIGNALS = {
+    "cannot_verify": Signal.CANNOT_VERIFY,
+    "release": Signal.RELEASE,
+    "rework_engineering": Signal.REWORK,
+}
+
+
+def delivery_feedback(projection: RunProjection, delivery: DeliverySpec, definitions: Definitions) -> Feedback:
+    # 交付摘要是反馈的接口身份；核验角色名单来自事项冻结的定义。
+    verifiers = definitions.verifiers_of(delivery.issuer, "delivery_spec")
+    return Feedback.for_outcome(delivery.content_hash, verifiers).observe(
+        ReviewSignal(review.issuer, review.delivery_spec_hash, DELIVERY_SIGNALS[review.verdict])
+        for review in projection.reviews if review.verdict in DELIVERY_SIGNALS
+    )
+
+
 def _latest_engineering_basis(projection: RunProjection) -> str | None:
     """工程最近一次成果所依据的 PRD 版本：普通事项的交付与建档的结构说明都算。"""
     delivery = latest_delivery(projection)
@@ -171,7 +188,7 @@ def _has_new_product_spec(projection: RunProjection, department: str,
             return False
         if projection.department_bases.get(department) == contract:
             return False
-        return not _has_new_delivery(projection)
+        return not _has_new_delivery(projection, department, definition)
     basis = _latest_engineering_basis(projection)
     if basis is None:
         return True
@@ -184,26 +201,18 @@ def _has_new_product_spec(projection: RunProjection, department: str,
     return delivery.effective_contract_hash != contract
 
 
-def _has_new_defect_record(projection: RunProjection) -> bool:
-    """针对最新交付的缺陷记录：这份交付上质检记了缺陷记录。"""
+def _has_new_defect_record(projection: RunProjection, department: str, definitions: Definitions) -> bool:
+    # 打回以后被核验版本已经失效，反馈仍须送回这一版的作者。
     delivery = latest_delivery(projection)
-    if delivery is None:
-        return False
-    return any(review.delivery_spec_hash == delivery.content_hash and review.verdict == "rework_engineering"
-               for review in projection.reviews)
+    return (delivery is not None and delivery.issuer == department
+            and delivery_feedback(projection, delivery, definitions).phase == FeedbackPhase.REWORK)
 
 
-def _has_new_delivery(projection: RunProjection) -> bool:
-    """新的交付：最近一份交付还没有质检的结论。
-
-    质检无法核验的结论（cannot_verify）不算核验过（工单 #1179）：用户回答「重新核验」以后
-    质检要以新的激活重新检查同一份交付，这一条决定它会不会被重新激活。
-    """
-    delivery = latest_delivery(projection)
-    if delivery is None:
-        return False
-    return not any(review.delivery_spec_hash == delivery.content_hash
-                   and review.verdict != "cannot_verify" for review in projection.reviews)
+def _has_new_delivery(projection: RunProjection, department: str, definitions: Definitions) -> bool:
+    # 只核验当前交付。无法核验留下待完成的核验位置，用户决定后可以重新核验。
+    delivery = projection.delivery_spec
+    return (delivery is not None and delivery.status == "active"
+            and department in delivery_feedback(projection, delivery, definitions).pending)
 
 
 def _has_new_structure(projection: RunProjection) -> bool:
@@ -234,8 +243,8 @@ _WATCHED_CHECKS = {
     # user_input 不在这里：用户输入由接这个事项来源的部门开始，不再由关注它的部门开始（工单 #1455）
     "guidance": lambda projection, department, definitions: _has_new_guidance(projection, department),
     "product_spec": _has_new_product_spec,
-    "defect_record": lambda projection, department, definitions: _has_new_defect_record(projection),
-    "delivery": lambda projection, department, definitions: _has_new_delivery(projection),
+    "defect_record": _has_new_defect_record,
+    "delivery": _has_new_delivery,
     "structure": lambda projection, department, definitions: _has_new_structure(projection),
     "baseline_review": lambda projection, department, definitions: has_new_baseline_review(projection),
 }
@@ -268,19 +277,6 @@ def has_new_work(projection: RunProjection, department: str,
     return bool(watched_new_work(projection, department, definitions))
 
 
-def pending_ask_department(projection: RunProjection) -> str | None:
-    """还没回答的询问：提问方的那一轮要继续，回答在分支里。
-
-    进程中断以后分支由提问方的会话继续（工单 #473 的恢复口径）。
-    """
-    for ask in projection.ask_stack:
-        origin = ask.get("origin_session_id")
-        for session in projection.sessions.values():
-            if session.session_id == origin:
-                return session.department
-    return None
-
-
 def _free(projection: RunProjection, waiting: set[str] | None, department: str) -> bool:
     """部门在等待工作：waiting 给出时按它判断，没有给出时按投影里的会话记录判断。"""
     return department in waiting if waiting is not None else is_waiting(projection, department)
@@ -292,9 +288,11 @@ def department_ready(projection: RunProjection, department: str, waiting: set[st
 
     同时运行（工单 #557）：准备激活的事务里由薄驱动重新问一次，别的会话在这期间做完了就开始。
     """
-    if not _free(projection, waiting, department):
+    definition = DEFINITIONS if definitions is None else definitions
+    if (projection.status in TERMINAL_STATUSES or department not in definition.departments
+            or not _free(projection, waiting, department)):
         return False
-    return has_new_work(projection, department, definitions)
+    return department in projection.pending_ask_departments() or has_new_work(projection, department, definition)
 
 
 def next_department(projection: RunProjection, waiting: set[str] | None = None,
@@ -306,14 +304,7 @@ def next_department(projection: RunProjection, waiting: set[str] | None = None,
     waiting 给出在等待的部门（进程中断以后会话是新开的，投影里那条「工作中」的记录不再算数）；
     没有给出时按投影里的会话记录判断。部门清单按这份形态的定义取（工单 #1509）。
     """
-    definition = DEFINITIONS if definitions is None else definitions
-    asking = pending_ask_department(projection)
-    if asking is not None and _free(projection, waiting, asking):
-        return asking
-    for department in definition.departments:
-        if _free(projection, waiting, department) and has_new_work(projection, department, definition):
-            return department
-    return None
+    return next(iter(ready_departments(projection, waiting, definitions)), None)
 
 
 def ready_departments(projection: RunProjection, waiting: set[str] | None = None,
@@ -328,19 +319,8 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     还没回答的询问是另一类：提问方的会话要继续，在它自己的会话里跑。部门清单按这份形态的定义取（工单 #1509）。
     """
     definition = DEFINITIONS if definitions is None else definitions
-    ready: list[str] = []
-
-    def take(department: str) -> None:
-        if department not in ready:
-            ready.append(department)
-
-    asking = pending_ask_department(projection)
-    if asking is not None and _free(projection, waiting, asking):
-        take(asking)
-    for department in definition.departments:
-        if _free(projection, waiting, department) and has_new_work(projection, department, definition):
-            take(department)
-    return ready
+    ordered = dict.fromkeys((*projection.pending_ask_departments(), *definition.departments))
+    return [role for role in ordered if department_ready(projection, role, waiting, definition)]
 
 
 # ---------------------------------------------------------------------------

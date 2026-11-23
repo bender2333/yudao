@@ -35,6 +35,8 @@ from typing import Any
 from . import routing_contract, tightening_contract
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .definitions import DEFINITIONS
+from .feedback import Feedback, FeedbackPhase, ReviewSignal, Signal
+from .kernel_events import accepted
 from .models import OPEN_LOOP_STOP_REASON, Event, EventType, RunProjection, TERMINAL_STATUSES, new_id
 from .tools import in_force, offers_with_input, proposal_kind, tool_action, tools_for
 from .validation import FieldError, TightenRequest, Tightened, evaluate_conditions
@@ -61,6 +63,7 @@ STRUCTURE_KIND = "structure"
 REVIEW_KIND = "completion_review"
 RELEASE_VERDICT = "release"
 REWORK_VERDICT = "rework"
+_SIGNALS = {RELEASE_VERDICT: Signal.RELEASE, REWORK_VERDICT: Signal.REWORK}
 
 # 一份直做定义必须写明事项结束用的那一个原因：它的定义里声明的封闭清单中的一条
 ITEM_END_REASON = "no_open_work"
@@ -154,7 +157,7 @@ def fold(events: list[Event]) -> AcceptedOutcomes:
     """从运行流的事件折出直做要看的两种成果（输入：路由自己折要用的状态）。"""
     completions: list[dict[str, Any]] = []
     reviews: list[dict[str, Any]] = []
-    for event in events:
+    for event in accepted(events):
         if event.type != EventType.ARTIFACT_ACCEPTED:
             continue
         payload = dict(event.payload or {})
@@ -193,38 +196,42 @@ def verification_of_current(artifacts: AcceptedOutcomes | None = None,
                  for verifier in definition.verifiers_of(author, final))
 
 
-def _all_released(current: tuple[tuple[str, dict[str, Any] | None], ...]) -> bool:
-    return bool(current) and all(verdict is not None and verdict.get("verdict") == RELEASE_VERDICT
-                                 for _verifier, verdict in current)
+def _verification(artifacts: AcceptedOutcomes | None, definitions: Any) -> Feedback | None:
+    outcomes = NO_OUTCOMES if artifacts is None else artifacts
+    completion = outcomes.latest_completion()
+    final = _final_outcome(definitions)
+    if completion is None or final is None or completion.get("artifact_kind") != final:
+        return None
+    author, digest = completion.get("artifact_issuer"), completion.get("content_hash")
+    if not isinstance(author, str) or not isinstance(digest, str):
+        return None
+    return Feedback.for_outcome(digest, definitions.verifiers_of(author, final)).observe(
+        ReviewSignal(review["artifact_issuer"], review["completion"], _SIGNALS[review["verdict"]])
+        for review in outcomes.reviews
+        if review.get("verdict") in _SIGNALS and review.get("completion") == digest
+        and isinstance(review.get("artifact_issuer"), str)
+    )
 
 
 def awaiting_verdict(artifacts: AcceptedOutcomes | None = None,
                      definitions: Any | None = None) -> bool:
-    """交完成以后还在等结论：当前这一版还有核验角色没给结论，也没有人打回它。
-
-    有核验角色时，交完成以后事项不结束（设计说明「直做」第 3 条）：等每一个核验角色对当前这一版的结论，
-    全部放行才算放行；任何一个打回就返工，那时不再等（交完成的角色重新开工）。
-    """
-    current = verification_of_current(artifacts, definitions)
-    if not current or _all_released(current):
-        return False
-    return not rework_requested(artifacts, definitions)
+    """当前成果的反馈状态是等待核验。"""
+    feedback = _verification(artifacts, in_force(definitions))
+    return feedback is not None and feedback.phase == FeedbackPhase.VERIFYING
 
 
 def rework_requested(artifacts: AcceptedOutcomes | None = None,
                      definitions: Any | None = None) -> bool:
-    """当前这一版被打回：交完成的角色要再做一轮（交出新的一版，旧结论随之失效）。"""
-    return any(verdict is not None and verdict.get("verdict") == REWORK_VERDICT
-               for _verifier, verdict in verification_of_current(artifacts, definitions))
+    """当前成果的反馈状态是返工。"""
+    feedback = _verification(artifacts, in_force(definitions))
+    return feedback is not None and feedback.phase == FeedbackPhase.REWORK
 
 
 def waiting_verifiers(artifacts: AcceptedOutcomes | None = None,
                       definitions: Any | None = None) -> set[str]:
-    """当前这一版还没有给结论、并且现在就该给的那些核验角色：它们在等结论时开工（返工时不再开工）。"""
-    if not awaiting_verdict(artifacts, definitions):
-        return set()
-    return {verifier for verifier, verdict in verification_of_current(artifacts, definitions)
-            if verdict is None}
+    """当前成果还没有给结论的核验角色。"""
+    feedback = _verification(artifacts, in_force(definitions))
+    return set() if feedback is None else set(feedback.pending)
 
 
 # ---------------------------------------------------------------------------
@@ -281,16 +288,6 @@ def has_new_guidance(projection: RunProjection, department: str) -> bool:
                for item in projection.department_guidance)
 
 
-def pending_ask_department(projection: RunProjection) -> str | None:
-    """还没回答的询问：提问方的那一轮要继续，回答在分支里（进程中断以后接着同一次询问）。"""
-    for ask in projection.ask_stack:
-        origin = ask.get("origin_session_id")
-        for session in projection.sessions.values():
-            if session.session_id == origin:
-                return session.department
-    return None
-
-
 def _free(projection: RunProjection, waiting: set[str] | None, department: str) -> bool:
     return department in waiting if waiting is not None else is_waiting(projection, department)
 
@@ -310,27 +307,28 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     definition = in_force(definitions)
     if projection.status in TERMINAL_STATUSES:
         return []
-    asking = pending_ask_department(projection)
+    asking = set(projection.pending_ask_departments())
     completing = set(completing_departments(definition, projection.kind))
-    current = verification_of_current(artifacts, definition)
-    rework = rework_requested(artifacts, definition)
-    # 交了完成、还没有人打回：交完成的角色等着（全部放行的情形事项已经结束，也不再有谁开工）。
-    # 这期间到达的输入与指导排着队，等结论到了、或者打回以后再进入它的一轮
-    waiting_for_conclusion = bool(current) and not rework
-    verifiers_at_work = waiting_verifiers(artifacts, definition)
+    feedback = _verification(artifacts, definition)
+    # 等待结论或结论已齐时，被核验角色都不再开工；返工反馈回到交成果的角色。
+    waiting_for_conclusion = feedback is not None and feedback.phase in {
+        FeedbackPhase.VERIFYING, FeedbackPhase.RELEASED,
+    }
+    verifiers_at_work = frozenset() if feedback is None else feedback.pending
     ready: list[str] = []
     for department in definition.departments:
         if not _free(projection, waiting, department):
             continue
+        if department in asking:
+            ready.append(department)
+            continue
         if waiting_for_conclusion and department in completing:
             continue
-        if (department == asking
-                or department in completing
+        if (department in completing
                 or department in verifiers_at_work
                 or has_new_input(projection, department, definition)
                 or has_new_guidance(projection, department)):
-            if department not in ready:
-                ready.append(department)
+            ready.append(department)
     return ready
 
 
@@ -637,10 +635,11 @@ def _allowed_now(projection: RunProjection, department: str, definitions: Any | 
     kinds = proposal_kinds_for(department, projection.kind, definition)
     if artifacts is None:
         return kinds
-    if awaiting_verdict(artifacts, definition) \
+    feedback = _verification(artifacts, definition)
+    if feedback is not None and feedback.phase == FeedbackPhase.VERIFYING \
             and department in completing_departments(definition, projection.kind):
         kinds.discard(COMPLETION_KIND)
-    if REVIEW_KIND in kinds and department not in waiting_verifiers(artifacts, definition):
+    if feedback is None or department not in feedback.pending:
         kinds.discard(REVIEW_KIND)
     return kinds
 
@@ -697,11 +696,12 @@ def _review_tightened(request: TightenRequest, proposal: dict[str, Any],
     rationale = proposal.get("rationale")
     if not isinstance(rationale, str) or not rationale.strip():
         return Tightened(errors=(FieldError("rationale", "rationale must be a non-empty string"),))
-    # 每一个核验角色都放行才算放行：还有别人没有结论时这一次不结束事项，等它的结论
-    others = [outcomes.verdict(verifier, completion.get("content_hash"))
-              for verifier in definitions.verifiers_of(author, final) if verifier != department]
-    releases = verdict == RELEASE_VERDICT and all(
-        other is not None and other.get("verdict") == RELEASE_VERDICT for other in others)
+    feedback = _verification(outcomes, definitions)
+    if feedback is None or department not in feedback.pending:
+        return Tightened(reason="no completion is waiting for your conclusion")
+    releases = feedback.observe([
+        ReviewSignal(department, feedback.outcome_hash, _SIGNALS[verdict]),
+    ]).phase == FeedbackPhase.RELEASED
     return Tightened(content={
         "completion": completion.get("content_hash"),
         "completion_issuer": author,
@@ -881,7 +881,8 @@ class Direct:
         # （只按定义判断的调用如此），有核验角色的形态在组装处一定拿到读取器
         if self._facts is None or not getattr(view, "run_id", None):
             return NO_OUTCOMES
-        return fold(list(self._facts.list_events(view.run_id)))
+        return fold([event for event in self._facts.list_events(view.run_id)
+                     if event.stream_version <= view.stream_version])
 
     def check_definition(self, definitions: Any) -> None:
         check_definition(definitions)

@@ -445,13 +445,14 @@ class ProposalCondition(_Definition):
     evaluated: Identifier | None = None
     # check_receipts：列出的检查名在提案里的位置、在哪个部门取回执、回执绑定哪些当前版本、是否必须是这一轮
     names: ConditionNames | None = None
-    department: Identifier | None = None
+    # $issuer 绑定当前提案的提交角色；职能标识仍可指定固定的回执签发者。
+    department: Identifier | Literal["$issuer"] | None = None
     bind: tuple[ConditionBinding, ...] = ()
     activation: bool = False
     # no_duplicate_content：与哪一份已接纳成果的历史比较，内容由哪些提案字段组成
     collection: Identifier | None = None
     content: tuple[str, ...] = ()
-    # 不满足时的拒绝理由（check_receipts 里 {name} 换成检查名）
+    # 拒绝理由；check_receipts 中可引用检查名 {name} 与实际签发角色 {department}。
     message: str = ""
 
     @model_validator(mode="after")
@@ -1610,7 +1611,7 @@ def _condition_references(contracts: ProposalContracts, organization: Organizati
     vocabulary = outcome_kinds.vocabulary() if outcome_kinds.kinds else set()
     for kind, conditions in contracts.conditions.items():
         for index, condition in enumerate(conditions):
-            if condition.department is not None and condition.department not in members:
+            if condition.department not in (None, "$issuer") and condition.department not in members:
                 issues.append((file, f"conditions.{kind}[{index}].department",
                                f"部门 {condition.department} 不属于任何组织"))
             if not vocabulary:

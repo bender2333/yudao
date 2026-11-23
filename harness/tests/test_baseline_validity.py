@@ -22,7 +22,7 @@ from harness.artifacts import ArtifactStore
 from harness.coverage import (BASELINE_UNAVAILABLE, baseline_open_records, baseline_outcome,
                               baseline_records, coverage_report)
 from harness.environment import LocalEnvironment, Workspaces
-from harness.models import ArtifactRef, DeliverySpec, EffectiveContract, SessionRecord
+from harness.models import ArtifactRef, DeliverySpec, EffectiveContract, RunProjection, SessionRecord
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
@@ -333,8 +333,7 @@ def test_the_release_gate_is_unchanged_by_the_baseline(tmp_path):
                            product_spec_hash=spec.content_hash, delivery_spec_hash=DELIVERY,
                            activation_id="act_q", effective_contract_hash=CONTRACT)
     # 基线也通过的一份回执（异常情形）：放行记录里写明，不被拒绝
-    baseline_receipt = CheckReceipt(name="smoke", department="quality", exit_code=0, summary="ran",
-                                    snapshot_hash=TREE, activation_id="act_q", baseline=True)
+    baseline_receipt = replace(receipt, baseline=True)
     projection = replace(_working(base, "quality"), effective_contract=contract, delivery_spec=delivery,
                          last_activations={"quality": "act_q"})
     facts = _facts(receipt, baseline_receipt, digest=TREE)
@@ -420,11 +419,7 @@ def test_baseline_uses_workspaces_wiring_and_prefers_valid_department_check(tmp_
                  "command": f'"{PYTHON}" -c "print(\'FROM_DELIVERY_SPEC\')"'}],
         known_risks=[], code_tree_digest=sealed.digest, tree_ref=sealed_ref,
     )
-    projection = SimpleNamespace(
-        run_id="run_1", parameters=None, sessions={}, branch_sessions=set(),
-        delivery_spec=delivery, baseline={"tree_ref": asdict(start_ref)}, snapshot=None,
-        qa_tests_archive_ref=None,
-    )
+    projection = RunProjection(run_id="run_1", delivery_spec=delivery, baseline={"tree_ref": asdict(start_ref)})
     workspaces = Workspaces(tmp_path / "ws", view=lambda _rid: projection, writes=None, artifacts=artifacts)
     environment = workspaces.new_inspection("run_1", "quality", session_id="ses_q")
 

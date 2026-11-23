@@ -944,14 +944,14 @@ class StepDriver:
             return None
         tree = self._environment.capture_qa_tests()
         digest = qa_tests_digest(tree)
-        projection = self._writes.read(self._stream).projection
-        if digest == projection.qa_tests_hash:
-            return None
-        if digest is None and projection.qa_tests_version == 0:
+        snapshot = self._writes.read(self._stream)
+        latest = snapshot.projection.check_materials(request.department, snapshot.events)
+        current_hash = None if latest is None else latest.content_hash
+        if digest == current_hash:
             return None
         ref = store_tree(self._artifacts, self._scope.run_id, tree)
         return {
-            "version": projection.qa_tests_version + 1,
+            "version": snapshot.projection.qa_tests_version + 1,
             "content_hash": digest,
             "archive_ref": asdict(ref),
             "activation_id": request.activation_id,

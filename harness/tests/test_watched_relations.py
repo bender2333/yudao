@@ -5,14 +5,27 @@
 """
 import json
 import shutil
+import sys
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 from harness import watched_outputs
-from harness.watched_outputs import has_new_work
-from harness.definitions import DEFINITIONS_DIR, load_definitions
-from harness.models import (
-    ArtifactRef, DeliverySpec, EffectiveContract, ProductSpec, QAReview, RunProjection, SessionRecord,
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.app.application import Application
+from harness.app.home import AwayReportRequest
+from harness.app.project_queries import ProjectFlow, ProjectOverview
+from harness.definitions import (
+    DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, Definitions, definitions_from_contents, load_definitions,
 )
+from harness.models import (
+    ArtifactRef, DeliverySpec, EffectiveContract, EventType, ProductSpec, QAReview, RunProjection, SessionRecord,
+)
+from harness.path_rules import QA_TESTS_DIR
+from harness.proposals import default_criteria, delivery_turn, judgement_turn, product_spec, review_turn
+from harness.runtime import LoopSystem
+from harness.tightening import WATCHED_OUTPUTS
+from harness.watched_outputs import has_new_work
 
 
 def _work(department: str) -> RunProjection:
@@ -76,3 +89,166 @@ def test_removing_the_watch_in_the_definition_stops_the_rework(tmp_path, monkeyp
     # 只少了这一条关注关系：其它部门的关注关系照旧
     assert definitions.watched_outputs("engineering") == ("product_spec", "guidance")
     assert definitions.watched_outputs("quality") == ("delivery", "guidance", "structure", "product_spec")
+
+
+INSPECTOR = "inspection"
+
+
+def with_second_delivery_verifier() -> Definitions:
+    contents = deepcopy(DEFINITIONS.contents)
+    organization = contents["organization.json"]
+    quality = next(role for role in organization["departments"] if role["id"] == "quality")
+    organization["departments"].append({**quality, "id": INSPECTOR, "roles": [INSPECTOR], "label": "复核"})
+    verification = organization["verification"]
+    verification["verifiers"].append({**verification["verifiers"][0], "role": INSPECTOR})
+    verification["write_scopes"][INSPECTOR] = verification["write_scopes"]["quality"]
+    contents["roles.json"][INSPECTOR] = contents["roles.json"]["quality"]
+    contracts = contents["proposal_contracts.json"]["roles"]
+    contracts[INSPECTOR] = contracts["quality"]
+    for work in contents["work_items.json"]["kinds"].values():
+        if "quality" in work.get("departments", {}):
+            work["departments"][INSPECTOR] = work["departments"]["quality"]
+    contents["routings.json"]["routings"][0]["departments"].append(INSPECTOR)
+    return definitions_from_contents(contents)
+
+
+def test_a_release_only_consumes_the_watch_of_the_verifier_who_submitted_it():
+    # R3：两个核验角色独立关注同一交付；一份结论不能消耗另一条关注关系。
+    definition = with_second_delivery_verifier()
+    projection = _with_defect_record()
+    projection.department_bases = dict.fromkeys(("quality", INSPECTOR), projection.effective_contract.content_hash)
+    projection.sessions.clear()
+    projection.reviews[0] = replace(projection.reviews[0], verdict="release")
+
+    assert not has_new_work(projection, "quality", definition)
+    assert has_new_work(projection, INSPECTOR, definition)
+
+    projection.reviews.append(replace(projection.reviews[0], issuer=INSPECTOR, verdict="rework_engineering"))
+    assert has_new_work(projection, "engineering", definition)
+    assert not has_new_work(projection, INSPECTOR, definition)
+
+
+def test_the_complete_feedback_path_rechecks_each_revision_before_reporting_release(tmp_path):
+    # R3：两位核验者各用主机运行的真实断言；初版部分通过后打回，新版必须重新获得两份结论。
+    executable = sys.executable.replace("\\", "/")
+    program = "import runpy; message = runpy.run_path('message.py')['MESSAGE']"
+    smoke = {"prints": {"command": f'"{executable}" -c "{program}; assert message"'}}
+    uppercase = {"uppercase": {"command": f'"{executable}" -c "{program}; assert message == \'HELLO\'"'}}
+    failed = default_criteria(1, list(uppercase), result="failed")
+
+    def first_independent_judgement(call):
+        delivery = json.loads(prompt_part(call, "current_delivery_spec"))
+        assert "summary" not in delivery and "known_risks" not in delivery
+        return judgement_turn(checks=uppercase, criteria=failed)(call)
+
+    script = {
+        "product": [product_spec(requirements=["The message is HELLO"], acceptance=["message.py exposes HELLO"])],
+        "engineering": [
+            delivery_turn("第一版", files={"message.py": "MESSAGE = 'hello'\n"}, checks=smoke),
+            delivery_turn("第二版", files={"message.py": "MESSAGE = 'HELLO'\n"}, checks=uppercase),
+        ],
+        "quality": [judgement_turn(checks=smoke), review_turn("release", "非空", checks=smoke),
+                    judgement_turn(checks=uppercase), review_turn("release", "大写正确", checks=uppercase)],
+        INSPECTOR: [
+            first_independent_judgement,
+            review_turn("rework_engineering", "消息不符合大写要求", checks=uppercase, criteria=failed,
+                        defects=[{"severity": "major", "summary": "message.py 必须提供 HELLO"}]),
+            judgement_turn(checks=uppercase), review_turn("release", "正确", checks=uppercase),
+        ],
+    }
+    definitions = with_second_delivery_verifier()
+    system = LoopSystem.for_testing(tmp_path / "feedback", FakeAdapter(script), resume_on_startup=False,
+                                    forms={DEFAULT_FORM: (definitions, WATCHED_OUTPUTS)})
+    try:
+        application = Application(system)
+        project_id = system.projects.register("核验反馈", "从命令行检查输出")
+        item_id, run_id = system.projects.start_work_item(project_id, "消息必须写成 HELLO")
+
+        def events(kind):
+            return [event for event in system.store.list_events(run_id) if event.type == kind]
+
+        def progress():
+            query = ProjectOverview(project_id=project_id, work_item=item_id)
+            return application.query("project.overview", query).data.work_items[0].progress
+
+        def flow():
+            return application.query("project.flow", ProjectFlow(project_id=project_id, work_item=item_id)).data.records
+
+        system.activate_once(run_id)  # 产品合同
+        system.activate_once(run_id)  # 交付
+        system.activate_once(run_id)  # 质检独立判断
+        partial = system.activate_once(run_id)  # 质检结论
+        assert partial.status == "running" and partial.last_review.issuer == "quality"
+        assert not events(EventType.RUN_DONE)
+        assert progress().conclusion is None
+        assert not any(row.kind == "放行" for row in flow())
+        assert any(row.kind == "核验通过" for row in flow())
+        report = application.query("home.away_report", AwayReportRequest(range="24h")).data
+        assert "released" not in {item.id for item in report.summary}
+        assert all(fact.kind != "release" for fact in report.facts)
+
+        result = system.run_until_stop(run_id)
+        assert (result.status, result.stop_reason) == ("done", "released"), result.error
+        [first, second] = result.delivery_specs
+        reviews = events(EventType.QA_SUBMITTED)
+        assert [(event.payload["delivery_spec_hash"], event.department, event.payload["verdict"])
+                for event in reviews[:2]] == [(first.content_hash, "quality", "release"),
+                                               (first.content_hash, INSPECTOR, "rework_engineering")]
+        assert len(reviews) == 4 and {event.department for event in reviews[2:]} == {"quality", INSPECTOR}
+        assert reviews[1].payload["checks"][0]["exit_code"] != 0
+        assert all(event.payload["checks"][0]["exit_code"] == 0 for event in reviews[2:])
+        assert all(event.payload["delivery_spec_hash"] == second.content_hash
+                   and event.payload["verdict"] == "release" for event in reviews[2:])
+        assert events(EventType.RUN_DONE)[0].position > max(event.position for event in reviews)
+        judgements = {event.event_id: event for event in events(EventType.INDEPENDENT_JUDGEMENT_COMMITTED)}
+        assert len(judgements) == 4
+        assert all(judgements[event.payload["judgement_event"]].department == event.department for event in reviews)
+        for event in reviews:
+            [check] = event.payload["checks"]
+            [observed] = [tool for tool in events(EventType.TOOL_CALLED) if tool.department == event.department
+                          and tool.payload.get("activation_id") == check["activation_id"]
+                          and tool.payload.get("name") == "run_check"]
+            assert observed.payload["output_ref"] in event.payload["evidence_refs"]
+        assert result.canonical_state() == system.replay(run_id).canonical_state()
+        assert progress().conclusion == "release"
+        [released] = [row for row in flow() if row.kind == "放行"]
+        assert released.event_id == reviews[-1].event_id
+    finally:
+        system.close()
+
+
+def test_a_second_verifier_starts_with_its_own_check_materials(tmp_path):
+    # R3：核验者的副本只装配它自己的检查材料，未保存本职能材料时不装配他人的脚本。
+    path = f"{QA_TESTS_DIR}/probe.py"
+    executable = sys.executable.replace("\\", "/")
+    smoke = {"probe": {"command": f'"{executable}" {path}'}}
+    first_material = "from pathlib import Path\nassert Path('src/echo.py').is_file()\n"
+    no_other_materials = {"isolation": {"command": (
+        f'"{executable}" -c "from pathlib import Path; assert not Path(\'{path}\').exists()"')}}
+
+    def first_check(call):
+        turn = judgement_turn(checks=smoke)(call)
+        return FakeTurn(proposal=turn.proposal, checks=turn.checks, writes={path: first_material})
+
+    script = {"product": [product_spec()], "engineering": [delivery_turn()],
+              "quality": [first_check, review_turn("release", "检查通过", checks=smoke)],
+              INSPECTOR: [judgement_turn(checks=no_other_materials),
+                          review_turn("release", "没有借用其他角色的检查材料", checks=no_other_materials)]}
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script), resume_on_startup=False,
+                                    forms={DEFAULT_FORM: (with_second_delivery_verifier(), WATCHED_OUTPUTS)})
+    try:
+        run_id = system.create_run("echo")
+        system.activate_once(run_id)  # 合同
+        system.activate_once(run_id)  # 交付
+        system.activate_once(run_id)  # 第一位核验者保存自己的脚本
+        system.activate_once(run_id)  # 第一位核验者完成核验
+        result = system.run_until_stop(run_id)
+        assert (result.status, result.stop_reason) == ("done", "released"), result.error
+        [isolation] = [review for review in result.reviews if review.issuer == INSPECTOR]
+        assert all(check["exit_code"] == 0 for check in isolation.checks)
+        replayed = system.replay(run_id)
+        assert result.check_materials_index == replayed.check_materials_index
+        assert replayed.check_materials_index and set(replayed.check_materials_index) == {"quality"}
+        assert result.canonical_state() == replayed.canonical_state()
+    finally:
+        system.close()

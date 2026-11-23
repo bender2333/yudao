@@ -14,5 +14,6 @@
 | [文档一致性核对：概念模型与符号推理方案](doc-consistency-concept-model.md) | [决策记录](../decision.md)「文档一致性」四条 | 方向已定，索引与确定性规则已建在 `tools/doc-consistency/`，不开工单；只服务 Yudao 开发，分设计与脚手架两条线；文件图谱、关系与 hash 放在 `.doc-index/`，判断走样靠 clingo 规则；LLM 开放提取的试验没有通过（第 13 节），定向提取待验证 |
 | [文档一致性：规则事实线方案](doc-consistency-rule-facts.md) | [决策记录](../decision.md)「文档一致性：规则事实单独成线」 | 给 LLM 读的规则文件单独成线，先做：规则类事实只在正本表格写一行，别处引用或用固定句式复述，clingo 比对，写文件时钩子提醒；工具没有改，第 1 至 4 步不改文档，用植入的矛盾验收 |
 | [Uncle Bob 的 ub-mode 调研](uncle-bob-ub-mode.md) | [总体路线图](../program-roadmap.md)第 3 节「内核的代码质量门槛」、[可信内核设计说明](../design/trusted-kernel.md) | ub-mode 的做法与参数速查、它调用的 crapper、dryer、mutator 三个工具的阈值与用法、他本人关于不读代码的公开说法，以及与内核质量门槛的逐项对照（只写事实） |
+| [范畴论控制论：Yudao 的开放角色与反馈环](categorical-cybernetics-control.md) | [成果驱动循环](../design/department-loop.md)、[独立核验](../design/independent-verification.md) | 以开放角色、接口组合与反馈闭合指导分片重构；不把组合律误作活性或语义完整性证明 |
 
 已归档的调研见 `docs/archive/research/`，索引是 [README-2026-09-06.md](../archive/research/README-2026-09-06.md)。

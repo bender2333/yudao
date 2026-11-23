@@ -10,11 +10,13 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import pytest
 
 from harness import validation
 from harness.actions import CheckReceipt, TreeFacts
-from harness.definitions import DEFINITIONS, ConditionBinding, Definitions, ProposalCondition, Tool
+from harness.definitions import DEFINITIONS, ConditionBinding, Definitions, ProposalCondition, Tool, definitions_from_contents
 from harness.kernel_events import canonical_hash
 from harness.minimal_projection import AcceptedArtifact, MinimalProjection
 from harness.models import RunProjection, SessionRecord
@@ -142,3 +144,26 @@ def test_the_same_proposal_is_refused_by_a_definition_without_the_kind() -> None
     decision = validation.evaluate_proposal(view, department="engineering", proposal=_proposal(), facts=_FACTS,
                                             tightening=WATCHED_OUTPUTS, events=[])
     assert [error.message for error in decision.errors] == [f"unknown proposal kind: '{NEW_KIND}'"]
+
+
+def test_an_issuer_bound_check_accepts_only_the_submitters_current_receipt() -> None:
+    # R1、R2：签发回执的角色与激活身份都必须匹配；同名回执不能跨角色、跨轮借用。
+    contents = deepcopy(DEFINITIONS.contents)
+    contents["proposal_contracts.json"]["conditions"]["delivery_spec"][1]["department"] = "$issuer"
+    definitions = definitions_from_contents(contents)
+    facts = TreeFacts(digest=TREE, files=(), checks=tuple(
+        CheckReceipt(name="smoke", department=role, exit_code=0, summary="ran", snapshot_hash=TREE,
+                     bindings={"product_spec": SPEC_HASH}, activation_id=activation)
+        for role, activation in (("engineering", "act_e"), ("quality", "act_q"))))
+
+    def receipts(role, rounds):
+        state = MinimalProjection(artifacts=_minimal().artifacts, rounds=rounds)
+        return validation.evaluate_conditions(
+            "delivery_spec", department=role, proposal={"basis_product_spec_hash": SPEC_HASH, "check_names": ["smoke"]},
+            minimal=state, facts=facts, definitions=definitions)
+
+    rounds = {"engineering": "act_e", "quality": "act_q"}
+    assert receipts("quality", rounds).receipts["smoke"]["activation_id"] == "act_q"
+    assert receipts("engineering", rounds).receipts["smoke"]["activation_id"] == "act_e"
+    for wrong in ({"engineering": "act_e"}, {**rounds, "quality": "act_e"}):
+        assert [error.field for error in receipts("quality", wrong).errors] == ["check_names"]

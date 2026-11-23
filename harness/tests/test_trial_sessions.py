@@ -37,7 +37,7 @@ from harness.artifacts import ArtifactStore
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment, Workspaces, inspection_root
 from harness.launch_rules import current_system, resolve_trial_launch
-from harness.models import EventType
+from harness.models import DeliverySpec, EventType, RunProjection
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
@@ -443,12 +443,15 @@ def test_a_retained_inspection_workspace_still_takes_the_trial_copy_from_the_del
     delivered = capture_public_tree(FIXTURE)
     tree_ref = store_tree(artifacts, "run-1", delivered)
     launch = _launch()
-    delivery = SimpleNamespace(tree_ref=tree_ref, content_hash="sha256:" + "1" * 64, launch=[launch])
+    delivery = DeliverySpec(
+        id="del_1", run_id="run-1", revision=1, parent_hash=None, content_hash="sha256:" + "1" * 64,
+        issuer="engineering", status="active", created_event_id="del_evt", product_spec_hash="sha256:spec",
+        effective_contract_hash="sha256:contract", summary="sealed", files=["index.html"],
+        check_names=[], checks=[], known_risks=[], code_tree_digest=delivered.digest, tree_ref=tree_ref, launch=[launch],
+    )
 
-    def view(run_id: str) -> Any:
-        return SimpleNamespace(run_id=run_id, delivery_spec=delivery, baseline=None, snapshot=None,
-                               branch_sessions=set(), sessions={}, parameters=None,
-                               qa_tests_archive_ref=None)
+    def view(run_id: str) -> RunProjection:
+        return RunProjection(run_id=run_id, delivery_spec=delivery)
 
     workspaces = Workspaces(tmp_path / "runs", view=view, writes=_UsedSession("ses_1"),
                             artifacts=artifacts, definitions=DEFINITIONS)

@@ -59,12 +59,12 @@ REWORK_VERDICTS = frozenset({"rework_engineering"})
 
 # 关键事实的种类（时间轴刻度与离开期间的报告使用）：刻度按种类着色。
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，事件种类登记以后在这里补上
-FACT_KINDS: dict[str, str] = {
+FACT_KINDS: dict[str, str | None] = {
     EventType.ASK_STARTED: "ask",
     EventType.ASK_ANSWERED: "answer",
     EventType.RUN_DONE: "release",
-    EventType.RUN_PAUSED: "release",
-    EventType.RUN_FAILED: "release",
+    EventType.RUN_PAUSED: "wait",
+    EventType.RUN_FAILED: None,
     ProjectEventType.DELIVERABLE_ADOPTED: "adopt",
     EventType.DECISION_REQUESTED: "decision",
     EventType.DECISION_ANSWERED: "decision",
@@ -72,10 +72,10 @@ FACT_KINDS: dict[str, str] = {
 }
 
 def _fact_kind(event: Event | ProjectEvent) -> str | None:
-    # 一条关键事实的种类：质检按结论分为放行与返工，其余按事件种类查表；不是关键事实时返回 None。
+    # 个别核验结论只标记返工；事项放行从结束事件读取。
     # 以开环完成结束的事项不算放行（工单 #1394）：结束原因写在事件上，这里按它分类
     if event.type == EventType.QA_SUBMITTED:
-        return "rework" if event.payload.get("verdict") in REWORK_VERDICTS else "release"
+        return "rework" if event.payload.get("verdict") in REWORK_VERDICTS else None
     if event.type == EventType.RUN_DONE and event.stop_reason == OPEN_LOOP_STOP_REASON:
         return "open_loop"
     return FACT_KINDS.get(event.type)
@@ -192,8 +192,7 @@ def _summary(application: Application, events: list[Event | ProjectEvent],
              from_position: int, to_position: int) -> list[ReportItem]:
     # 汇总各项：由范围内的事件汇总得到，没有来源事件的项不显示（不写成零）。
     # 完成与放行、用量来自现有事件；故障、修复、部署与回滚、等待模型服务、磁盘与报到属于 Stage 4
-    # 「完成与放行的事项」只数成果被采纳（deliverable_adopted）或被质检放行的事项：
-    # 跑完一轮（run_done）不算——被用户放弃的建档也是跑完过的，但它的成果没有采纳（工单 #707）
+    # 「完成与放行的事项」只数成果被采纳、或以 released 结束的事项，不数个别核验结论。
     items: list[ReportItem] = []
     # 开环完成的事项（工单 #1394）：以开环完成结束的事项不进「完成与放行」，另起一项。结束原因写在
     # run_done 事件上（记录上写明是开环完成还是放行），报告读这条记录，不重新判断
@@ -202,7 +201,7 @@ def _summary(application: Application, events: list[Event | ProjectEvent],
     open_loop_items = {event.work_item_id for event in open_loop_events if event.work_item_id is not None}
     released_events = [
         event for event in events
-        if (event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release")
+        if (event.type == EventType.RUN_DONE and event.stop_reason == "released")
         or event.type == ProjectEventType.DELIVERABLE_ADOPTED
     ]
     # 开环完成的事项连同它的放行记录与采纳一起移出「完成与放行」：它的成果没有经过独立核验
@@ -316,9 +315,14 @@ def _convergence_rows(store: Any, run_id: str, from_position: int,
 
 def _open_release_item(application: Application, events: list[Event | ProjectEvent]) -> ReportItem | None:
     # 带开环条件的放行：放行记录里有开环条件的那几次，明细写事项标题与条件编号
-    releases = [event for event in events
-                if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release"
-                and event.payload.get("open_criteria")]
+    released = {(event.run_id, event.parent_event_id, event.department) for event in events
+                if event.type == EventType.RUN_DONE and event.stop_reason == "released"}
+    reviews = [event for event in events if event.type == EventType.QA_SUBMITTED
+               and event.payload.get("verdict") == "release"]
+    released_deliveries = {(event.run_id, event.payload.get("delivery_spec_hash")) for event in reviews
+                           if (event.run_id, event.parent_event_id, event.department) in released}
+    releases = [event for event in reviews if event.payload.get("open_criteria")
+                and (event.run_id, event.payload.get("delivery_spec_hash")) in released_deliveries]
     if not releases:
         return None
     entries = [
