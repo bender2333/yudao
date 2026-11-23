@@ -10,11 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from harness.watched_outputs import has_new_work
-from harness.adapters.fake import FakeAdapter
-from harness.models import EventType
-from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
+from harness.adapters.fake import FakeAdapter, prompt_part
+from harness.models import ArtifactRef, EventType
+from harness.proposals import default_criteria, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
+from harness.tests.helpers import python_snippet
 
 QUESTION_FACTS = "接口：echo <文本>，输出大写；文件：src/echo.py"
 QUESTION_EXPLANATION = "这样实现是因为历史用例要求大写输出"
@@ -55,8 +56,6 @@ def _text(call: Any) -> str:
 
 def _pinned(call: Any, source: str) -> Any:
     # 请求里钉住的那一段材料（装配在历史以前，同名段第一次出现的是钉住的这份）
-    from harness.adapters.fake import prompt_part
-
     text = prompt_part(call, source)
     return None if text is None else json.loads(text)
 
@@ -176,3 +175,91 @@ def test_the_quality_sees_only_facts_before_its_own_conclusion(tmp_path: Path):
     assert len(reviews) == 2
 
 
+def test_disclosed_ordering_limit_is_checked_before_release(tmp_path: Path):
+    # R3：简单样本不区分两种实现。解释揭示限制后，质检用冲突输入补证，按回执打回，修正后核验新交付。
+    goal = "置顶项排在普通项之前，同类按最近更新时间从新到旧。"
+    risk = "首版只比较时间；较早的置顶项可能排到较新的普通项后面。"
+    path = "src/order.py"
+    common = {"aligned": {"command": python_snippet(
+        "from src.order import first; assert first([('A', 1, False), ('B', 2, True)]) == 'B'"
+    )}}
+    conflict = {"conflict": {"command": python_snippet(
+        "from src.order import first; actual = first([('A', 1, True), ('B', 2, False)]); "
+        "assert actual == 'A', f'AC1: expected A first, got {actual}'"
+    )}}
+    unchecked = default_criteria(1, [], method="open", result="unverified")
+    failed = default_criteria(1, ["conflict"], result="failed")
+    failed[0]["change_reason"] = "独立补查发现较早的置顶项没有排在首位。"
+    adapter = FakeAdapter({
+        "product": [product_spec(goal, requirements=[goal], acceptance=[
+            "输入较早的置顶项 A 和较新的普通项 B，首项为 A。",
+        ])],
+        "engineering": [
+            delivery_turn("按时间排序", files={path: "def first(rows):\n    return max(rows, key=lambda row: row[1])[0]\n"},
+                          checks=common, known_risks=[risk]),
+            delivery_turn("先比较置顶，再比较时间", files={path:
+                          "def first(rows):\n    return max(rows, key=lambda row: (row[2], row[1]))[0]\n"},
+                          checks=common),
+        ],
+        "quality": [
+            judgement_turn(checks=common, criteria=unchecked),
+            review_turn("rework_engineering", "冲突样本不符合 AC1", checks=conflict, criteria=failed,
+                        defects=[{"severity": "major", "summary": "较新的普通项错误地排在置顶项前"}]),
+            judgement_turn(checks=conflict),
+            review_turn("release", "修正后的交付通过冲突检查", checks=conflict),
+        ],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run(goal)
+    # 单步驱动，避免预测性探索和工程交付争用同一个阶段。
+    system.activate_once(run_id)   # 产品定合同
+    system.activate_once(run_id)   # 工程首交
+    system.activate_once(run_id)   # 质检仅据事实判断
+    system.activate_once(run_id)   # 看到限制，补查并打回
+    system.activate_once(run_id)   # 工程返工交付
+    system.activate_once(run_id)   # 新交付独立判断
+    result = system.activate_once(run_id)   # 按当前回执放行
+    assert result.stop_reason == "released", result.error
+
+    events = system.store.list_events(run_id)
+    deliveries = [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
+    judgements = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
+    rework, release = reviews = [event for event in events if event.type == EventType.QA_SUBMITTED]
+    assert [event.payload["verdict"] for event in reviews] == ["rework_engineering", "release"]
+    assert rework.position < deliveries[1].position
+    assert deliveries[0].payload["code_tree_digest"] != deliveries[1].payload["code_tree_digest"]
+    first_delivery_hash = deliveries[0].payload["content_hash"]
+    first_contexts = [context for call in _quality_calls(adapter)
+                      if (context := _pinned(call, "current_delivery_spec"))
+                      and context["content_hash"] == first_delivery_hash]
+    assert "known_risks" not in first_contexts[0]
+    assert first_contexts[-1]["known_risks"] == [risk]
+    assert judgements[0].payload["criteria"][0]["result"] == "unverified"
+    for delivery, judgement, review, (expected_result, expected_exit) in zip(
+        deliveries, judgements, reviews, [("failed", 1), ("passed", 0)], strict=True,
+    ):
+        [aligned_receipt] = delivery.payload["checks"]
+        assert aligned_receipt["name"] == "aligned"
+        assert aligned_receipt["exit_code"] == 0  # 两种实现都通过简单样本
+        assert delivery.position < judgement.position < review.position
+        assert review.payload["judgement_event"] == judgement.event_id
+        [criterion] = review.payload["criteria"]
+        assert (criterion["criterion"], criterion["method"], criterion["result"], criterion["checks"]) == (
+            "AC1", "check", expected_result, ["conflict"],
+        )
+        [receipt] = [row for row in review.payload["checks"] if row["name"] == "conflict"]
+        assert receipt["exit_code"] == expected_exit
+        assert receipt["command"] == conflict["conflict"]["command"]
+        assert receipt["snapshot_hash"] == delivery.payload["code_tree_digest"]
+        assert receipt["delivery_spec_hash"] == delivery.payload["content_hash"]
+        assert receipt["effective_contract_hash"] == delivery.payload["effective_contract_hash"]
+
+        [check_event] = [event for event in events
+                         if judgement.position < event.position < review.position
+                         and event.department == "quality" and event.type == EventType.TOOL_CALLED
+                         and event.payload["name"] == "run_check" and event.payload["args"]["name"] == "conflict"]
+        executed = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**check_event.payload["output_ref"])))
+        assert executed["executor"] == "host"
+        assert {key: executed[key] for key in receipt} == receipt
+        if review is rework:
+            assert "AssertionError: AC1: expected A first, got B" in executed["summary"]

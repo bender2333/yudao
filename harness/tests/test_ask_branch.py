@@ -13,8 +13,7 @@ from harness.tightening import WATCHED_OUTPUTS
 
 
 def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
-    # 工单 #555：质检的结论只有缺陷记录与放行，要求有问题时质检询问产品，
-    # 产品在回答里修订 PRD；质检对旧交付的放行被拒绝（交付依据的 PRD 版本过期，#471）
+    # 工单 #555：质检发现验收漏项后询问产品，产品修订 PRD；旧交付不能沿用到新版合同（#471）
     adapter = FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn()],

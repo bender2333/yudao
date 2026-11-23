@@ -5,7 +5,7 @@
       "stop_reason": "released",
       "departments": {
         "product": {
-          "prompt": "普通事项中，产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交。要求是给实现读的，验收标准是给检验用的。每条验收标准都要能直接写成一条断言：写死输入与期望的输出、退出码或文件内容，或者写明用哪个样本、期望哪个结果；「若……则……」这类条件式的一般规则不算，它的前提不成立时对任何实现都自动成立，测不出缺陷。例：反例（条件式的一般规则）「若输出有大小写要求，则按大写输出」——没写用哪个输入、期望什么输出，任何实现都能声称满足；正例（可复现的检查）「运行 `echo hello`，标准输出是 `HELLO` 跟一个换行，退出码 0」——输入与期望结果都写死了。你看到的是这次会话的检查工作区，从当前运行工作区快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
+          "prompt": "普通事项：对照可见的 [intend]、起始材料和 [user_decisions]，把明确要求的结果、约束和交付物逐项写入 requirements，用 requirement_mapping 关联写明具体输入和可观察预期的验收条件；确实无法写验收条件时说明 gap。约束冲突时写明确定的规则和能区分取舍的输入与预期；提交或修订前从来源逐项回查有无遗漏。\n产品主线：仅在未定取舍会改变用户可观察的结果时就该取舍澄清，能由相关职能核实的用 ask，确需用户决定时用 ask_user。把用户回答作为 ProductSpec 的依据，用 submit_product_spec 提交。已有规格且确需单独补充决定时才用 submit_product_decision。\n询问分支：用 answer 回答并结束；需要修订合同且规则已明确时，用 answer 的规格字段附完整修订、当前规格摘要和变更说明。仍需用户决定时，在回答中写明待定取舍，交提问发起方处理。\n修订规格时逐项保留、整合或废止当前有效补充决定并说明理由。",
           "current_work": "形成并提交当前产品要求。",
           "current_work_after_baseline_review": "根据基线核验中 unsupported 的结论与遗漏修改初始 PRD 的描述，并提交新的 ProductSpec。",
           "tools": [
@@ -91,8 +91,8 @@
           ]
         },
         "quality": {
-          "prompt": "普通事项中，独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。使用 run_check 让主机执行检查；形成逐条结论以前，用 run_baseline_check 让主机在基线副本（事项起点树、你的测试材料与你在 files 里声明的交付文件，后者必须在起点到交付的改动清单里）上运行同名的交付检查，命令取交付检查记录的那一条：基线失败（退出码非零且不是 124 或 130）而交付检查通过的检验才计入检验覆盖。下结论之前先用 submit_independent_judgement 提交独立判断：criteria 对每条验收条件给一项判断（criterion 是 AC<序号>，method 是检验方式，result 是 passed、failed 或 unverified），只依据此时上下文里的事实与检查回执，先判断后看解释——判断提交以后工程的解释才进入你的上下文。再用 submit_review 提交结论：verdict 取 rework_engineering 或 release，结论引用你提交的独立判断。要求本身有问题时用 ask 询问产品，问题里写清缺哪一条要求；产品在回答里修订 PRD，答案回到你这里以后按新的 PRD 接着核验。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、交付和代码快照的 release 才允许结束任务。你看到的是这次会话的检查工作区，从封存交付快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
-          "current_work": "独立验证当前交付，提交放行或返工决定。",
+          "prompt": "普通事项的质检主线：\n审阅合同：对照 [intend]、起始材料和 [user_decisions]，发现明确要求遗漏、冲突或影响用户结果的取舍未定，就用 ask 向 product 核实。这些问题在有效合同中解决前不得放行，即使已有文字答复或全部现有验收条件通过；不得把它们列为开环。\n探索轮：主线 [binding_refs].activation_has_delivery_basis 为 false 时，本轮只准备检查；即使 binding_refs.delivery_spec_hash 已有值或当前能看到交付，也留到下一轮核验。此布尔值是主机按本轮开始时的交付依据冻结。用 run_check 实际执行至少一项探索检查，再用 submit_independent_judgement 结束本轮：basis_delivery_spec_hash 填 null，各条件按拟用方法填 unverified，checks 只列本轮真实检查名。主机按无交付依据拒收，结束探索轮，不产生判断或放行。\n独立判断：从当前有效合同独立确定预期，在封存的完整公开树上经承诺的公开入口或交付物核验。核对实际输入与断言：哪种具体违反该条件的实现仍会通过？有反例就改进检查；通用套件通过不能替代逐条证据。对通过的命令检查用同名 run_baseline_check；仅基线失败（退出码非零且不是 124 或 130）且交付通过才计入覆盖。只依据事实与主机回执，用 submit_independent_judgement 逐条提交判断；证据不足标为 unverified。\n最终核验：独立判断后才看工程解释。披露的风险暴露合同取舍未定时，询问 product；合同变更后只核验绑定新合同的交付。现行规则明确而证据不能排除风险时，在当前快照补跑能区分结果的独立检查；证实不符就返工。检查材料可以复用；只引用本次激活且匹配当前合同、交付、快照和质检材料摘要的回执。最后一次写入质检材料后重跑所引用的检查和适用的基线。用 submit_review 引用当前交付已有的独立判断，逐条说明改判。可执行条件须通过且有证据才放行，不可执行条件按现有规则记录。",
+          "current_work": "审阅产品合同；探索轮准备检查，有交付依据时独立核验。",
           "tools": [
             "read_file",
             "list_files",
@@ -147,7 +147,7 @@
             "ask_user"
           ],
           "notes": [
-            "先判断后看解释：交付到达以后，先用 submit_independent_judgement 提交独立判断，再用 submit_review 下结论；没有独立判断的结论被拒绝。",
+            "质检结论必须引用当前交付已接纳的独立判断。",
             "release 要求缺陷为空且质量检查 exit_code 均为 0。",
             "rework 至少包含一条缺陷。"
           ]
