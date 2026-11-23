@@ -6,7 +6,6 @@
 import json
 import shutil
 import sys
-from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 
@@ -16,7 +15,7 @@ from harness.app.application import Application
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import ProjectFlow, ProjectOverview
 from harness.definitions import (
-    DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, Definitions, definitions_from_contents, load_definitions,
+    DEFAULT_FORM, DEFINITIONS_DIR, load_definitions,
 )
 from harness.models import (
     ArtifactRef, DeliverySpec, EffectiveContract, EventType, ProductSpec, QAReview, RunProjection, SessionRecord,
@@ -24,6 +23,7 @@ from harness.models import (
 from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import default_criteria, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
+from harness.tests.verification_definitions import INSPECTOR, with_second_delivery_verifier
 from harness.tightening import WATCHED_OUTPUTS
 from harness.watched_outputs import has_new_work
 
@@ -89,27 +89,6 @@ def test_removing_the_watch_in_the_definition_stops_the_rework(tmp_path, monkeyp
     # 只少了这一条关注关系：其它部门的关注关系照旧
     assert definitions.watched_outputs("engineering") == ("product_spec", "guidance")
     assert definitions.watched_outputs("quality") == ("delivery", "guidance", "structure", "product_spec")
-
-
-INSPECTOR = "inspection"
-
-
-def with_second_delivery_verifier() -> Definitions:
-    contents = deepcopy(DEFINITIONS.contents)
-    organization = contents["organization.json"]
-    quality = next(role for role in organization["departments"] if role["id"] == "quality")
-    organization["departments"].append({**quality, "id": INSPECTOR, "roles": [INSPECTOR], "label": "复核"})
-    verification = organization["verification"]
-    verification["verifiers"].append({**verification["verifiers"][0], "role": INSPECTOR})
-    verification["write_scopes"][INSPECTOR] = verification["write_scopes"]["quality"]
-    contents["roles.json"][INSPECTOR] = contents["roles.json"]["quality"]
-    contracts = contents["proposal_contracts.json"]["roles"]
-    contracts[INSPECTOR] = contracts["quality"]
-    for work in contents["work_items.json"]["kinds"].values():
-        if "quality" in work.get("departments", {}):
-            work["departments"][INSPECTOR] = work["departments"]["quality"]
-    contents["routings.json"]["routings"][0]["departments"].append(INSPECTOR)
-    return definitions_from_contents(contents)
 
 
 def test_a_release_only_consumes_the_watch_of_the_verifier_who_submitted_it():

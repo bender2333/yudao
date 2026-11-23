@@ -27,7 +27,7 @@ from harness.models import (
 )
 from harness.proposals import baseline_review, product_spec, review, structure
 from harness.runtime import LoopSystem
-from harness.tests.test_watched_relations import INSPECTOR, with_second_delivery_verifier
+from harness.tests.verification_definitions import INSPECTOR, with_second_delivery_verifier
 from harness.tightening import WATCHED_OUTPUTS, pending_product_input
 from harness.validation import TightenRequest
 
