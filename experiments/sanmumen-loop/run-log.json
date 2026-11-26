@@ -1,0 +1,47 @@
+{
+  "task": "写一个纯函数 clamp(x, lo, hi)：把 x 限制在闭区间 [lo, hi] 后返回。若 lo > hi，视为参数错误，必须抛出 ValueError，不得默默交换两端。",
+  "engine": "deterministic_stub",
+  "note": "未调用真实模型。对照只说明：互检循环能否靠角色交叉检查抓住单次交付漏掉的 lo>hi 约定。",
+  "loop": {
+    "mode": "sanmumen_loop",
+    "cycles": 2,
+    "released": true,
+    "spec": "验收：\n1. lo<=x<=hi 时返回 x；x<lo 返回 lo；x>hi 返回 hi。\n2. lo>hi 时必须抛出 ValueError，不得交换两端后继续计算。\n",
+    "delivery": "def clamp(x, lo, hi):\n    if lo > hi:\n        raise ValueError('lo > hi')\n    return max(lo, min(hi, x))\n",
+    "defects_open": [],
+    "critiques": [
+      "质检挑工程: 未处理 lo>hi：应抛 ValueError",
+      "产品挑工程: 交付未落实「lo>hi 报错」，合同第 2 条被丢掉了"
+    ],
+    "hidden_misses": [],
+    "pass": true,
+    "log": [
+      "-- 第 1 圈 --",
+      "C1 产品→合同: 写下含 lo>hi 必须报错的验收",
+      "C1 工程→交付: 首稿使用 max/min（lo>hi 会默默交换）",
+      "C1 质检挑工程: 未处理 lo>hi：应抛 ValueError → 缺陷记录，不放行",
+      "-- 第 2 圈 --",
+      "C2 产品挑工程: 交付未落实「lo>hi 报错」，合同第 2 条被丢掉了",
+      "C2 工程→返工: 按缺陷修订，已处理 ['未处理 lo>hi：应抛 ValueError']",
+      "C2 质检→放行: 交付覆盖当前合同，事项完成"
+    ]
+  },
+  "single": {
+    "mode": "single_engine",
+    "cycles": 1,
+    "released": false,
+    "spec": "",
+    "delivery": "def clamp(x, lo, hi):\n    return max(lo, min(hi, x))\n",
+    "defects_open": [],
+    "critiques": [],
+    "hidden_misses": [
+      "clamp(3, 5, 2) 应抛 ValueError，实际返回 5"
+    ],
+    "pass": false,
+    "log": [
+      "-- 单引擎 --",
+      "单引擎→交付: 一次写出 max/min 夹取，未单独处理 lo>hi"
+    ]
+  },
+  "loop_caught_what_single_missed": true
+}
